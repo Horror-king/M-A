@@ -155,11 +155,11 @@ function handleCommand(input) {
 
 // Enhanced Chat API Endpoints
 
-// GET messages
-app.get('/messages', async (req, res) => {
+// GET massages
+app.get('/massages', async (req, res) => {
   try {
     const { data, error } = await supabase
-      .from('message')
+      .from('massage')
       .select('id, content, username, created_at, image_url')
       .order('created_at', { ascending: false });
 
@@ -171,7 +171,7 @@ app.get('/messages', async (req, res) => {
       ));
     }
 
-    global.utils.log.info(`Retrieved ${data?.length || 0} messages`);
+    global.utils.log.info(`Retrieved ${data?.length || 0} massages`);
     res.json(global.utils.response.success(data || []));
   } catch (err) {
     global.utils.log.err('Server error:', err);
@@ -182,8 +182,8 @@ app.get('/messages', async (req, res) => {
   }
 });
 
-// POST messages
-app.post('/messages', async (req, res) => {
+// POST massages
+app.post('/massages', async (req, res) => {
   try {
     const { content, username, image_url } = req.body;
 
@@ -196,12 +196,12 @@ app.post('/messages', async (req, res) => {
     const trimmedContent = content?.trim() || '';
     if (trimmedContent.length > 500) {
       return res.status(400).json(global.utils.response.error(
-        "Message too long (max 500 characters)"
+        "Massage too long (max 500 characters)"
       ));
     }
 
     const { data, error } = await supabase
-      .from('message')
+      .from('massage')
       .insert([{ 
         content: trimmedContent, 
         username, 
@@ -211,12 +211,12 @@ app.post('/messages', async (req, res) => {
 
     if (error) throw error;
 
-    global.utils.log.info('Message saved:', data[0]);
+    global.utils.log.info('Massage saved:', data[0]);
     res.status(201).json(global.utils.response.success(data[0]));
   } catch (error) {
-    global.utils.log.err('Error processing message:', error);
+    global.utils.log.err('Error processing massage:', error);
     res.status(500).json(global.utils.response.error(
-      "Failed to save message",
+      "Failed to save massage",
       error.message
     ));
   }
@@ -262,12 +262,12 @@ app.post('/upload', upload.single('image'), async (req, res) => {
   }
 });
 
-// DELETE messages
-app.delete('/messages/:id', async (req, res) => {
+// DELETE massages
+app.delete('/massages/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { error } = await supabase
-      .from('message')
+      .from('massage')
       .delete()
       .eq('id', id);
 
@@ -276,7 +276,7 @@ app.delete('/messages/:id', async (req, res) => {
   } catch (error) {
     global.utils.log.err('Delete error:', error);
     res.status(500).json(global.utils.response.error(
-      "Failed to delete message",
+      "Failed to delete massage",
       error.message
     ));
   }
