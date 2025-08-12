@@ -159,7 +159,7 @@ function handleCommand(input) {
 app.get('/messages', async (req, res) => {
   try {
     const { data, error } = await supabase
-      .from('messages')
+      .from('message')
       .select('id, content, username, created_at, image_url')
       .order('created_at', { ascending: false });
 
@@ -201,7 +201,7 @@ app.post('/messages', async (req, res) => {
     }
 
     const { data, error } = await supabase
-      .from('messages')
+      .from('message')
       .insert([{ 
         content: trimmedContent, 
         username, 
@@ -267,7 +267,7 @@ app.delete('/messages/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { error } = await supabase
-      .from('messages')
+      .from('message')
       .delete()
       .eq('id', id);
 
