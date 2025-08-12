@@ -11,20 +11,29 @@ const config = require('./config.json');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Global setup
+// Enhanced global setup
 global.GoatBot = { config };
 global.utils = {
   log: {
-    info: (...args) => console.log("[INFO]", ...args),
-    err: (...args) => console.error("[ERROR]", ...args)
+    info: (...args) => console.log(`[INFO][${new Date().toISOString()}]`, ...args),
+    err: (...args) => console.error(`[ERROR][${new Date().toISOString()}]`, ...args),
+    warn: (...args) => console.warn(`[WARN][${new Date().toISOString()}]`, ...args)
   },
-  getText: () => "✅ Bot is running smoothly"
+  getText: () => "✅ Bot is running smoothly",
+  response: {
+    success: (data) => ({ status: 'success', data }),
+    error: (message, details) => ({ status: 'error', message, details })
+  }
 };
 
-// Initialize Supabase
+// Initialize Supabase client with your original credentials
 const supabase = createClient(
-  'https://ugalfvlbxwvrcsewtmjh.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVnYWxmdmxieHd2cmNzZXd0bWpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYyODU0MDUsImV4cCI6MjA2MTg2MTQwNX0.aZ8OyCmPMvfYFjMiVBikKCCxzb-9Mp1p-ZOi18swKN0'
+  'https://vpxjadjfkkgqobsbdwnw.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZweGphZGpma2tncW9ic2Jkd253Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIzNjkzNDAsImV4cCI6MjA2Nzk0NTM0MH0.QchMPd2mcBGFodg5mkL75Dq3IeWNq_TfOphPbAnOFlE',
+  {
+    db: { schema: 'public' },
+    auth: { persistSession: false }
+  }
 );
 
 // Configure multer for file uploads
@@ -123,10 +132,10 @@ function loadCommands() {
         if (Array.isArray(cmd.config.aliases)) {
           cmd.config.aliases.forEach(alias => commands[alias] = cmd);
         }
-        console.log(`✅ Loaded command: ${PREFIX}${cmd.config.name}`);
+        global.utils.log.info(`Loaded command: ${PREFIX}${cmd.config.name}`);
       }
     } catch (err) {
-      console.error(`❌ Failed to load ${file}:`, err);
+      global.utils.log.err(`Failed to load ${file}:`, err);
     }
   });
 }
@@ -144,20 +153,32 @@ function handleCommand(input) {
   return { commandName, args, text };
 }
 
-// Chat API Endpoints
+// Enhanced Chat API Endpoints
 
 // GET messages
 app.get('/messages', async (req, res) => {
   try {
     const { data, error } = await supabase
-      .from('chatter')
+      .from('messages')
       .select('id, content, username, created_at, image_url')
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
-    res.json(data || []);
+    if (error) {
+      global.utils.log.err('Supabase error:', error);
+      return res.status(500).json(global.utils.response.error(
+        'Database error',
+        error.message
+      ));
+    }
+
+    global.utils.log.info(`Retrieved ${data?.length || 0} messages`);
+    res.json(global.utils.response.success(data || []));
   } catch (err) {
-    res.status(500).json({ error: 'Server error' });
+    global.utils.log.err('Server error:', err);
+    res.status(500).json(global.utils.response.error(
+      'Server error',
+      err.message
+    ));
   }
 });
 
@@ -167,18 +188,37 @@ app.post('/messages', async (req, res) => {
     const { content, username, image_url } = req.body;
 
     if ((!content && !image_url) || !username) {
-      return res.status(400).json({ error: "Content or image, and username required" });
+      return res.status(400).json(global.utils.response.error(
+        "Content or image, and username are required"
+      ));
+    }
+
+    const trimmedContent = content?.trim() || '';
+    if (trimmedContent.length > 500) {
+      return res.status(400).json(global.utils.response.error(
+        "Message too long (max 500 characters)"
+      ));
     }
 
     const { data, error } = await supabase
-      .from('chatter')
-      .insert([{ content, username, image_url }])
+      .from('messages')
+      .insert([{ 
+        content: trimmedContent, 
+        username, 
+        image_url 
+      }])
       .select();
 
     if (error) throw error;
-    res.status(201).json(data[0]);
+
+    global.utils.log.info('Message saved:', data[0]);
+    res.status(201).json(global.utils.response.success(data[0]));
   } catch (error) {
-    res.status(500).json({ error: "Failed to save message" });
+    global.utils.log.err('Error processing message:', error);
+    res.status(500).json(global.utils.response.error(
+      "Failed to save message",
+      error.message
+    ));
   }
 });
 
@@ -186,7 +226,9 @@ app.post('/messages', async (req, res) => {
 app.post('/upload', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: 'No image file provided' });
+      return res.status(400).json(global.utils.response.error(
+        'No image file provided'
+      ));
     }
 
     const fileBuffer = req.file.buffer;
@@ -208,13 +250,15 @@ app.post('/upload', upload.single('image'), async (req, res) => {
       .from('chat-images')
       .getPublicUrl(filePath);
 
-    res.json({ 
+    res.json(global.utils.response.success({
       imageUrl: urlData.publicUrl,
       message: 'Image uploaded successfully'
-    });
+    }));
   } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({ error: error.message || 'Failed to upload image' });
+    global.utils.log.err('Upload error:', error);
+    res.status(500).json(global.utils.response.error(
+      error.message || 'Failed to upload image'
+    ));
   }
 });
 
@@ -223,14 +267,18 @@ app.delete('/messages/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { error } = await supabase
-      .from('chatter')
+      .from('messages')
       .delete()
       .eq('id', id);
 
     if (error) throw error;
-    res.status(200).json({ success: true });
+    res.json(global.utils.response.success({ id }));
   } catch (error) {
-    res.status(500).json({ error: "Failed to delete message" });
+    global.utils.log.err('Delete error:', error);
+    res.status(500).json(global.utils.response.error(
+      "Failed to delete message",
+      error.message
+    ));
   }
 });
 
@@ -238,10 +286,16 @@ app.delete('/messages/:id', async (req, res) => {
 app.post("/api/command", async (req, res) => {
   try {
     const { message } = req.body;
-    if (!message) return res.status(400).json({ reply: "❌ Message is required" });
+    if (!message) {
+      return res.status(400).json(global.utils.response.error(
+        "Message is required"
+      ));
+    }
 
     if (message.trim().toLowerCase() === "prefix") {
-      return res.json({ reply: `🔹 My command prefix is: \`${PREFIX}\`` });
+      return res.json(global.utils.response.success({
+        reply: `🔹 My command prefix is: \`${PREFIX}\``
+      }));
     }
 
     const cmd = handleCommand(message);
@@ -269,33 +323,50 @@ app.post("/api/command", async (req, res) => {
             if (response.data.includes('error') || response.status !== 200) {
               throw new Error(response.data || `API returned status ${response.status}`);
             }
-            return res.json({ reply: response.data });
+            return res.json(global.utils.response.success({
+              reply: response.data
+            }));
           }
         } else {
           responseData = response.data;
         }
 
         if (responseData.response) {
-          return res.json({ reply: responseData.response });
+          return res.json(global.utils.response.success({
+            reply: responseData.response
+          }));
         } else if (responseData.message) {
-          return res.json({ reply: responseData.message });
+          return res.json(global.utils.response.success({
+            reply: responseData.message
+          }));
         } else if (responseData.data) {
-          return res.json({ reply: responseData.data });
+          return res.json(global.utils.response.success({
+            reply: responseData.data
+          }));
         } else {
-          return res.json({ reply: JSON.stringify(responseData) || "⚠️ No recognizable response format" });
+          return res.json(global.utils.response.success({
+            reply: JSON.stringify(responseData) || "⚠️ No recognizable response format"
+          }));
         }
       } catch (aiError) {
-        console.error("AI Processing Error:", aiError);
-        return res.status(500).json({ 
-          reply: `❌ AI Error: ${aiError.message.replace(/[\n\r]/g, ' ').substring(0, 200)}` 
-        });
+        global.utils.log.err("AI Processing Error:", aiError);
+        return res.status(500).json(global.utils.response.error(
+          "AI Error",
+          aiError.message.replace(/[\n\r]/g, ' ').substring(0, 200)
+        ));
       }
     }
 
     const command = commands[cmd.commandName];
-    if (!command) return res.json({ reply: "❌ Command not found" });
+    if (!command) {
+      return res.json(global.utils.response.error(
+        "Command not found"
+      ));
+    }
     if (typeof command.onStart !== "function") {
-      return res.json({ reply: "❌ This command does not support execution" });
+      return res.json(global.utils.response.error(
+        "This command does not support execution"
+      ));
     }
 
     const replies = [];
@@ -311,27 +382,32 @@ app.post("/api/command", async (req, res) => {
     });
 
     if (!res.headersSent) {
-      res.json({ reply: replies.length === 1 ? replies[0] : replies });
+      res.json(global.utils.response.success({
+        reply: replies.length === 1 ? replies[0] : replies
+      }));
     }
   } catch (error) {
-    console.error("Server Error:", error);
-    res.status(500).json({ reply: `❌ Server Error: ${error.message}` });
+    global.utils.log.err("Server Error:", error);
+    res.status(500).json(global.utils.response.error(
+      "Server Error",
+      error.message
+    ));
   }
 });
 
 // Start server
 app.listen(port, () => {
-  console.log(`🚀 Server running on port ${port}`);
-  console.log(`🔹 Command prefix: "${PREFIX}"`);
+  global.utils.log.info(`🚀 Server running on port ${port}`);
+  global.utils.log.info(`🔹 Command prefix: "${PREFIX}"`);
   if (isRender && renderExternalUrl) {
-    console.log(`🌐 Render External URL: ${renderExternalUrl}`);
-    console.log(`⏱️ UptimeRobot monitoring URL: ${renderExternalUrl}/health`);
+    global.utils.log.info(`🌐 Render External URL: ${renderExternalUrl}`);
+    global.utils.log.info(`⏱️ UptimeRobot monitoring URL: ${renderExternalUrl}/health`);
   }
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('SIGTERM received. Shutting down gracefully...');
+  global.utils.log.info('SIGTERM received. Shutting down gracefully...');
   process.exit(0);
 });
 
