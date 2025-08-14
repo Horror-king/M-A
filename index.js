@@ -11,29 +11,20 @@ const config = require('./config.json');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Enhanced global setup
+// Global setup
 global.GoatBot = { config };
 global.utils = {
   log: {
-    info: (...args) => console.log(`[INFO][${new Date().toISOString()}]`, ...args),
-    err: (...args) => console.error(`[ERROR][${new Date().toISOString()}]`, ...args),
-    warn: (...args) => console.warn(`[WARN][${new Date().toISOString()}]`, ...args)
+    info: (...args) => console.log("[INFO]", ...args),
+    err: (...args) => console.error("[ERROR]", ...args)
   },
-  getText: () => "✅ Bot is running smoothly",
-  response: {
-    success: (data) => ({ status: 'success', data }),
-    error: (message, details) => ({ status: 'error', message, details })
-  }
+  getText: () => "✅ Bot is running smoothly"
 };
 
-// Initialize Supabase client
+// Initialize Supabase
 const supabase = createClient(
-  'https://sratulilszjazwcevxta.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNyYXR1bGlsc3pqYXp3Y2V2eHRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA5NjIwMDAsImV4cCI6MjA2NjUzODAwMH0.xsNMr1PYeCXMcuEgkkSZnWib63mFATblTF3wR5Zpci4',
-  {
-    db: { schema: 'public' },
-    auth: { persistSession: false }
-  }
+  'https://lalcvmjyzubzqlerogqb.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxhbGN2bWp5enVienFsZXJvZ3FiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxMjI5MzQsImV4cCI6MjA3MDY5ODkzNH0.WRv_BYCvFLKyZPms3LMjoeDlewiJYRF1EZsNNcRAPtY',
 );
 
 // Configure multer for file uploads
@@ -132,10 +123,10 @@ function loadCommands() {
         if (Array.isArray(cmd.config.aliases)) {
           cmd.config.aliases.forEach(alias => commands[alias] = cmd);
         }
-        global.utils.log.info(`Loaded command: ${PREFIX}${cmd.config.name}`);
+        console.log(`✅ Loaded command: ${PREFIX}${cmd.config.name}`);
       }
     } catch (err) {
-      global.utils.log.err(`Failed to load ${file}:`, err);
+      console.error(`❌ Failed to load ${file}:`, err);
     }
   });
 }
@@ -153,73 +144,41 @@ function handleCommand(input) {
   return { commandName, args, text };
 }
 
-// Enhanced Chat API Endpoints
+// Chat API Endpoints
 
 // GET messages
 app.get('/messages', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('chatter')
-      .select('id, content, username, created_at, image_url, user_id')
+      .select('id, content, username, created_at, image_url')
       .order('created_at', { ascending: false });
 
-    if (error) {
-      global.utils.log.err('Supabase error:', error);
-      return res.status(500).json(global.utils.response.error(
-        'Database error',
-        error.message
-      ));
-    }
-
-    global.utils.log.info(`Retrieved ${data?.length || 0} messages`);
-    res.json(global.utils.response.success(data || []));
+    if (error) throw error;
+    res.json(data || []);
   } catch (err) {
-    global.utils.log.err('Server error:', err);
-    res.status(500).json(global.utils.response.error(
-      'Server error',
-      err.message
-    ));
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
 // POST messages
 app.post('/messages', async (req, res) => {
   try {
-    const { content, username, image_url, user_id } = req.body;
+    const { content, username, image_url } = req.body;
 
     if ((!content && !image_url) || !username) {
-      return res.status(400).json(global.utils.response.error(
-        "Content or image, and username are required"
-      ));
-    }
-
-    const trimmedContent = content?.trim() || '';
-    if (trimmedContent.length > 500) {
-      return res.status(400).json(global.utils.response.error(
-        "Message too long (max 500 characters)"
-      ));
+      return res.status(400).json({ error: "Content or image, and username required" });
     }
 
     const { data, error } = await supabase
       .from('chatter')
-      .insert([{ 
-        content: trimmedContent, 
-        username,
-        user_id: user_id || null, // Store user_id if provided
-        image_url 
-      }])
+      .insert([{ content, username, image_url }])
       .select();
 
     if (error) throw error;
-
-    global.utils.log.info('Message saved:', data[0]);
-    res.status(201).json(global.utils.response.success(data[0]));
+    res.status(201).json(data[0]);
   } catch (error) {
-    global.utils.log.err('Error processing message:', error);
-    res.status(500).json(global.utils.response.error(
-      "Failed to save message",
-      error.message
-    ));
+    res.status(500).json({ error: "Failed to save message" });
   }
 });
 
@@ -227,9 +186,7 @@ app.post('/messages', async (req, res) => {
 app.post('/upload', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json(global.utils.response.error(
-        'No image file provided'
-      ));
+      return res.status(400).json({ error: 'No image file provided' });
     }
 
     const fileBuffer = req.file.buffer;
@@ -251,77 +208,29 @@ app.post('/upload', upload.single('image'), async (req, res) => {
       .from('chat-images')
       .getPublicUrl(filePath);
 
-    res.json(global.utils.response.success({
+    res.json({ 
       imageUrl: urlData.publicUrl,
       message: 'Image uploaded successfully'
-    }));
+    });
   } catch (error) {
-    global.utils.log.err('Upload error:', error);
-    res.status(500).json(global.utils.response.error(
-      error.message || 'Failed to upload image'
-    ));
+    console.error('Upload error:', error);
+    res.status(500).json({ error: error.message || 'Failed to upload image' });
   }
 });
 
-// DELETE messages with enhanced authentication
+// DELETE messages
 app.delete('/messages/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const token = req.headers.authorization?.split(' ')[1];
-    
-    // Create authenticated Supabase client if token exists
-    const supabaseClient = token 
-      ? createClient(
-          'https://sratulilszjazwcevxta.supabase.co',
-          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNyYXR1bGlsc3pqYXp3Y2V2eHRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA5NjIwMDAsImV4cCI6MjA2NjUzODAwMH0.xsNMr1PYeCXMcuEgkkSZnWib63mFATblTF3wR5Zpci4',
-          {
-            global: {
-              headers: {
-                Authorization: `Bearer ${token}`
-              }
-            }
-          }
-        )
-      : supabase;
-
-    // First check if message exists
-    const { data: messageData, error: fetchError } = await supabaseClient
-      .from('chatter')
-      .select('id, user_id')
-      .eq('id', id)
-      .single();
-
-    if (fetchError) throw fetchError;
-    if (!messageData) {
-      return res.status(404).json(global.utils.response.error(
-        "Message not found"
-      ));
-    }
-
-    // Delete the message
-    const { error: deleteError } = await supabaseClient
+    const { error } = await supabase
       .from('chatter')
       .delete()
       .eq('id', id);
 
-    if (deleteError) throw deleteError;
-
-    res.json(global.utils.response.success({
-      id,
-      message: "Message deleted successfully"
-    }));
+    if (error) throw error;
+    res.status(200).json({ success: true });
   } catch (error) {
-    global.utils.log.err('Delete error:', error);
-    
-    let errorMessage = "Failed to delete message";
-    if (error.message.includes('violates row-level security policy')) {
-      errorMessage = "You don't have permission to delete this message";
-    }
-
-    res.status(500).json(global.utils.response.error(
-      errorMessage,
-      error.message
-    ));
+    res.status(500).json({ error: "Failed to delete message" });
   }
 });
 
@@ -329,16 +238,10 @@ app.delete('/messages/:id', async (req, res) => {
 app.post("/api/command", async (req, res) => {
   try {
     const { message } = req.body;
-    if (!message) {
-      return res.status(400).json(global.utils.response.error(
-        "Message is required"
-      ));
-    }
+    if (!message) return res.status(400).json({ reply: "❌ Message is required" });
 
     if (message.trim().toLowerCase() === "prefix") {
-      return res.json(global.utils.response.success({
-        reply: `🔹 My command prefix is: \`${PREFIX}\``
-      }));
+      return res.json({ reply: `🔹 My command prefix is: \`${PREFIX}\`` });
     }
 
     const cmd = handleCommand(message);
@@ -366,50 +269,33 @@ app.post("/api/command", async (req, res) => {
             if (response.data.includes('error') || response.status !== 200) {
               throw new Error(response.data || `API returned status ${response.status}`);
             }
-            return res.json(global.utils.response.success({
-              reply: response.data
-            }));
+            return res.json({ reply: response.data });
           }
         } else {
           responseData = response.data;
         }
 
         if (responseData.response) {
-          return res.json(global.utils.response.success({
-            reply: responseData.response
-          }));
+          return res.json({ reply: responseData.response });
         } else if (responseData.message) {
-          return res.json(global.utils.response.success({
-            reply: responseData.message
-          }));
+          return res.json({ reply: responseData.message });
         } else if (responseData.data) {
-          return res.json(global.utils.response.success({
-            reply: responseData.data
-          }));
+          return res.json({ reply: responseData.data });
         } else {
-          return res.json(global.utils.response.success({
-            reply: JSON.stringify(responseData) || "⚠️ No recognizable response format"
-          }));
+          return res.json({ reply: JSON.stringify(responseData) || "⚠️ No recognizable response format" });
         }
       } catch (aiError) {
-        global.utils.log.err("AI Processing Error:", aiError);
-        return res.status(500).json(global.utils.response.error(
-          "AI Error",
-          aiError.message.replace(/[\n\r]/g, ' ').substring(0, 200)
-        ));
+        console.error("AI Processing Error:", aiError);
+        return res.status(500).json({ 
+          reply: `❌ AI Error: ${aiError.message.replace(/[\n\r]/g, ' ').substring(0, 200)}` 
+        });
       }
     }
 
     const command = commands[cmd.commandName];
-    if (!command) {
-      return res.json(global.utils.response.error(
-        "Command not found"
-      ));
-    }
+    if (!command) return res.json({ reply: "❌ Command not found" });
     if (typeof command.onStart !== "function") {
-      return res.json(global.utils.response.error(
-        "This command does not support execution"
-      ));
+      return res.json({ reply: "❌ This command does not support execution" });
     }
 
     const replies = [];
@@ -425,32 +311,27 @@ app.post("/api/command", async (req, res) => {
     });
 
     if (!res.headersSent) {
-      res.json(global.utils.response.success({
-        reply: replies.length === 1 ? replies[0] : replies
-      }));
+      res.json({ reply: replies.length === 1 ? replies[0] : replies });
     }
   } catch (error) {
-    global.utils.log.err("Server Error:", error);
-    res.status(500).json(global.utils.response.error(
-      "Server Error",
-      error.message
-    ));
+    console.error("Server Error:", error);
+    res.status(500).json({ reply: `❌ Server Error: ${error.message}` });
   }
 });
 
 // Start server
 app.listen(port, () => {
-  global.utils.log.info(`🚀 Server running on port ${port}`);
-  global.utils.log.info(`🔹 Command prefix: "${PREFIX}"`);
+  console.log(`🚀 Server running on port ${port}`);
+  console.log(`🔹 Command prefix: "${PREFIX}"`);
   if (isRender && renderExternalUrl) {
-    global.utils.log.info(`🌐 Render External URL: ${renderExternalUrl}`);
-    global.utils.log.info(`⏱️ UptimeRobot monitoring URL: ${renderExternalUrl}/health`);
+    console.log(`🌐 Render External URL: ${renderExternalUrl}`);
+    console.log(`⏱️ UptimeRobot monitoring URL: ${renderExternalUrl}/health`);
   }
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  global.utils.log.info('SIGTERM received. Shutting down gracefully...');
+  console.log('SIGTERM received. Shutting down gracefully...');
   process.exit(0);
 });
 
