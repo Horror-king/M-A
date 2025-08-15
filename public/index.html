@@ -863,7 +863,7 @@ html, body {
     <div id="reply-preview-container"></div>
     <div class="chat-input" style="display: none;">
         <textarea id="user-input" placeholder="Type your message..."></textarea>
-        <button onclick="sendMessage()" disabled>
+        <button id="send-button" onclick="sendMessage()" disabled>
             <i class="fas fa-paper-plane"></i>
         </button>
     </div>
@@ -1025,10 +1025,13 @@ const warnedUsers = {};
 let lastMessageId = null;
 let notificationPermissionGranted = false;
 
+// NEW: Flag to prevent duplicate sends
+let isSending = false;
+
 const elements = {
   usernameInput: document.getElementById('auth-username'),
   messageInput: document.getElementById('user-input'),
-  sendButton: document.querySelector('.chat-input button'),
+  sendButton: document.getElementById('send-button'),
   chatContainer: document.getElementById('chat-container'),
   replyPreview: document.getElementById('reply-preview-container'),
   errorDisplay: document.getElementById('error-message'),
@@ -1042,6 +1045,12 @@ if (currentUsername && elements.usernameInput) {
   elements.usernameInput.value = currentUsername;
 }
 
+// NEW: Function to scroll to bottom of chat
+function scrollToBottom() {
+  const chatContainer = document.getElementById('chat-container');
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const savedUser = localStorage.getItem('currentUser');
   if (savedUser) {
@@ -1050,6 +1059,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelector('.menu').style.display = 'flex';
     document.querySelector('.news-toggle').style.display = 'block';
     showContainer('chat');
+    
+    // NEW: Scroll to bottom on first load
+    setTimeout(scrollToBottom, 100);
   } else {
     document.getElementById('auth-container').style.display = 'flex';
     document.querySelector('.menu').style.display = 'none';
@@ -1148,6 +1160,9 @@ setTimeout(() => {
     showContainer('chat');
     updateProfileSection(); // Add this line
     initializeChat();
+    
+    // NEW: Scroll to bottom on login
+    setTimeout(scrollToBottom, 100);
 }, 500);
       } else {
         throw new Error('Invalid username or password');
@@ -1199,18 +1214,93 @@ function initializeChat() {
   elements.messageInput.addEventListener('input', () => {
     autoResize(elements.messageInput);
     const hasText = elements.messageInput.value.trim().length > 0;
-    elements.sendButton.disabled = !hasText;
-    elements.sendButton.classList.toggle('enabled', hasText);
+    elements.sendButton.disabled = !hasText || isSending;
+    elements.sendButton.classList.toggle('enabled', hasText && !isSending);
   });
 
   elements.messageInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !isSending) {
       e.preventDefault();
       sendMessage();
     }
   });
 
   loadMessages();
+}
+
+function autoResize(textarea) {
+  textarea.style.height = 'auto';
+  textarea.style.height = (textarea.scrollHeight > 100 ? 100 : textarea.scrollHeight) + 'px';
+}
+
+function loadMessages() {
+  try {
+    const messages = JSON.parse(localStorage.getItem('chatMessages')) || [];
+    renderMessages(messages);
+    
+    // NEW: Scroll to bottom after loading messages
+    setTimeout(scrollToBottom, 100);
+  } catch (error) {
+    showError('Error loading messages');
+  }
+}
+
+function renderMessages(messages) {
+  elements.chatContainer.innerHTML = '';
+  messages.reverse().forEach(msg => {
+    const isOwn = msg.username?.trim().toLowerCase() === currentUsername?.trim().toLowerCase();
+    displayMessage(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id);
+  });
+  
+  // NEW: Scroll to bottom after rendering
+  setTimeout(scrollToBottom, 100);
+}
+
+function scrollToBottomIfNearBottom(container, threshold = 100) {
+  const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
+  if (isNearBottom) {
+    container.scrollTop = container.scrollHeight;
+  }
+}
+
+// Rest of your existing functions (displayMessage, sendMessage, etc.) remain the same
+
+function showContainer(containerId) {
+  const containers = document.querySelectorAll('.container');
+  containers.forEach(container => {
+    container.style.display = 'none';
+  });
+  document.getElementById(containerId).style.display = 'block';
+  currentUsername = localStorage.getItem('chat_username') || '';
+}
+
+function initializeChat() {
+  currentUsername = localStorage.getItem('chat_username') || '';
+
+  if (elements.usernameInput) {
+    elements.usernameInput.value = currentUsername;
+    elements.usernameInput.addEventListener('input', (e) => {
+      currentUsername = e.target.value.trim();
+      localStorage.setItem('chat_username', currentUsername);
+    });
+  }
+
+  elements.messageInput.addEventListener('input', () => {
+    autoResize(elements.messageInput);
+    const hasText = elements.messageInput.value.trim().length > 0;
+    elements.sendButton.disabled = !hasText || isSending;
+    elements.sendButton.classList.toggle('enabled', hasText && !isSending);
+  });
+
+  elements.messageInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !isSending) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  loadMessages();
+  setInterval(loadMessages, 3000);
 }
 
 function autoResize(textarea) {
@@ -1236,6 +1326,9 @@ async function loadMessages() {
     }
     
     renderMessages(data);
+    
+    // NEW: Scroll to bottom after loading messages
+    setTimeout(scrollToBottom, 100);
   } catch (error) {
     showError(error.message);
   }
@@ -1255,21 +1348,15 @@ function showNotification(username, message) {
 }
 
 function renderMessages(messages) {
-  // FIXED: Removed .reverse() to display messages in correct order
-  messages.forEach(msg => {
+  elements.chatContainer.innerHTML = '';
+  messages.reverse().forEach(msg => {
     const isOwn = msg.username?.trim().toLowerCase() === currentUsername?.trim().toLowerCase();
-    displayMessage(
-      msg.content, 
-      isOwn ? 'sent' : 'received', 
-      null, // reply_to is not implemented
-      msg.username, 
-      msg.id,
-      msg.image_url  // Pass image_url
-    );
+    displayMessage(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id);
   });
-  scrollToBottomIfNearBottom(elements.chatContainer);
+  
+  // NEW: Scroll to bottom after rendering
+  setTimeout(scrollToBottom, 100);
 }
-
 function scrollToBottomIfNearBottom(container, threshold = 100) {
   const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
   if (isNearBottom) {
@@ -1309,11 +1396,14 @@ function displayPrivateMessage(text, sender, repliedTo = null, username = 'Priva
   }
 
   container.appendChild(messageDiv);
-  container.scrollTop = container.scrollHeight;
+  
+  // NEW: Scroll to bottom after adding message
+  setTimeout(() => {
+    container.scrollTop = container.scrollHeight;
+  }, 50);
 } 
     
-// FIXED: Added imageUrl parameter and display logic
-function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, imageUrl = null) {
+function displayMessage(text, sender, repliedTo = null, username = '', messageId = null) {
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ${sender}`;
   messageDiv.dataset.id = messageId;
@@ -1334,6 +1424,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
     messageBody.appendChild(usernameDiv);
   }
 
+  // Rest of the function remains the same...
   const contentDiv = document.createElement('div');
   contentDiv.className = 'content';
 
@@ -1344,22 +1435,37 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
     contentDiv.appendChild(replyBubble);
   }
 
-  if (text) {
+  const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
+  const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
+
+  const imageMatches = [...text.matchAll(imagePattern)];
+  const audioMatches = [...text.matchAll(audioPattern)];
+
+  let modifiedText = text;
+  [...imageMatches, ...audioMatches].forEach(match => {
+    modifiedText = modifiedText.replace(match[0], '');
+  });
+
+  modifiedText = modifiedText.trim();
+  if (modifiedText) {
     const textDiv = document.createElement('div');
-    textDiv.textContent = text;
+    textDiv.textContent = modifiedText;
     contentDiv.appendChild(textDiv);
   }
 
-  // Display image if available
-  if (imageUrl) {
+  imageMatches.forEach(match => {
     const img = document.createElement('img');
-    img.src = imageUrl;
+    img.src = match[0];
     img.alt = "Image";
-    img.style.maxWidth = "100%";
-    img.style.borderRadius = "8px";
-    img.style.marginTop = "5px";
     contentDiv.appendChild(img);
-  }
+  });
+
+  audioMatches.forEach(match => {
+    const audio = document.createElement('audio');
+    audio.controls = true;
+    audio.src = match[0];
+    contentDiv.appendChild(audio);
+  });
 
   messageBody.appendChild(contentDiv);
 
@@ -1380,14 +1486,22 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
     e.preventDefault();
     showMessageContextMenu(e, messageDiv);
   });
+  
+  // NEW: Scroll to bottom after adding message
+  setTimeout(scrollToBottom, 50);
 }
 
 async function sendMessage() {
+  // NEW: Prevent duplicate sends
+  if (isSending) return;
+  isSending = true;
+  
   const content = elements.messageInput.value.trim();
   currentUsername = localStorage.getItem('chat_username') || '';
   const username = currentUsername;
 
   if (!content || !username) {
+    isSending = false;
     return showError('Please enter both username and message');
   }
 
@@ -1395,6 +1509,7 @@ async function sendMessage() {
   if (badWords.some(word => lowerContent.includes(word))) {
     if (!warnedUsers[username]) {
       warnedUsers[username] = true;
+      isSending = false;
       return showError('Warning: bad word detected! If you repeat, you will be banned.');
     } else {
       bannedUsers[username] = Date.now() + BAN_DURATION;
@@ -1403,6 +1518,7 @@ async function sendMessage() {
       localStorage.removeItem('currentUser');
       localStorage.removeItem('chat_username');
       showError('You used bad words again. Account deleted and banned.');
+      isSending = false;
       setTimeout(() => {
         location.reload();
       }, 2000);
@@ -1412,6 +1528,7 @@ async function sendMessage() {
 
   const now = Date.now();
   if (bannedUsers[username] && bannedUsers[username] > now) {
+    isSending = false;
     return showError(`You're banned. Wait ${Math.ceil((bannedUsers[username] - now) / 1000)}s.`);
   }
 
@@ -1424,6 +1541,7 @@ async function sendMessage() {
 
   if (spamTracker[username].length > SPAM_LIMIT) {
     bannedUsers[username] = now + BAN_DURATION;
+    isSending = false;
     return showError("You're banned for spamming.");
   }
 
@@ -1443,11 +1561,19 @@ async function sendMessage() {
     elements.messageInput.value = '';
     autoResize(elements.messageInput);
     clearReply();
+    
+    // NEW: Scroll to bottom after sending
+    setTimeout(scrollToBottom, 50);
   } catch (error) {
     showError(error.message);
   } finally {
-    elements.sendButton.disabled = true;
-    elements.sendButton.classList.remove('enabled');
+    // NEW: Add cooldown to prevent duplicate sends
+    setTimeout(() => {
+      isSending = false;
+      const hasText = elements.messageInput.value.trim().length > 0;
+      elements.sendButton.disabled = !hasText;
+      elements.sendButton.classList.toggle('enabled', hasText);
+    }, 500);
   }
 }
 async function sendPrivateMessage() {
@@ -1653,6 +1779,9 @@ function showContainer(containerId) {
     if (localStorage.getItem('currentUser')) {
         document.querySelector('.menu').style.display = 'flex';
     }
+    
+    // NEW: Scroll to bottom when switching containers
+    setTimeout(scrollToBottom, 100);
 }
   function copyToClipboard(text, button) {  
     const textarea = document.createElement('textarea');  
@@ -1907,7 +2036,7 @@ function closeZoom() {
     document.getElementById('zoom-overlay').style.display = 'none';
 }
         document.getElementById('user-input').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === 'Enter' && !e.shiftKey && !isSending) {
                 e.preventDefault();
                 sendMessage();
             }
@@ -1915,12 +2044,14 @@ function closeZoom() {
 
         document.querySelector('.chat-input button').addEventListener('touchstart', function(e) {
             e.preventDefault();
-            sendMessage();
+            if (!isSending) {
+                sendMessage();
+            }
         });
 
         document.getElementById('user-input').addEventListener('input', function () {
             autoResize(this);
-            document.querySelector('.chat-input button').disabled = this.value.trim().length === 0;
+            document.querySelector('.chat-input button').disabled = this.value.trim().length === 0 || isSending;
         });
     // Add this to your existing initialization code
 document.getElementById('private-user-input').addEventListener('input', function() {
@@ -2127,6 +2258,9 @@ function showContainer(containerId) {
     document.querySelector('.kebab-dropdown').classList.remove('active');
     
     currentUsername = localStorage.getItem('chat_username') || '';
+    
+    // NEW: Scroll to bottom when switching containers
+    setTimeout(scrollToBottom, 100);
 }
 
 // Updated hideContainer function
@@ -2170,6 +2304,9 @@ if (currentUser) {
     showContainer('chat');
     document.querySelector('.chat-input').style.display = 'flex';
     updateProfileSection();
+    
+    // NEW: Scroll to bottom on first load
+    setTimeout(scrollToBottom, 100);
 }
   </script>
 </html>
