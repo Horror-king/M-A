@@ -1,4 +1,4 @@
-<DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
@@ -1218,76 +1218,6 @@ function autoResize(textarea) {
   textarea.style.height = (textarea.scrollHeight > 100 ? 100 : textarea.scrollHeight) + 'px';
 }
 
-function loadMessages() {
-  try {
-    const messages = JSON.parse(localStorage.getItem('chatMessages')) || [];
-    renderMessages(messages);
-  } catch (error) {
-    showError('Error loading messages');
-  }
-}
-
-function renderMessages(messages) {
-  elements.chatContainer.innerHTML = '';
-  messages.reverse().forEach(msg => {
-    const isOwn = msg.username?.trim().toLowerCase() === currentUsername?.trim().toLowerCase();
-    displayMessage(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id);
-  });
-  scrollToBottomIfNearBottom(elements.chatContainer);
-}
-
-function scrollToBottomIfNearBottom(container, threshold = 100) {
-  const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
-  if (isNearBottom) {
-    container.scrollTop = container.scrollHeight;
-  }
-}
-
-// Rest of your existing functions (displayMessage, sendMessage, etc.) remain the same
-
-function showContainer(containerId) {
-  const containers = document.querySelectorAll('.container');
-  containers.forEach(container => {
-    container.style.display = 'none';
-  });
-  document.getElementById(containerId).style.display = 'block';
-  currentUsername = localStorage.getItem('chat_username') || '';
-}
-
-function initializeChat() {
-  currentUsername = localStorage.getItem('chat_username') || '';
-
-  if (elements.usernameInput) {
-    elements.usernameInput.value = currentUsername;
-    elements.usernameInput.addEventListener('input', (e) => {
-      currentUsername = e.target.value.trim();
-      localStorage.setItem('chat_username', currentUsername);
-    });
-  }
-
-  elements.messageInput.addEventListener('input', () => {
-    autoResize(elements.messageInput);
-    const hasText = elements.messageInput.value.trim().length > 0;
-    elements.sendButton.disabled = !hasText;
-    elements.sendButton.classList.toggle('enabled', hasText);
-  });
-
-  elements.messageInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  });
-
-  loadMessages();
-  setInterval(loadMessages, 3000);
-}
-
-function autoResize(textarea) {
-  textarea.style.height = 'auto';
-  textarea.style.height = (textarea.scrollHeight > 100 ? 100 : textarea.scrollHeight) + 'px';
-}
-
 async function loadMessages() {
   try {
     const response = await fetch('/messages');
@@ -1325,10 +1255,17 @@ function showNotification(username, message) {
 }
 
 function renderMessages(messages) {
-  elements.chatContainer.innerHTML = '';
-  messages.reverse().forEach(msg => {
+  // FIXED: Removed .reverse() to display messages in correct order
+  messages.forEach(msg => {
     const isOwn = msg.username?.trim().toLowerCase() === currentUsername?.trim().toLowerCase();
-    displayMessage(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id);
+    displayMessage(
+      msg.content, 
+      isOwn ? 'sent' : 'received', 
+      null, // reply_to is not implemented
+      msg.username, 
+      msg.id,
+      msg.image_url  // Pass image_url
+    );
   });
   scrollToBottomIfNearBottom(elements.chatContainer);
 }
@@ -1375,7 +1312,8 @@ function displayPrivateMessage(text, sender, repliedTo = null, username = 'Priva
   container.scrollTop = container.scrollHeight;
 } 
     
-function displayMessage(text, sender, repliedTo = null, username = '', messageId = null) {
+// FIXED: Added imageUrl parameter and display logic
+function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, imageUrl = null) {
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ${sender}`;
   messageDiv.dataset.id = messageId;
@@ -1396,7 +1334,6 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
     messageBody.appendChild(usernameDiv);
   }
 
-  // Rest of the function remains the same...
   const contentDiv = document.createElement('div');
   contentDiv.className = 'content';
 
@@ -1407,37 +1344,22 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
     contentDiv.appendChild(replyBubble);
   }
 
-  const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
-  const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
-
-  const imageMatches = [...text.matchAll(imagePattern)];
-  const audioMatches = [...text.matchAll(audioPattern)];
-
-  let modifiedText = text;
-  [...imageMatches, ...audioMatches].forEach(match => {
-    modifiedText = modifiedText.replace(match[0], '');
-  });
-
-  modifiedText = modifiedText.trim();
-  if (modifiedText) {
+  if (text) {
     const textDiv = document.createElement('div');
-    textDiv.textContent = modifiedText;
+    textDiv.textContent = text;
     contentDiv.appendChild(textDiv);
   }
 
-  imageMatches.forEach(match => {
+  // Display image if available
+  if (imageUrl) {
     const img = document.createElement('img');
-    img.src = match[0];
+    img.src = imageUrl;
     img.alt = "Image";
+    img.style.maxWidth = "100%";
+    img.style.borderRadius = "8px";
+    img.style.marginTop = "5px";
     contentDiv.appendChild(img);
-  });
-
-  audioMatches.forEach(match => {
-    const audio = document.createElement('audio');
-    audio.controls = true;
-    audio.src = match[0];
-    contentDiv.appendChild(audio);
-  });
+  }
 
   messageBody.appendChild(contentDiv);
 
