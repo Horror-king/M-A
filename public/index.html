@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MessageMate with Scroll Button</title>
+    <title>MessageMate</title>
     <meta property="og:image" content="https://i.ibb.co/p6LrrNRK/1746227326721.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="MessageMate" />
@@ -1133,7 +1133,13 @@ if (currentUsername && elements.usernameInput) {
   elements.usernameInput.value = currentUsername;
 }
 
-// NEW: Function to scroll to bottom of chat
+// NEW: Improved scroll position detection
+function checkIfAtBottom(container) {
+  const threshold = 50; // pixels (reduced for better accuracy)
+  return container.scrollHeight - container.scrollTop - container.clientHeight <= threshold;
+}
+
+// NEW: Scroll to bottom function
 function scrollToBottom() {
   const chatContainer = document.getElementById('chat-container');
   chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -1143,13 +1149,18 @@ function scrollToBottom() {
   scrollToBottomBtn.classList.remove('visible');
 }
 
-// NEW: Check if user is near bottom of chat
-function checkIfNearBottom(container) {
-  const threshold = 100; // pixels
-  const scrollPosition = container.scrollTop + container.clientHeight;
-  const scrollHeight = container.scrollHeight;
+// NEW: Update scroll state function
+function updateScrollState() {
+  const chatContainer = document.getElementById('chat-container');
+  isAtBottom = checkIfAtBottom(chatContainer);
   
-  return scrollHeight - scrollPosition <= threshold;
+  if (isAtBottom) {
+    newMessagesCount = 0;
+    newMessagesCountEl.textContent = '0';
+    scrollToBottomBtn.classList.remove('visible');
+  } else {
+    scrollToBottomBtn.classList.add('visible');
+  }
 }
 
 // Save scroll position when leaving page
@@ -1168,7 +1179,7 @@ function restoreScrollPosition() {
     if (savedPosition !== null) {
       chatContainer.scrollTop = savedPosition;
       lastScrollPosition = parseInt(savedPosition);
-      isAtBottom = checkIfNearBottom(chatContainer);
+      updateScrollState();
       shouldRestoreScroll = false;
     }
   }
@@ -1200,20 +1211,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initializeChat();
   
   // Add scroll event listener
-  elements.chatContainer.addEventListener('scroll', () => {
-    isAtBottom = checkIfNearBottom(elements.chatContainer);
-    
-    if (isAtBottom && newMessagesCount > 0) {
-      newMessagesCount = 0;
-      newMessagesCountEl.textContent = '0';
-    }
-    
-    if (!isAtBottom) {
-      scrollToBottomBtn.classList.add('visible');
-    } else {
-      scrollToBottomBtn.classList.remove('visible');
-    }
-  });
+  elements.chatContainer.addEventListener('scroll', updateScrollState);
   
   // Add click event to scroll button
   scrollToBottomBtn.addEventListener('click', scrollToBottom);
@@ -1420,6 +1418,9 @@ function renderMessages(messages) {
     displayMessage(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id, false);
   });
   
+  // Update scroll state after rendering messages
+  setTimeout(updateScrollState, 0);
+  
   // Restore scroll position if needed
   if (shouldRestoreScroll) {
     setTimeout(restoreScrollPosition, 100);
@@ -1562,7 +1563,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
     showMessageContextMenu(e, messageDiv);
   });
   
-  // Only show notification for new messages
+  // NEW: Improved message counting logic
   if (isNew) {
     if (sender === 'received') {
       if (isAtBottom) {
@@ -1576,6 +1577,9 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
       scrollToBottom();
     }
   }
+  
+  // Update scroll state after adding message
+  setTimeout(updateScrollState, 0);
 }
 
 async function sendMessage() {
@@ -2396,5 +2400,5 @@ if (currentUser) {
     // Set flag to restore scroll position after messages load
     shouldRestoreScroll = true;
 }
-  </script>
+ </script>
 </html>
