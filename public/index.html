@@ -243,53 +243,61 @@ html, body {
     margin-bottom: 50px;
     gap: 2px; /* Added to reduce space between messages */
 }
-.chat-messages {
-    flex: 1;
-    height: calc(100% - 60px);
-    padding: 10px 15px; /* Changed from 15px to 10px 15px */
-    overflow-y: auto;
-    display: flex;
-    margin-bottom: 50px;
-    flex-direction: column;
-    scroll-behavior: smooth;
-    background-color: white;
-    position: relative;
-    margin-top: 0;
-    font-size: 16px;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-    touch-action: auto;
-    gap: 2px; /* Added to reduce space between messages */
-}
+ .chat-messages {
+            flex: 1;
+            height: calc(100% - 60px);
+            padding: 10px 15px;
+            overflow-y: auto;
+            display: flex;
+            margin-bottom: 50px;
+            flex-direction: column;
+            scroll-behavior: smooth;
+            background-color: white;
+            position: relative;
+            margin-top: 0;
+            font-size: 16px;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+            touch-action: auto;
+            gap: 2px;
+            box-sizing: border-box; /* Ensure padding is included in width */
+        }
 
-.message {
-    padding: 6px 10px; /* Changed from 10px to 6px 10px */
-    border-radius: 18px; /* Changed from 20px to 18px */
-    margin-bottom: 2px; /* Changed from 8px to 2px */
-    max-width: 85%; /* Changed from 83% to 85% */
-    word-wrap: break-word;
-    white-space: pre-wrap;
-    position: relative;
-    display: flex;
-    align-items: flex-start;
-    gap: 6px; /* Changed from 8px to 6px */
-    touch-action: none;
-    -webkit-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-    touch-action: manipulation;
-}
+   .message {
+            padding: 6px 10px;
+            border-radius: 18px;
+            margin-bottom: 2px;
+            max-width: 85%;
+            word-wrap: break-word;
+            overflow-wrap: break-word; /* Ensure words break to prevent overflow */
+            word-break: break-word; /* Break long words if needed */
+            white-space: pre-wrap;
+            position: relative;
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            touch-action: none;
+            -webkit-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
+            box-sizing: border-box; /* Include padding in width calculation */
+   }
      
-.content {
-    user-select: none;
-    flex-grow: 1;
-    padding: 8px 12px; /* Changed from 10px to 8px 12px */
-    border-radius: 14px; /* Changed from 15px to 14px */
-    position: relative;
-    overflow: hidden;
-    background-color: #f2f3f5;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); /* Changed from 0 2px 5px */
-}
+  .content {
+            user-select: none;
+            flex-grow: 1;
+            padding: 8px 12px;
+            border-radius: 14px;
+            position: relative;
+            overflow: hidden;
+            background-color: #f2f3f5;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            max-width: 100%; /* Ensure content doesn't overflow its container */
+            overflow-wrap: break-word; /* Break long words */
+            word-break: break-word; /* Break long words if needed */
+            box-sizing: border-box; /* Include padding in width calculation */
+  }
 
 .message.sent .content {
     background-color: #dcf8c6;
