@@ -590,16 +590,16 @@ html, body {
 }
    
        #private-ai .gotopbtn {
-    position: fixed; /* Changed from absolute to fixed */
+    position: absolute;
     width: 30px;
     height: 30px;
-    background: #4267B2; /* Added background for visibility */
-    color: white; /* Changed text color */
+    background: transparent;
     bottom: 90px;
-    right: calc(50% - 300px + 20px); /* Center with the chat */
+    right: 20px;
     text-decoration: none;
     text-align: center;
     line-height: 30px;
+    color: black;
     font-size: 14px;
     border-radius: 15px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
@@ -609,9 +609,13 @@ html, body {
 }
 
 #private-ai .gotopbtn:hover {
-    background: #365899;
-    transform: scale(1.1);
+    background: rgba(0, 0, 0, 0.2);
 }
+
+        
+        .gotopbtn:hover {
+            background: rgba(0, 0, 0, 0.2);
+        }
 
         .about-container, .features-container, .help-container {
             padding: 20px;
@@ -1185,6 +1189,33 @@ function restoreScrollPosition() {
   }
 }
 
+// ===== Private AI Go to Top button functions =====
+let privateGoTopBtn;
+let privateContainer;
+
+function handlePrivateScroll() {
+  if (!privateContainer || !privateGoTopBtn) return;
+  const scrollTop = privateContainer.scrollTop;
+  
+  // Show button if scrolled more than 200px, else hide
+  if (scrollTop > 200) {
+    privateGoTopBtn.style.display = 'block';
+  } else {
+    privateGoTopBtn.style.display = 'none';
+  }
+}
+
+function scrollPrivateToTop(e) {
+  e.preventDefault();
+  if (privateContainer) {
+    privateContainer.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  }
+}
+// ===== END of Private AI Go to Top button functions =====
+
 document.addEventListener('DOMContentLoaded', () => {
   const savedUser = localStorage.getItem('currentUser');
   if (savedUser) {
@@ -1249,6 +1280,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+// ... rest of the code remains unchanged ...
 function toggleAuth() {
   isLogin = !isLogin;
   const authTitle = document.getElementById('auth-title');
@@ -1379,7 +1411,7 @@ function showContainer(containerId) {
     shouldRestoreScroll = true;
   }
   
-  // Handle Private AI scroll events
+  // NEW: Handle Private AI scroll events
   if (containerId === 'private-ai') {
     if (privateContainer) {
       privateContainer.addEventListener('scroll', handlePrivateScroll);
@@ -1609,7 +1641,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
     showMessageContextMenu(e, messageDiv);
   });
   
-  // Improved message counting logic
+  // NEW: Improved message counting logic
   if (isNew) {
     if (sender === 'received') {
       if (isAtBottom) {
@@ -1629,7 +1661,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
 }
 
 async function sendMessage() {
-  // Prevent duplicate sends
+  // NEW: Prevent duplicate sends
   if (isSending) return;
   isSending = true;
   
@@ -1701,7 +1733,7 @@ async function sendMessage() {
   } catch (error) {
     showError(error.message);
   } finally {
-    // Add cooldown to prevent duplicate sends
+    // NEW: Add cooldown to prevent duplicate sends
     setTimeout(() => {
       isSending = false;
       const hasText = elements.messageInput.value.trim().length > 0;
