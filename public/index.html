@@ -590,16 +590,16 @@ html, body {
 }
    
        #private-ai .gotopbtn {
-    position: absolute;
+    position: fixed; /* Changed from absolute to fixed */
     width: 30px;
     height: 30px;
-    background: transparent;
+    background: #4267B2; /* Added background for visibility */
+    color: white; /* Changed text color */
     bottom: 90px;
-    right: 20px;
+    right: calc(50% - 300px + 20px); /* Center with the chat */
     text-decoration: none;
     text-align: center;
     line-height: 30px;
-    color: black;
     font-size: 14px;
     border-radius: 15px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
@@ -609,13 +609,9 @@ html, body {
 }
 
 #private-ai .gotopbtn:hover {
-    background: rgba(0, 0, 0, 0.2);
+    background: #365899;
+    transform: scale(1.1);
 }
-
-        
-        .gotopbtn:hover {
-            background: rgba(0, 0, 0, 0.2);
-        }
 
         .about-container, .features-container, .help-container {
             padding: 20px;
@@ -1107,10 +1103,10 @@ const warnedUsers = {};
 let lastMessageId = null;
 let notificationPermissionGranted = false;
 
-// NEW: Flag to prevent duplicate sends
+// Flag to prevent duplicate sends
 let isSending = false;
 
-// NEW: Scroll state variables
+// Scroll state variables
 let isAtBottom = true;
 let newMessagesCount = 0;
 let scrollToBottomBtn = document.getElementById('scrollToBottomBtn');
@@ -1137,13 +1133,13 @@ if (currentUsername && elements.usernameInput) {
   elements.usernameInput.value = currentUsername;
 }
 
-// NEW: Improved scroll position detection
+// Improved scroll position detection
 function checkIfAtBottom(container) {
-  const threshold = 50; // pixels (reduced for better accuracy)
+  const threshold = 50; // pixels
   return container.scrollHeight - container.scrollTop - container.clientHeight <= threshold;
 }
 
-// NEW: Scroll to bottom function
+// Scroll to bottom function
 function scrollToBottom() {
   const chatContainer = document.getElementById('chat-container');
   chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -1153,7 +1149,7 @@ function scrollToBottom() {
   scrollToBottomBtn.classList.remove('visible');
 }
 
-// NEW: Update scroll state function
+// Update scroll state function
 function updateScrollState() {
   const chatContainer = document.getElementById('chat-container');
   isAtBottom = checkIfAtBottom(chatContainer);
@@ -1188,33 +1184,6 @@ function restoreScrollPosition() {
     }
   }
 }
-
-// ===== NEW: Private AI Go to Top button functions =====
-let privateGoTopBtn;
-let privateContainer;
-
-function handlePrivateScroll() {
-  if (!privateContainer) return;
-  const scrollTop = privateContainer.scrollTop;
-  
-  // Show button if scrolled more than 200px, else hide
-  if (scrollTop > 200) {
-    privateGoTopBtn.style.display = 'block';
-  } else {
-    privateGoTopBtn.style.display = 'none';
-  }
-}
-
-function scrollPrivateToTop(e) {
-  e.preventDefault();
-  if (privateContainer) {
-    privateContainer.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    });
-  }
-}
-// ===== END of Private AI Go to Top button functions =====
 
 document.addEventListener('DOMContentLoaded', () => {
   const savedUser = localStorage.getItem('currentUser');
@@ -1252,6 +1221,8 @@ document.addEventListener('DOMContentLoaded', () => {
   
   if (privateGoTopBtn) {
     privateGoTopBtn.addEventListener('click', scrollPrivateToTop);
+    // Initially hide the button
+    privateGoTopBtn.style.display = 'none';
   }
   
   initializeChat();
@@ -1408,7 +1379,7 @@ function showContainer(containerId) {
     shouldRestoreScroll = true;
   }
   
-  // NEW: Handle Private AI scroll events
+  // Handle Private AI scroll events
   if (containerId === 'private-ai') {
     if (privateContainer) {
       privateContainer.addEventListener('scroll', handlePrivateScroll);
@@ -1638,7 +1609,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
     showMessageContextMenu(e, messageDiv);
   });
   
-  // NEW: Improved message counting logic
+  // Improved message counting logic
   if (isNew) {
     if (sender === 'received') {
       if (isAtBottom) {
@@ -1658,7 +1629,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
 }
 
 async function sendMessage() {
-  // NEW: Prevent duplicate sends
+  // Prevent duplicate sends
   if (isSending) return;
   isSending = true;
   
@@ -1730,7 +1701,7 @@ async function sendMessage() {
   } catch (error) {
     showError(error.message);
   } finally {
-    // NEW: Add cooldown to prevent duplicate sends
+    // Add cooldown to prevent duplicate sends
     setTimeout(() => {
       isSending = false;
       const hasText = elements.messageInput.value.trim().length > 0;
