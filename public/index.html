@@ -612,11 +612,6 @@ html, body {
     background: rgba(0, 0, 0, 0.2);
 }
 
-        
-        .gotopbtn:hover {
-            background: rgba(0, 0, 0, 0.2);
-        }
-
         .about-container, .features-container, .help-container {
             padding: 20px;
             width: 90%;
@@ -954,9 +949,11 @@ html, body {
             <i class="fas fa-paper-plane"></i>
         </button>
     </div>
-    <!-- Added Go to Top button inside private-ai -->
-    <a class="gotopbtn" id="private-go-top" href="#"><i class="fas fa-arrow-up"></i></a>
-</div>
+     <!-- Fixed Go to Top Button -->
+        <div class="go-top-btn" id="private-go-top">
+            <i class="fas fa-arrow-up"></i>
+        </div>
+    </div>
   
   <!-- WhatsApp-style scroll to bottom button -->
   <div class="scroll-to-bottom-btn" id="scrollToBottomBtn">
@@ -1200,13 +1197,15 @@ function handlePrivateScroll() {
   // Show button if scrolled more than 200px, else hide
   if (scrollTop > 200) {
     privateGoTopBtn.style.display = 'block';
+    privateGoTopBtn.classList.add('visible');
   } else {
     privateGoTopBtn.style.display = 'none';
+    privateGoTopBtn.classList.remove('visible');
   }
 }
 
 function scrollPrivateToTop(e) {
-  e.preventDefault();
+  if (e) e.preventDefault();
   if (privateContainer) {
     privateContainer.scrollTo({
       top: 0,
@@ -1225,7 +1224,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelector('.news-toggle').style.display = 'block';
     
     // Show scroll button after login
-    document.getElementById('scrollToBottomBtn').style.display = 'block';
+    if (scrollToBottomBtn) scrollToBottomBtn.style.display = 'block';
     
     showContainer('chat');
     
@@ -1237,7 +1236,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelector('.news-toggle').style.display = 'none';
     
     // Hide scroll button before login
-    document.getElementById('scrollToBottomBtn').style.display = 'none';
+    if (scrollToBottomBtn) scrollToBottomBtn.style.display = 'none';
   }
   
   if ('Notification' in window) {
@@ -1251,14 +1250,21 @@ document.addEventListener('DOMContentLoaded', () => {
   privateContainer = document.getElementById('private-ai-container');
   
   if (privateGoTopBtn) {
+    // Set fixed positioning for the button
+    privateGoTopBtn.style.position = 'fixed';
+    privateGoTopBtn.style.bottom = '90px';
+    privateGoTopBtn.style.right = '20px';
+    privateGoTopBtn.style.zIndex = '1000';
+    
     privateGoTopBtn.addEventListener('click', scrollPrivateToTop);
     // Initially hide the button
     privateGoTopBtn.style.display = 'none';
+    privateGoTopBtn.classList.remove('visible');
   }
   
   initializeChat();
   
-  // Add scroll event listener
+  // Add scroll event listener for main chat
   if (elements.chatContainer) {
     elements.chatContainer.addEventListener('scroll', updateScrollState);
   }
@@ -1280,7 +1286,52 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// ... rest of the code remains unchanged ...
+// MODIFIED showContainer FUNCTION
+function showContainer(containerId) {
+  // Hide all containers
+  document.querySelectorAll('.container').forEach(container => {
+    container.style.display = 'none';
+  });
+  
+  // Hide all chat inputs
+  document.querySelectorAll('.chat-input').forEach(input => {
+    input.style.display = 'none';
+  });
+  
+  // Show the selected container
+  const container = document.getElementById(containerId);
+  if (container) {
+    container.style.display = 'block';
+    
+    // Show its input if it's a chat container
+    if (containerId === 'chat' || containerId === 'private-ai') {
+      container.querySelector('.chat-input').style.display = 'flex';
+    }
+  }
+  
+  // Handle scroll events for private container
+  if (containerId === 'private-ai' && privateContainer) {
+    // Attach scroll event for private container
+    privateContainer.addEventListener('scroll', handlePrivateScroll);
+    // Initial check for scroll position
+    setTimeout(handlePrivateScroll, 100);
+  } else if (privateContainer) {
+    // Remove scroll event when not in private container
+    privateContainer.removeEventListener('scroll', handlePrivateScroll);
+    // Hide the go-top button when switching away
+    if (privateGoTopBtn) {
+      privateGoTopBtn.style.display = 'none';
+      privateGoTopBtn.classList.remove('visible');
+    }
+  }
+  
+  // Set scroll restore flag for chat container
+  if (containerId === 'chat') {
+    shouldRestoreScroll = true;
+  }
+}
+
+// ... rest of your existing functions remain unchanged ...
 function toggleAuth() {
   isLogin = !isLogin;
   const authTitle = document.getElementById('auth-title');
@@ -1362,7 +1413,7 @@ async function handleAuth() {
             document.querySelector('.news-toggle').style.display = 'block';
             
             // Show scroll button after successful login
-            document.getElementById('scrollToBottomBtn').style.display = 'block';
+            if (scrollToBottomBtn) scrollToBottomBtn.style.display = 'block';
             
             showContainer('chat');
             updateProfileSection();
@@ -1391,36 +1442,6 @@ async function handleAuth() {
   } catch (error) {
     loader.style.display = 'none';
     showError(error.message);
-  }
-}
-
-function showContainer(containerId) {
-  document.querySelectorAll('.container').forEach(c => c.style.display = 'none');
-  document.querySelectorAll('.chat-input').forEach(i => i.style.display = 'none');
-  
-  const container = document.getElementById(containerId);
-  if (container) {
-    container.style.display = 'block';
-    if (containerId === 'chat' || containerId === 'private-ai') {
-      container.querySelector('.chat-input').style.display = 'flex';
-    }
-  }
-  
-  // Set flag to restore scroll position for chat container
-  if (containerId === 'chat') {
-    shouldRestoreScroll = true;
-  }
-  
-  // NEW: Handle Private AI scroll events
-  if (containerId === 'private-ai') {
-    if (privateContainer) {
-      privateContainer.addEventListener('scroll', handlePrivateScroll);
-      handlePrivateScroll(); // Initial check
-    }
-  } else {
-    if (privateContainer) {
-      privateContainer.removeEventListener('scroll', handlePrivateScroll);
-    }
   }
 }
 
@@ -1956,6 +1977,22 @@ function showContainer(containerId) {
     if (containerId === 'chat') {
         shouldRestoreScroll = true;
     }
+    
+    // Handle scroll events for private container
+    if (containerId === 'private-ai' && privateContainer) {
+        // Attach scroll event for private container
+        privateContainer.addEventListener('scroll', handlePrivateScroll);
+        // Initial check for scroll position
+        setTimeout(handlePrivateScroll, 100);
+    } else if (privateContainer) {
+        // Remove scroll event when not in private container
+        privateContainer.removeEventListener('scroll', handlePrivateScroll);
+        // Hide the go-top button when switching away
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.classList.remove('visible');
+        }
+    }
 }
   function copyToClipboard(text, button) {  
     const textarea = document.createElement('textarea');  
@@ -2469,6 +2506,22 @@ function showContainer(containerId) {
     // Set scroll restore flag for chat container
     if (containerId === 'chat') {
         shouldRestoreScroll = true;
+    }
+    
+    // Handle scroll events for private container
+    if (containerId === 'private-ai' && privateContainer) {
+        // Attach scroll event for private container
+        privateContainer.addEventListener('scroll', handlePrivateScroll);
+        // Initial check for scroll position
+        setTimeout(handlePrivateScroll, 100);
+    } else if (privateContainer) {
+        // Remove scroll event when not in private container
+        privateContainer.removeEventListener('scroll', handlePrivateScroll);
+        // Hide the go-top button when switching away
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.classList.remove('visible');
+        }
     }
 }
 
