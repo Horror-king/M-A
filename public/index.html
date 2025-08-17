@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MessageMate</title>
+    <title>MessageMate with Scroll Button</title>
     <meta property="og:image" content="https://i.ibb.co/p6LrrNRK/1746227326721.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="MessageMate" />
@@ -858,7 +858,10 @@ html, body {
         .scroll-to-bottom-btn i {
             transition: transform 0.2s ease;
         }
-        
+   
+     .scroll-to-bottom-btn {
+          display: none; /* Add this line to hide initially */
+}
         .scroll-to-bottom-btn:hover i {
             transform: translateY(2px);
         }
@@ -1192,6 +1195,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('auth-container').style.display = 'none';
     document.querySelector('.menu').style.display = 'flex';
     document.querySelector('.news-toggle').style.display = 'block';
+    
+    // Show scroll button after login
+    document.getElementById('scrollToBottomBtn').style.display = 'block';
+    
     showContainer('chat');
     
     // Set flag to restore scroll position after messages load
@@ -1200,6 +1207,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('auth-container').style.display = 'flex';
     document.querySelector('.menu').style.display = 'none';
     document.querySelector('.news-toggle').style.display = 'none';
+    
+    // Hide scroll button before login
+    document.getElementById('scrollToBottomBtn').style.display = 'none';
   }
   
   if ('Notification' in window) {
@@ -1211,10 +1221,14 @@ document.addEventListener('DOMContentLoaded', () => {
   initializeChat();
   
   // Add scroll event listener
-  elements.chatContainer.addEventListener('scroll', updateScrollState);
+  if (elements.chatContainer) {
+    elements.chatContainer.addEventListener('scroll', updateScrollState);
+  }
   
   // Add click event to scroll button
-  scrollToBottomBtn.addEventListener('click', scrollToBottom);
+  if (scrollToBottomBtn) {
+    scrollToBottomBtn.addEventListener('click', scrollToBottom);
+  }
 
   // Set up page visibility listeners
   document.addEventListener('visibilitychange', () => {
@@ -1307,6 +1321,10 @@ async function handleAuth() {
             document.getElementById('auth-container').style.display = 'none';
             document.querySelector('.menu').style.display = 'flex';
             document.querySelector('.news-toggle').style.display = 'block';
+            
+            // Show scroll button after successful login
+            document.getElementById('scrollToBottomBtn').style.display = 'block';
+            
             showContainer('chat');
             updateProfileSection();
             initializeChat();
@@ -1366,26 +1384,30 @@ function initializeChat() {
     });
   }
 
-  elements.messageInput.addEventListener('input', () => {
-    autoResize(elements.messageInput);
-    const hasText = elements.messageInput.value.trim().length > 0;
-    elements.sendButton.disabled = !hasText || isSending;
-    elements.sendButton.classList.toggle('enabled', hasText && !isSending);
-  });
+  if (elements.messageInput) {
+    elements.messageInput.addEventListener('input', () => {
+      autoResize(elements.messageInput);
+      const hasText = elements.messageInput.value.trim().length > 0;
+      elements.sendButton.disabled = !hasText || isSending;
+      elements.sendButton.classList.toggle('enabled', hasText && !isSending);
+    });
 
-  elements.messageInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey && !isSending) {
-      e.preventDefault();
-      sendMessage();
-    }
-  });
+    elements.messageInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey && !isSending) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+  }
 
   loadMessages();
 }
 
 function autoResize(textarea) {
-  textarea.style.height = 'auto';
-  textarea.style.height = (textarea.scrollHeight > 100 ? 100 : textarea.scrollHeight) + 'px';
+  if (textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = (textarea.scrollHeight > 100 ? 100 : textarea.scrollHeight) + 'px';
+  }
 }
 
 async function loadMessages() {
@@ -1412,6 +1434,8 @@ async function loadMessages() {
 }
 
 function renderMessages(messages) {
+  if (!elements.chatContainer) return;
+  
   elements.chatContainer.innerHTML = '';
   messages.reverse().forEach(msg => {
     const isOwn = msg.username?.trim().toLowerCase() === currentUsername?.trim().toLowerCase();
@@ -1442,6 +1466,8 @@ function showNotification(username, message) {
     
 function displayPrivateMessage(text, sender, repliedTo = null, username = 'Private AI', messageId = null) {
   const container = document.getElementById('private-ai-container');
+  if (!container) return;
+  
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ${sender}`;
   
@@ -1480,6 +1506,8 @@ function displayPrivateMessage(text, sender, repliedTo = null, username = 'Priva
 } 
     
 function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
+  if (!elements.chatContainer) return;
+  
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ${sender}`;
   messageDiv.dataset.id = messageId;
@@ -1500,7 +1528,6 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
     messageBody.appendChild(usernameDiv);
   }
 
-  // Rest of the function remains the same...
   const contentDiv = document.createElement('div');
   contentDiv.className = 'content';
 
@@ -1666,6 +1693,8 @@ async function sendMessage() {
 }
 async function sendPrivateMessage() {
   const input = document.getElementById('private-user-input');
+  if (!input) return;
+  
   const content = input.value.trim();
   
   if (!content) return;
@@ -1765,7 +1794,7 @@ function clearReply() {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     // When page becomes visible, update lastMessageId to prevent duplicate notifications
-    if (elements.chatContainer.lastChild) {
+    if (elements.chatContainer && elements.chatContainer.lastChild) {
       lastMessageId = elements.chatContainer.lastChild.dataset.id;
     }
   }
@@ -1823,6 +1852,8 @@ document.addEventListener('visibilitychange', () => {
   }  
 
   function showReplyPreview() {  
+    if (!elements.replyPreview) return;
+    
     elements.replyPreview.innerHTML = `  
       <div class="reply-preview">  
         Replying to: ${replyToText.substring(0, 80)}  
@@ -1833,7 +1864,9 @@ document.addEventListener('visibilitychange', () => {
 
   function clearReply() {  
     replyToText = null;  
-    elements.replyPreview.innerHTML = '';  
+    if (elements.replyPreview) {
+      elements.replyPreview.innerHTML = '';
+    }
   }  
 function showContainer(containerId) {
     // Hide all containers
@@ -1899,12 +1932,14 @@ function showContainer(containerId) {
            function toggleKebabMenu(event) {
             event.stopPropagation();
             const dropdown = document.querySelector('.kebab-dropdown');
-            dropdown.classList.toggle('active');
+            if (dropdown) {
+                dropdown.classList.toggle('active');
+            }
         }
 
         document.addEventListener('click', function(event) {
             const dropdown = document.querySelector('.kebab-dropdown');
-            if (dropdown.classList.contains('active')) {
+            if (dropdown && dropdown.classList.contains('active')) {
                 dropdown.classList.remove('active');
             }
         });
@@ -1912,18 +1947,26 @@ function showContainer(containerId) {
         function toggleTheme() {
             document.body.classList.toggle('dark-theme');
             const dropdown = document.querySelector('.kebab-dropdown');
-            dropdown.classList.remove('active');
+            if (dropdown) {
+                dropdown.classList.remove('active');
+            }
         }
 
         function clearChat() {
             const chatContainer = document.getElementById('chat-container');
-            chatContainer.innerHTML = '';
+            if (chatContainer) {
+                chatContainer.innerHTML = '';
+            }
             const dropdown = document.querySelector('.kebab-dropdown');
-            dropdown.classList.remove('active');
+            if (dropdown) {
+                dropdown.classList.remove('active');
+            }
         }
 
         function exportChat() {
             const chatContainer = document.getElementById('chat-container');
+            if (!chatContainer) return;
+            
             const messages = chatContainer.innerText;
             const blob = new Blob([messages], { type: 'text/plain' });
             const url = window.URL.createObjectURL(blob);
@@ -1933,12 +1976,17 @@ function showContainer(containerId) {
             a.click();
             window.URL.revokeObjectURL(url);
             const dropdown = document.querySelector('.kebab-dropdown');
-            dropdown.classList.remove('active');
+            if (dropdown) {
+                dropdown.classList.remove('active');
+            }
         }
 
           function exportChatPDF() {
     const chatContainer = document.getElementById('chat-container');
+    if (!chatContainer) return;
+    
     const dropdown = document.querySelector('.kebab-dropdown');
+    if (!dropdown) return;
 
     const clone = chatContainer.cloneNode(true);
 
@@ -2058,12 +2106,16 @@ function showContainer(containerId) {
         function showSettings() {
             alert('Settings panel coming soon!');
             const dropdown = document.querySelector('.kebab-dropdown');
-            dropdown.classList.remove('active');
+            if (dropdown) {
+                dropdown.classList.remove('active');
+            }
         }
 
         function toggleNews() {
             const newsContainer = document.getElementById('news-container');
-            newsContainer.style.display = newsContainer.style.display === 'none' ? 'block' : 'none';
+            if (newsContainer) {
+                newsContainer.style.display = newsContainer.style.display === 'none' ? 'block' : 'none';
+            }
         }
 
         const sampleNews = [
@@ -2086,6 +2138,8 @@ function showContainer(containerId) {
 
         function populateNews() {
             const newsItems = document.getElementById('news-items');
+            if (!newsItems) return;
+            
             newsItems.innerHTML = '';
 
             sampleNews.forEach(news => {
@@ -2112,6 +2166,8 @@ function openZoom(src) {
     const zoomImage = document.getElementById('zoom-image');
     const downloadBtn = document.getElementById('download-btn');
 
+    if (!overlay || !zoomImage || !downloadBtn) return;
+    
     zoomImage.src = src;
 
     // Force download filename
@@ -2123,94 +2179,124 @@ function openZoom(src) {
 
 function closeZoom() {
     document.body.style.overflow = '';
-    document.getElementById('zoom-overlay').style.display = 'none';
-}
-        document.getElementById('user-input').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey && !isSending) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-
-        document.querySelector('.chat-input button').addEventListener('touchstart', function(e) {
-            e.preventDefault();
-            if (!isSending) {
-                sendMessage();
-            }
-        });
-
-        document.getElementById('user-input').addEventListener('input', function () {
-            autoResize(this);
-            document.querySelector('.chat-input button').disabled = this.value.trim().length === 0 || isSending;
-        });
-    // Add this to your existing initialization code
-document.getElementById('private-user-input').addEventListener('input', function() {
-    autoResize(this);
-    this.nextElementSibling.disabled = this.value.trim().length === 0;
-    this.nextElementSibling.classList.toggle('enabled', this.value.trim().length > 0);
-});
-
-document.getElementById('private-user-input').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendPrivateMessage();
+    const overlay = document.getElementById('zoom-overlay');
+    if (overlay) {
+        overlay.style.display = 'none';
     }
-});
+}
+        if (document.getElementById('user-input')) {
+            document.getElementById('user-input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey && !isSending) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+
+            document.querySelector('.chat-input button').addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                if (!isSending) {
+                    sendMessage();
+                }
+            });
+
+            document.getElementById('user-input').addEventListener('input', function () {
+                autoResize(this);
+                document.querySelector('.chat-input button').disabled = this.value.trim().length === 0 || isSending;
+            });
+        }
+    
+    if (document.getElementById('private-user-input')) {
+        document.getElementById('private-user-input').addEventListener('input', function() {
+            autoResize(this);
+            this.nextElementSibling.disabled = this.value.trim().length === 0;
+            this.nextElementSibling.classList.toggle('enabled', this.value.trim().length > 0);
+        });
+
+        document.getElementById('private-user-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendPrivateMessage();
+            }
+        });
+    }
 
 function autoResize(textarea) {
-    textarea.style.height = 'auto';
-    textarea.style.height = (textarea.scrollHeight > 100 ? 100 : textarea.scrollHeight) + 'px';
+    if (textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = (textarea.scrollHeight > 100 ? 100 : textarea.scrollHeight) + 'px';
+    }
 }
 
-document.getElementById("year").textContent = new Date().getFullYear();
+if (document.getElementById("year")) {
+    document.getElementById("year").textContent = new Date().getFullYear();
+}
 
 document.addEventListener('DOMContentLoaded', function () {
     updateGoTopBtn();
     handleScroll();
     populateNews();
 
-    document.querySelector('.gotopbtn').addEventListener('click', function (e) {
-        e.preventDefault();
-        document.getElementById('chat-container').scrollTo({
-            top: 0,
-            behavior: 'smooth'
+    const gotopBtn = document.querySelector('.gotopbtn');
+    if (gotopBtn) {
+        gotopBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            const chatContainer = document.getElementById('chat-container');
+            if (chatContainer) {
+                chatContainer.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            }
         });
-    });
+    }
 
-    document.getElementById('chat-container').addEventListener('scroll', handleScroll);
+    const chatContainer = document.getElementById('chat-container');
+    if (chatContainer) {
+        chatContainer.addEventListener('scroll', handleScroll);
+    }
 
     const currentUser = localStorage.getItem('currentUser');
     if (currentUser) {
-        document.querySelector('.news-toggle').style.display = 'block';
+        const newsToggle = document.querySelector('.news-toggle');
+        if (newsToggle) newsToggle.style.display = 'block';
     } else {
-        document.querySelector('.news-toggle').style.display = 'none';
-        document.querySelector('.news-container').style.display = 'none';
+        const newsToggle = document.querySelector('.news-toggle');
+        if (newsToggle) newsToggle.style.display = 'none';
+        
+        const newsContainer = document.querySelector('.news-container');
+        if (newsContainer) newsContainer.style.display = 'none';
     }
 });
 
 function handleScroll() {
     const goTopBtn = document.querySelector('.gotopbtn');
     const chatContainer = document.getElementById('chat-container');
-    if (chatContainer.scrollTop > 200) {
-        goTopBtn.style.display = 'block';
-    } else {
-        goTopBtn.style.display = 'none';
+    if (goTopBtn && chatContainer) {
+        if (chatContainer.scrollTop > 200) {
+            goTopBtn.style.display = 'block';
+        } else {
+            goTopBtn.style.display = 'none';
+        }
     }
 }
 
 function updateGoTopBtn() {
     const goTopBtn = document.querySelector('.gotopbtn');
     const currentUser = localStorage.getItem('currentUser');
-    if (currentUser) {
-        goTopBtn.style.display = 'none';
-    } else {
-        goTopBtn.style.display = 'none';
+    if (goTopBtn) {
+        if (currentUser) {
+            goTopBtn.style.display = 'none';
+        } else {
+            goTopBtn.style.display = 'none';
+        }
     }
 }
 
 // Updated function to update the profile section
 function updateProfileSection() {
     const dropdown = document.getElementById('dropdown');
+    if (!dropdown) return;
+    
     const currentUsername = localStorage.getItem('currentUser');
     
     // Remove existing profile section if it exists
@@ -2246,7 +2332,7 @@ document.addEventListener('click', function(event) {
     const kebabMenu = document.querySelector('.kebab-menu');
     
     // Close dropdown if clicking outside of it and not on menu controls
-    if (dropdown.style.display === 'block' && 
+    if (dropdown && dropdown.style.display === 'block' && 
         !dropdown.contains(event.target) && 
         event.target !== hamburger &&
         !kebabMenu.contains(event.target)) {
@@ -2255,7 +2341,7 @@ document.addEventListener('click', function(event) {
     
     // Close kebab menu if clicking outside
     const kebabDropdown = document.querySelector('.kebab-dropdown');
-    if (kebabDropdown.classList.contains('active') && 
+    if (kebabDropdown && kebabDropdown.classList.contains('active') && 
         !kebabMenu.contains(event.target) && 
         !kebabDropdown.contains(event.target)) {
         kebabDropdown.classList.remove('active');
@@ -2271,9 +2357,15 @@ function logout() {
     document.querySelectorAll('.container').forEach(container => {
         container.style.display = 'none';
     });
-    document.querySelector('.menu').style.display = 'none';
-    document.getElementById('dropdown').style.display = 'none';
-    document.querySelector('.kebab-dropdown').classList.remove('active');
+    
+    const menu = document.querySelector('.menu');
+    if (menu) menu.style.display = 'none';
+    
+    const dropdown = document.getElementById('dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    
+    const kebabDropdown = document.querySelector('.kebab-dropdown');
+    if (kebabDropdown) kebabDropdown.classList.remove('active');
     
     // Hide all chat inputs
     document.querySelectorAll('.chat-input').forEach(input => {
@@ -2284,15 +2376,29 @@ function logout() {
     document.getElementById('auth-container').style.display = 'flex';
     
     // Hide news toggle
-    document.querySelector('.news-toggle').style.display = 'none';
-    document.querySelector('.news-container').style.display = 'none';
+    const newsToggle = document.querySelector('.news-toggle');
+    if (newsToggle) newsToggle.style.display = 'none';
+    
+    const newsContainer = document.querySelector('.news-container');
+    if (newsContainer) newsContainer.style.display = 'none';
+    
+    // Hide scroll button
+    const scrollBtn = document.getElementById('scrollToBottomBtn');
+    if (scrollBtn) scrollBtn.style.display = 'none';
     
     // Reset auth form
     isLogin = true;
-    document.getElementById('auth-title').textContent = 'Login';
-    document.querySelector('.auth-box button').textContent = 'Login';
-    document.getElementById('toggle-text').textContent = "Don't have an account? ";
-    document.getElementById('toggle-link').textContent = 'Sign Up';
+    const authTitle = document.getElementById('auth-title');
+    if (authTitle) authTitle.textContent = 'Login';
+    
+    const authButton = document.querySelector('.auth-box button');
+    if (authButton) authButton.textContent = 'Login';
+    
+    const toggleText = document.getElementById('toggle-text');
+    if (toggleText) toggleText.textContent = "Don't have an account? ";
+    
+    const toggleLink = document.getElementById('toggle-link');
+    if (toggleLink) toggleLink.textContent = 'Sign Up';
     
     // Clear profile section
     const profileSection = document.querySelector('.profile-section');
@@ -2306,10 +2412,13 @@ function logout() {
 // Improved toggleDropdown function
 function toggleDropdown() {
     const dropdown = document.getElementById('dropdown');
+    if (!dropdown) return;
+    
     const isVisible = dropdown.style.display === 'block';
     
     // Close all other menus first
-    document.querySelector('.kebab-dropdown').classList.remove('active');
+    const kebabDropdown = document.querySelector('.kebab-dropdown');
+    if (kebabDropdown) kebabDropdown.classList.remove('active');
     
     // Toggle dropdown
     dropdown.style.display = isVisible ? 'none' : 'block';
@@ -2339,13 +2448,17 @@ function showContainer(containerId) {
         
         // Show the appropriate chat input
         if (containerId === 'chat' || containerId === 'private-ai') {
-            container.querySelector('.chat-input').style.display = 'flex';
+            const chatInput = container.querySelector('.chat-input');
+            if (chatInput) chatInput.style.display = 'flex';
         }
     }
     
     // Close all menus when showing any container
-    document.getElementById('dropdown').style.display = 'none';
-    document.querySelector('.kebab-dropdown').classList.remove('active');
+    const dropdown = document.getElementById('dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    
+    const kebabDropdown = document.querySelector('.kebab-dropdown');
+    if (kebabDropdown) kebabDropdown.classList.remove('active');
     
     currentUsername = localStorage.getItem('chat_username') || '';
     
@@ -2357,12 +2470,18 @@ function showContainer(containerId) {
 
 // Updated hideContainer function
 function hideContainer(containerId) {
-    document.getElementById(containerId).style.display = 'none';
-    document.getElementById('overlay').style.display = 'none';
+    const container = document.getElementById(containerId);
+    if (container) container.style.display = 'none';
+    
+    const overlay = document.getElementById('overlay');
+    if (overlay) overlay.style.display = 'none';
     
     // Close all menus when hiding any container
-    document.getElementById('dropdown').style.display = 'none';
-    document.querySelector('.kebab-dropdown').classList.remove('active');
+    const dropdown = document.getElementById('dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    
+    const kebabDropdown = document.querySelector('.kebab-dropdown');
+    if (kebabDropdown) kebabDropdown.classList.remove('active');
     
     // Show chat container and input after closing any section
     showContainer('chat');
@@ -2373,32 +2492,45 @@ function openZoom(src) {
     document.body.style.overflow = 'hidden';
     const overlay = document.getElementById('zoom-overlay');
     const zoomImage = document.getElementById('zoom-image');
+    if (!overlay || !zoomImage) return;
+    
     zoomImage.src = src;
     overlay.style.display = 'flex';
 }
 
 function closeZoom() {
     document.body.style.overflow = '';
-    document.getElementById('zoom-overlay').style.display = 'none';
+    const overlay = document.getElementById('zoom-overlay');
+    if (overlay) overlay.style.display = 'none';
 }
 
-document.getElementById('overlay').addEventListener('click', function() {
-    document.querySelectorAll('.about-container, .features-container, .help-container').forEach(container => {
-        container.style.display = 'none';
+const overlay = document.getElementById('overlay');
+if (overlay) {
+    overlay.addEventListener('click', function() {
+        document.querySelectorAll('.about-container, .features-container, .help-container').forEach(container => {
+            container.style.display = 'none';
+        });
+        this.style.display = 'none';
+        showContainer('chat');
     });
-    this.style.display = 'none';
-    showContainer('chat');
-});
+}
 
 // Initialize if user is logged in
 const currentUser = localStorage.getItem('currentUser');
 if (currentUser) {
     showContainer('chat');
-    document.querySelector('.chat-input').style.display = 'flex';
+    
+    const chatInput = document.querySelector('.chat-input');
+    if (chatInput) chatInput.style.display = 'flex';
+    
     updateProfileSection();
     
     // Set flag to restore scroll position after messages load
     shouldRestoreScroll = true;
+    
+    // Show scroll button
+    const scrollBtn = document.getElementById('scrollToBottomBtn');
+    if (scrollBtn) scrollBtn.style.display = 'block';
 }
  </script>
-</html>
+</html> 
