@@ -24,7 +24,7 @@ global.utils = {
 // Initialize Supabase
 const supabase = createClient(
   'https://lalcvmjyzubzqlerogqb.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxhbGN2bWp5enVienFsZXJvZ3FiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxMjI5MzQsImV4cCI6MjA3MDY5ODkzNH0.WRv_BYCvFLKyZPms3LMjoeDlewiJYRF1EZsNNcRAPtY',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpvcHRvc2dmcGFnYWN5bHp3ZGlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg0ODMwOTUsImV4cCI6MjA3NDA1OTA5NX0.EsVyr8Mys1-SjD8fCj0HFaiBQ9crO0bGSH8i3guD4QA',
 );
 
 // Configure multer for file uploads
