@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MessageMate with Scroll Button</title>
+    <title>MessageMate</title>
     <meta property="og:image" content="https://i.ibb.co/p6LrrNRK/1746227326721.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="MessageMate" />
@@ -1482,6 +1482,8 @@ function autoResize(textarea) {
   }
 }
 
+// --- CUT HERE ---
+
 async function loadMessages() {
   try {
     const response = await fetch('/messages');
@@ -1559,7 +1561,43 @@ function displayPrivateMessage(text, sender, repliedTo = null, username = 'Priva
 
   const contentDiv = document.createElement('div');
   contentDiv.className = 'content';
-  contentDiv.textContent = text;
+
+  // Parse for image URLs and render them as images
+  const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
+  const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
+
+  const imageMatches = [...text.matchAll(imagePattern)];
+  const audioMatches = [...text.matchAll(audioPattern)];
+
+  let modifiedText = text;
+  [...imageMatches, ...audioMatches].forEach(match => {
+    modifiedText = modifiedText.replace(match[0], '');
+  });
+
+  modifiedText = modifiedText.trim();
+  if (modifiedText) {
+    const textDiv = document.createElement('div');
+    textDiv.textContent = modifiedText;
+    contentDiv.appendChild(textDiv);
+  }
+
+  // Add images to the message
+  imageMatches.forEach(match => {
+    const img = document.createElement('img');
+    img.src = match[0];
+    img.alt = "Image";
+    img.loading = "lazy";
+    contentDiv.appendChild(img);
+  });
+
+  // Add audio files to the message
+  audioMatches.forEach(match => {
+    const audio = document.createElement('audio');
+    audio.controls = true;
+    audio.src = match[0];
+    contentDiv.appendChild(audio);
+  });
+
   messageBody.appendChild(contentDiv);
 
   if (sender === 'sent') {
