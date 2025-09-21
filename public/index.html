@@ -869,7 +869,9 @@ html, body {
                 right: 15px;
             }
         }
-  </style>
+// --- CUT HERE ---
+    
+    </style>
 </head>
 <body>
     <div class="loader" id="loader">
@@ -929,6 +931,12 @@ html, body {
     <i class="fas fa-newspaper"></i>
 </button>
   
+    <!-- News Container - This was missing from your HTML -->
+<div class="news-container" id="news-container">
+    <div class="news-header">Latest News</div>
+    <div class="news-items" id="news-items"></div>
+</div>
+    
   <div id="chat" class="chat-container container" style="display: none;">
     <div class="chat-messages" id="chat-container"></div>
     <div id="reply-preview-container"></div>
@@ -1046,6 +1054,7 @@ html, body {
         <div class="section-content">
             <p>This advanced AI chatbot is designed to provide intelligent conversations and assist users with various tasks. Built with cutting-edge technology, it offers a seamless and intuitive experience.</p>
             <p>Our mission is to make AI accessible and helpful for everyone, providing accurate and relevant responses while maintaining user privacy and data security.</p>
+            <p>For support, please contact us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></p>
             <p>©<span id="year"></span> AI Chatbot. All rights reserved.</p>
         </div>
     </div>
@@ -1085,7 +1094,12 @@ html, body {
             <div class="help-question">Is my data secure?</div>
             <div class="help-answer">Yes, we use secure authentication and encryption to protect your conversations and personal data.</div>
         </div>
+        <div class="help-section">
+            <div class="help-question">How can I contact support?</div>
+            <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
+        </div>
     </div>
+
 
     <script>
 let isLogin = true;
@@ -2236,13 +2250,20 @@ function showContainer(containerId) {
                 dropdown.classList.remove('active');
             }
         }
-
+         
         function toggleNews() {
-            const newsContainer = document.getElementById('news-container');
-            if (newsContainer) {
-                newsContainer.style.display = newsContainer.style.display === 'none' ? 'block' : 'none';
-            }
+    const newsContainer = document.getElementById('news-container');
+    if (newsContainer) {
+        // Toggle the display of the news container
+        if (newsContainer.style.display === 'none' || newsContainer.style.display === '') {
+            newsContainer.style.display = 'block';
+            // Make sure it's populated with news items
+            populateNews();
+        } else {
+            newsContainer.style.display = 'none';
         }
+    }
+}
 
         const sampleNews = [
             {
