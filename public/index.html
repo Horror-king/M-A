@@ -263,7 +263,7 @@
             box-sizing: border-box;
         }
 
-        /* Improved message styling with better avatar alignment */
+        /* PERFECT ALIGNMENT: Improved message styling with perfect avatar alignment */
         .message {
             padding: 6px 10px;
             border-radius: 18px;
@@ -276,7 +276,7 @@
             position: relative;
             display: flex;
             align-items: flex-start;
-            gap: 6px;
+            gap: 8px;
             touch-action: none;
             -webkit-user-select: none;
             -ms-user-select: none;
@@ -284,7 +284,7 @@
             touch-action: manipulation;
             box-sizing: border-box;
         }
-     
+
         .content {
             user-select: none;
             flex-grow: 1;
@@ -316,38 +316,41 @@
             white-space: pre-wrap;
         }
 
-        /* Improved avatar styling */
-        
-/* Avatar base style */
-.message .avatar {
-    width: 26px; /* Changed from 28px */
-    height: 26px; /* Changed from 28px */
-    border-radius: 50%;
-    flex-shrink: 0;
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    align-self: flex-start;
-    margin-top: 6px; /* Changed from 10px */
-}
+        /* PERFECT ALIGNMENT: Avatar styling */
+        .message .avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            align-self: flex-start;
+            border: 2px solid #fff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            margin-top: 2px; /* Perfect alignment adjustment */
+        }
 
-/* Sent messages should also show avatars now */
-.message.sent .avatar {
-    display: block;
-    order: 2;
-    margin-top: 6px; /* Changed from 10px */
-}
+        .message .avatar img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            display: block;
+        }
 
-        /* Improved username with status indicator */
+        /* PERFECT ALIGNMENT: Username with status indicator */
         .message .username {
-            font-size: 0.68rem;
-            font-weight: bold;
-            color: #777;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #666;
             margin-bottom: 2px;
-            line-height: 1;
+            line-height: 1.2;
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 6px;
+            height: 28px; /* Match avatar height for perfect alignment */
+            align-items: flex-start; /* Align with avatar top */
+            padding-top: 2px; /* Fine-tuned for perfect alignment */
         }
 
         .user-status-indicator {
@@ -355,6 +358,7 @@
             height: 8px;
             border-radius: 50%;
             display: inline-block;
+            flex-shrink: 0;
         }
 
         .user-status-indicator.online {
@@ -370,33 +374,31 @@
             background-color: #FFC107;
         }
 
-        /* Message body improvements */
+        /* PERFECT ALIGNMENT: Message body improvements */
         .message-body {
             display: flex;
             flex-direction: column;
             flex-grow: 1;
-            min-width: 0; /* Prevent flex overflow */
+            min-width: 0;
+            gap: 2px;
         }
 
-        /* Received messages (left aligned) */
-.message.received {
-    align-self: flex-start;
-    margin-left: -10px; /* Changed from -15px */
-    flex-direction: row;
-}
+        /* PERFECT ALIGNMENT: Received messages (left aligned) */
+        .message.received {
+            align-self: flex-start;
+            margin-left: 0;
+            flex-direction: row;
+            align-items: flex-start;
+        }
 
-/* Sent messages (right aligned) */
-.message.sent {
-    align-self: flex-end;
-    margin-right: -10px; /* Changed from -15px */
-    flex-direction: row;
-    justify-content: flex-end;
-}
+        /* PERFECT ALIGNMENT: Sent messages (right aligned) - HIDE AVATAR FOR SENT MESSAGES */
+        .message.sent {
+            align-self: flex-end;
+            margin-right: 0;
+            flex-direction: row-reverse;
+            justify-content: flex-end;
+        }
 
-/* Content ordering for sent messages */
-.message.sent .content {
-    order: 1;
-}
         /* Hide avatar and username for sent messages */
         .message.sent .avatar {
             display: none !important;
@@ -404,6 +406,19 @@
 
         .message.sent .username {
             display: none !important;
+        }
+
+        /* Ensure username and avatar are perfectly aligned */
+        .message.received .username {
+            display: flex;
+            align-items: center;
+            padding-top: 2px; /* Fine-tuned for perfect alignment */
+        }
+
+        /* Content alignment */
+        .message.received .content {
+            margin-left: 0;
+            margin-top: 0;
         }
 
         .message img {
@@ -996,6 +1011,11 @@
             .message .avatar {
                 width: 24px;
                 height: 24px;
+            }
+            
+            .message .username {
+                height: 24px; /* Match smaller avatar */
+                font-size: 0.7rem;
             }
             
             .profile-panel {
@@ -1925,7 +1945,7 @@
             }, 50);
         } 
             
-        // UPDATED displayMessage function with improved avatar alignment
+        // UPDATED displayMessage function with PERFECT avatar alignment
         function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
             if (!elements.chatContainer) return;
             
@@ -1941,69 +1961,83 @@
                 avatarDiv.className = 'avatar';
                 avatarDiv.innerHTML = `<img src="https://i.pravatar.cc/50?u=${encodeURIComponent(username)}" alt="avatar">`;
                 messageDiv.appendChild(avatarDiv);
-            }
 
-            const messageBody = document.createElement('div');
-            messageBody.className = 'message-body';
+                const messageBody = document.createElement('div');
+                messageBody.className = 'message-body';
 
-            // Only show username for received messages with status indicator
-            if (username && sender === 'received') {
+                // Username with status indicator - PERFECT ALIGNMENT
                 const usernameDiv = document.createElement('div');
                 usernameDiv.className = 'username';
                 
-                // Add status indicator
                 const statusIndicator = document.createElement('span');
-                statusIndicator.className = 'user-status-indicator online'; // Default to online
+                statusIndicator.className = 'user-status-indicator online';
                 
                 usernameDiv.appendChild(document.createTextNode(username));
                 usernameDiv.appendChild(statusIndicator);
                 messageBody.appendChild(usernameDiv);
-            }
 
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'content';
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'content';
 
-            if (repliedTo) {
-                const replyBubble = document.createElement('div');
-                replyBubble.className = 'reply-preview';
-                replyBubble.textContent = repliedTo;
-                contentDiv.appendChild(replyBubble);
-            }
+                if (repliedTo) {
+                    const replyBubble = document.createElement('div');
+                    replyBubble.className = 'reply-preview';
+                    replyBubble.textContent = repliedTo;
+                    contentDiv.appendChild(replyBubble);
+                }
 
-            const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
-            const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
+                const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
+                const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
 
-            const imageMatches = [...text.matchAll(imagePattern)];
-            const audioMatches = [...text.matchAll(audioPattern)];
+                const imageMatches = [...text.matchAll(imagePattern)];
+                const audioMatches = [...text.matchAll(audioPattern)];
 
-            let modifiedText = text;
-            [...imageMatches, ...audioMatches].forEach(match => {
-                modifiedText = modifiedText.replace(match[0], '');
-            });
+                let modifiedText = text;
+                [...imageMatches, ...audioMatches].forEach(match => {
+                    modifiedText = modifiedText.replace(match[0], '');
+                });
 
-            modifiedText = modifiedText.trim();
-            if (modifiedText) {
+                modifiedText = modifiedText.trim();
+                if (modifiedText) {
+                    const textDiv = document.createElement('div');
+                    textDiv.textContent = modifiedText;
+                    contentDiv.appendChild(textDiv);
+                }
+
+                imageMatches.forEach(match => {
+                    const img = document.createElement('img');
+                    img.src = match[0];
+                    img.alt = "Image";
+                    contentDiv.appendChild(img);
+                });
+
+                audioMatches.forEach(match => {
+                    const audio = document.createElement('audio');
+                    audio.controls = true;
+                    audio.src = match[0];
+                    contentDiv.appendChild(audio);
+                });
+
+                messageBody.appendChild(contentDiv);
+                messageDiv.appendChild(messageBody);
+            } else {
+                // For sent messages - simpler structure without avatar/username
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'content';
+                
+                if (repliedTo) {
+                    const replyBubble = document.createElement('div');
+                    replyBubble.className = 'reply-preview';
+                    replyBubble.textContent = repliedTo;
+                    contentDiv.appendChild(replyBubble);
+                }
+
                 const textDiv = document.createElement('div');
-                textDiv.textContent = modifiedText;
+                textDiv.textContent = text;
                 contentDiv.appendChild(textDiv);
+                
+                messageDiv.appendChild(contentDiv);
             }
-
-            imageMatches.forEach(match => {
-                const img = document.createElement('img');
-                img.src = match[0];
-                img.alt = "Image";
-                contentDiv.appendChild(img);
-            });
-
-            audioMatches.forEach(match => {
-                const audio = document.createElement('audio');
-                audio.controls = true;
-                audio.src = match[0];
-                contentDiv.appendChild(audio);
-            });
-
-            messageBody.appendChild(contentDiv);
-            messageDiv.appendChild(messageBody);
 
             elements.chatContainer.appendChild(messageDiv);
 
@@ -2840,7 +2874,9 @@
         function closeZoom() {
             document.body.style.overflow = '';
             const overlay = document.getElementById('zoom-overlay');
-            if (overlay) overlay.style.display = 'none';
+            if (overlay) {
+                overlay.style.display = 'none';
+            }
         }
 
         const overlay = document.getElementById('overlay');
