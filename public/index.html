@@ -12,6 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -870,7 +871,57 @@ html, body {
             }
         }
 // --- CUT HERE ---
-    
+        .online-users-panel {
+  background: white;
+  border-radius: 10px;
+  padding: 15px;
+  margin: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.online-users-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.online-user {
+  display: flex;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.online-dot {
+  width: 10px;
+  height: 10px;
+  background: #4CAF50;
+  border-radius: 50%;
+  margin-right: 10px;
+  display: inline-block;
+}
+
+.user-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-left: 5px;
+  display: inline-block;
+}
+
+.user-status.online {
+  background: #4CAF50;
+}
+
+.user-status.offline {
+  background: #ccc;
+}
+
+#typing-indicator {
+  padding: 5px 15px;
+  font-style: italic;
+  color: #666;
+  font-size: 0.9em;
+}
     </style>
 </head>
 <body>
@@ -927,6 +978,12 @@ html, body {
     <a href="#" onclick="logout()" style="color: #ff4444;">Logout</a>
 </div>
 
+  <!-- Add to your dropdown menu -->
+<div class="online-users-panel">
+  <h3>Online Users <span id="online-count">0</span></h3>
+  <div id="online-users-list" class="online-users-list"></div>
+</div>
+  
 <button class="news-toggle" onclick="toggleNews()" title="Toggle News" style="display: none;">
     <i class="fas fa-newspaper"></i>
 </button>
@@ -1102,6 +1159,8 @@ html, body {
 
 
     <script>
+// --- CUT HERE ---
+   // --- CUT HERE ---
 let isLogin = true;
 let users = JSON.parse(localStorage.getItem('users')) || {};
 let longPressTimer;
@@ -1131,6 +1190,11 @@ let newMessagesCountEl = document.getElementById('newMessagesCount');
 let lastScrollPosition = 0;
 let shouldRestoreScroll = false;
 
+// Real-time active status variables
+let socket;
+let isTyping = false;
+let typingTimer;
+
 const elements = {
   usernameInput: document.getElementById('auth-username'),
   messageInput: document.getElementById('user-input'),
@@ -1147,6 +1211,120 @@ let currentUsername = localStorage.getItem('chat_username') || '';
 if (currentUsername && elements.usernameInput) {
   elements.usernameInput.value = currentUsername;
 }
+
+// ===== REAL-TIME ACTIVE STATUS FUNCTIONS =====
+
+// Initialize socket connection
+function initSocket() {
+  socket = io();
+  
+  socket.on('connect', () => {
+    const username = localStorage.getItem('chat_username');
+    if (username) {
+      socket.emit('user-online', username);
+    }
+  });
+  
+  socket.on('user-status-change', (data) => {
+    updateOnlineUsersList(data.onlineUsers);
+    updateUserStatusIndicator(data.username, data.status);
+  });
+  
+  socket.on('user-typing', (data) => {
+    showTypingIndicator(data.username, data.isTyping);
+  });
+  
+  // Send heartbeat every 20 seconds to stay online
+  setInterval(() => {
+    const username = localStorage.getItem('chat_username');
+    if (username && socket.connected) {
+      socket.emit('user-online', username);
+    }
+  }, 20000);
+}
+
+// Update the online users list
+function updateOnlineUsersList(onlineUsers) {
+  const onlineList = document.getElementById('online-users-list');
+  if (!onlineList) return;
+  
+  onlineList.innerHTML = '';
+  onlineUsers.forEach(user => {
+    const userElement = document.createElement('div');
+    userElement.className = 'online-user';
+    userElement.innerHTML = `
+      <span class="online-dot"></span>
+      ${user}
+    `;
+    onlineList.appendChild(userElement);
+  });
+  
+  // Update online count
+  const onlineCount = document.getElementById('online-count');
+  if (onlineCount) {
+    onlineCount.textContent = onlineUsers.length;
+  }
+}
+
+// Update status indicator for a specific user
+function updateUserStatusIndicator(username, status) {
+  // Find all messages from this user and update their status
+  const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
+  userMessages.forEach(msg => {
+    const statusIndicator = msg.querySelector('.user-status') || createStatusIndicator();
+    statusIndicator.className = `user-status ${status}`;
+    if (!msg.contains(statusIndicator)) {
+      msg.querySelector('.message-body').appendChild(statusIndicator);
+    }
+  });
+}
+
+// Create a status indicator element
+function createStatusIndicator() {
+  const indicator = document.createElement('span');
+  indicator.className = 'user-status';
+  return indicator;
+}
+
+// Show typing indicator
+function showTypingIndicator(username, isTyping) {
+  let indicator = document.getElementById('typing-indicator');
+  
+  if (isTyping) {
+    if (!indicator) {
+      indicator = document.createElement('div');
+      indicator.id = 'typing-indicator';
+      indicator.innerHTML = `${username} is typing...`;
+      document.getElementById('chat-container').appendChild(indicator);
+    }
+  } else if (indicator) {
+    indicator.remove();
+  }
+}
+
+// Handle typing events
+function setupTypingHandlers() {
+  const messageInput = document.getElementById('user-input');
+  if (!messageInput) return;
+  
+  messageInput.addEventListener('input', () => {
+    const username = localStorage.getItem('chat_username');
+    if (!username || !socket) return;
+    
+    if (!isTyping) {
+      isTyping = true;
+      socket.emit('typing-start', { username });
+    }
+    
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => {
+      isTyping = false;
+      socket.emit('typing-stop', { username });
+    }, 1000);
+  });
+}
+
+// ===== END OF REAL-TIME FUNCTIONS =====
 
 // Improved scroll position detection
 function checkIfAtBottom(container) {
@@ -1244,6 +1422,10 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Set flag to restore scroll position after messages load
     shouldRestoreScroll = true;
+    
+    // Initialize real-time features after login
+    initSocket();
+    setupTypingHandlers();
   } else {
     document.getElementById('auth-container').style.display = 'flex';
     document.querySelector('.menu').style.display = 'none';
@@ -1345,7 +1527,6 @@ function showContainer(containerId) {
   }
 }
 
-// ... rest of your existing functions remain unchanged ...
 function toggleAuth() {
   isLogin = !isLogin;
   const authTitle = document.getElementById('auth-title');
@@ -1433,6 +1614,10 @@ async function handleAuth() {
             updateProfileSection();
             initializeChat();
             
+            // Initialize real-time features after login
+            initSocket();
+            setupTypingHandlers();
+            
             // Set flag to restore scroll position after messages load
             shouldRestoreScroll = true;
         }, 500);
@@ -1495,8 +1680,6 @@ function autoResize(textarea) {
     textarea.style.height = (textarea.scrollHeight > 100 ? 100 : textarea.scrollHeight) + 'px';
   }
 }
-
-// --- CUT HERE ---
 
 async function loadMessages() {
   try {
@@ -1636,6 +1819,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
   messageDiv.className = `message ${sender}`;
   messageDiv.dataset.id = messageId;
   messageDiv.dataset.content = text;
+  messageDiv.dataset.username = username; // Add username for status tracking
 
   const avatarDiv = document.createElement('div');
   avatarDiv.className = 'avatar';
@@ -1815,6 +1999,7 @@ async function sendMessage() {
     }, 500);
   }
 }
+
 async function sendPrivateMessage() {
   const input = document.getElementById('private-user-input');
   if (!input) return;
@@ -1831,6 +2016,7 @@ async function sendPrivateMessage() {
   // Get AI response
   await fetchPrivateAIResponse(content);
 }
+
 async function fetchChatResponse(userInput) {
   try {
     const response = await fetch('/api/command', {
@@ -1923,730 +2109,745 @@ document.addEventListener('visibilitychange', () => {
     }
   }
 });
-  function showMessageContextMenu(e, message) {  
-    const messageText = message.dataset.content || '';  
-    const messageId = message.dataset.id;  
 
-    document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());  
+function showMessageContextMenu(e, message) {  
+  const messageText = message.dataset.content || '';  
+  const messageId = message.dataset.id;  
 
-    const contextMenu = document.createElement('div');  
-    contextMenu.className = 'message-context-menu active';  
-    contextMenu.style.left = `${(e.touches?.[0]?.pageX || e.clientX)}px`;  
-    contextMenu.style.top = `${(e.touches?.[0]?.pageY || e.clientY)}px`;  
+  document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());  
 
-    const copyButton = document.createElement('button');  
-    copyButton.textContent = 'Copy';  
-    copyButton.onclick = () => {  
-      copyToClipboard(messageText, copyButton);  
+  const contextMenu = document.createElement('div');  
+  contextMenu.className = 'message-context-menu active';  
+  contextMenu.style.left = `${(e.touches?.[0]?.pageX || e.clientX)}px`;  
+  contextMenu.style.top = `${(e.touches?.[0]?.pageY || e.clientY)}px`;  
+
+  const copyButton = document.createElement('button');  
+  copyButton.textContent = 'Copy';  
+  copyButton.onclick = () => {  
+    copyToClipboard(messageText, copyButton);  
+    contextMenu.remove();  
+  };  
+
+  const replyButton = document.createElement('button');  
+  replyButton.textContent = 'Reply';  
+  replyButton.onclick = () => {  
+    replyToText = messageText;  
+    elements.messageInput.focus();  
+    showReplyPreview();  
+    contextMenu.remove();  
+  };  
+
+  contextMenu.appendChild(copyButton);  
+  contextMenu.appendChild(replyButton);  
+
+  if (messageId && message.classList.contains('sent')) {  
+    const deleteButton = document.createElement('button');  
+    deleteButton.textContent = 'Delete';  
+    deleteButton.onclick = async () => {  
+      try {  
+        const response = await fetch(`/messages/${messageId}`, {  
+          method: 'DELETE'  
+        });  
+        if (!response.ok) throw new Error('Delete failed');  
+        message.remove();  
+      } catch (err) {  
+        showError(err.message);  
+      }  
       contextMenu.remove();  
     };  
-
-    const replyButton = document.createElement('button');  
-    replyButton.textContent = 'Reply';  
-    replyButton.onclick = () => {  
-      replyToText = messageText;  
-      elements.messageInput.focus();  
-      showReplyPreview();  
-      contextMenu.remove();  
-    };  
-
-    contextMenu.appendChild(copyButton);  
-    contextMenu.appendChild(replyButton);  
-
-    if (messageId && message.classList.contains('sent')) {  
-      const deleteButton = document.createElement('button');  
-      deleteButton.textContent = 'Delete';  
-      deleteButton.onclick = async () => {  
-        try {  
-          const response = await fetch(`/messages/${messageId}`, {  
-            method: 'DELETE'  
-          });  
-          if (!response.ok) throw new Error('Delete failed');  
-          message.remove();  
-        } catch (err) {  
-          showError(err.message);  
-        }  
-        contextMenu.remove();  
-      };  
-      contextMenu.appendChild(deleteButton);  
-    }  
-
-    document.body.appendChild(contextMenu);  
-    document.addEventListener('click', () => contextMenu.remove(), { once: true });  
+    contextMenu.appendChild(deleteButton);  
   }  
 
-  function showReplyPreview() {  
-    if (!elements.replyPreview) return;
-    
-    elements.replyPreview.innerHTML = `  
-      <div class="reply-preview">  
-        Replying to: ${replyToText.substring(0, 80)}  
-        <button onclick="clearReply()" style="float:right; font-size:12px;">✕</button>  
-      </div>  
-    `;  
-  }  
+  document.body.appendChild(contextMenu);  
+  document.addEventListener('click', () => contextMenu.remove(), { once: true });  
+}  
 
-  function clearReply() {  
-    replyToText = null;  
-    if (elements.replyPreview) {
-      elements.replyPreview.innerHTML = '';
-    }
-  }  
+function showReplyPreview() {  
+  if (!elements.replyPreview) return;
+  
+  elements.replyPreview.innerHTML = `  
+    <div class="reply-preview">  
+      Replying to: ${replyToText.substring(0, 80)}  
+      <button onclick="clearReply()" style="float:right; font-size:12px;">✕</button>  
+    </div>  
+  `;  
+}  
+
+function clearReply() {  
+  replyToText = null;  
+  if (elements.replyPreview) {
+    elements.replyPreview.innerHTML = '';
+  }
+}  
+
 function showContainer(containerId) {
-    // Hide all containers
-    document.querySelectorAll('.container').forEach(container => {
-        container.style.display = 'none';
-    });
-    
-    // Hide all chat inputs
-    document.querySelectorAll('.chat-input').forEach(input => {
-        input.style.display = 'none';
-    });
-    
-    // Show the selected container
-    const container = document.getElementById(containerId);
-    if (container) {
-        container.style.display = 'block';
-        
-        // Show its input if it's a chat container
-        if (containerId === 'chat' || containerId === 'private-ai') {
-            container.querySelector('.chat-input').style.display = 'flex';
-        }
-    }
-    
-    // Hide the dropdown menu
-    document.getElementById('dropdown').style.display = 'none';
-    
-    // Hide auth container if showing
-    document.getElementById('auth-container').style.display = 'none';
-    
-    // Show menu if logged in
-    if (localStorage.getItem('currentUser')) {
-        document.querySelector('.menu').style.display = 'flex';
-    }
-    
-    // Set scroll restore flag for chat container
-    if (containerId === 'chat') {
-        shouldRestoreScroll = true;
-    }
-    
-    // Handle scroll events for private container
-    if (containerId === 'private-ai' && privateContainer) {
-        // Attach scroll event for private container
-        privateContainer.addEventListener('scroll', handlePrivateScroll);
-        // Initial check for scroll position
-        setTimeout(handlePrivateScroll, 100);
-    } else if (privateContainer) {
-        // Remove scroll event when not in private container
-        privateContainer.removeEventListener('scroll', handlePrivateScroll);
-        // Hide the go-top button when switching away
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    }
-}
-  function copyToClipboard(text, button) {  
-    const textarea = document.createElement('textarea');  
-    textarea.value = text;  
-    document.body.appendChild(textarea);  
-    textarea.select();  
-    document.execCommand('copy');  
-    document.body.removeChild(textarea);  
-
-    button.innerHTML = '<span style="font-size: 15px;">Copied!</span>';  
-    setTimeout(() => {  
-      button.innerHTML = 'Copy';  
-    }, 2000);  
-  }  
-
-  function showError(msg) {  
-    if (!elements.errorDisplay) return;  
-    elements.errorDisplay.textContent = msg;  
-    elements.errorDisplay.style.display = 'block';  
-    setTimeout(() => {  
-      elements.errorDisplay.style.display = 'none';  
-    }, 3000);  
-  }  
-
-           function toggleKebabMenu(event) {
-            event.stopPropagation();
-            const dropdown = document.querySelector('.kebab-dropdown');
-            if (dropdown) {
-                dropdown.classList.toggle('active');
-            }
-        }
-
-        document.addEventListener('click', function(event) {
-            const dropdown = document.querySelector('.kebab-dropdown');
-            if (dropdown && dropdown.classList.contains('active')) {
-                dropdown.classList.remove('active');
-            }
-        });
-
-        function toggleTheme() {
-            document.body.classList.toggle('dark-theme');
-            const dropdown = document.querySelector('.kebab-dropdown');
-            if (dropdown) {
-                dropdown.classList.remove('active');
-            }
-        }
-
-        function clearChat() {
-            const chatContainer = document.getElementById('chat-container');
-            if (chatContainer) {
-                chatContainer.innerHTML = '';
-            }
-            const dropdown = document.querySelector('.kebab-dropdown');
-            if (dropdown) {
-                dropdown.classList.remove('active');
-            }
-        }
-
-        function exportChat() {
-            const chatContainer = document.getElementById('chat-container');
-            if (!chatContainer) return;
-            
-            const messages = chatContainer.innerText;
-            const blob = new Blob([messages], { type: 'text/plain' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'chat-export.txt';
-            a.click();
-            window.URL.revokeObjectURL(url);
-            const dropdown = document.querySelector('.kebab-dropdown');
-            if (dropdown) {
-                dropdown.classList.remove('active');
-            }
-        }
-
-          function exportChatPDF() {
-    const chatContainer = document.getElementById('chat-container');
-    if (!chatContainer) return;
-    
-    const dropdown = document.querySelector('.kebab-dropdown');
-    if (!dropdown) return;
-
-    const clone = chatContainer.cloneNode(true);
-
-    // Show downloading alert
-    const downloadingAlert = document.createElement('div');
-    downloadingAlert.id = 'downloading-alert';
-    downloadingAlert.textContent = 'Preparing download, please wait...';
-    downloadingAlert.style.position = 'fixed';
-    downloadingAlert.style.top = '20px';
-    downloadingAlert.style.left = '50%';
-    downloadingAlert.style.transform = 'translateX(-50%)';
-    downloadingAlert.style.padding = '10px 20px';
-    downloadingAlert.style.backgroundColor = '#333';
-    downloadingAlert.style.color = '#fff';
-    downloadingAlert.style.fontSize = '16px';
-    downloadingAlert.style.borderRadius = '8px';
-    downloadingAlert.style.zIndex = '9999';
-    document.body.appendChild(downloadingAlert);
-
-    // Find all images and replace src with base64
-    const images = clone.querySelectorAll('img');
-    const promises = [];
-
-    images.forEach(img => {
-        const promise = new Promise((resolve, reject) => {
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            const originalImage = new Image();
-            originalImage.crossOrigin = 'anonymous';
-            originalImage.src = img.src;
-
-            originalImage.onload = () => {
-                try {
-                    // Store original display style to restore later
-                    const originalDisplay = img.style.display;
-                    const originalWidth = img.style.width;
-                    const originalHeight = img.style.height;
-
-                    // Temporarily make image visible and full size for capture
-                    img.style.display = 'block';
-                    img.style.width = 'auto';
-                    img.style.height = 'auto';
-                    img.style.maxWidth = 'none';
-                    img.style.maxHeight = 'none';
-
-                    canvas.width = originalImage.naturalWidth;
-                    canvas.height = originalImage.naturalHeight;
-                    context.drawImage(originalImage, 0, 0);
-
-                    const dataURL = canvas.toDataURL('image/png');
-                    img.src = dataURL;
-
-                    // Restore original styles
-                    img.style.display = originalDisplay;
-                    img.style.width = originalWidth;
-                    img.style.height = originalHeight;
-
-                    resolve();
-                } catch (error) {
-                    console.error('Error converting image:', error);
-                    resolve();
-                }
-            };
-
-            originalImage.onerror = () => {
-                console.error('Error loading image:', img.src);
-                resolve();
-            };
-        });
-        promises.push(promise);
-    });
-
-    Promise.all(promises).then(() => {
-        const opt = {
-            margin: 10,
-            filename: 'chat-export.pdf',
-            image: { type: 'jpeg', quality: 1 },
-            html2canvas: { 
-                scale: 2,
-                useCORS: true,
-                allowTaint: true,
-                scrollX: 0,
-                scrollY: 0,
-                windowWidth: document.documentElement.scrollWidth,
-                windowHeight: document.documentElement.scrollHeight
-            },
-            jsPDF: { 
-                unit: 'mm',
-                format: 'a4',
-                orientation: 'portrait',
-                hotfixes: ['px_scaling'] 
-            },
-            pagebreak: { 
-                mode: ['avoid-all', 'css', 'legacy'],
-                before: '.page-break' 
-            }
-        };
-
-        // Temporarily modify image styles for PDF generation
-        const allImages = clone.querySelectorAll('img');
-        allImages.forEach(img => {
-            img.style.maxWidth = '100%';
-            img.style.height = 'auto';
-            img.style.display = 'block';
-        });
-
-        html2pdf().set(opt).from(clone).save().then(() => {
-            downloadingAlert.remove();
-        }).catch((error) => {
-            console.error('Error generating PDF:', error);
-            downloadingAlert.remove();
-        });
-
-        dropdown.classList.remove('active');
-    });
-}
-        function showSettings() {
-            alert('Settings panel coming soon!');
-            const dropdown = document.querySelector('.kebab-dropdown');
-            if (dropdown) {
-                dropdown.classList.remove('active');
-            }
-        }
-         
-        function toggleNews() {
-    const newsContainer = document.getElementById('news-container');
-    if (newsContainer) {
-        // Toggle the display of the news container
-        if (newsContainer.style.display === 'none' || newsContainer.style.display === '') {
-            newsContainer.style.display = 'block';
-            // Make sure it's populated with news items
-            populateNews();
-        } else {
-            newsContainer.style.display = 'none';
-        }
-    }
+  // Hide all containers
+  document.querySelectorAll('.container').forEach(container => {
+      container.style.display = 'none';
+  });
+  
+  // Hide all chat inputs
+  document.querySelectorAll('.chat-input').forEach(input => {
+      input.style.display = 'none';
+  });
+  
+  // Show the selected container
+  const container = document.getElementById(containerId);
+  if (container) {
+      container.style.display = 'block';
+      
+      // Show its input if it's a chat container
+      if (containerId === 'chat' || containerId === 'private-ai') {
+          container.querySelector('.chat-input').style.display = 'flex';
+      }
+  }
+  
+  // Hide the dropdown menu
+  document.getElementById('dropdown').style.display = 'none';
+  
+  // Hide auth container if showing
+  document.getElementById('auth-container').style.display = 'none';
+  
+  // Show menu if logged in
+  if (localStorage.getItem('currentUser')) {
+      document.querySelector('.menu').style.display = 'flex';
+  }
+  
+  // Set scroll restore flag for chat container
+  if (containerId === 'chat') {
+      shouldRestoreScroll = true;
+  }
+  
+  // Handle scroll events for private container
+  if (containerId === 'private-ai' && privateContainer) {
+      // Attach scroll event for private container
+      privateContainer.addEventListener('scroll', handlePrivateScroll);
+      // Initial check for scroll position
+      setTimeout(handlePrivateScroll, 100);
+  } else if (privateContainer) {
+      // Remove scroll event when not in private container
+      privateContainer.removeEventListener('scroll', handlePrivateScroll);
+      // Hide the go-top button when switching away
+      if (privateGoTopBtn) {
+          privateGoTopBtn.style.display = 'none';
+          privateGoTopBtn.classList.remove('visible');
+      }
+  }
 }
 
-        const sampleNews = [
-            {
-                title: "New AI Features Released",
-                description: "We've added exciting new capabilities to our chatbot!",
-                date: "2025-01-15"
-            },
-            {
-                title: "System Update",
-                description: "Performance improvements and bug fixes",
-                date: "2025-03-14"
-            },
-            {
-                title: "Maintenance Notice",
-                description: "Scheduled maintenance on January 20th",
-                date: "2025-03-13"
-            }
-        ];
+function copyToClipboard(text, button) {  
+  const textarea = document.createElement('textarea');  
+  textarea.value = text;  
+  document.body.appendChild(textarea);  
+  textarea.select();  
+  document.execCommand('copy');  
+  document.body.removeChild(textarea);  
 
-        function populateNews() {
-            const newsItems = document.getElementById('news-items');
-            if (!newsItems) return;
-            
-            newsItems.innerHTML = '';
+  button.innerHTML = '<span style="font-size: 15px;">Copied!</span>';  
+  setTimeout(() => {  
+    button.innerHTML = 'Copy';  
+  }, 2000);  
+}  
 
-            sampleNews.forEach(news => {
-                const newsItem = document.createElement('div');
-                newsItem.className = 'news-item';
-                newsItem.innerHTML = `
-                    <h3>${news.title}</h3>
-                    <p>${news.description}</p>
-                    <small>${news.date}</small>
-                `;
-                newsItems.appendChild(newsItem);
-            });
-        }
+function showError(msg) {  
+  if (!elements.errorDisplay) return;  
+  elements.errorDisplay.textContent = msg;  
+  elements.errorDisplay.style.display = 'block';  
+  setTimeout(() => {  
+    elements.errorDisplay.style.display = 'none';  
+  }, 3000);  
+}  
 
-    document.addEventListener('click', function (e) {
-    if (e.target.tagName === 'IMG' && e.target.closest('.message')) {
-        openZoom(e.target.src);
-    }
+function toggleKebabMenu(event) {
+  event.stopPropagation();
+  const dropdown = document.querySelector('.kebab-dropdown');
+  if (dropdown) {
+      dropdown.classList.toggle('active');
+  }
+}
+
+document.addEventListener('click', function(event) {
+  const dropdown = document.querySelector('.kebab-dropdown');
+  if (dropdown && dropdown.classList.contains('active')) {
+      dropdown.classList.remove('active');
+  }
+});
+
+function toggleTheme() {
+  document.body.classList.toggle('dark-theme');
+  const dropdown = document.querySelector('.kebab-dropdown');
+  if (dropdown) {
+      dropdown.classList.remove('active');
+  }
+}
+
+function clearChat() {
+  const chatContainer = document.getElementById('chat-container');
+  if (chatContainer) {
+      chatContainer.innerHTML = '';
+  }
+  const dropdown = document.querySelector('.kebab-dropdown');
+  if (dropdown) {
+      dropdown.classList.remove('active');
+  }
+}
+
+function exportChat() {
+  const chatContainer = document.getElementById('chat-container');
+  if (!chatContainer) return;
+  
+  const messages = chatContainer.innerText;
+  const blob = new Blob([messages], { type: 'text/plain' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'chat-export.txt';
+  a.click();
+  window.URL.revokeObjectURL(url);
+  const dropdown = document.querySelector('.kebab-dropdown');
+  if (dropdown) {
+      dropdown.classList.remove('active');
+  }
+}
+
+function exportChatPDF() {
+  const chatContainer = document.getElementById('chat-container');
+  if (!chatContainer) return;
+  
+  const dropdown = document.querySelector('.kebab-dropdown');
+  if (!dropdown) return;
+
+  const clone = chatContainer.cloneNode(true);
+
+  // Show downloading alert
+  const downloadingAlert = document.createElement('div');
+  downloadingAlert.id = 'downloading-alert';
+  downloadingAlert.textContent = 'Preparing download, please wait...';
+  downloadingAlert.style.position = 'fixed';
+  downloadingAlert.style.top = '20px';
+  downloadingAlert.style.left = '50%';
+  downloadingAlert.style.transform = 'translateX(-50%)';
+  downloadingAlert.style.padding = '10px 20px';
+  downloadingAlert.style.backgroundColor = '#333';
+  downloadingAlert.style.color = '#fff';
+  downloadingAlert.style.fontSize = '16px';
+  downloadingAlert.style.borderRadius = '8px';
+  downloadingAlert.style.zIndex = '9999';
+  document.body.appendChild(downloadingAlert);
+
+  // Find all images and replace src with base64
+  const images = clone.querySelectorAll('img');
+  const promises = [];
+
+  images.forEach(img => {
+      const promise = new Promise((resolve, reject) => {
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          const originalImage = new Image();
+          originalImage.crossOrigin = 'anonymous';
+          originalImage.src = img.src;
+
+          originalImage.onload = () => {
+              try {
+                  // Store original display style to restore later
+                  const originalDisplay = img.style.display;
+                  const originalWidth = img.style.width;
+                  const originalHeight = img.style.height;
+
+                  // Temporarily make image visible and full size for capture
+                  img.style.display = 'block';
+                  img.style.width = 'auto';
+                  img.style.height = 'auto';
+                  img.style.maxWidth = 'none';
+                  img.style.maxHeight = 'none';
+
+                  canvas.width = originalImage.naturalWidth;
+                  canvas.height = originalImage.naturalHeight;
+                  context.drawImage(originalImage, 0, 0);
+
+                  const dataURL = canvas.toDataURL('image/png');
+                  img.src = dataURL;
+
+                  // Restore original styles
+                  img.style.display = originalDisplay;
+                  img.style.width = originalWidth;
+                  img.style.height = originalHeight;
+
+                  resolve();
+              } catch (error) {
+                  console.error('Error converting image:', error);
+                  resolve();
+              }
+          };
+
+          originalImage.onerror = () => {
+              console.error('Error loading image:', img.src);
+              resolve();
+          };
+      });
+      promises.push(promise);
+  });
+
+  Promise.all(promises).then(() => {
+      const opt = {
+          margin: 10,
+          filename: 'chat-export.pdf',
+          image: { type: 'jpeg', quality: 1 },
+          html2canvas: { 
+              scale: 2,
+              useCORS: true,
+              allowTaint: true,
+              scrollX: 0,
+              scrollY: 0,
+              windowWidth: document.documentElement.scrollWidth,
+              windowHeight: document.documentElement.scrollHeight
+          },
+          jsPDF: { 
+              unit: 'mm',
+              format: 'a4',
+              orientation: 'portrait',
+              hotfixes: ['px_scaling'] 
+          },
+          pagebreak: { 
+              mode: ['avoid-all', 'css', 'legacy'],
+              before: '.page-break' 
+          }
+      };
+
+      // Temporarily modify image styles for PDF generation
+      const allImages = clone.querySelectorAll('img');
+      allImages.forEach(img => {
+          img.style.maxWidth = '100%';
+          img.style.height = 'auto';
+          img.style.display = 'block';
+      });
+
+      html2pdf().set(opt).from(clone).save().then(() => {
+          downloadingAlert.remove();
+      }).catch((error) => {
+          console.error('Error generating PDF:', error);
+          downloadingAlert.remove();
+      });
+
+      dropdown.classList.remove('active');
+  });
+}
+
+function showSettings() {
+  alert('Settings panel coming soon!');
+  const dropdown = document.querySelector('.kebab-dropdown');
+  if (dropdown) {
+      dropdown.classList.remove('active');
+  }
+}
+ 
+function toggleNews() {
+  const newsContainer = document.getElementById('news-container');
+  if (newsContainer) {
+      // Toggle the display of the news container
+      if (newsContainer.style.display === 'none' || newsContainer.style.display === '') {
+          newsContainer.style.display = 'block';
+          // Make sure it's populated with news items
+          populateNews();
+      } else {
+          newsContainer.style.display = 'none';
+      }
+  }
+}
+
+const sampleNews = [
+  {
+      title: "New AI Features Released",
+      description: "We've added exciting new capabilities to our chatbot!",
+      date: "2025-01-15"
+  },
+  {
+      title: "System Update",
+      description: "Performance improvements and bug fixes",
+      date: "2025-03-14"
+  },
+  {
+      title: "Maintenance Notice",
+      description: "Scheduled maintenance on January 20th",
+      date: "2025-03-13"
+  }
+];
+
+function populateNews() {
+  const newsItems = document.getElementById('news-items');
+  if (!newsItems) return;
+  
+  newsItems.innerHTML = '';
+
+  sampleNews.forEach(news => {
+      const newsItem = document.createElement('div');
+      newsItem.className = 'news-item';
+      newsItem.innerHTML = `
+          <h3>${news.title}</h3>
+          <p>${news.description}</p>
+          <small>${news.date}</small>
+      `;
+      newsItems.appendChild(newsItem);
+  });
+}
+
+document.addEventListener('click', function (e) {
+  if (e.target.tagName === 'IMG' && e.target.closest('.message')) {
+      openZoom(e.target.src);
+  }
 });
 
 function openZoom(src) {
-    document.body.style.overflow = 'hidden';
-    const overlay = document.getElementById('zoom-overlay');
-    const zoomImage = document.getElementById('zoom-image');
-    const downloadBtn = document.getElementById('download-btn');
+  document.body.style.overflow = 'hidden';
+  const overlay = document.getElementById('zoom-overlay');
+  const zoomImage = document.getElementById('zoom-image');
+  const downloadBtn = document.getElementById('download-btn');
 
-    if (!overlay || !zoomImage || !downloadBtn) return;
-    
-    zoomImage.src = src;
+  if (!overlay || !zoomImage || !downloadBtn) return;
+  
+  zoomImage.src = src;
 
-    // Force download filename
-    downloadBtn.href = src;
-    downloadBtn.setAttribute('download', 'image.jpg');
+  // Force download filename
+  downloadBtn.href = src;
+  downloadBtn.setAttribute('download', 'image.jpg');
 
-    overlay.style.display = 'flex';
+  overlay.style.display = 'flex';
 }
 
 function closeZoom() {
-    document.body.style.overflow = '';
-    const overlay = document.getElementById('zoom-overlay');
-    if (overlay) {
-        overlay.style.display = 'none';
-    }
+  document.body.style.overflow = '';
+  const overlay = document.getElementById('zoom-overlay');
+  if (overlay) {
+      overlay.style.display = 'none';
+  }
 }
-        if (document.getElementById('user-input')) {
-            document.getElementById('user-input').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter' && !e.shiftKey && !isSending) {
-                    e.preventDefault();
-                    sendMessage();
-                }
-            });
 
-            document.querySelector('.chat-input button').addEventListener('touchstart', function(e) {
-                e.preventDefault();
-                if (!isSending) {
-                    sendMessage();
-                }
-            });
+if (document.getElementById('user-input')) {
+  document.getElementById('user-input').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey && !isSending) {
+          e.preventDefault();
+          sendMessage();
+      }
+  });
 
-            document.getElementById('user-input').addEventListener('input', function () {
-                autoResize(this);
-                document.querySelector('.chat-input button').disabled = this.value.trim().length === 0 || isSending;
-            });
-        }
-    
-    if (document.getElementById('private-user-input')) {
-        document.getElementById('private-user-input').addEventListener('input', function() {
-            autoResize(this);
-            this.nextElementSibling.disabled = this.value.trim().length === 0;
-            this.nextElementSibling.classList.toggle('enabled', this.value.trim().length > 0);
-        });
+  document.querySelector('.chat-input button').addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      if (!isSending) {
+          sendMessage();
+      }
+  });
 
-        document.getElementById('private-user-input').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendPrivateMessage();
-            }
-        });
-    }
+  document.getElementById('user-input').addEventListener('input', function () {
+      autoResize(this);
+      document.querySelector('.chat-input button').disabled = this.value.trim().length === 0 || isSending;
+  });
+}
+
+if (document.getElementById('private-user-input')) {
+  document.getElementById('private-user-input').addEventListener('input', function() {
+      autoResize(this);
+      this.nextElementSibling.disabled = this.value.trim().length === 0;
+      this.nextElementSibling.classList.toggle('enabled', this.value.trim().length > 0);
+  });
+
+  document.getElementById('private-user-input').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendPrivateMessage();
+      }
+  });
+}
 
 function autoResize(textarea) {
-    if (textarea) {
-        textarea.style.height = 'auto';
-        textarea.style.height = (textarea.scrollHeight > 100 ? 100 : textarea.scrollHeight) + 'px';
-    }
+  if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = (textarea.scrollHeight > 100 ? 100 : textarea.scrollHeight) + 'px';
+  }
 }
 
 if (document.getElementById("year")) {
-    document.getElementById("year").textContent = new Date().getFullYear();
+  document.getElementById("year").textContent = new Date().getFullYear();
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    populateNews();
+  populateNews();
 
-    const currentUser = localStorage.getItem('currentUser');
-    if (currentUser) {
-        const newsToggle = document.querySelector('.news-toggle');
-        if (newsToggle) newsToggle.style.display = 'block';
-    } else {
-        const newsToggle = document.querySelector('.news-toggle');
-        if (newsToggle) newsToggle.style.display = 'none';
-        
-        const newsContainer = document.querySelector('.news-container');
-        if (newsContainer) newsContainer.style.display = 'none';
-    }
+  const currentUser = localStorage.getItem('currentUser');
+  if (currentUser) {
+      const newsToggle = document.querySelector('.news-toggle');
+      if (newsToggle) newsToggle.style.display = 'block';
+  } else {
+      const newsToggle = document.querySelector('.news-toggle');
+      if (newsToggle) newsToggle.style.display = 'none';
+      
+      const newsContainer = document.querySelector('.news-container');
+      if (newsContainer) newsContainer.style.display = 'none';
+  }
 });
 
 // Updated function to update the profile section
 function updateProfileSection() {
-    const dropdown = document.getElementById('dropdown');
-    if (!dropdown) return;
-    
-    const currentUsername = localStorage.getItem('currentUser');
-    
-    // Remove existing profile section if it exists
-    const existingProfile = document.querySelector('.profile-section');
-    const existingDivider = document.querySelector('.menu-divider');
-    if (existingProfile) existingProfile.remove();
-    if (existingDivider) existingDivider.remove();
-    
-    // Only add profile section if user is logged in
-    if (currentUsername) {
-        const profileSection = document.createElement('div');
-        profileSection.className = 'profile-section';
-        profileSection.innerHTML = `
-            <div class="profile-avatar">
-                <img src="https://i.pravatar.cc/50?u=${encodeURIComponent(currentUsername)}" alt="Profile">
-            </div>
-            <div class="profile-username">${currentUsername}</div>
-        `;
-        
-        const divider = document.createElement('div');
-        divider.className = 'menu-divider';
-        
-        // Insert at the beginning of dropdown
-        dropdown.insertBefore(divider, dropdown.firstChild);
-        dropdown.insertBefore(profileSection, dropdown.firstChild);
-    }
+  const dropdown = document.getElementById('dropdown');
+  if (!dropdown) return;
+  
+  const currentUsername = localStorage.getItem('currentUser');
+  
+  // Remove existing profile section if it exists
+  const existingProfile = document.querySelector('.profile-section');
+  const existingDivider = document.querySelector('.menu-divider');
+  if (existingProfile) existingProfile.remove();
+  if (existingDivider) existingDivider.remove();
+  
+  // Only add profile section if user is logged in
+  if (currentUsername) {
+      const profileSection = document.createElement('div');
+      profileSection.className = 'profile-section';
+      profileSection.innerHTML = `
+          <div class="profile-avatar">
+              <img src="https://i.pravatar.cc/50?u=${encodeURIComponent(currentUsername)}" alt="Profile">
+          </div>
+          <div class="profile-username">${currentUsername}</div>
+      `;
+      
+      const divider = document.createElement('div');
+      divider.className = 'menu-divider';
+      
+      // Insert at the beginning of dropdown
+      dropdown.insertBefore(divider, dropdown.firstChild);
+      dropdown.insertBefore(profileSection, dropdown.firstChild);
+  }
 }
 
 // Improved click handler for dropdown
 document.addEventListener('click', function(event) {
-    const dropdown = document.getElementById('dropdown');
-    const hamburger = document.querySelector('.hamburger');
-    const kebabMenu = document.querySelector('.kebab-menu');
-    
-    // Close dropdown if clicking outside of it and not on menu controls
-    if (dropdown && dropdown.style.display === 'block' && 
-        !dropdown.contains(event.target) && 
-        event.target !== hamburger &&
-        !kebabMenu.contains(event.target)) {
-        dropdown.style.display = 'none';
-    }
-    
-    // Close kebab menu if clicking outside
-    const kebabDropdown = document.querySelector('.kebab-dropdown');
-    if (kebabDropdown && kebabDropdown.classList.contains('active') && 
-        !kebabMenu.contains(event.target) && 
-        !kebabDropdown.contains(event.target)) {
-        kebabDropdown.classList.remove('active');
-    }
+  const dropdown = document.getElementById('dropdown');
+  const hamburger = document.querySelector('.hamburger');
+  const kebabMenu = document.querySelector('.kebab-menu');
+  
+  // Close dropdown if clicking outside of it and not on menu controls
+  if (dropdown && dropdown.style.display === 'block' && 
+      !dropdown.contains(event.target) && 
+      event.target !== hamburger &&
+      !kebabMenu.contains(event.target)) {
+      dropdown.style.display = 'none';
+  }
+  
+  // Close kebab menu if clicking outside
+  const kebabDropdown = document.querySelector('.kebab-dropdown');
+  if (kebabDropdown && kebabDropdown.classList.contains('active') && 
+      !kebabMenu.contains(event.target) && 
+      !kebabDropdown.contains(event.target)) {
+      kebabDropdown.classList.remove('active');
+  }
 });
 
 function logout() {
-    // Clear user data
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('chat_username');
-    
-    // Hide all containers and menus
-    document.querySelectorAll('.container').forEach(container => {
-        container.style.display = 'none';
-    });
-    
-    const menu = document.querySelector('.menu');
-    if (menu) menu.style.display = 'none';
-    
-    const dropdown = document.getElementById('dropdown');
-    if (dropdown) dropdown.style.display = 'none';
-    
-    const kebabDropdown = document.querySelector('.kebab-dropdown');
-    if (kebabDropdown) kebabDropdown.classList.remove('active');
-    
-    // Hide all chat inputs
-    document.querySelectorAll('.chat-input').forEach(input => {
-        input.style.display = 'none';
-    });
-    
-    // Show auth container
-    document.getElementById('auth-container').style.display = 'flex';
-    
-    // Hide news toggle
-    const newsToggle = document.querySelector('.news-toggle');
-    if (newsToggle) newsToggle.style.display = 'none';
-    
-    const newsContainer = document.querySelector('.news-container');
-    if (newsContainer) newsContainer.style.display = 'none';
-    
-    // Hide scroll button
-    const scrollBtn = document.getElementById('scrollToBottomBtn');
-    if (scrollBtn) scrollBtn.style.display = 'none';
-    
-    // Reset auth form
-    isLogin = true;
-    const authTitle = document.getElementById('auth-title');
-    if (authTitle) authTitle.textContent = 'Login';
-    
-    const authButton = document.querySelector('.auth-box button');
-    if (authButton) authButton.textContent = 'Login';
-    
-    const toggleText = document.getElementById('toggle-text');
-    if (toggleText) toggleText.textContent = "Don't have an account? ";
-    
-    const toggleLink = document.getElementById('toggle-link');
-    if (toggleLink) toggleLink.textContent = 'Sign Up';
-    
-    // Clear profile section
-    const profileSection = document.querySelector('.profile-section');
-    const divider = document.querySelector('.menu-divider');
-    if (profileSection) profileSection.remove();
-    if (divider) divider.remove();
+  // Disconnect socket when logging out
+  if (socket) {
+    socket.disconnect();
+  }
+  
+  // Clear user data
+  localStorage.removeItem('currentUser');
+  localStorage.removeItem('chat_username');
+  
+  // Hide all containers and menus
+  document.querySelectorAll('.container').forEach(container => {
+      container.style.display = 'none';
+  });
+  
+  const menu = document.querySelector('.menu');
+  if (menu) menu.style.display = 'none';
+  
+  const dropdown = document.getElementById('dropdown');
+  if (dropdown) dropdown.style.display = 'none';
+  
+  const kebabDropdown = document.querySelector('.kebab-dropdown');
+  if (kebabDropdown) kebabDropdown.classList.remove('active');
+  
+  // Hide all chat inputs
+  document.querySelectorAll('.chat-input').forEach(input => {
+      input.style.display = 'none';
+  });
+  
+  // Show auth container
+  document.getElementById('auth-container').style.display = 'flex';
+  
+  // Hide news toggle
+  const newsToggle = document.querySelector('.news-toggle');
+  if (newsToggle) newsToggle.style.display = 'none';
+  
+  const newsContainer = document.querySelector('.news-container');
+  if (newsContainer) newsContainer.style.display = 'none';
+  
+  // Hide scroll button
+  const scrollBtn = document.getElementById('scrollToBottomBtn');
+  if (scrollBtn) scrollBtn.style.display = 'none';
+  
+  // Reset auth form
+  isLogin = true;
+  const authTitle = document.getElementById('auth-title');
+  if (authTitle) authTitle.textContent = 'Login';
+  
+  const authButton = document.querySelector('.auth-box button');
+  if (authButton) authButton.textContent = 'Login';
+  
+  const toggleText = document.getElementById('toggle-text');
+  if (toggleText) toggleText.textContent = "Don't have an account? ";
+  
+  const toggleLink = document.getElementById('toggle-link');
+  if (toggleLink) toggleLink.textContent = 'Sign Up';
+  
+  // Clear profile section
+  const profileSection = document.querySelector('.profile-section');
+  const divider = document.querySelector('.menu-divider');
+  if (profileSection) profileSection.remove();
+  if (divider) divider.remove();
 }
 
 // Improved toggleDropdown function
 function toggleDropdown() {
-    const dropdown = document.getElementById('dropdown');
-    if (!dropdown) return;
-    
-    const isVisible = dropdown.style.display === 'block';
-    
-    // Close all other menus first
-    const kebabDropdown = document.querySelector('.kebab-dropdown');
-    if (kebabDropdown) kebabDropdown.classList.remove('active');
-    
-    // Toggle dropdown
-    dropdown.style.display = isVisible ? 'none' : 'block';
-    
-    // Close if clicking the same button while open
-    if (isVisible) {
-        dropdown.style.display = 'none';
-    }
+  const dropdown = document.getElementById('dropdown');
+  if (!dropdown) return;
+  
+  const isVisible = dropdown.style.display === 'block';
+  
+  // Close all other menus first
+  const kebabDropdown = document.querySelector('.kebab-dropdown');
+  if (kebabDropdown) kebabDropdown.classList.remove('active');
+  
+  // Toggle dropdown
+  dropdown.style.display = isVisible ? 'none' : 'block';
+  
+  // Close if clicking the same button while open
+  if (isVisible) {
+      dropdown.style.display = 'none';
+  }
 }
 
 // Updated showContainer function with proper menu handling
 function showContainer(containerId) {
-    const containers = document.querySelectorAll('.container');
-    containers.forEach(container => {
-        container.style.display = 'none';
-    });
-    
-    // Hide all chat inputs first
-    document.querySelectorAll('.chat-input').forEach(input => {
-        input.style.display = 'none';
-    });
-    
-    // Show the selected container
-    const container = document.getElementById(containerId);
-    if (container) {
-        container.style.display = 'block';
-        
-        // Show the appropriate chat input
-        if (containerId === 'chat' || containerId === 'private-ai') {
-            const chatInput = container.querySelector('.chat-input');
-            if (chatInput) chatInput.style.display = 'flex';
-        }
-    }
-    
-    // Close all menus when showing any container
-    const dropdown = document.getElementById('dropdown');
-    if (dropdown) dropdown.style.display = 'none';
-    
-    const kebabDropdown = document.querySelector('.kebab-dropdown');
-    if (kebabDropdown) kebabDropdown.classList.remove('active');
-    
-    currentUsername = localStorage.getItem('chat_username') || '';
-    
-    // Set scroll restore flag for chat container
-    if (containerId === 'chat') {
-        shouldRestoreScroll = true;
-    }
-    
-    // Handle scroll events for private container
-    if (containerId === 'private-ai' && privateContainer) {
-        // Attach scroll event for private container
-        privateContainer.addEventListener('scroll', handlePrivateScroll);
-        // Initial check for scroll position
-        setTimeout(handlePrivateScroll, 100);
-    } else if (privateContainer) {
-        // Remove scroll event when not in private container
-        privateContainer.removeEventListener('scroll', handlePrivateScroll);
-        // Hide the go-top button when switching away
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    }
+  const containers = document.querySelectorAll('.container');
+  containers.forEach(container => {
+      container.style.display = 'none';
+  });
+  
+  // Hide all chat inputs first
+  document.querySelectorAll('.chat-input').forEach(input => {
+      input.style.display = 'none';
+  });
+  
+  // Show the selected container
+  const container = document.getElementById(containerId);
+  if (container) {
+      container.style.display = 'block';
+      
+      // Show the appropriate chat input
+      if (containerId === 'chat' || containerId === 'private-ai') {
+          const chatInput = container.querySelector('.chat-input');
+          if (chatInput) chatInput.style.display = 'flex';
+      }
+  }
+  
+  // Close all menus when showing any container
+  const dropdown = document.getElementById('dropdown');
+  if (dropdown) dropdown.style.display = 'none';
+  
+  const kebabDropdown = document.querySelector('.kebab-dropdown');
+  if (kebabDropdown) kebabDropdown.classList.remove('active');
+  
+  currentUsername = localStorage.getItem('chat_username') || '';
+  
+  // Set scroll restore flag for chat container
+  if (containerId === 'chat') {
+      shouldRestoreScroll = true;
+  }
+  
+  // Handle scroll events for private container
+  if (containerId === 'private-ai' && privateContainer) {
+      // Attach scroll event for private container
+      privateContainer.addEventListener('scroll', handlePrivateScroll);
+      // Initial check for scroll position
+      setTimeout(handlePrivateScroll, 100);
+  } else if (privateContainer) {
+      // Remove scroll event when not in private container
+      privateContainer.removeEventListener('scroll', handlePrivateScroll);
+      // Hide the go-top button when switching away
+      if (privateGoTopBtn) {
+          privateGoTopBtn.style.display = 'none';
+          privateGoTopBtn.classList.remove('visible');
+      }
+  }
 }
 
 // Updated hideContainer function
 function hideContainer(containerId) {
-    const container = document.getElementById(containerId);
-    if (container) container.style.display = 'none';
-    
-    const overlay = document.getElementById('overlay');
-    if (overlay) overlay.style.display = 'none';
-    
-    // Close all menus when hiding any container
-    const dropdown = document.getElementById('dropdown');
-    if (dropdown) dropdown.style.display = 'none';
-    
-    const kebabDropdown = document.querySelector('.kebab-dropdown');
-    if (kebabDropdown) kebabDropdown.classList.remove('active');
-    
-    // Show chat container and input after closing any section
-    showContainer('chat');
+  const container = document.getElementById(containerId);
+  if (container) container.style.display = 'none';
+  
+  const overlay = document.getElementById('overlay');
+  if (overlay) overlay.style.display = 'none';
+  
+  // Close all menus when hiding any container
+  const dropdown = document.getElementById('dropdown');
+  if (dropdown) dropdown.style.display = 'none';
+  
+  const kebabDropdown = document.querySelector('.kebab-dropdown');
+  if (kebabDropdown) kebabDropdown.classList.remove('active');
+  
+  // Show chat container and input after closing any section
+  showContainer('chat');
 }
 
 // Zoom functions remain the same
 function openZoom(src) {
-    document.body.style.overflow = 'hidden';
-    const overlay = document.getElementById('zoom-overlay');
-    const zoomImage = document.getElementById('zoom-image');
-    if (!overlay || !zoomImage) return;
-    
-    zoomImage.src = src;
-    overlay.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  const overlay = document.getElementById('zoom-overlay');
+  const zoomImage = document.getElementById('zoom-image');
+  if (!overlay || !zoomImage) return;
+  
+  zoomImage.src = src;
+  overlay.style.display = 'flex';
 }
 
 function closeZoom() {
-    document.body.style.overflow = '';
-    const overlay = document.getElementById('zoom-overlay');
-    if (overlay) overlay.style.display = 'none';
+  document.body.style.overflow = '';
+  const overlay = document.getElementById('zoom-overlay');
+  if (overlay) overlay.style.display = 'none';
 }
 
 const overlay = document.getElementById('overlay');
 if (overlay) {
-    overlay.addEventListener('click', function() {
-        document.querySelectorAll('.about-container, .features-container, .help-container').forEach(container => {
-            container.style.display = 'none';
-        });
-        this.style.display = 'none';
-        showContainer('chat');
-    });
+  overlay.addEventListener('click', function() {
+      document.querySelectorAll('.about-container, .features-container, .help-container').forEach(container => {
+          container.style.display = 'none';
+      });
+      this.style.display = 'none';
+      showContainer('chat');
+  });
 }
 
 // Initialize if user is logged in
 const currentUser = localStorage.getItem('currentUser');
 if (currentUser) {
-    showContainer('chat');
-    
-    const chatInput = document.querySelector('.chat-input');
-    if (chatInput) chatInput.style.display = 'flex';
-    
-    updateProfileSection();
-    
-    // Set flag to restore scroll position after messages load
-    shouldRestoreScroll = true;
-    
-    // Show scroll button
-    const scrollBtn = document.getElementById('scrollToBottomBtn');
-    if (scrollBtn) scrollBtn.style.display = 'block';
+  showContainer('chat');
+  
+  const chatInput = document.querySelector('.chat-input');
+  if (chatInput) chatInput.style.display = 'flex';
+  
+  updateProfileSection();
+  
+  // Initialize real-time features
+  initSocket();
+  setupTypingHandlers();
+  
+  // Set flag to restore scroll position after messages load
+  shouldRestoreScroll = true;
+  
+  // Show scroll button
+  const scrollBtn = document.getElementById('scrollToBottomBtn');
+  if (scrollBtn) scrollBtn.style.display = 'block';
 }
- </script>
+
+  </script>
 </html>
