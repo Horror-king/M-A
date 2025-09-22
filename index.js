@@ -6,10 +6,25 @@ const path = require('path');
 const axios = require('axios');
 const fs = require('fs-extra');
 const config = require('./config.json');
+const http = require('http');
+const { Server } = require('socket.io');
 
 // Initialize apps
 const app = express();
+const server = http.createServer(app);
 const port = process.env.PORT || 3000;
+
+// Initialize Socket.io
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+// Track online users
+const onlineUsers = new Map();
+const onlineStatusTimeout = 30000; // 30 seconds
 
 // Global setup
 global.GoatBot = { config };
@@ -319,8 +334,81 @@ app.post("/api/command", async (req, res) => {
   }
 });
 
+// Add endpoint to get online users
+app.get('/online-users', (req, res) => {
+  res.json(Array.from(onlineUsers.keys()));
+});
+
+// Socket.io connection handling
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+  
+  socket.on('user-online', (username) => {
+    if (username) {
+      onlineUsers.set(username, {
+        socketId: socket.id,
+        lastSeen: Date.now()
+      });
+      
+      // Broadcast to all users that this user is online
+      io.emit('user-status-change', { 
+        username, 
+        status: 'online',
+        onlineUsers: Array.from(onlineUsers.keys())
+      });
+    }
+  });
+  
+  socket.on('disconnect', () => {
+    // Find user by socket ID and remove them
+    for (let [username, data] of onlineUsers.entries()) {
+      if (data.socketId === socket.id) {
+        onlineUsers.delete(username);
+        
+        // Broadcast that user went offline
+        io.emit('user-status-change', { 
+          username, 
+          status: 'offline',
+          onlineUsers: Array.from(onlineUsers.keys())
+        });
+        break;
+      }
+    }
+    console.log('User disconnected:', socket.id);
+  });
+  
+  socket.on('typing-start', (data) => {
+    socket.broadcast.emit('user-typing', {
+      username: data.username,
+      isTyping: true
+    });
+  });
+  
+  socket.on('typing-stop', (data) => {
+    socket.broadcast.emit('user-typing', {
+      username: data.username,
+      isTyping: false
+    });
+  });
+});
+
+// Periodically clean up users who haven't sent a heartbeat
+setInterval(() => {
+  const now = Date.now();
+  for (let [username, data] of onlineUsers.entries()) {
+    if (now - data.lastSeen > onlineStatusTimeout) {
+      onlineUsers.delete(username);
+      io.emit('user-status-change', { 
+        username, 
+        status: 'offline',
+        onlineUsers: Array.from(onlineUsers.keys())
+      });
+    }
+  }
+}, 10000); // Check every 10 seconds
+
 // Start server
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
   console.log(`🔹 Command prefix: "${PREFIX}"`);
   if (isRender && renderExternalUrl) {
