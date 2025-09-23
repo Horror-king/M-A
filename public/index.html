@@ -923,120 +923,139 @@
             }
         }
 
-            /* Improved online users panel - HORIZONTAL ALIGNMENT */
-.online-users-panel {
-    background: white;
-    border-radius: 10px;
-    padding: 15px;
-    margin: 10px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    overflow-x: auto; /* Allow horizontal scrolling if needed */
-}
-
-.online-users-list {
-    display: flex; /* Change to flex for horizontal layout */
-    gap: 15px; /* Space between users */
-    padding: 5px 0;
-    overflow-x: auto;
-    max-width: 100%;
-    flex-wrap: nowrap; /* Keep in single line */
-}
-
-.online-user {
-    display: flex;
-    flex-direction: column; /* Stack avatar and name vertically */
-    align-items: center;
-    padding: 8px 12px;
-    border-radius: 20px;
-    background: #f8f9fa;
-    min-width: 80px;
-    transition: all 0.3s ease;
-    border: 2px solid transparent;
-}
-
-.online-user:hover {
-    background: #e9ecef;
-    border-color: #4267B2;
-    transform: translateY(-2px);
-}
-
-.online-user-avatar {
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    overflow: hidden;
-    margin-bottom: 8px;
-    border: 3px solid #4CAF50;
-    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
-}
-
-.online-user-avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.online-user-info {
-    text-align: center;
-    flex-grow: 1;
-}
-
-.online-user-name {
-    font-weight: 600;
-    font-size: 14px;
-    color: #333;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 70px;
-}
-
-/* Remove the individual online dot since we have border indicator */
-.online-dot {
-    display: none;
-}
-
-/* Online status indicator on avatar */
-.online-user.active .online-user-avatar {
-    border-color: #4CAF50;
-}
-
-.online-user.away .online-user-avatar {
-    border-color: #FFC107;
-}
-
-.online-user.offline .online-user-avatar {
-    border-color: #ccc;
-}
-
-/* Scrollbar styling for horizontal scroll */
-.online-users-list::-webkit-scrollbar {
-    height: 6px;
-}
-
-.online-users-list::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 3px;
-}
-
-.online-users-list::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 3px;
-}
-
-.online-users-list::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
-}  
-
-        #typing-indicator {
-            padding: 5px 15px;
-            font-style: italic;
-            color: #666;
-            font-size: 0.9em;
+        /* TIGHTER ONLINE USERS PANEL - LIKE REFERENCE IMAGE */
+        .online-users-panel {
+            background: white;
+            border-radius: 10px;
+            padding: 12px 15px;
+            margin: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow-x: auto;
         }
 
-        /* Responsive adjustments */
+        .online-users-list {
+            display: flex;
+            gap: 8px; /* Reduced from 15px to 8px for tighter spacing */
+            padding: 5px 0;
+            overflow-x: auto;
+            max-width: 100%;
+            flex-wrap: nowrap;
+            align-items: center;
+        }
+
+        .online-user {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 6px 8px; /* Reduced padding */
+            border-radius: 15px;
+            background: #f8f9fa;
+            min-width: 60px; /* Reduced min-width */
+            transition: all 0.3s ease;
+            border: 1px solid transparent;
+            position: relative;
+        }
+
+        .online-user:hover {
+            background: #e9ecef;
+            border-color: #4267B2;
+            transform: translateY(-1px);
+        }
+
+        .online-user-avatar {
+            width: 42px; /* Reduced from 50px */
+            height: 42px;
+            border-radius: 50%;
+            overflow: hidden;
+            margin-bottom: 6px; /* Reduced margin */
+            position: relative;
+        }
+
+        .online-user-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* GREEN DOT INDICATOR - LIKE REFERENCE IMAGE */
+        .online-dot {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 12px;
+            height: 12px;
+            background: #4CAF50;
+            border-radius: 50%;
+            border: 2px solid white;
+            z-index: 2;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        .online-user-info {
+            text-align: center;
+            flex-grow: 1;
+        }
+
+        .online-user-name {
+            font-weight: 600;
+            font-size: 12px; /* Smaller font size */
+            color: #333;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 55px; /* Reduced max-width */
+        }
+
+        /* Scrollbar styling for horizontal scroll */
+        .online-users-list::-webkit-scrollbar {
+            height: 4px;
+        }
+
+        .online-users-list::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 2px;
+        }
+
+        .online-users-list::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 2px;
+        }
+
+        .online-users-list::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+
+        /* Responsive adjustments for mobile */
         @media (max-width: 480px) {
+            .online-users-panel {
+                padding: 10px 12px;
+                margin: 8px;
+            }
+            
+            .online-users-list {
+                gap: 6px;
+            }
+            
+            .online-user {
+                min-width: 55px;
+                padding: 5px 6px;
+            }
+            
+            .online-user-avatar {
+                width: 38px;
+                height: 38px;
+            }
+            
+            .online-dot {
+                width: 10px;
+                height: 10px;
+            }
+            
+            .online-user-name {
+                font-size: 11px;
+                max-width: 50px;
+            }
+            
             .message .avatar {
                 width: 24px;
                 height: 24px;
@@ -1050,6 +1069,13 @@
                 width: 36px;
                 height: 36px;
             }
+        }
+
+        #typing-indicator {
+            padding: 5px 15px;
+            font-style: italic;
+            color: #666;
+            font-size: 0.9em;
         }
     </style>
 </head>
@@ -1114,13 +1140,13 @@
         <a href="#" onclick="logout()" style="color: #ff4444;">Logout</a>
     </div>
 
-    <!-- Replace the existing online-users-panel with this -->
-<div class="online-users-panel">
-    <h3 style="margin: 0 0 15px 0; font-size: 16px; color: #333;">
-        Online Users <span id="online-count" style="background: #4CAF50; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">0</span>
-    </h3>
-    <div id="online-users-list" class="online-users-list"></div>
-</div>
+    <div class="online-users-panel">
+        <h3 style="margin: 0 0 12px 0; font-size: 16px; color: #333; display: flex; align-items: center; gap: 8px;">
+            Online Users 
+            <span id="online-count" style="background: #4CAF50; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px;">0</span>
+        </h3>
+        <div id="online-users-list" class="online-users-list"></div>
+    </div>
   
     <button class="news-toggle" onclick="toggleNews()" title="Toggle News" style="display: none;">
         <i class="fas fa-newspaper"></i>
@@ -1374,32 +1400,33 @@
             }, 20000);
         }
 
-        // Update the online users list with horizontal layout
-function updateOnlineUsersList(onlineUsers) {
-    const onlineList = document.getElementById('online-users-list');
-    if (!onlineList) return;
-    
-    onlineList.innerHTML = '';
-    onlineUsers.forEach(user => {
-        const userElement = document.createElement('div');
-        userElement.className = 'online-user active'; // active for online status
-        userElement.innerHTML = `
-            <div class="online-user-avatar">
-                <img src="https://i.pravatar.cc/60?u=${encodeURIComponent(user)}" alt="${user}">
-            </div>
-            <div class="online-user-info">
-                <div class="online-user-name">${user}</div>
-            </div>
-        `;
-        onlineList.appendChild(userElement);
-    });
-    
-    // Update online count
-    const onlineCount = document.getElementById('online-count');
-    if (onlineCount) {
-        onlineCount.textContent = onlineUsers.length;
-    }
-}
+        // Update the online users list with tighter spacing and green dots
+        function updateOnlineUsersList(onlineUsers) {
+            const onlineList = document.getElementById('online-users-list');
+            if (!onlineList) return;
+            
+            onlineList.innerHTML = '';
+            onlineUsers.forEach(user => {
+                const userElement = document.createElement('div');
+                userElement.className = 'online-user';
+                userElement.innerHTML = `
+                    <div class="online-user-avatar">
+                        <img src="https://i.pravatar.cc/50?u=${encodeURIComponent(user)}" alt="${user}">
+                        <div class="online-dot"></div>
+                    </div>
+                    <div class="online-user-info">
+                        <div class="online-user-name">${user}</div>
+                    </div>
+                `;
+                onlineList.appendChild(userElement);
+            });
+            
+            // Update online count
+            const onlineCount = document.getElementById('online-count');
+            if (onlineCount) {
+                onlineCount.textContent = onlineUsers.length;
+            }
+        }
 
         // Update status indicator for a specific user
         function updateUserStatusIndicator(username, status) {
@@ -1971,7 +1998,7 @@ function updateOnlineUsersList(onlineUsers) {
             }, 50);
         } 
             
-        // UPDATED displayMessage function with improved avatar alignment
+        // UPDATED displayMessage function with PERFECT avatar alignment
         function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
             if (!elements.chatContainer) return;
             
@@ -1987,69 +2014,83 @@ function updateOnlineUsersList(onlineUsers) {
                 avatarDiv.className = 'avatar';
                 avatarDiv.innerHTML = `<img src="https://i.pravatar.cc/50?u=${encodeURIComponent(username)}" alt="avatar">`;
                 messageDiv.appendChild(avatarDiv);
-            }
 
-            const messageBody = document.createElement('div');
-            messageBody.className = 'message-body';
+                const messageBody = document.createElement('div');
+                messageBody.className = 'message-body';
 
-            // Only show username for received messages with status indicator
-            if (username && sender === 'received') {
+                // Username with status indicator - PERFECT ALIGNMENT
                 const usernameDiv = document.createElement('div');
                 usernameDiv.className = 'username';
                 
-                // Add status indicator
                 const statusIndicator = document.createElement('span');
-                statusIndicator.className = 'user-status-indicator online'; // Default to online
+                statusIndicator.className = 'user-status-indicator online';
                 
                 usernameDiv.appendChild(document.createTextNode(username));
                 usernameDiv.appendChild(statusIndicator);
                 messageBody.appendChild(usernameDiv);
-            }
 
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'content';
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'content';
 
-            if (repliedTo) {
-                const replyBubble = document.createElement('div');
-                replyBubble.className = 'reply-preview';
-                replyBubble.textContent = repliedTo;
-                contentDiv.appendChild(replyBubble);
-            }
+                if (repliedTo) {
+                    const replyBubble = document.createElement('div');
+                    replyBubble.className = 'reply-preview';
+                    replyBubble.textContent = repliedTo;
+                    contentDiv.appendChild(replyBubble);
+                }
 
-            const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
-            const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
+                const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
+                const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
 
-            const imageMatches = [...text.matchAll(imagePattern)];
-            const audioMatches = [...text.matchAll(audioPattern)];
+                const imageMatches = [...text.matchAll(imagePattern)];
+                const audioMatches = [...text.matchAll(audioPattern)];
 
-            let modifiedText = text;
-            [...imageMatches, ...audioMatches].forEach(match => {
-                modifiedText = modifiedText.replace(match[0], '');
-            });
+                let modifiedText = text;
+                [...imageMatches, ...audioMatches].forEach(match => {
+                    modifiedText = modifiedText.replace(match[0], '');
+                });
 
-            modifiedText = modifiedText.trim();
-            if (modifiedText) {
+                modifiedText = modifiedText.trim();
+                if (modifiedText) {
+                    const textDiv = document.createElement('div');
+                    textDiv.textContent = modifiedText;
+                    contentDiv.appendChild(textDiv);
+                }
+
+                imageMatches.forEach(match => {
+                    const img = document.createElement('img');
+                    img.src = match[0];
+                    img.alt = "Image";
+                    contentDiv.appendChild(img);
+                });
+
+                audioMatches.forEach(match => {
+                    const audio = document.createElement('audio');
+                    audio.controls = true;
+                    audio.src = match[0];
+                    contentDiv.appendChild(audio);
+                });
+
+                messageBody.appendChild(contentDiv);
+                messageDiv.appendChild(messageBody);
+            } else {
+                // For sent messages - simpler structure without avatar/username
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'content';
+                
+                if (repliedTo) {
+                    const replyBubble = document.createElement('div');
+                    replyBubble.className = 'reply-preview';
+                    replyBubble.textContent = repliedTo;
+                    contentDiv.appendChild(replyBubble);
+                }
+
                 const textDiv = document.createElement('div');
-                textDiv.textContent = modifiedText;
+                textDiv.textContent = text;
                 contentDiv.appendChild(textDiv);
+                
+                messageDiv.appendChild(contentDiv);
             }
-
-            imageMatches.forEach(match => {
-                const img = document.createElement('img');
-                img.src = match[0];
-                img.alt = "Image";
-                contentDiv.appendChild(img);
-            });
-
-            audioMatches.forEach(match => {
-                const audio = document.createElement('audio');
-                audio.controls = true;
-                audio.src = match[0];
-                contentDiv.appendChild(audio);
-            });
-
-            messageBody.appendChild(contentDiv);
-            messageDiv.appendChild(messageBody);
 
             elements.chatContainer.appendChild(messageDiv);
 
@@ -2543,6 +2584,7 @@ function updateOnlineUsersList(onlineUsers) {
                 dropdown.classList.remove('active');
             }
         }
+             // --- CUT HERE ---
         
         function toggleNews() {
             const newsContainer = document.getElementById('news-container');
