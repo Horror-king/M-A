@@ -77,6 +77,7 @@
             z-index: 1000;
             box-sizing: border-box;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            height: 50px;
         }
 
         .menu .hamburger {
@@ -211,49 +212,36 @@
             height: 100%;
         }
 
-        .chat-container {
+        /* FIXED: Main chat container that includes both online users and messages */
+        .main-chat-interface {
             flex: 1;
+            display: flex;
+            flex-direction: column;
             max-width: 600px;
             margin: 50px auto 0;
             width: 100%;
             height: calc(100vh - 50px);
             background-color: white;
-            display: flex;
-            flex-direction: column;
             position: relative;
             overflow: hidden;
-            z-index: 1;
             border-radius: 0;
             box-shadow: none;
+        }
+
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background-color: white;
         }
         
         #private-ai {
             flex: 1;
-            max-width: 600px;
-            margin: 50px auto 0;
-            width: 100%;
-            height: calc(100vh - 50px);
-            background-color: white;
             display: flex;
             flex-direction: column;
-            position: relative;
-            overflow: hidden;
-            border-radius: 0;
-            box-shadow: none;
-        }
-        
-        .chat-container, #private-ai {
-            flex: 1;
-            max-width: 600px;
-            margin: 50px auto 0;
-            width: 100%;
-            height: calc(100vh - 50px);
+            height: 100%;
             background-color: white;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-            overflow: hidden;
-            border-radius: 0;
         }
 
         .chat-messages, #private-ai-container {
@@ -261,7 +249,6 @@
             padding: 10px 15px;
             overflow-y: auto;
             margin-bottom: 50px;
-            gap: 2px;
         }
         
         .chat-messages {
@@ -945,7 +932,7 @@
             }
         }
 
-        /* FIXED: TIGHTER ONLINE USERS PANEL - REMOVED SPACE-BETWEEN */
+        /* FIXED: INTEGRATED ONLINE USERS PANEL - NOW PART OF CHAT CONTAINER */
         .online-users-panel {
             background: white;
             border-radius: 0;
@@ -954,17 +941,18 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             overflow-x: auto;
             border-bottom: 1px solid #e4e6eb;
+            flex-shrink: 0; /* Prevent shrinking */
         }
 
         .online-users-list {
             display: flex;
-            gap: 4px; /* Reduced from 8px to 4px for tighter spacing */
+            gap: 4px;
             padding: 5px 0;
             overflow-x: auto;
             max-width: 100%;
             flex-wrap: nowrap;
             align-items: center;
-            justify-content: flex-start; /* Changed from space-between to flex-start */
+            justify-content: flex-start;
         }
 
         .online-user {
@@ -978,7 +966,7 @@
             transition: all 0.3s ease;
             border: 1px solid transparent;
             position: relative;
-            flex-shrink: 0; /* Prevent shrinking */
+            flex-shrink: 0;
         }
 
         .online-user:hover {
@@ -1002,7 +990,7 @@
             object-fit: cover;
         }
 
-        /* GREEN DOT INDICATOR - LIKE REFERENCE IMAGE */
+        /* GREEN DOT INDICATOR */
         .online-dot {
             position: absolute;
             bottom: 2px;
@@ -1058,7 +1046,7 @@
             }
             
             .online-users-list {
-                gap: 3px; /* Even tighter on mobile */
+                gap: 3px;
             }
             
             .online-user {
@@ -1166,26 +1154,21 @@
         <a href="#" onclick="logout()" style="color: #ff4444;">Logout</a>
     </div>
 
-    <div class="online-users-panel">
-        <h3 style="margin: 0 0 12px 0; font-size: 16px; color: #1c1e21; display: flex; align-items: center; gap: 8px;">
-            Online Users 
-            <span id="online-count" style="background: #4CAF50; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px;">0</span>
-        </h3>
-        <div id="online-users-list" class="online-users-list"></div>
-    </div>
-  
-    <button class="news-toggle" onclick="toggleNews()" title="Toggle News" style="display: none;">
-        <i class="fas fa-newspaper"></i>
-    </button>
-  
-    <div class="news-container" id="news-container">
-        <div class="news-header">Latest News</div>
-        <div class="news-items" id="news-items"></div>
-    </div>
-    
-    <div id="chat" class="chat-container container" style="display: none;">
-        <div class="chat-messages" id="chat-container"></div>
-        <div id="reply-preview-container"></div>
+    <!-- FIXED: Moved online users panel INSIDE the main chat interface -->
+    <div id="chat" class="main-chat-interface container" style="display: none;">
+        <div class="online-users-panel">
+            <h3 style="margin: 0 0 12px 0; font-size: 16px; color: #1c1e21; display: flex; align-items: center; gap: 8px;">
+                Online Users 
+                <span id="online-count" style="background: #4CAF50; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px;">0</span>
+            </h3>
+            <div id="online-users-list" class="online-users-list"></div>
+        </div>
+        
+        <div class="chat-container">
+            <div class="chat-messages" id="chat-container"></div>
+            <div id="reply-preview-container"></div>
+        </div>
+        
         <div class="chat-input" style="display: none;">
             <textarea id="user-input" placeholder="Type your message..."></textarea>
             <button id="send-button" onclick="sendMessage()" disabled>
@@ -1194,9 +1177,12 @@
         </div>
     </div>
 
-    <div id="private-ai" class="chat-container container" style="display: none;">
-        <div class="chat-messages" id="private-ai-container"></div>
-        <div id="private-reply-preview-container"></div>
+    <div id="private-ai" class="main-chat-interface container" style="display: none;">
+        <div class="chat-container">
+            <div class="chat-messages" id="private-ai-container"></div>
+            <div id="private-reply-preview-container"></div>
+        </div>
+        
         <div class="chat-input" style="display: none;">
             <textarea id="private-user-input" placeholder="Type your private message..."></textarea>
             <button id="private-send-button" onclick="sendPrivateMessage()" disabled>
@@ -1206,6 +1192,15 @@
         <div class="go-top-btn" id="private-go-top">
             <i class="fas fa-arrow-up"></i>
         </div>
+    </div>
+  
+    <button class="news-toggle" onclick="toggleNews()" title="Toggle News" style="display: none;">
+        <i class="fas fa-newspaper"></i>
+    </button>
+  
+    <div class="news-container" id="news-container">
+        <div class="news-header">Latest News</div>
+        <div class="news-items" id="news-items"></div>
     </div>
   
     <div class="scroll-to-bottom-btn" id="scrollToBottomBtn">
@@ -1693,7 +1688,7 @@
         // MODIFIED showContainer FUNCTION
         function showContainer(containerId) {
             // Hide all containers
-            document.querySelectorAll('.container').forEach(container => {
+            document.querySelectorAll('.main-chat-interface').forEach(container => {
                 container.style.display = 'none';
             });
             
@@ -2793,7 +2788,7 @@
             localStorage.removeItem('chat_username');
             
             // Hide all containers and menus
-            document.querySelectorAll('.container').forEach(container => {
+            document.querySelectorAll('.main-chat-interface').forEach(container => {
                 container.style.display = 'none';
             });
             
@@ -2868,7 +2863,7 @@
 
         // Updated showContainer function with proper menu handling
         function showContainer(containerId) {
-            const containers = document.querySelectorAll('.container');
+            const containers = document.querySelectorAll('.main-chat-interface');
             containers.forEach(container => {
                 container.style.display = 'none';
             });
