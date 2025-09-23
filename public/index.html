@@ -258,16 +258,16 @@
 
         .chat-messages, #private-ai-container {
             flex: 1;
-            padding: 10px 15px;
+            padding: 5px 10px;
             overflow-y: auto;
             margin-bottom: 50px;
-            gap: 2px;
+            gap: 0;
         }
         
         .chat-messages {
             flex: 1;
             height: calc(100% - 60px);
-            padding: 10px 15px;
+            padding: 5px 10px;
             overflow-y: auto;
             display: flex;
             margin-bottom: 50px;
@@ -280,15 +280,15 @@
             -webkit-overflow-scrolling: touch;
             overscroll-behavior: contain;
             touch-action: auto;
-            gap: 2px;
+            gap: 0;
             box-sizing: border-box;
         }
 
-        /* Improved message styling with better avatar alignment */
+        /* Improved message styling with NO spacing between messages */
         .message {
-            padding: 6px 10px;
-            border-radius: 18px;
-            margin-bottom: 2px;
+            padding: 2px 5px;
+            border-radius: 0;
+            margin-bottom: 0;
             max-width: 85%;
             word-wrap: break-word;
             overflow-wrap: break-word;
@@ -297,7 +297,7 @@
             position: relative;
             display: flex;
             align-items: flex-start;
-            gap: 6px;
+            gap: 5px;
             touch-action: none;
             -webkit-user-select: none;
             -ms-user-select: none;
@@ -309,16 +309,17 @@
         .content {
             user-select: none;
             flex-grow: 1;
-            padding: 8px 12px;
+            padding: 6px 10px;
             border-radius: 14px;
             position: relative;
             overflow: hidden;
             background-color: #f2f3f5;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
             max-width: 100%;
             overflow-wrap: break-word;
             word-break: break-word;
             box-sizing: border-box;
+            margin: 1px 0;
         }
 
         .message.sent .content {
@@ -337,7 +338,27 @@
             white-space: pre-wrap;
         }
 
-        /* Improved avatar styling */
+        /* Modified avatar styling with extended grey background */
+        .message .avatar-container {
+            width: 32px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-right: 5px;
+            flex-shrink: 0;
+        }
+
+        .message .avatar-background {
+            background-color: #e0e0e0;
+            border-radius: 16px;
+            padding: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 32px;
+            width: 100%;
+        }
+
         .message .avatar {
             width: 26px;
             height: 26px;
@@ -346,10 +367,8 @@
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
-            align-self: flex-start;
-            margin-top: 6px;
-            border: 2px solid #fff;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            background-color: #fff;
+            border: 2px solid #e0e0e0;
         }
 
         .message .avatar img {
@@ -369,6 +388,7 @@
             display: flex;
             align-items: center;
             gap: 5px;
+            padding-left: 5px;
         }
 
         .user-status-indicator {
@@ -396,7 +416,7 @@
             display: flex;
             flex-direction: column;
             flex-grow: 1;
-            min-width: 0; /* Prevent flex overflow */
+            min-width: 0;
         }
 
         /* Received messages (left aligned) */
@@ -410,12 +430,12 @@
         .message.sent {
             align-self: flex-end;
             margin-right: 0;
-            flex-direction: row;
+            flex-direction: row-reverse;
             justify-content: flex-end;
         }
 
         /* Hide avatar and username for sent messages */
-        .message.sent .avatar {
+        .message.sent .avatar-container {
             display: none !important;
         }
 
@@ -1950,10 +1970,19 @@
             
             // Only create avatar for received messages
             if (sender === 'received') {
+                const avatarContainer = document.createElement('div');
+                avatarContainer.className = 'avatar-container';
+                
+                const avatarBackground = document.createElement('div');
+                avatarBackground.className = 'avatar-background';
+                
                 const avatarDiv = document.createElement('div');
                 avatarDiv.className = 'avatar';
                 avatarDiv.innerHTML = `<img src="https://i.pravatar.cc/50?u=${encodeURIComponent(username)}" alt="avatar">`;
-                messageDiv.appendChild(avatarDiv);
+                
+                avatarBackground.appendChild(avatarDiv);
+                avatarContainer.appendChild(avatarBackground);
+                messageDiv.appendChild(avatarContainer);
             }
 
             const messageBody = document.createElement('div');
@@ -2022,7 +2051,7 @@
             }, 50);
         } 
             
-        // UPDATED displayMessage function with PERFECT avatar alignment
+        // UPDATED displayMessage function with NO SPACING and EXTENDED AVATAR BACKGROUND
         function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
             if (!elements.chatContainer) return;
             
@@ -2034,15 +2063,24 @@
 
             // Only create avatar for received messages
             if (sender === 'received') {
+                const avatarContainer = document.createElement('div');
+                avatarContainer.className = 'avatar-container';
+                
+                const avatarBackground = document.createElement('div');
+                avatarBackground.className = 'avatar-background';
+                
                 const avatarDiv = document.createElement('div');
                 avatarDiv.className = 'avatar';
                 avatarDiv.innerHTML = `<img src="https://i.pravatar.cc/50?u=${encodeURIComponent(username)}" alt="avatar">`;
-                messageDiv.appendChild(avatarDiv);
+                
+                avatarBackground.appendChild(avatarDiv);
+                avatarContainer.appendChild(avatarBackground);
+                messageDiv.appendChild(avatarContainer);
 
                 const messageBody = document.createElement('div');
                 messageBody.className = 'message-body';
 
-                // Username with status indicator - PERFECT ALIGNMENT
+                // Username with status indicator
                 const usernameDiv = document.createElement('div');
                 usernameDiv.className = 'username';
                 
