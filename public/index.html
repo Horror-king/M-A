@@ -263,7 +263,7 @@
             box-sizing: border-box;
         }
 
-        /* PERFECT ALIGNMENT: Improved message styling with perfect avatar alignment */
+        /* Improved message styling with better avatar alignment */
         .message {
             padding: 6px 10px;
             border-radius: 18px;
@@ -276,7 +276,7 @@
             position: relative;
             display: flex;
             align-items: flex-start;
-            gap: 8px;
+            gap: 6px;
             touch-action: none;
             -webkit-user-select: none;
             -ms-user-select: none;
@@ -284,7 +284,7 @@
             touch-action: manipulation;
             box-sizing: border-box;
         }
-
+     
         .content {
             user-select: none;
             flex-grow: 1;
@@ -316,19 +316,19 @@
             white-space: pre-wrap;
         }
 
-        /* PERFECT ALIGNMENT: Avatar styling */
+        /* Improved avatar styling */
         .message .avatar {
-            width: 28px;
-            height: 28px;
+            width: 26px;
+            height: 26px;
             border-radius: 50%;
             flex-shrink: 0;
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
             align-self: flex-start;
+            margin-top: 6px;
             border: 2px solid #fff;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-            margin-top: 2px; /* Perfect alignment adjustment */
         }
 
         .message .avatar img {
@@ -338,19 +338,16 @@
             display: block;
         }
 
-        /* PERFECT ALIGNMENT: Username with status indicator */
+        /* Improved username with status indicator */
         .message .username {
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: #666;
+            font-size: 0.68rem;
+            font-weight: bold;
+            color: #777;
             margin-bottom: 2px;
-            line-height: 1.2;
+            line-height: 1;
             display: flex;
             align-items: center;
-            gap: 6px;
-            height: 28px; /* Match avatar height for perfect alignment */
-            align-items: flex-start; /* Align with avatar top */
-            padding-top: 2px; /* Fine-tuned for perfect alignment */
+            gap: 5px;
         }
 
         .user-status-indicator {
@@ -358,7 +355,6 @@
             height: 8px;
             border-radius: 50%;
             display: inline-block;
-            flex-shrink: 0;
         }
 
         .user-status-indicator.online {
@@ -374,28 +370,26 @@
             background-color: #FFC107;
         }
 
-        /* PERFECT ALIGNMENT: Message body improvements */
+        /* Message body improvements */
         .message-body {
             display: flex;
             flex-direction: column;
             flex-grow: 1;
-            min-width: 0;
-            gap: 2px;
+            min-width: 0; /* Prevent flex overflow */
         }
 
-        /* PERFECT ALIGNMENT: Received messages (left aligned) */
+        /* Received messages (left aligned) */
         .message.received {
             align-self: flex-start;
             margin-left: 0;
             flex-direction: row;
-            align-items: flex-start;
         }
 
-        /* PERFECT ALIGNMENT: Sent messages (right aligned) - HIDE AVATAR FOR SENT MESSAGES */
+        /* Sent messages (right aligned) - HIDE AVATAR FOR SENT MESSAGES */
         .message.sent {
             align-self: flex-end;
             margin-right: 0;
-            flex-direction: row-reverse;
+            flex-direction: row;
             justify-content: flex-end;
         }
 
@@ -406,19 +400,6 @@
 
         .message.sent .username {
             display: none !important;
-        }
-
-        /* Ensure username and avatar are perfectly aligned */
-        .message.received .username {
-            display: flex;
-            align-items: center;
-            padding-top: 2px; /* Fine-tuned for perfect alignment */
-        }
-
-        /* Content alignment */
-        .message.received .content {
-            margin-left: 0;
-            margin-top: 0;
         }
 
         .message img {
@@ -942,62 +923,110 @@
             }
         }
 
-        /* Improved online users panel */
-        .online-users-panel {
-            background: white;
-            border-radius: 10px;
-            padding: 15px;
-            margin: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
+            /* Improved online users panel - HORIZONTAL ALIGNMENT */
+.online-users-panel {
+    background: white;
+    border-radius: 10px;
+    padding: 15px;
+    margin: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    overflow-x: auto; /* Allow horizontal scrolling if needed */
+}
 
-        .online-users-list {
-            max-height: 200px;
-            overflow-y: auto;
-        }
+.online-users-list {
+    display: flex; /* Change to flex for horizontal layout */
+    gap: 15px; /* Space between users */
+    padding: 5px 0;
+    overflow-x: auto;
+    max-width: 100%;
+    flex-wrap: nowrap; /* Keep in single line */
+}
 
-        .online-user {
-            display: flex;
-            align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid #f0f0f0;
-        }
+.online-user {
+    display: flex;
+    flex-direction: column; /* Stack avatar and name vertically */
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 20px;
+    background: #f8f9fa;
+    min-width: 80px;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
 
-        .online-user:last-child {
-            border-bottom: none;
-        }
+.online-user:hover {
+    background: #e9ecef;
+    border-color: #4267B2;
+    transform: translateY(-2px);
+}
 
-        .online-user-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            overflow: hidden;
-            margin-right: 10px;
-        }
+.online-user-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    overflow: hidden;
+    margin-bottom: 8px;
+    border: 3px solid #4CAF50;
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+}
 
-        .online-user-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
+.online-user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
 
-        .online-user-info {
-            flex-grow: 1;
-        }
+.online-user-info {
+    text-align: center;
+    flex-grow: 1;
+}
 
-        .online-user-name {
-            font-weight: 500;
-            font-size: 14px;
-        }
+.online-user-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 70px;
+}
 
-        .online-dot {
-            width: 10px;
-            height: 10px;
-            background: #4CAF50;
-            border-radius: 50%;
-            margin-right: 10px;
-            flex-shrink: 0;
-        }
+/* Remove the individual online dot since we have border indicator */
+.online-dot {
+    display: none;
+}
+
+/* Online status indicator on avatar */
+.online-user.active .online-user-avatar {
+    border-color: #4CAF50;
+}
+
+.online-user.away .online-user-avatar {
+    border-color: #FFC107;
+}
+
+.online-user.offline .online-user-avatar {
+    border-color: #ccc;
+}
+
+/* Scrollbar styling for horizontal scroll */
+.online-users-list::-webkit-scrollbar {
+    height: 6px;
+}
+
+.online-users-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.online-users-list::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.online-users-list::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}  
 
         #typing-indicator {
             padding: 5px 15px;
@@ -1011,11 +1040,6 @@
             .message .avatar {
                 width: 24px;
                 height: 24px;
-            }
-            
-            .message .username {
-                height: 24px; /* Match smaller avatar */
-                font-size: 0.7rem;
             }
             
             .profile-panel {
@@ -1090,10 +1114,13 @@
         <a href="#" onclick="logout()" style="color: #ff4444;">Logout</a>
     </div>
 
-    <div class="online-users-panel">
-        <h3>Online Users <span id="online-count">0</span></h3>
-        <div id="online-users-list" class="online-users-list"></div>
-    </div>
+    <!-- Replace the existing online-users-panel with this -->
+<div class="online-users-panel">
+    <h3 style="margin: 0 0 15px 0; font-size: 16px; color: #333;">
+        Online Users <span id="online-count" style="background: #4CAF50; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">0</span>
+    </h3>
+    <div id="online-users-list" class="online-users-list"></div>
+</div>
   
     <button class="news-toggle" onclick="toggleNews()" title="Toggle News" style="display: none;">
         <i class="fas fa-newspaper"></i>
@@ -1347,33 +1374,32 @@
             }, 20000);
         }
 
-        // Update the online users list with avatars
-        function updateOnlineUsersList(onlineUsers) {
-            const onlineList = document.getElementById('online-users-list');
-            if (!onlineList) return;
-            
-            onlineList.innerHTML = '';
-            onlineUsers.forEach(user => {
-                const userElement = document.createElement('div');
-                userElement.className = 'online-user';
-                userElement.innerHTML = `
-                    <div class="online-dot"></div>
-                    <div class="online-user-avatar">
-                        <img src="https://i.pravatar.cc/40?u=${encodeURIComponent(user)}" alt="${user}">
-                    </div>
-                    <div class="online-user-info">
-                        <div class="online-user-name">${user}</div>
-                    </div>
-                `;
-                onlineList.appendChild(userElement);
-            });
-            
-            // Update online count
-            const onlineCount = document.getElementById('online-count');
-            if (onlineCount) {
-                onlineCount.textContent = onlineUsers.length;
-            }
-        }
+        // Update the online users list with horizontal layout
+function updateOnlineUsersList(onlineUsers) {
+    const onlineList = document.getElementById('online-users-list');
+    if (!onlineList) return;
+    
+    onlineList.innerHTML = '';
+    onlineUsers.forEach(user => {
+        const userElement = document.createElement('div');
+        userElement.className = 'online-user active'; // active for online status
+        userElement.innerHTML = `
+            <div class="online-user-avatar">
+                <img src="https://i.pravatar.cc/60?u=${encodeURIComponent(user)}" alt="${user}">
+            </div>
+            <div class="online-user-info">
+                <div class="online-user-name">${user}</div>
+            </div>
+        `;
+        onlineList.appendChild(userElement);
+    });
+    
+    // Update online count
+    const onlineCount = document.getElementById('online-count');
+    if (onlineCount) {
+        onlineCount.textContent = onlineUsers.length;
+    }
+}
 
         // Update status indicator for a specific user
         function updateUserStatusIndicator(username, status) {
@@ -1945,7 +1971,7 @@
             }, 50);
         } 
             
-        // UPDATED displayMessage function with PERFECT avatar alignment
+        // UPDATED displayMessage function with improved avatar alignment
         function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
             if (!elements.chatContainer) return;
             
@@ -1961,83 +1987,69 @@
                 avatarDiv.className = 'avatar';
                 avatarDiv.innerHTML = `<img src="https://i.pravatar.cc/50?u=${encodeURIComponent(username)}" alt="avatar">`;
                 messageDiv.appendChild(avatarDiv);
+            }
 
-                const messageBody = document.createElement('div');
-                messageBody.className = 'message-body';
+            const messageBody = document.createElement('div');
+            messageBody.className = 'message-body';
 
-                // Username with status indicator - PERFECT ALIGNMENT
+            // Only show username for received messages with status indicator
+            if (username && sender === 'received') {
                 const usernameDiv = document.createElement('div');
                 usernameDiv.className = 'username';
                 
+                // Add status indicator
                 const statusIndicator = document.createElement('span');
-                statusIndicator.className = 'user-status-indicator online';
+                statusIndicator.className = 'user-status-indicator online'; // Default to online
                 
                 usernameDiv.appendChild(document.createTextNode(username));
                 usernameDiv.appendChild(statusIndicator);
                 messageBody.appendChild(usernameDiv);
-
-                const contentDiv = document.createElement('div');
-                contentDiv.className = 'content';
-
-                if (repliedTo) {
-                    const replyBubble = document.createElement('div');
-                    replyBubble.className = 'reply-preview';
-                    replyBubble.textContent = repliedTo;
-                    contentDiv.appendChild(replyBubble);
-                }
-
-                const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
-                const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
-
-                const imageMatches = [...text.matchAll(imagePattern)];
-                const audioMatches = [...text.matchAll(audioPattern)];
-
-                let modifiedText = text;
-                [...imageMatches, ...audioMatches].forEach(match => {
-                    modifiedText = modifiedText.replace(match[0], '');
-                });
-
-                modifiedText = modifiedText.trim();
-                if (modifiedText) {
-                    const textDiv = document.createElement('div');
-                    textDiv.textContent = modifiedText;
-                    contentDiv.appendChild(textDiv);
-                }
-
-                imageMatches.forEach(match => {
-                    const img = document.createElement('img');
-                    img.src = match[0];
-                    img.alt = "Image";
-                    contentDiv.appendChild(img);
-                });
-
-                audioMatches.forEach(match => {
-                    const audio = document.createElement('audio');
-                    audio.controls = true;
-                    audio.src = match[0];
-                    contentDiv.appendChild(audio);
-                });
-
-                messageBody.appendChild(contentDiv);
-                messageDiv.appendChild(messageBody);
-            } else {
-                // For sent messages - simpler structure without avatar/username
-                const contentDiv = document.createElement('div');
-                contentDiv.className = 'content';
-                
-                if (repliedTo) {
-                    const replyBubble = document.createElement('div');
-                    replyBubble.className = 'reply-preview';
-                    replyBubble.textContent = repliedTo;
-                    contentDiv.appendChild(replyBubble);
-                }
-
-                const textDiv = document.createElement('div');
-                textDiv.textContent = text;
-                contentDiv.appendChild(textDiv);
-                
-                messageDiv.appendChild(contentDiv);
             }
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'content';
+
+            if (repliedTo) {
+                const replyBubble = document.createElement('div');
+                replyBubble.className = 'reply-preview';
+                replyBubble.textContent = repliedTo;
+                contentDiv.appendChild(replyBubble);
+            }
+
+            const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
+            const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
+
+            const imageMatches = [...text.matchAll(imagePattern)];
+            const audioMatches = [...text.matchAll(audioPattern)];
+
+            let modifiedText = text;
+            [...imageMatches, ...audioMatches].forEach(match => {
+                modifiedText = modifiedText.replace(match[0], '');
+            });
+
+            modifiedText = modifiedText.trim();
+            if (modifiedText) {
+                const textDiv = document.createElement('div');
+                textDiv.textContent = modifiedText;
+                contentDiv.appendChild(textDiv);
+            }
+
+            imageMatches.forEach(match => {
+                const img = document.createElement('img');
+                img.src = match[0];
+                img.alt = "Image";
+                contentDiv.appendChild(img);
+            });
+
+            audioMatches.forEach(match => {
+                const audio = document.createElement('audio');
+                audio.controls = true;
+                audio.src = match[0];
+                contentDiv.appendChild(audio);
+            });
+
+            messageBody.appendChild(contentDiv);
+            messageDiv.appendChild(messageBody);
 
             elements.chatContainer.appendChild(messageDiv);
 
@@ -2874,9 +2886,7 @@
         function closeZoom() {
             document.body.style.overflow = '';
             const overlay = document.getElementById('zoom-overlay');
-            if (overlay) {
-                overlay.style.display = 'none';
-            }
+            if (overlay) overlay.style.display = 'none';
         }
 
         const overlay = document.getElementById('overlay');
