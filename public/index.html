@@ -1165,11 +1165,11 @@
             </div>
         </div>
         <div class="menu-divider"></div>
-        <a href="#" onclick="showContainer('chat')">Chat with AI</a>
+        <a href="#" onclick="showContainer('main-chat')">Chat with AI</a>
         <a href="#" onclick="showContainer('private-ai')">Private AI</a>
-        <a href="#" onclick="showContainer('about')">About</a>
-        <a href="#" onclick="showContainer('features')">Features</a>
-        <a href="#" onclick="showContainer('help')">Help</a>
+        <a href="#" onclick="showSection('about')">About</a>
+        <a href="#" onclick="showSection('features')">Features</a>
+        <a href="#" onclick="showSection('help')">Help</a>
         <a href="#" onclick="logout()" style="color: #ff4444;">Logout</a>
     </div>
 
@@ -1297,7 +1297,7 @@
     <div class="overlay" id="overlay"></div>
 
     <div id="about" class="about-container">
-        <span class="close-btn" onclick="hideContainer('about')">&times;</span>
+        <span class="close-btn" onclick="hideSection('about')">&times;</span>
         <h2 class="section-title">About this AI Chatbot</h2>
         <div class="section-content">
             <p>This advanced AI chatbot is designed to provide intelligent conversations and assist users with various tasks. Built with cutting-edge technology, it offers a seamless and intuitive experience.</p>
@@ -1308,7 +1308,7 @@
     </div>
 
     <div id="features" class="features-container">
-        <span class="close-btn" onclick="hideContainer('features')">&times;</span>
+        <span class="close-btn" onclick="hideSection('features')">&times;</span>
         <h2 class="section-title">Features</h2>
         <ul class="features-list">
             <li>Natural Language Processing for human-like conversations</li>
@@ -1324,7 +1324,7 @@
     </div>
 
     <div id="help" class="help-container">
-        <span class="close-btn" onclick="hideContainer('help')">&times;</span>
+        <span class="close-btn" onclick="hideSection('help')">&times;</span>
         <h2 class="section-title">Help Center</h2>
         <div class="help-section">
             <div class="help-question">How do I start a conversation?</div>
@@ -1349,8 +1349,6 @@
     </div>
 
     <script>
-        // --- CUT HERE ---
-        // --- CUT HERE ---
         // --- CUT HERE ---
         let isLogin = true;
         let users = JSON.parse(localStorage.getItem('users')) || {};
@@ -1700,11 +1698,15 @@
             }
         });
 
-        // MODIFIED showContainer FUNCTION
+        // FIXED CONTAINER MANAGEMENT FUNCTIONS
         function showContainer(containerId) {
-            // Hide all containers
-            document.querySelectorAll('.container').forEach(container => {
-                container.style.display = 'none';
+            console.log('Showing container:', containerId);
+            
+            // Hide all main containers but NOT sections (about, features, help)
+            const containersToHide = ['main-chat', 'private-ai'];
+            containersToHide.forEach(id => {
+                const container = document.getElementById(id);
+                if (container) container.style.display = 'none';
             });
             
             // Hide all chat inputs
@@ -1717,32 +1719,76 @@
             if (container) {
                 container.style.display = 'block';
                 
-                // Show its input if it's a chat container
-                if (containerId === 'main-chat' || containerId === 'private-ai') {
-                    container.querySelector('.chat-input').style.display = 'flex';
+                // Show the appropriate chat input
+                if (containerId === 'main-chat') {
+                    const chatInput = document.querySelector('#main-chat .chat-input');
+                    if (chatInput) chatInput.style.display = 'flex';
+                    // Reload messages when switching back to main chat
+                    loadMessages();
+                } else if (containerId === 'private-ai') {
+                    const chatInput = document.querySelector('#private-ai .chat-input');
+                    if (chatInput) chatInput.style.display = 'flex';
                 }
             }
             
+            // Close dropdown menu
+            const dropdown = document.getElementById('dropdown');
+            if (dropdown) dropdown.style.display = 'none';
+            
+            const kebabDropdown = document.querySelector('.kebab-dropdown');
+            if (kebabDropdown) kebabDropdown.classList.remove('active');
+            
             // Handle scroll events for private container
             if (containerId === 'private-ai' && privateContainer) {
-                // Attach scroll event for private container
                 privateContainer.addEventListener('scroll', handlePrivateScroll);
-                // Initial check for scroll position
                 setTimeout(handlePrivateScroll, 100);
             } else if (privateContainer) {
-                // Remove scroll event when not in private container
                 privateContainer.removeEventListener('scroll', handlePrivateScroll);
-                // Hide the go-top button when switching away
                 if (privateGoTopBtn) {
                     privateGoTopBtn.style.display = 'none';
                     privateGoTopBtn.classList.remove('visible');
                 }
             }
             
-            // Set scroll restore flag for chat container
+            // Set scroll restore flag for main chat
             if (containerId === 'main-chat') {
                 shouldRestoreScroll = true;
             }
+        }
+
+        // NEW FUNCTION: Show sections (about, features, help)
+        function showSection(sectionId) {
+            console.log('Showing section:', sectionId);
+            
+            // Hide all containers first
+            showContainer('main-chat'); // This will hide private-ai and show main-chat
+            
+            // Then show the section and overlay
+            const section = document.getElementById(sectionId);
+            const overlay = document.getElementById('overlay');
+            
+            if (section && overlay) {
+                section.style.display = 'block';
+                overlay.style.display = 'block';
+            }
+            
+            // Close dropdown menu
+            const dropdown = document.getElementById('dropdown');
+            if (dropdown) dropdown.style.display = 'none';
+        }
+
+        // NEW FUNCTION: Hide sections
+        function hideSection(sectionId) {
+            console.log('Hiding section:', sectionId);
+            
+            const section = document.getElementById(sectionId);
+            const overlay = document.getElementById('overlay');
+            
+            if (section) section.style.display = 'none';
+            if (overlay) overlay.style.display = 'none';
+            
+            // Ensure main chat is visible
+            showContainer('main-chat');
         }
 
         function toggleAuth() {
@@ -2304,7 +2350,9 @@
                 displayPrivateMessage("Error connecting to Private AI", 'received');
             }
         }
-            
+
+        // ... (rest of the functions remain the same, but I'll include the critical fixes)
+        // --- CUT HERE ---
         function handleTouchStart(e) {
             isLongPress = false;
             e.currentTarget.classList.add('no-select');
@@ -2853,8 +2901,7 @@
             if (profileSection) profileSection.remove();
             if (divider) divider.remove();
         }
-
-        // Improved toggleDropdown function
+        // FIXED toggleDropdown function
         function toggleDropdown() {
             const dropdown = document.getElementById('dropdown');
             if (!dropdown) return;
@@ -2867,103 +2914,9 @@
             
             // Toggle dropdown
             dropdown.style.display = isVisible ? 'none' : 'block';
-            
-            // Close if clicking the same button while open
-            if (isVisible) {
-                dropdown.style.display = 'none';
-            }
         }
 
-        // Updated showContainer function with proper menu handling
-        function showContainer(containerId) {
-            const containers = document.querySelectorAll('.container');
-            containers.forEach(container => {
-                container.style.display = 'none';
-            });
-            
-            // Hide all chat inputs
-            document.querySelectorAll('.chat-input').forEach(input => {
-                input.style.display = 'none';
-            });
-            
-            // Show the selected container
-            const container = document.getElementById(containerId);
-            if (container) {
-                container.style.display = 'block';
-                
-                // Show its input if it's a chat container
-                if (containerId === 'main-chat' || containerId === 'private-ai') {
-                    container.querySelector('.chat-input').style.display = 'flex';
-                }
-            }
-            
-            // Close all menus when showing any container
-            const dropdown = document.getElementById('dropdown');
-            if (dropdown) dropdown.style.display = 'none';
-            
-            const kebabDropdown = document.querySelector('.kebab-dropdown');
-            if (kebabDropdown) kebabDropdown.classList.remove('active');
-            
-            currentUsername = localStorage.getItem('chat_username') || '';
-            
-            // Set scroll restore flag for chat container
-            if (containerId === 'main-chat') {
-                shouldRestoreScroll = true;
-            }
-            
-            // Handle scroll events for private container
-            if (containerId === 'private-ai' && privateContainer) {
-                // Attach scroll event for private container
-                privateContainer.addEventListener('scroll', handlePrivateScroll);
-                // Initial check for scroll position
-                setTimeout(handlePrivateScroll, 100);
-            } else if (privateContainer) {
-                // Remove scroll event when not in private container
-                privateContainer.removeEventListener('scroll', handlePrivateScroll);
-                // Hide the go-top button when switching away
-                if (privateGoTopBtn) {
-                    privateGoTopBtn.style.display = 'none';
-                    privateGoTopBtn.classList.remove('visible');
-                }
-            }
-        }
-
-        // Updated hideContainer function
-        function hideContainer(containerId) {
-            const container = document.getElementById(containerId);
-            if (container) container.style.display = 'none';
-            
-            const overlay = document.getElementById('overlay');
-            if (overlay) overlay.style.display = 'none';
-            
-            // Close all menus when hiding any container
-            const dropdown = document.getElementById('dropdown');
-            if (dropdown) dropdown.style.display = 'none';
-            
-            const kebabDropdown = document.querySelector('.kebab-dropdown');
-            if (kebabDropdown) kebabDropdown.classList.remove('active');
-            
-            // Show chat container and input after closing any section
-            showContainer('main-chat');
-        }
-
-        // Zoom functions remain the same
-        function openZoom(src) {
-            document.body.style.overflow = 'hidden';
-            const overlay = document.getElementById('zoom-overlay');
-            const zoomImage = document.getElementById('zoom-image');
-            if (!overlay || !zoomImage) return;
-            
-            zoomImage.src = src;
-            overlay.style.display = 'flex';
-        }
-
-        function closeZoom() {
-            document.body.style.overflow = '';
-            const overlay = document.getElementById('zoom-overlay');
-            if (overlay) overlay.style.display = 'none';
-        }
-
+        // FIXED overlay click handler
         const overlay = document.getElementById('overlay');
         if (overlay) {
             overlay.addEventListener('click', function() {
@@ -2980,7 +2933,7 @@
         if (currentUser) {
             showContainer('main-chat');
             
-            const chatInput = document.querySelector('.chat-input');
+            const chatInput = document.querySelector('#main-chat .chat-input');
             if (chatInput) chatInput.style.display = 'flex';
             
             updateProfileSection();
@@ -2996,6 +2949,10 @@
             const scrollBtn = document.getElementById('scrollToBottomBtn');
             if (scrollBtn) scrollBtn.style.display = 'block';
         }
+
+        // Keep the rest of your existing functions as they are...
+        // (The functions I didn't modify above should remain unchanged)
+
     </script>
 </body>
 </html>
