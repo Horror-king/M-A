@@ -212,29 +212,30 @@
         }
 
         /* MAIN CONTAINER THAT HOLDS BOTH ONLINE USERS AND CHAT - NO GAP */
-        .main-chat-interface {
-            flex: 1;
-            max-width: 600px;
-            margin: 50px auto 0;
-            width: 100%;
-            height: calc(100vh - 50px);
-            background-color: white;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-            overflow: hidden;
-            z-index: 1;
-            border-radius: 0;
-            box-shadow: none;
-        }
+.main-chat-interface {
+    flex: 1;
+    max-width: 600px;
+    margin: 50px auto 0;
+    width: 100%;
+    height: calc(100vh - 50px);
+    background-color: white;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    z-index: 1;
+    border-radius: 0;
+    box-shadow: none;
+}
 
-        .chat-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-        }
-        
+/* FIXED: Chat container should take remaining space */
+.chat-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
         #private-ai {
             flex: 1;
             max-width: 600px;
@@ -272,25 +273,21 @@
             gap: 2px;
         }
         
-        .chat-messages {
-            flex: 1;
-            height: calc(100% - 60px);
-            padding: 10px 15px;
-            overflow-y: auto;
-            display: flex;
-            margin-bottom: 50px;
-            flex-direction: column;
-            scroll-behavior: smooth;
-            background-color: white;
-            position: relative;
-            margin-top: 0;
-            font-size: 16px;
-            -webkit-overflow-scrolling: touch;
-            overscroll-behavior: contain;
-            touch-action: auto;
-            gap: 2px;
-            box-sizing: border-box;
-        }
+        /* FIXED: Chat messages container - proper positioning and scrolling */
+.chat-messages {
+    flex: 1;
+    padding: 10px 15px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    scroll-behavior: smooth;
+    background-color: white;
+    position: relative;
+    margin-bottom: 0; /* Remove margin bottom */
+    gap: 2px;
+    box-sizing: border-box;
+    height: calc(100% - 60px); /* Account for input height */
+}
 
         /* Improved message styling with better avatar alignment */
         .message {
