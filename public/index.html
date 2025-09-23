@@ -211,7 +211,8 @@
             height: 100%;
         }
 
-        .chat-container {
+        /* MAIN CONTAINER THAT HOLDS BOTH ONLINE USERS AND CHAT - NO GAP */
+        .main-chat-interface {
             flex: 1;
             max-width: 600px;
             margin: 50px auto 0;
@@ -225,6 +226,13 @@
             z-index: 1;
             border-radius: 0;
             box-shadow: none;
+        }
+
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
         }
         
         #private-ai {
@@ -258,16 +266,16 @@
 
         .chat-messages, #private-ai-container {
             flex: 1;
-            padding: 5px 10px;
+            padding: 10px 15px;
             overflow-y: auto;
             margin-bottom: 50px;
-            gap: 0;
+            gap: 2px;
         }
         
         .chat-messages {
             flex: 1;
             height: calc(100% - 60px);
-            padding: 5px 10px;
+            padding: 10px 15px;
             overflow-y: auto;
             display: flex;
             margin-bottom: 50px;
@@ -280,15 +288,15 @@
             -webkit-overflow-scrolling: touch;
             overscroll-behavior: contain;
             touch-action: auto;
-            gap: 0;
+            gap: 2px;
             box-sizing: border-box;
         }
 
-        /* Improved message styling with NO spacing between messages */
+        /* Improved message styling with better avatar alignment */
         .message {
-            padding: 2px 5px;
-            border-radius: 0;
-            margin-bottom: 0;
+            padding: 6px 10px;
+            border-radius: 18px;
+            margin-bottom: 2px;
             max-width: 85%;
             word-wrap: break-word;
             overflow-wrap: break-word;
@@ -297,7 +305,7 @@
             position: relative;
             display: flex;
             align-items: flex-start;
-            gap: 5px;
+            gap: 6px;
             touch-action: none;
             -webkit-user-select: none;
             -ms-user-select: none;
@@ -309,17 +317,16 @@
         .content {
             user-select: none;
             flex-grow: 1;
-            padding: 6px 10px;
+            padding: 8px 12px;
             border-radius: 14px;
             position: relative;
             overflow: hidden;
             background-color: #f2f3f5;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
             max-width: 100%;
             overflow-wrap: break-word;
             word-break: break-word;
             box-sizing: border-box;
-            margin: 1px 0;
         }
 
         .message.sent .content {
@@ -338,27 +345,7 @@
             white-space: pre-wrap;
         }
 
-        /* Modified avatar styling with extended grey background */
-        .message .avatar-container {
-            width: 32px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-right: 5px;
-            flex-shrink: 0;
-        }
-
-        .message .avatar-background {
-            background-color: #e0e0e0;
-            border-radius: 16px;
-            padding: 3px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 32px;
-            width: 100%;
-        }
-
+        /* Improved avatar styling */
         .message .avatar {
             width: 26px;
             height: 26px;
@@ -367,8 +354,10 @@
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
-            background-color: #fff;
-            border: 2px solid #e0e0e0;
+            align-self: flex-start;
+            margin-top: 6px;
+            border: 2px solid #fff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
         }
 
         .message .avatar img {
@@ -388,7 +377,6 @@
             display: flex;
             align-items: center;
             gap: 5px;
-            padding-left: 5px;
         }
 
         .user-status-indicator {
@@ -416,7 +404,7 @@
             display: flex;
             flex-direction: column;
             flex-grow: 1;
-            min-width: 0;
+            min-width: 0; /* Prevent flex overflow */
         }
 
         /* Received messages (left aligned) */
@@ -430,12 +418,12 @@
         .message.sent {
             align-self: flex-end;
             margin-right: 0;
-            flex-direction: row-reverse;
+            flex-direction: row;
             justify-content: flex-end;
         }
 
         /* Hide avatar and username for sent messages */
-        .message.sent .avatar-container {
+        .message.sent .avatar {
             display: none !important;
         }
 
@@ -965,7 +953,7 @@
             }
         }
 
-        /* TIGHTER ONLINE USERS PANEL - LIKE REFERENCE IMAGE */
+        /* TIGHTER ONLINE USERS PANEL - NO GAP BETWEEN PANELS */
         .online-users-panel {
             background: white;
             border-radius: 0;
@@ -974,6 +962,7 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             overflow-x: auto;
             border-bottom: 1px solid #e4e6eb;
+            flex-shrink: 0;
         }
 
         .online-users-list {
@@ -1184,12 +1173,26 @@
         <a href="#" onclick="logout()" style="color: #ff4444;">Logout</a>
     </div>
 
-    <div class="online-users-panel">
-        <h3 style="margin: 0 0 12px 0; font-size: 16px; color: #1c1e21; display: flex; align-items: center; gap: 8px;">
-            Online Users 
-            <span id="online-count" style="background: #4CAF50; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px;">0</span>
-        </h3>
-        <div id="online-users-list" class="online-users-list"></div>
+    <!-- MAIN CHAT INTERFACE - NO GAP BETWEEN ONLINE USERS AND CHAT -->
+    <div class="main-chat-interface container" id="main-chat" style="display: none;">
+        <div class="online-users-panel">
+            <h3 style="margin: 0 0 12px 0; font-size: 16px; color: #1c1e21; display: flex; align-items: center; gap: 8px;">
+                Online Users 
+                <span id="online-count" style="background: #4CAF50; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px;">0</span>
+            </h3>
+            <div id="online-users-list" class="online-users-list"></div>
+        </div>
+        
+        <div class="chat-container">
+            <div class="chat-messages" id="chat-container"></div>
+            <div id="reply-preview-container"></div>
+            <div class="chat-input" style="display: none;">
+                <textarea id="user-input" placeholder="Type your message..."></textarea>
+                <button id="send-button" onclick="sendMessage()" disabled>
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
     </div>
   
     <button class="news-toggle" onclick="toggleNews()" title="Toggle News" style="display: none;">
@@ -1199,17 +1202,6 @@
     <div class="news-container" id="news-container">
         <div class="news-header">Latest News</div>
         <div class="news-items" id="news-items"></div>
-    </div>
-    
-    <div id="chat" class="chat-container container" style="display: none;">
-        <div class="chat-messages" id="chat-container"></div>
-        <div id="reply-preview-container"></div>
-        <div class="chat-input" style="display: none;">
-            <textarea id="user-input" placeholder="Type your message..."></textarea>
-            <button id="send-button" onclick="sendMessage()" disabled>
-                <i class="fas fa-paper-plane"></i>
-            </button>
-        </div>
     </div>
 
     <div id="private-ai" class="chat-container container" style="display: none;">
@@ -1627,7 +1619,7 @@
                 // Show scroll button after login
                 if (scrollToBottomBtn) scrollToBottomBtn.style.display = 'block';
                 
-                showContainer('chat');
+                showContainer('main-chat');
                 
                 // Set flag to restore scroll position after messages load
                 shouldRestoreScroll = true;
@@ -1726,7 +1718,7 @@
                 container.style.display = 'block';
                 
                 // Show its input if it's a chat container
-                if (containerId === 'chat' || containerId === 'private-ai') {
+                if (containerId === 'main-chat' || containerId === 'private-ai') {
                     container.querySelector('.chat-input').style.display = 'flex';
                 }
             }
@@ -1748,7 +1740,7 @@
             }
             
             // Set scroll restore flag for chat container
-            if (containerId === 'chat') {
+            if (containerId === 'main-chat') {
                 shouldRestoreScroll = true;
             }
         }
@@ -1836,7 +1828,7 @@
                             // Show scroll button after successful login
                             if (scrollToBottomBtn) scrollToBottomBtn.style.display = 'block';
                             
-                            showContainer('chat');
+                            showContainer('main-chat');
                             updateProfileSection();
                             initializeChat();
                             
@@ -1970,19 +1962,10 @@
             
             // Only create avatar for received messages
             if (sender === 'received') {
-                const avatarContainer = document.createElement('div');
-                avatarContainer.className = 'avatar-container';
-                
-                const avatarBackground = document.createElement('div');
-                avatarBackground.className = 'avatar-background';
-                
                 const avatarDiv = document.createElement('div');
                 avatarDiv.className = 'avatar';
                 avatarDiv.innerHTML = `<img src="https://i.pravatar.cc/50?u=${encodeURIComponent(username)}" alt="avatar">`;
-                
-                avatarBackground.appendChild(avatarDiv);
-                avatarContainer.appendChild(avatarBackground);
-                messageDiv.appendChild(avatarContainer);
+                messageDiv.appendChild(avatarDiv);
             }
 
             const messageBody = document.createElement('div');
@@ -2051,7 +2034,7 @@
             }, 50);
         } 
             
-        // UPDATED displayMessage function with NO SPACING and EXTENDED AVATAR BACKGROUND
+        // UPDATED displayMessage function with PERFECT avatar alignment
         function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
             if (!elements.chatContainer) return;
             
@@ -2063,24 +2046,15 @@
 
             // Only create avatar for received messages
             if (sender === 'received') {
-                const avatarContainer = document.createElement('div');
-                avatarContainer.className = 'avatar-container';
-                
-                const avatarBackground = document.createElement('div');
-                avatarBackground.className = 'avatar-background';
-                
                 const avatarDiv = document.createElement('div');
                 avatarDiv.className = 'avatar';
                 avatarDiv.innerHTML = `<img src="https://i.pravatar.cc/50?u=${encodeURIComponent(username)}" alt="avatar">`;
-                
-                avatarBackground.appendChild(avatarDiv);
-                avatarContainer.appendChild(avatarBackground);
-                messageDiv.appendChild(avatarContainer);
+                messageDiv.appendChild(avatarDiv);
 
                 const messageBody = document.createElement('div');
                 messageBody.className = 'message-body';
 
-                // Username with status indicator
+                // Username with status indicator - PERFECT ALIGNMENT
                 const usernameDiv = document.createElement('div');
                 usernameDiv.className = 'username';
                 
@@ -2724,9 +2698,7 @@
         function closeZoom() {
             document.body.style.overflow = '';
             const overlay = document.getElementById('zoom-overlay');
-            if (overlay) {
-                overlay.style.display = 'none';
-            }
+            if (overlay) overlay.style.display = 'none';
         }
 
         function autoResize(textarea) {
@@ -2909,7 +2881,7 @@
                 container.style.display = 'none';
             });
             
-            // Hide all chat inputs first
+            // Hide all chat inputs
             document.querySelectorAll('.chat-input').forEach(input => {
                 input.style.display = 'none';
             });
@@ -2919,10 +2891,9 @@
             if (container) {
                 container.style.display = 'block';
                 
-                // Show the appropriate chat input
-                if (containerId === 'chat' || containerId === 'private-ai') {
-                    const chatInput = container.querySelector('.chat-input');
-                    if (chatInput) chatInput.style.display = 'flex';
+                // Show its input if it's a chat container
+                if (containerId === 'main-chat' || containerId === 'private-ai') {
+                    container.querySelector('.chat-input').style.display = 'flex';
                 }
             }
             
@@ -2936,7 +2907,7 @@
             currentUsername = localStorage.getItem('chat_username') || '';
             
             // Set scroll restore flag for chat container
-            if (containerId === 'chat') {
+            if (containerId === 'main-chat') {
                 shouldRestoreScroll = true;
             }
             
@@ -2973,7 +2944,7 @@
             if (kebabDropdown) kebabDropdown.classList.remove('active');
             
             // Show chat container and input after closing any section
-            showContainer('chat');
+            showContainer('main-chat');
         }
 
         // Zoom functions remain the same
@@ -3000,14 +2971,14 @@
                     container.style.display = 'none';
                 });
                 this.style.display = 'none';
-                showContainer('chat');
+                showContainer('main-chat');
             });
         }
 
         // Initialize if user is logged in
         const currentUser = localStorage.getItem('currentUser');
         if (currentUser) {
-            showContainer('chat');
+            showContainer('main-chat');
             
             const chatInput = document.querySelector('.chat-input');
             if (chatInput) chatInput.style.display = 'flex';
