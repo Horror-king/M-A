@@ -1177,7 +1177,16 @@
         </div>
     </div>
 
+    <!-- MODIFIED: Added online users panel to private AI container -->
     <div id="private-ai" class="main-chat-interface container" style="display: none;">
+        <div class="online-users-panel">
+            <h3 style="margin: 0 0 12px 0; font-size: 16px; color: #1c1e21; display: flex; align-items: center; gap: 8px;">
+                Online Users 
+                <span id="private-online-count" style="background: #4CAF50; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px;">0</span>
+            </h3>
+            <div id="private-online-users-list" class="online-users-list"></div>
+        </div>
+        
         <div class="chat-container">
             <div class="chat-messages" id="private-ai-container"></div>
             <div id="private-reply-preview-container"></div>
@@ -1334,9 +1343,6 @@
     </div>
 
     <script>
-        // --- CUT HERE ---
-        // --- CUT HERE ---
-        // --- CUT HERE ---
         let isLogin = true;
         let users = JSON.parse(localStorage.getItem('users')) || {};
         let longPressTimer;
@@ -1421,31 +1427,58 @@
             }, 20000);
         }
 
-        // Update the online users list with tighter spacing and green dots
+        // MODIFIED: Update both online users lists (main chat and private AI)
         function updateOnlineUsersList(onlineUsers) {
+            // Update main chat online list
             const onlineList = document.getElementById('online-users-list');
-            if (!onlineList) return;
+            if (onlineList) {
+                onlineList.innerHTML = '';
+                onlineUsers.forEach(user => {
+                    const userElement = document.createElement('div');
+                    userElement.className = 'online-user';
+                    userElement.innerHTML = `
+                        <div class="online-user-avatar">
+                            <img src="https://i.pravatar.cc/50?u=${encodeURIComponent(user)}" alt="${user}">
+                            <div class="online-dot"></div>
+                        </div>
+                        <div class="online-user-info">
+                            <div class="online-user-name">${user}</div>
+                        </div>
+                    `;
+                    onlineList.appendChild(userElement);
+                });
+                
+                // Update online count for main chat
+                const onlineCount = document.getElementById('online-count');
+                if (onlineCount) {
+                    onlineCount.textContent = onlineUsers.length;
+                }
+            }
             
-            onlineList.innerHTML = '';
-            onlineUsers.forEach(user => {
-                const userElement = document.createElement('div');
-                userElement.className = 'online-user';
-                userElement.innerHTML = `
-                    <div class="online-user-avatar">
-                        <img src="https://i.pravatar.cc/50?u=${encodeURIComponent(user)}" alt="${user}">
-                        <div class="online-dot"></div>
-                    </div>
-                    <div class="online-user-info">
-                        <div class="online-user-name">${user}</div>
-                    </div>
-                `;
-                onlineList.appendChild(userElement);
-            });
-            
-            // Update online count
-            const onlineCount = document.getElementById('online-count');
-            if (onlineCount) {
-                onlineCount.textContent = onlineUsers.length;
+            // Update private AI online list
+            const privateOnlineList = document.getElementById('private-online-users-list');
+            if (privateOnlineList) {
+                privateOnlineList.innerHTML = '';
+                onlineUsers.forEach(user => {
+                    const userElement = document.createElement('div');
+                    userElement.className = 'online-user';
+                    userElement.innerHTML = `
+                        <div class="online-user-avatar">
+                            <img src="https://i.pravatar.cc/50?u=${encodeURIComponent(user)}" alt="${user}">
+                            <div class="online-dot"></div>
+                        </div>
+                        <div class="online-user-info">
+                            <div class="online-user-name">${user}</div>
+                        </div>
+                    `;
+                    privateOnlineList.appendChild(userElement);
+                });
+                
+                // Update online count for private AI
+                const privateOnlineCount = document.getElementById('private-online-count');
+                if (privateOnlineCount) {
+                    privateOnlineCount.textContent = onlineUsers.length;
+                }
             }
         }
 
@@ -2605,8 +2638,7 @@
                 dropdown.classList.remove('active');
             }
         }
-             // --- CUT HERE ---
-        
+             
         function toggleNews() {
             const newsContainer = document.getElementById('news-container');
             if (newsContainer) {
