@@ -234,6 +234,7 @@
             flex-direction: column;
             height: 100%;
             background-color: white;
+            overflow: hidden; /* Added to contain scrolling */
         }
         
         #private-ai {
@@ -242,22 +243,17 @@
             flex-direction: column;
             height: 100%;
             background-color: white;
+            overflow: hidden; /* Added to contain scrolling */
         }
 
+        /* FIXED: Chat messages container with proper scrolling */
         .chat-messages, #private-ai-container {
             flex: 1;
             padding: 10px 15px;
             overflow-y: auto;
             margin-bottom: 50px;
-        }
-        
-        .chat-messages {
-            flex: 1;
-            height: calc(100% - 60px);
-            padding: 10px 15px;
-            overflow-y: auto;
+            height: calc(100% - 60px); /* Adjusted to account for online users panel */
             display: flex;
-            margin-bottom: 50px;
             flex-direction: column;
             scroll-behavior: smooth;
             background-color: white;
@@ -942,6 +938,7 @@
             overflow-x: auto;
             border-bottom: 1px solid #e4e6eb;
             flex-shrink: 0; /* Prevent shrinking */
+            height: auto; /* Let it take the space it needs */
         }
 
         .online-users-list {
@@ -1036,6 +1033,38 @@
 
         .online-users-list::-webkit-scrollbar-thumb:hover {
             background: #a8a8a8;
+        }
+
+        /* FIXED: Go to Top button for private AI */
+        .go-top-btn {
+            position: fixed;
+            width: 40px;
+            height: 40px;
+            background: #128C7E;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            z-index: 999;
+            bottom: 80px;
+            right: 20px;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+            display: none;
+        }
+        
+        .go-top-btn.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .go-top-btn:hover {
+            background: #075E54;
         }
 
         /* Responsive adjustments for mobile */
@@ -1547,6 +1576,7 @@
 
         // Improved scroll position detection
         function checkIfAtBottom(container) {
+            if (!container) return true;
             const threshold = 50; // pixels
             return container.scrollHeight - container.scrollTop - container.clientHeight <= threshold;
         }
@@ -1554,11 +1584,21 @@
         // Scroll to bottom function
         function scrollToBottom() {
             const chatContainer = document.getElementById('chat-container');
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-            isAtBottom = true;
-            newMessagesCount = 0;
-            newMessagesCountEl.textContent = '0';
-            scrollToBottomBtn.classList.remove('visible');
+            if (chatContainer) {
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+                isAtBottom = true;
+                newMessagesCount = 0;
+                newMessagesCountEl.textContent = '0';
+                scrollToBottomBtn.classList.remove('visible');
+            }
+        }
+
+        // Scroll to bottom for private AI
+        function scrollPrivateToBottom() {
+            const privateContainer = document.getElementById('private-ai-container');
+            if (privateContainer) {
+                privateContainer.scrollTop = privateContainer.scrollHeight;
+            }
         }
 
         // Update scroll state function
@@ -1747,6 +1787,8 @@
                 privateContainer.addEventListener('scroll', handlePrivateScroll);
                 // Initial check for scroll position
                 setTimeout(handlePrivateScroll, 100);
+                // Scroll to bottom when switching to private AI
+                setTimeout(scrollPrivateToBottom, 150);
             } else if (privateContainer) {
                 // Remove scroll event when not in private container
                 privateContainer.removeEventListener('scroll', handlePrivateScroll);
@@ -1760,6 +1802,8 @@
             // Set scroll restore flag for chat container
             if (containerId === 'chat') {
                 shouldRestoreScroll = true;
+                // Scroll to bottom when switching to main chat
+                setTimeout(scrollToBottom, 150);
             }
         }
 
