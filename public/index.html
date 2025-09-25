@@ -234,7 +234,7 @@ html, body {
     flex-direction: column;
     height: 100%;
     background-color: white;
-    overflow: hidden; /* Added to contain scrolling */
+    
 }
 
 #private-ai {
@@ -247,10 +247,9 @@ html, body {
 }
 
 /* FIXED: Chat messages container with correct height above input */
-/* Chat messages area */
 .chat-messages,
 #private-ai-container {
-  flex: 1; /* take available space */
+  flex: 1;
   padding: 10px 15px;
   overflow-y: auto;
   display: flex;
@@ -260,12 +259,8 @@ html, body {
   font-size: 16px;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  touch-action: auto;
   gap: 2px;
   box-sizing: border-box;
-
-  /* 👇 this is the magic: leave room for input */
-  margin-bottom: 70px; /* must equal chat-input height */
 }
         
 /* Improved message styling with better avatar alignment */
@@ -481,19 +476,18 @@ html, body {
 }
 
 /* FIXED: Chat input positioning */
+/* 👇 remove "fixed", make it natural */
 .chat-input {
-  display: none;
+  display: flex;
   align-items: center;
-  padding: 5px;
+  padding: 10px;
   border-top: 1px solid #e4e6eb;
   background-color: white;
-  position: fixed;
-  bottom: 0;
-  width: 100%;
-  max-width: 600px;
+  flex-shrink: 0;   /* don’t let it shrink */
+  height: auto;     /* grows if textarea expands */
+  min-height: 70px; /* stable baseline height */
   box-sizing: border-box;
-  z-index: 1000;
-  min-height: 70px; /* stable height so messages never overlap */
+  z-index: 100;
 }
 
 /* Responsive adjustments for mobile */
