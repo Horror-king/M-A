@@ -226,6 +226,7 @@ html, body {
     overflow: hidden;
     border-radius: 0;
     box-shadow: none;
+    padding-bottom: 70px;
 }
 
 .chat-container {
@@ -259,11 +260,12 @@ html, body {
   font-size: 16px;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  gap: 2px;
+  gap: 10px;
   box-sizing: border-box;
 
-  /* JS will update this dynamically */
-  padding-bottom: 100px;
+    /* 🚫 remove all bottom padding/margin */
+  padding-bottom: 0;
+  margin-bottom: 0;
 }
         
 /* Improved message styling with better avatar alignment */
@@ -479,23 +481,23 @@ html, body {
 }
 
 /* FIXED: Chat input positioning */
-/* 👇 remove "fixed", make it natural */
+/* Input stays fixed at bottom */
 .chat-input {
-  display: flex;
-  align-items: center;
-  padding: 10px;
-  border-top: 1px solid #e4e6eb;
-  background-color: white;
   position: fixed;
   bottom: 0;
-  width: 100%;
+  left: 0;
+  right: 0;
   max-width: 600px;
-  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 10px;
+  background: #fff;
+  border-top: 1px solid #ddd;
+  height: 70px; /* fixed */
+  display: flex;
+  align-items: center;
   z-index: 1000;
-  height: 100px;       /* can grow if multiline */
-  min-height: 60px;   /* base height */
 }
-
+        
 /* Responsive adjustments for mobile */
 @media (max-width: 480px) {
   .chat-messages,
