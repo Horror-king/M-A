@@ -247,26 +247,25 @@ html, body {
 }
 
 /* FIXED: Chat messages container with correct height above input */
+/* Chat messages area */
 .chat-messages,
 #private-ai-container {
-  flex: 1;
+  flex: 1; /* take available space */
   padding: 10px 15px;
   overflow-y: auto;
-  /* Instead of full height, subtract menu (50px) + input height (~60px) */
-  height: calc(100% - 50px - 60px);
   display: flex;
   flex-direction: column;
   scroll-behavior: smooth;
   background-color: white;
-  position: relative;
-  margin-top: 0;
   font-size: 16px;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   touch-action: auto;
   gap: 2px;
   box-sizing: border-box;
-  padding-bottom: 15px; /* just a small gap for breathing room */
+
+  /* 👇 this is the magic: leave room for input */
+  padding-bottom: 70px; /* must match chat-input height */
 }
         
 /* Improved message styling with better avatar alignment */
@@ -494,7 +493,7 @@ html, body {
   max-width: 600px;
   box-sizing: border-box;
   z-index: 1000;
-  min-height: 60px; /* stable height so messages never overlap */
+  min-height: 70px; /* stable height so messages never overlap */
 }
 
 /* Responsive adjustments for mobile */
