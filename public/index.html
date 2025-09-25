@@ -226,14 +226,14 @@ html, body {
     overflow: hidden;
     border-radius: 0;
     box-shadow: none;
-    padding-bottom: 70px;
+    
 }
 
 .chat-container {
     flex: 1;
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    height: 100px;
     background-color: white;
     overflow: hidden; 
 }
@@ -242,7 +242,7 @@ html, body {
     flex: 1;
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    height: 100px;
     background-color: white;
     overflow: hidden; /* Added to contain scrolling */
 }
@@ -3038,27 +3038,7 @@ function clearReply() {
             const scrollBtn = document.getElementById('scrollToBottomBtn');
             if (scrollBtn) scrollBtn.style.display = 'block';
         }
-         function adjustChatPadding() {
-  const chatInput = document.querySelector('.chat-input');
-  const chatMessages = document.querySelector('.chat-messages');
-  if (chatInput && chatMessages) {
-    const inputHeight = chatInput.offsetHeight;
-    chatMessages.style.paddingBottom = inputHeight + 'px';
-  }
-}
-
-// Run once on load
-adjustChatPadding();
-
-// Run on resize (e.g. mobile keyboard, window resize)
-window.addEventListener('resize', adjustChatPadding);
-
-// Run if input height changes (multi-line typing)
-const chatInput = document.querySelector('.chat-input');
-if (chatInput) {
-  const observer = new ResizeObserver(adjustChatPadding);
-  observer.observe(chatInput);
-}
+         
     </script>
 </body>
 </html>
