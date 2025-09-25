@@ -247,27 +247,27 @@ html, body {
 }
 
 /* FIXED: Chat messages container with proper scrolling and padding */
-.chat-messages, #private-ai-container {
-    flex: 1;
-    max-width: 600px;
-    overflow-y: auto;
-    /* height: calc(100% - 50px - 50px);  ❌ Removed */
-    height: 100%; /* ✅ Let flexbox handle height */
-    display: flex;
-    flex-direction: column;
-    scroll-behavior: smooth;
-    background-color: white;
-    position: relative;
-    margin-top: 0;
-    font-size: 16px;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-    touch-action: auto;
-    gap: 2px;
-    box-sizing: border-box;
+.chat-messages,
+#private-ai-container {
+  flex: 1;
+  padding: 10px 15px;
+  overflow-y: auto;
+  height: calc(100% - 50px - 50px); /* accounts for menu (50px) + input (50px) */
+  display: flex;
+  flex-direction: column;
+  scroll-behavior: smooth;
+  background-color: white;
+  position: relative;
+  margin-top: 0;
+  font-size: 16px;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: auto;
+  gap: 2px;
+  box-sizing: border-box;
 
-    /* ✅ Padding ensures last message never hides behind input */
-    padding-bottom: 200px; 
+  /* 🔥 FIX: Ensure last message is never cut off */
+  padding-bottom: 100px; /* increased from 80px */
 }
 
 /* Improved message styling with better avatar alignment */
@@ -482,22 +482,29 @@ html, body {
     outline: none;
 }
 
-/* FIXED: Chat input positioning - Now properly positioned without hiding messages */
+/* FIXED: Chat input positioning */
 .chat-input {
-    display: none;
-    align-items: center;
-    padding: 5px;
-    border-top: 1px solid #e4e6eb;
-    background-color: white;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    max-width: 600px;
-    box-sizing: border-box;
-    z-index: 1000;
-    height: auto;
-    min-height: 55px;
+  display: none;
+  align-items: center;
+  padding: 5px;
+  border-top: 1px solid #e4e6eb;
+  background-color: white;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  max-width: 600px;
+  box-sizing: border-box;
+  z-index: 1000;
+  height: auto;
+  min-height: 50px;
+}
+
+/* Responsive adjustments for mobile */
+@media (max-width: 480px) {
+  .chat-messages,
+  #private-ai-container {
+    padding-bottom: 120px; /* extra space for mobile keyboards */
+  }
 }
 
 .chat-input textarea {
