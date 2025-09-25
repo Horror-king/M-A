@@ -1131,7 +1131,6 @@ html, body {
     font-size: 0.9em;
 }
 // --- CUT HERE ---
-// --- CUT HERE ---
     </style>
 </head>
 <body>
@@ -1437,6 +1436,39 @@ html, body {
             elements.usernameInput.value = currentUsername;
         }
 
+        // ===== AUTO-SCROLL FUNCTIONS =====
+        // This keeps chat always scrolled to the bottom
+        function scrollToBottom(containerId) {
+            const container = document.getElementById(containerId);
+            if (container) {
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+
+        // Run after each new message is added
+        function observeChat(containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            const observer = new MutationObserver(() => {
+                scrollToBottom(containerId);
+            });
+
+            observer.observe(container, {
+                childList: true,
+                subtree: true
+            });
+
+            // Initial scroll
+            scrollToBottom(containerId);
+        }
+
+        // Apply to both chat containers
+        function initAutoScroll() {
+            observeChat("chat-container");       // your public chat container
+            observeChat("private-ai-container"); // your private AI container
+        }
+
         // ===== REAL-TIME ACTIVE STATUS FUNCTIONS =====
 
         // Initialize socket connection
@@ -1596,7 +1628,7 @@ html, body {
         }
 
         // Scroll to bottom function - FIXED with proper timing
-        function scrollToBottom() {
+        function scrollToBottomMain() {
             const chatContainer = document.getElementById('chat-container');
             if (chatContainer) {
                 // Use setTimeout to ensure DOM is updated before scrolling
@@ -1704,6 +1736,9 @@ html, body {
                 // Initialize real-time features after login
                 initSocket();
                 setupTypingHandlers();
+                
+                // Initialize auto-scroll after login
+                setTimeout(initAutoScroll, 500);
             } else {
                 document.getElementById('auth-container').style.display = 'flex';
                 document.querySelector('.menu').style.display = 'none';
@@ -1745,7 +1780,7 @@ html, body {
             
             // Add click event to scroll button
             if (scrollToBottomBtn) {
-                scrollToBottomBtn.addEventListener('click', scrollToBottom);
+                scrollToBottomBtn.addEventListener('click', scrollToBottomMain);
             }
 
             // Set up page visibility listeners
@@ -1822,7 +1857,7 @@ html, body {
             if (containerId === 'chat') {
                 shouldRestoreScroll = true;
                 // Scroll to bottom when switching to main chat
-                setTimeout(scrollToBottom, 150);
+                setTimeout(scrollToBottomMain, 150);
             }
         }
 
@@ -1916,6 +1951,9 @@ html, body {
                             // Initialize real-time features after login
                             initSocket();
                             setupTypingHandlers();
+                            
+                            // Initialize auto-scroll after login
+                            setTimeout(initAutoScroll, 500);
                             
                             // Set flag to restore scroll position after messages load
                             shouldRestoreScroll = true;
@@ -2021,7 +2059,7 @@ html, body {
             }
             
             // Always scroll to bottom after loading messages
-            setTimeout(scrollToBottom, 200);
+            setTimeout(() => scrollToBottom('chat-container'), 200);
         }
 
         function showNotification(username, message) {
@@ -2114,7 +2152,7 @@ html, body {
             
             // Always scroll to bottom for private chat
             setTimeout(() => {
-                container.scrollTop = container.scrollHeight;
+                scrollToBottom('private-ai-container');
             }, 100);
         } 
             
@@ -2221,24 +2259,6 @@ html, body {
                 e.preventDefault();
                 showMessageContextMenu(e, messageDiv);
             });
-            
-            // FIXED: Improved auto-scroll logic
-            if (isNew) {
-                // Always scroll to bottom for sent messages
-                if (sender === 'sent') {
-                    setTimeout(scrollToBottom, 100);
-                } 
-                // For received messages, only scroll if already at bottom
-                else if (sender === 'received') {
-                    if (isAtBottom) {
-                        setTimeout(scrollToBottom, 100);
-                    } else {
-                        newMessagesCount++;
-                        newMessagesCountEl.textContent = newMessagesCount;
-                        scrollToBottomBtn.classList.add('visible');
-                    }
-                }
-            }
             
             // Update scroll state after adding message
             setTimeout(updateScrollState, 0);
@@ -3078,6 +3098,9 @@ html, body {
             initSocket();
             setupTypingHandlers();
             
+            // Initialize auto-scroll
+            setTimeout(initAutoScroll, 500);
+            
             // Set flag to restore scroll position after messages load
             shouldRestoreScroll = true;
             
@@ -3086,5 +3109,6 @@ html, body {
             if (scrollBtn) scrollBtn.style.display = 'block';
         }
     </script>
-</body>
+  </body>
 </html>
+          
