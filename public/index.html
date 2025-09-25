@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -15,7 +14,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-          body {
+        body {
     font-family: Arial, sans-serif;
     background-color: #f0f2f5;
     margin: 0;
@@ -66,7 +65,7 @@
 }
 
 .menu {
-    display: flex; /* Changed from none to flex to ensure it's visible */
+    display: none;
     justify-content: space-between;
     align-items: center;
     background-color: white;
@@ -209,10 +208,11 @@
 }
 
 html, body {
-    overflow: hidden; /* Changed from auto to hidden to manage scrolling on specific elements */
+    overflow: auto;
     height: 100%;
 }
 
+/* FIXED: Main chat container that includes both online users and messages */
 .main-chat-interface {
     flex: 1;
     display: flex;
@@ -234,7 +234,7 @@ html, body {
     flex-direction: column;
     height: 100%;
     background-color: white;
-    overflow: hidden;
+    overflow: hidden; /* Added to contain scrolling */
 }
 
 #private-ai {
@@ -243,15 +243,15 @@ html, body {
     flex-direction: column;
     height: 100%;
     background-color: white;
-    overflow: hidden;
+    overflow: hidden; /* Added to contain scrolling */
 }
 
-/* FIX: The most important changes are here */
+/* FIXED: Chat messages container with proper scrolling and padding */
 .chat-messages, #private-ai-container {
-    flex: 1; /* This is the key. It makes the element grow to fill available space. */
-    padding: 10px 15px 80px 15px; /* Added explicit padding-bottom */
+    flex: 1;
+    padding: 10px 15px;
     overflow-y: auto;
-    height: auto; /* Changed to auto so it doesn't fight with flex-grow: 1 */
+    height: 100%; /* FIXED: Allow flexbox to control height */
     display: flex;
     flex-direction: column;
     scroll-behavior: smooth;
@@ -264,8 +264,11 @@ html, body {
     touch-action: auto;
     gap: 2px;
     box-sizing: border-box;
+    /* FIXED: Increased padding to ensure last message is visible */
+    padding-bottom: 120px; /* Increased from 70px to ensure messages are visible */
 }
 
+/* Improved message styling with better avatar alignment */
 .message {
     padding: 6px 10px;
     border-radius: 18px;
@@ -318,6 +321,7 @@ html, body {
     white-space: pre-wrap;
 }
 
+/* Improved avatar styling */
 .message .avatar {
     width: 26px;
     height: 26px;
@@ -339,6 +343,7 @@ html, body {
     display: block;
 }
 
+/* Improved username with status indicator */
 .message .username {
     font-size: 0.68rem;
     font-weight: bold;
@@ -370,19 +375,22 @@ html, body {
     background-color: #FFC107;
 }
 
+/* Message body improvements */
 .message-body {
     display: flex;
     flex-direction: column;
     flex-grow: 1;
-    min-width: 0;
+    min-width: 0; /* Prevent flex overflow */
 }
 
+/* Received messages (left aligned) */
 .message.received {
     align-self: flex-start;
     margin-left: 0;
     flex-direction: row;
 }
 
+/* Sent messages (right aligned) - HIDE AVATAR FOR SENT MESSAGES */
 .message.sent {
     align-self: flex-end;
     margin-right: 0;
@@ -390,6 +398,7 @@ html, body {
     justify-content: flex-end;
 }
 
+/* Hide avatar and username for sent messages */
 .message.sent .avatar {
     display: none !important;
 }
@@ -471,15 +480,16 @@ html, body {
     outline: none;
 }
 
-/* FIX: Ensure chat input is visible */
+/* FIXED: Chat input positioning - Now properly positioned without hiding messages */
 .chat-input {
-    display: flex; /* Changed from none to flex to ensure it's visible */
+    display: none;
     align-items: center;
     padding: 5px;
     border-top: 1px solid #e4e6eb;
     background-color: white;
     position: fixed;
     bottom: 0;
+    left: 0;
     width: 100%;
     max-width: 600px;
     box-sizing: border-box;
@@ -527,6 +537,7 @@ html, body {
     color: #4267B2;
 }
 
+/* Fix for Private AI send button */
 #private-ai .chat-input button.enabled i {
     color: #4267B2 !important;
 }
@@ -691,6 +702,12 @@ html, body {
     padding: 0;
 }
 
+.features-list li {
+    margin: 15px 0;
+    padding-left: 25px;
+    position: relative;
+}
+
 .features-list li:before {
     content: '✓';
     color: #4267B2;
@@ -788,6 +805,7 @@ html, body {
     font-size: 20px;
 }
 
+/* Improved profile panel styling - Facebook-like white theme */
 .profile-panel {
     display: flex;
     align-items: center;
@@ -852,6 +870,7 @@ html, body {
     margin: 5px 0;
 }
 
+/* WhatsApp-style scroll button */
 .scroll-to-bottom-btn {
     position: fixed;
     width: 40px;
@@ -914,6 +933,7 @@ html, body {
     }
 }
 
+/* FIXED: INTEGRATED ONLINE USERS PANEL - NOW PART OF CHAT CONTAINER */
 .online-users-panel {
     background: white;
     border-radius: 0;
@@ -922,8 +942,8 @@ html, body {
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     overflow-x: auto;
     border-bottom: 1px solid #e4e6eb;
-    flex-shrink: 0;
-    height: auto;
+    flex-shrink: 0; /* Prevent shrinking */
+    height: auto; /* Let it take the space it needs */
 }
 
 .online-users-list {
@@ -972,6 +992,7 @@ html, body {
     object-fit: cover;
 }
 
+/* GREEN DOT INDICATOR */
 .online-dot {
     position: absolute;
     bottom: 2px;
@@ -1000,6 +1021,7 @@ html, body {
     max-width: 55px;
 }
 
+/* Scrollbar styling for horizontal scroll */
 .online-users-list::-webkit-scrollbar {
     height: 4px;
 }
@@ -1018,6 +1040,7 @@ html, body {
     background: #a8a8a8;
 }
 
+/* FIXED: Go to Top button for private AI */
 .go-top-btn {
     position: fixed;
     width: 40px;
@@ -1049,6 +1072,7 @@ html, body {
     background: #075E54;
 }
 
+/* Responsive adjustments for mobile */
 @media (max-width: 480px) {
     .online-users-panel {
         padding: 10px 12px;
@@ -1094,8 +1118,9 @@ html, body {
         height: 36px;
     }
     
+    /* Adjust padding for mobile to ensure messages are visible */
     .chat-messages, #private-ai-container {
-        padding-bottom: 90px;
+        padding-bottom: 90px; /* Increased for mobile */
     }
 }
 
