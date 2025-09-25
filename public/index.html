@@ -246,13 +246,14 @@ html, body {
     overflow: hidden; /* Added to contain scrolling */
 }
 
-/* FIXED: Chat messages container with proper scrolling and padding */
+/* FIXED: Chat messages container with correct height above input */
 .chat-messages,
 #private-ai-container {
   flex: 1;
   padding: 10px 15px;
   overflow-y: auto;
-  height: calc(100% - 50px - 50px); /* accounts for menu (50px) + input (50px) */
+  /* Instead of full height, subtract menu (50px) + input height (~60px) */
+  height: calc(100% - 50px - 60px);
   display: flex;
   flex-direction: column;
   scroll-behavior: smooth;
@@ -265,11 +266,9 @@ html, body {
   touch-action: auto;
   gap: 2px;
   box-sizing: border-box;
-
-  /* 🔥 FIX: Ensure last message is never cut off */
-  padding-bottom: 100px; /* increased from 80px */
+  padding-bottom: 15px; /* just a small gap for breathing room */
 }
-
+        
 /* Improved message styling with better avatar alignment */
 .message {
     padding: 6px 10px;
@@ -495,15 +494,14 @@ html, body {
   max-width: 600px;
   box-sizing: border-box;
   z-index: 1000;
-  height: auto;
-  min-height: 50px;
+  min-height: 60px; /* stable height so messages never overlap */
 }
 
 /* Responsive adjustments for mobile */
 @media (max-width: 480px) {
   .chat-messages,
   #private-ai-container {
-    padding-bottom: 120px; /* extra space for mobile keyboards */
+    height: calc(100% - 50px - 70px); /* slightly more space for mobile input */
   }
 }
 
