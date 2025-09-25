@@ -248,9 +248,10 @@ html, body {
 }
 
 /* FIXED: Chat messages container with correct height above input */
+/* Chat messages area */
 .chat-messages,
 #private-ai-container {
-  flex: 1;
+  flex: 1; /* take available space */
   padding: 10px 15px;
   overflow-y: auto;
   display: flex;
@@ -260,12 +261,12 @@ html, body {
   font-size: 16px;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  gap: 10px;
+  touch-action: auto;
+  gap: 2px;
   box-sizing: border-box;
 
-    /* 🚫 remove all bottom padding/margin */
-  padding-bottom: 0;
-  margin-bottom: 0;
+  /* 👇 this is the magic: leave room for input */
+  padding-bottom: 90px; /* must match chat-input height */
 }
         
 /* Improved message styling with better avatar alignment */
@@ -481,21 +482,20 @@ html, body {
 }
 
 /* FIXED: Chat input positioning */
-/* Input stays fixed at bottom */
+/* Chat input bar */
 .chat-input {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  max-width: 600px;
-  margin: 0 auto;
-  padding: 10px;
-  background: #fff;
-  border-top: 1px solid #ddd;
-  height: 70px; /* fixed */
   display: flex;
   align-items: center;
+  padding: 5px;
+  border-top: 1px solid #e4e6eb;
+  background-color: white;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  max-width: 600px;
+  box-sizing: border-box;
   z-index: 1000;
+  min-height: 70px; /* matches padding-bottom above */
 }
         
 /* Responsive adjustments for mobile */
