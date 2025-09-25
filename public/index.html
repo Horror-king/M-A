@@ -261,6 +261,9 @@ html, body {
   overscroll-behavior: contain;
   gap: 2px;
   box-sizing: border-box;
+
+  /* 👇 This ensures last message never hides */
+  padding-bottom: 90px; /* same as input height */
 }
         
 /* Improved message styling with better avatar alignment */
@@ -483,11 +486,13 @@ html, body {
   padding: 10px;
   border-top: 1px solid #e4e6eb;
   background-color: white;
-  flex-shrink: 0;   /* don’t let it shrink */
-  height: auto;     /* grows if textarea expands */
-  min-height: 70px; /* stable baseline height */
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  max-width: 600px;
   box-sizing: border-box;
-  z-index: 100;
+  z-index: 1000;
+  height: 90px; /* must match padding-bottom above */
 }
 
 /* Responsive adjustments for mobile */
