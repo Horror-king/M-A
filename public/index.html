@@ -1382,7 +1382,7 @@ html, body {
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
-    <script>
+     <script>
         let isLogin = true;
         let users = JSON.parse(localStorage.getItem('users')) || {};
         let longPressTimer;
@@ -1436,37 +1436,60 @@ html, body {
             elements.usernameInput.value = currentUsername;
         }
 
-        // ===== AUTO-SCROLL FUNCTIONS =====
-        // This keeps chat always scrolled to the bottom
+        // ===== SIMPLE AND RELIABLE AUTO-SCROLL FUNCTIONS =====
         function scrollToBottom(containerId) {
             const container = document.getElementById(containerId);
             if (container) {
-                container.scrollTop = container.scrollHeight;
+                // Use multiple methods to ensure scrolling works
+                setTimeout(() => {
+                    container.scrollTop = container.scrollHeight;
+                    
+                    // Additional methods for reliability
+                    setTimeout(() => {
+                        container.scrollTop = container.scrollHeight;
+                    }, 50);
+                    
+                    setTimeout(() => {
+                        container.scrollTop = container.scrollHeight;
+                    }, 100);
+                }, 10);
             }
         }
 
-        // Run after each new message is added
-        function observeChat(containerId) {
+        // Force scroll to bottom - more aggressive approach
+        function forceScrollToBottom(containerId) {
             const container = document.getElementById(containerId);
             if (!container) return;
-
-            const observer = new MutationObserver(() => {
-                scrollToBottom(containerId);
-            });
-
-            observer.observe(container, {
-                childList: true,
-                subtree: true
-            });
-
-            // Initial scroll
-            scrollToBottom(containerId);
+            
+            // Multiple attempts to ensure scroll works
+            const attemptScroll = (attempts = 0) => {
+                if (attempts >= 5) return;
+                
+                container.scrollTop = container.scrollHeight;
+                
+                // Check if we actually scrolled to bottom
+                const isAtBottom = Math.abs(container.scrollHeight - container.scrollTop - container.clientHeight) < 10;
+                
+                if (!isAtBottom) {
+                    setTimeout(() => attemptScroll(attempts + 1), 50);
+                }
+            };
+            
+            attemptScroll();
         }
 
-        // Apply to both chat containers
-        function initAutoScroll() {
-            observeChat("chat-container");       // your public chat container
-            observeChat("private-ai-container"); // your private AI container
+        // Scroll to bottom for main chat
+        function scrollToBottomMain() {
+            scrollToBottom('chat-container');
+            isAtBottom = true;
+            newMessagesCount = 0;
+            if (newMessagesCountEl) newMessagesCountEl.textContent = '0';
+            if (scrollToBottomBtn) scrollToBottomBtn.classList.remove('visible');
+        }
+
+        // Scroll to bottom for private AI
+        function scrollPrivateToBottom() {
+            scrollToBottom('private-ai-container');
         }
 
         // ===== REAL-TIME ACTIVE STATUS FUNCTIONS =====
@@ -1627,31 +1650,6 @@ html, body {
             return Math.abs(scrollHeight - scrollPosition) <= threshold;
         }
 
-        // Scroll to bottom function - FIXED with proper timing
-        function scrollToBottomMain() {
-            const chatContainer = document.getElementById('chat-container');
-            if (chatContainer) {
-                // Use setTimeout to ensure DOM is updated before scrolling
-                setTimeout(() => {
-                    chatContainer.scrollTop = chatContainer.scrollHeight;
-                    isAtBottom = true;
-                    newMessagesCount = 0;
-                    newMessagesCountEl.textContent = '0';
-                    scrollToBottomBtn.classList.remove('visible');
-                }, 100);
-            }
-        }
-
-        // Scroll to bottom for private AI - FIXED with proper timing
-        function scrollPrivateToBottom() {
-            const privateContainer = document.getElementById('private-ai-container');
-            if (privateContainer) {
-                setTimeout(() => {
-                    privateContainer.scrollTop = privateContainer.scrollHeight;
-                }, 100);
-            }
-        }
-
         // Update scroll state function
         function updateScrollState() {
             const chatContainer = document.getElementById('chat-container');
@@ -1659,10 +1657,10 @@ html, body {
             
             if (isAtBottom) {
                 newMessagesCount = 0;
-                newMessagesCountEl.textContent = '0';
-                scrollToBottomBtn.classList.remove('visible');
+                if (newMessagesCountEl) newMessagesCountEl.textContent = '0';
+                if (scrollToBottomBtn) scrollToBottomBtn.classList.remove('visible');
             } else {
-                scrollToBottomBtn.classList.add('visible');
+                if (scrollToBottomBtn) scrollToBottomBtn.classList.add('visible');
             }
         }
 
@@ -1736,9 +1734,6 @@ html, body {
                 // Initialize real-time features after login
                 initSocket();
                 setupTypingHandlers();
-                
-                // Initialize auto-scroll after login
-                setTimeout(initAutoScroll, 500);
             } else {
                 document.getElementById('auth-container').style.display = 'flex';
                 document.querySelector('.menu').style.display = 'none';
@@ -1842,7 +1837,7 @@ html, body {
                 // Initial check for scroll position
                 setTimeout(handlePrivateScroll, 100);
                 // Scroll to bottom when switching to private AI
-                setTimeout(scrollPrivateToBottom, 150);
+                setTimeout(() => forceScrollToBottom('private-ai-container'), 200);
             } else if (privateContainer) {
                 // Remove scroll event when not in private container
                 privateContainer.removeEventListener('scroll', handlePrivateScroll);
@@ -1857,7 +1852,7 @@ html, body {
             if (containerId === 'chat') {
                 shouldRestoreScroll = true;
                 // Scroll to bottom when switching to main chat
-                setTimeout(scrollToBottomMain, 150);
+                setTimeout(() => forceScrollToBottom('chat-container'), 200);
             }
         }
 
@@ -1951,9 +1946,6 @@ html, body {
                             // Initialize real-time features after login
                             initSocket();
                             setupTypingHandlers();
-                            
-                            // Initialize auto-scroll after login
-                            setTimeout(initAutoScroll, 500);
                             
                             // Set flag to restore scroll position after messages load
                             shouldRestoreScroll = true;
@@ -2058,8 +2050,8 @@ html, body {
                 setTimeout(restoreScrollPosition, 100);
             }
             
-            // Always scroll to bottom after loading messages
-            setTimeout(() => scrollToBottom('chat-container'), 200);
+            // ALWAYS scroll to bottom after loading messages - FORCE IT
+            setTimeout(() => forceScrollToBottom('chat-container'), 300);
         }
 
         function showNotification(username, message) {
@@ -2150,13 +2142,11 @@ html, body {
 
             container.appendChild(messageDiv);
             
-            // Always scroll to bottom for private chat
-            setTimeout(() => {
-                scrollToBottom('private-ai-container');
-            }, 100);
+            // ALWAYS scroll to bottom for private chat - FORCE IT
+            setTimeout(() => forceScrollToBottom('private-ai-container'), 100);
         } 
             
-        // UPDATED displayMessage function with PERFECT avatar alignment and FIXED auto-scroll
+        // UPDATED displayMessage function with FORCED auto-scroll
         function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
             if (!elements.chatContainer) return;
             
@@ -2259,6 +2249,11 @@ html, body {
                 e.preventDefault();
                 showMessageContextMenu(e, messageDiv);
             });
+            
+            // FORCE SCROLL TO BOTTOM FOR EVERY NEW MESSAGE
+            if (isNew) {
+                setTimeout(() => forceScrollToBottom('chat-container'), 50);
+            }
             
             // Update scroll state after adding message
             setTimeout(updateScrollState, 0);
@@ -2531,6 +2526,7 @@ html, body {
             }
         }  
 
+       // --- CUT HERE ---
         function copyToClipboard(text, button) {  
             const textarea = document.createElement('textarea');  
             textarea.value = text;  
@@ -3098,9 +3094,6 @@ html, body {
             initSocket();
             setupTypingHandlers();
             
-            // Initialize auto-scroll
-            setTimeout(initAutoScroll, 500);
-            
             // Set flag to restore scroll position after messages load
             shouldRestoreScroll = true;
             
@@ -3109,6 +3102,5 @@ html, body {
             if (scrollBtn) scrollBtn.style.display = 'block';
         }
     </script>
-  </body>
+</body>
 </html>
-          
