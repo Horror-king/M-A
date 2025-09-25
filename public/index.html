@@ -262,8 +262,8 @@ html, body {
   gap: 2px;
   box-sizing: border-box;
 
-  /* 👇 This ensures last message never hides */
-  padding-bottom: 100px; /* same as input height */
+  /* JS will update this dynamically */
+  padding-bottom: 0;
 }
         
 /* Improved message styling with better avatar alignment */
@@ -492,7 +492,8 @@ html, body {
   max-width: 600px;
   box-sizing: border-box;
   z-index: 1000;
-  height: 50px; /* must match padding-bottom above */
+  height: auto;       /* can grow if multiline */
+  min-height: 60px;   /* base height */
 }
 
 /* Responsive adjustments for mobile */
@@ -3035,6 +3036,27 @@ function clearReply() {
             const scrollBtn = document.getElementById('scrollToBottomBtn');
             if (scrollBtn) scrollBtn.style.display = 'block';
         }
+         function adjustChatPadding() {
+  const chatInput = document.querySelector('.chat-input');
+  const chatMessages = document.querySelector('.chat-messages');
+  if (chatInput && chatMessages) {
+    const inputHeight = chatInput.offsetHeight;
+    chatMessages.style.paddingBottom = inputHeight + 'px';
+  }
+}
+
+// Run once on load
+adjustChatPadding();
+
+// Run on resize (e.g. mobile keyboard, window resize)
+window.addEventListener('resize', adjustChatPadding);
+
+// Run if input height changes (multi-line typing)
+const chatInput = document.querySelector('.chat-input');
+if (chatInput) {
+  const observer = new ResizeObserver(adjustChatPadding);
+  observer.observe(chatInput);
+}
     </script>
 </body>
 </html>
