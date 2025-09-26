@@ -479,18 +479,12 @@ html, body {
 /* FIXED: Chat input positioning */
 /* Chat input bar */
 .chat-input {
+  position: relative; /* instead of fixed */
+  min-height: 73px;
+  border-top: 1px solid #e4e6eb;
+  background: white;
   display: flex;
   align-items: center;
-  padding: 5px;
-  border-top: 1px solid #e4e6eb;
-  background-color: white;
-  position: fixed;
-  bottom: 0;
-  width: 100%;
-  max-width: 600px;
-  box-sizing: border-box;
-  z-index: 1000;
-  min-height: 73px; /* matches padding-bottom above */
 }
         
 /* Responsive adjustments for mobile */
