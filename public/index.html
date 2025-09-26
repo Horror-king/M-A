@@ -235,6 +235,7 @@ html, body {
     flex-direction: column;
     height: 100vh;
     overflow: hidden; 
+    padding-bottom: 73px; /* Reserve space for fixed input */
 }
 
 #private-ai {
@@ -473,19 +474,20 @@ html, body {
 }
 
 /* FIXED: Chat input positioning */
-/* Chat input bar */
+/* Your fixed chat input */
 .chat-input {
   position: fixed;
   bottom: 0;
   left: 0;
-  right: 0;
-  height: 70px;
-  border-top: 1px solid #ddd;
-  background: #fff;
+  width: 100%;
+  max-width: 600px;
+  min-height: 73px;
+  border-top: 1px solid #e4e6eb;
+  background: white;
   display: flex;
   align-items: center;
-  padding: 10px;
   z-index: 1000;
+  padding: 10px;
 }
         
 /* Responsive adjustments for mobile */
