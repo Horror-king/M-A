@@ -249,23 +249,19 @@ html, body {
 /* FIXED: Chat messages container with correct height above input */
 /* Chat messages area */
 .chat-messages,
+.chat-messages,
 #private-ai-container {
-  flex: 1; /* take available space */
-  padding: 10px 15px;
+  flex: 1;
   overflow-y: auto;
+  padding: 10px 15px;
+  background-color: white;
   display: flex;
   flex-direction: column;
   scroll-behavior: smooth;
-  background-color: white;
-  font-size: 16px;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  touch-action: auto;
-  gap: 2px;
   box-sizing: border-box;
 
-  /* 👇 this is the magic: leave room for input */
-  padding-bottom: 73px; /* must match chat-input height */
+  /* ❌ REMOVE THIS */
+  /* padding-bottom: 73px; */
 }
         
 /* Improved message styling with better avatar alignment */
