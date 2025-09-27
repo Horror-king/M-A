@@ -1143,8 +1143,8 @@
             <h2 id="auth-title">Login</h2>
             <input type="text" id="auth-username" placeholder="Username">
             <input type="password" id="auth-password" placeholder="Password">
-            <div class="error-message" id="error-message"></div>
-            <div class="success-message" id="success-message"></div>
+            <div class="error-message" id="auth-error-message"></div>
+            <div class="success-message" id="auth-success-message"></div>
             <button onclick="handleAuth()">Login</button>
             <div class="auth-toggle">
                 <span id="toggle-text">Don't have an account? </span>
@@ -1175,10 +1175,10 @@
     <div class="dropdown" id="dropdown" style="display: none;">
         <div class="profile-panel">
             <div class="profile-avatar">
-                <img src="https://i.pravatar.cc/50?u=${encodeURIComponent(currentUsername)}" alt="Profile">
+                <img src="https://i.pravatar.cc/50?u=user" alt="Profile">
             </div>
             <div class="profile-info">
-                <div class="profile-username">${currentUsername}</div>
+                <div class="profile-username" id="profile-username">User</div>
                 <div class="profile-status online">
                     <span class="status-dot"></span>
                     <span>Online</span>
@@ -1385,8 +1385,179 @@
     </div>
 
     <script>
+        // ===== FIXED AUTHENTICATION CODE =====
         let isLogin = true;
         let users = JSON.parse(localStorage.getItem('users')) || {};
+        
+        // Fixed: Wait for DOM to be fully loaded before accessing elements
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+
+        function initializeApp() {
+            // Check if user is already logged in
+            const savedUser = localStorage.getItem('currentUser');
+            if (savedUser) {
+                // User is logged in, show chat interface
+                document.getElementById('auth-container').style.display = 'none';
+                document.querySelector('.menu').style.display = 'flex';
+                document.querySelector('.news-toggle').style.display = 'block';
+                showContainer('chat');
+                updateProfileSection();
+            } else {
+                // User is not logged in, show auth interface
+                document.getElementById('auth-container').style.display = 'flex';
+                document.querySelector('.menu').style.display = 'none';
+            }
+            
+            // Set current year in footer
+            if (document.getElementById("year")) {
+                document.getElementById("year").textContent = new Date().getFullYear();
+            }
+            
+            // Initialize news
+            populateNews();
+        }
+
+        function toggleAuth() {
+            isLogin = !isLogin;
+            const authTitle = document.getElementById('auth-title');
+            const authButton = document.querySelector('.auth-box button');
+            const toggleText = document.getElementById('toggle-text');
+            const toggleLink = document.getElementById('toggle-link');
+            
+            // Clear any error/success messages
+            const authError = document.getElementById('auth-error-message');
+            const authSuccess = document.getElementById('auth-success-message');
+            if (authError) authError.style.display = 'none';
+            if (authSuccess) authSuccess.style.display = 'none';
+            
+            if (isLogin) {
+                authTitle.textContent = 'Login';
+                authButton.textContent = 'Login';
+                toggleText.textContent = "Don't have an account? ";
+                toggleLink.textContent = 'Sign Up';
+            } else {
+                authTitle.textContent = 'Sign Up';
+                authButton.textContent = 'Sign Up';
+                toggleText.textContent = 'Already have an account? ';
+                toggleLink.textContent = 'Login';
+            }
+        }
+
+        function showAuthError(message) {
+            const errorDisplay = document.getElementById('auth-error-message');
+            if (errorDisplay) {
+                errorDisplay.textContent = message;
+                errorDisplay.style.display = 'block';
+                setTimeout(() => {
+                    errorDisplay.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        function showAuthSuccess(message) {
+            const successDisplay = document.getElementById('auth-success-message');
+            if (successDisplay) {
+                successDisplay.textContent = message;
+                successDisplay.style.display = 'block';
+                setTimeout(() => {
+                    successDisplay.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        async function handleAuth() {
+            const username = document.getElementById('auth-username').value.trim();
+            const password = document.getElementById('auth-password').value;
+            const loader = document.getElementById('loader');
+            
+            // Clear previous messages
+            showAuthError('');
+            showAuthSuccess('');
+            
+            if (!username || !password) {
+                showAuthError('Please enter both username and password');
+                return;
+            }
+            
+            if (username.length < 3 || username.length > 20) {
+                showAuthError('Username must be between 3-20 characters');
+                return;
+            }
+            
+            if (password.length < 4 || password.length > 20) {
+                showAuthError('Password must be between 4-20 characters');
+                return;
+            }
+            
+            // Show loader
+            if (loader) loader.style.display = 'flex';
+            
+            try {
+                // Simulate network delay
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                if (isLogin) {
+                    // Login logic
+                    if (users[username] && users[username] === password) {
+                        showAuthSuccess('Login successful!');
+                        localStorage.setItem('currentUser', username);
+                        localStorage.setItem('chat_username', username);
+                        
+                        setTimeout(() => {
+                            if (loader) loader.style.display = 'none';
+                            document.getElementById('auth-container').style.display = 'none';
+                            document.querySelector('.menu').style.display = 'flex';
+                            document.querySelector('.news-toggle').style.display = 'block';
+                            showContainer('chat');
+                            updateProfileSection();
+                            initializeChat();
+                        }, 500);
+                    } else {
+                        throw new Error('Invalid username or password');
+                    }
+                } else {
+                    // Signup logic
+                    if (users[username]) {
+                        throw new Error('Username already exists');
+                    } else {
+                        users[username] = password;
+                        localStorage.setItem('users', JSON.stringify(users));
+                        showAuthSuccess('Account created successfully! Please login.');
+                        
+                        setTimeout(() => {
+                            if (loader) loader.style.display = 'none';
+                            toggleAuth(); // Switch back to login
+                        }, 1000);
+                    }
+                }
+            } catch (error) {
+                if (loader) loader.style.display = 'none';
+                showAuthError(error.message);
+            }
+        }
+
+        function updateProfileSection() {
+            const dropdown = document.getElementById('dropdown');
+            if (!dropdown) return;
+            
+            const currentUsername = localStorage.getItem('currentUser');
+            const profileUsername = document.getElementById('profile-username');
+            
+            if (profileUsername && currentUsername) {
+                profileUsername.textContent = currentUsername;
+            }
+            
+            // Update profile avatar
+            const profileAvatar = document.querySelector('.profile-avatar img');
+            if (profileAvatar && currentUsername) {
+                profileAvatar.src = `https://i.pravatar.cc/50?u=${encodeURIComponent(currentUsername)}`;
+                profileAvatar.alt = currentUsername;
+            }
+        }
+
+        // ===== REST OF THE CHAT FUNCTIONALITY =====
         let longPressTimer;
         let isLongPress = false;
         const badWords = ['fuck', 'nigga', 'shit', 'bitch', 'asshole'];
@@ -1425,8 +1596,8 @@
             sendButton: document.getElementById('send-button'),
             chatContainer: document.getElementById('chat-container'),
             replyPreview: document.getElementById('reply-preview-container'),
-            errorDisplay: document.getElementById('error-message'),
-            successDisplay: document.getElementById('success-message'),
+            errorDisplay: document.getElementById('auth-error-message'),
+            successDisplay: document.getElementById('auth-success-message'),
             privateInput: document.getElementById('private-user-input'),
             privateSendButton: document.getElementById('private-send-button')
         };
@@ -1822,113 +1993,6 @@
                 shouldRestoreScroll = true;
                 // Scroll to bottom when switching to main chat
                 setTimeout(() => forceScrollToBottom('chat-container'), 200);
-            }
-        }
-
-        function toggleAuth() {
-            isLogin = !isLogin;
-            const authTitle = document.getElementById('auth-title');
-            const authButton = document.querySelector('.auth-box button');
-            const toggleText = document.getElementById('toggle-text');
-            const toggleLink = document.getElementById('toggle-link');
-            elements.errorDisplay.style.display = 'none';
-            elements.successDisplay.style.display = 'none';
-            if (isLogin) {
-                authTitle.textContent = 'Login';
-                authButton.textContent = 'Login';
-                toggleText.textContent = "Don't have an account? ";
-                toggleLink.textContent = 'Sign Up';
-            } else {
-                authTitle.textContent = 'Sign Up';
-                authButton.textContent = 'Sign Up';
-                toggleText.textContent = 'Already have an account? ';
-                toggleLink.textContent = 'Login';
-            }
-        }
-
-        function showSuccess(message) {
-            elements.successDisplay.textContent = message;
-            elements.successDisplay.style.display = 'block';
-            setTimeout(() => {
-                elements.successDisplay.style.display = 'none';
-            }, 3000);
-        }
-
-        function showError(message) {
-            elements.errorDisplay.textContent = message;
-            elements.errorDisplay.style.display = 'block';
-            setTimeout(() => {
-                elements.errorDisplay.style.display = 'none';
-            }, 3000);
-        }
-
-        async function handleAuth() {
-            const username = document.getElementById('auth-username').value.trim();
-            const password = document.getElementById('auth-password').value;
-            const loader = document.getElementById('loader');
-            elements.errorDisplay.style.display = 'none';
-            elements.successDisplay.style.display = 'none';
-            if (!username || !password) {
-                showError('Please enter both username and password');
-                return;
-            }
-            if (username.length < 3 || username.length > 20) {
-                showError('Username must be between 3-20 characters');
-                return;
-            }
-            if (password.length < 4 || password.length > 20) {
-                showError('Password must be between 4-20 characters');
-                return;
-            }
-            loader.style.display = 'flex';
-            try {
-                // Simulate network delay
-                await new Promise(resolve => setTimeout(resolve, 500));
-
-                if (isLogin) {
-                    // Login logic
-                    if (users[username] && users[username] === password) {
-                        showSuccess('Login successful!');
-                        localStorage.setItem('currentUser', username);
-                        localStorage.setItem('chat_username', username);
-                        setTimeout(() => {
-                            loader.style.display = 'none';
-                            document.getElementById('auth-container').style.display = 'none';
-                            document.querySelector('.menu').style.display = 'flex';
-                            document.querySelector('.news-toggle').style.display = 'block';
-                            // Show scroll button after successful login
-                            if (scrollToBottomBtn) scrollToBottomBtn.style.display = 'block';
-                            showContainer('chat');
-                            updateProfileSection();
-                            initializeChat();
-
-                            // Initialize real-time features after login
-                            initSocket();
-                            setupTypingHandlers();
-
-                            // Set flag to restore scroll position after messages load
-                            shouldRestoreScroll = true;
-                        }, 500);
-                    } else {
-                        throw new Error('Invalid username or password');
-                    }
-                } else {
-                    // Signup logic
-                    if (users[username]) {
-                        throw new Error('Username already exists');
-                    } else {
-                        users[username] = password;
-                        localStorage.setItem('users', JSON.stringify(users));
-                        showSuccess('Account created successfully! Please login.');
-                        setTimeout(() => {
-                            loader.style.display = 'none';
-                            toggleAuth();
-                        }, 1000);
-                    }
-                }
-            } catch (error) {
-                loader.style.display = 'none';
-                showError(error.message);
             }
         }
 
@@ -2760,68 +2824,6 @@
             }
         });
 
-        // UPDATED function to update the profile section with new design
-        function updateProfileSection() {
-            const dropdown = document.getElementById('dropdown');
-            if (!dropdown) return;
-            
-            const currentUsername = localStorage.getItem('currentUser');
-            
-            // Remove existing profile section if it exists
-            const existingProfile = document.querySelector('.profile-section');
-            const existingDivider = document.querySelector('.menu-divider');
-            if (existingProfile) existingProfile.remove();
-            if (existingDivider) existingDivider.remove();
-            
-            // Only add profile section if user is logged in
-            if (currentUsername) {
-                const profileSection = document.createElement('div');
-                profileSection.className = 'profile-panel';
-                profileSection.innerHTML = `
-                    <div class="profile-avatar">
-                        <img src="https://i.pravatar.cc/50?u=${encodeURIComponent(currentUsername)}" alt="Profile">
-                    </div>
-                    <div class="profile-info">
-                        <div class="profile-username">${currentUsername}</div>
-                        <div class="profile-status online">
-                            <span class="status-dot"></span>
-                            <span>Online</span>
-                        </div>
-                    </div>
-                `;
-                
-                const divider = document.createElement('div');
-                divider.className = 'menu-divider';
-                
-                // Insert at the beginning of dropdown
-                dropdown.insertBefore(divider, dropdown.firstChild);
-                dropdown.insertBefore(profileSection, dropdown.firstChild);
-            }
-        }
-
-        // Improved click handler for dropdown
-        document.addEventListener('click', function(event) {
-            const dropdown = document.getElementById('dropdown');
-            const hamburger = document.querySelector('.hamburger');
-            const kebabMenu = document.querySelector('.kebab-menu');
-            
-            // Close dropdown if clicking outside of it and not on menu controls
-            if (dropdown && dropdown.style.display === 'block' && 
-                !dropdown.contains(event.target) && 
-                event.target !== hamburger &&
-                !kebabMenu.contains(event.target)) {
-                dropdown.style.display = 'none';
-            }
-            
-            // Close kebab menu if clicking outside
-            const kebabDropdown = document.querySelector('.kebab-dropdown');
-            if (kebabDropdown && kebabDropdown.classList.contains('active') && 
-                !kebabMenu.contains(event.target) && 
-                !kebabDropdown.contains(event.target)) {
-                kebabDropdown.classList.remove('active');
-            }
-        });
-
         function logout() {
             // Disconnect socket when logging out
             if (socket) {
@@ -2901,50 +2903,6 @@
             }
         }
 
-        // FIXED: Updated showContainer function - REMOVED chat input hiding logic
-        function showContainer(containerId) {
-            const containers = document.querySelectorAll('.main-chat-interface');
-            containers.forEach(container => {
-                container.style.display = 'none';
-            });
-            
-            // Show the selected container
-            const container = document.getElementById(containerId);
-            if (container) {
-                container.style.display = 'block';
-            }
-            
-            // Close all menus when showing any container
-            const dropdown = document.getElementById('dropdown');
-            if (dropdown) dropdown.style.display = 'none';
-            
-            const kebabDropdown = document.querySelector('.kebab-dropdown');
-            if (kebabDropdown) kebabDropdown.classList.remove('active');
-            
-            currentUsername = localStorage.getItem('chat_username') || '';
-            
-            // Set scroll restore flag for chat container
-            if (containerId === 'chat') {
-                shouldRestoreScroll = true;
-            }
-            
-            // Handle scroll events for private container
-            if (containerId === 'private-ai' && privateContainer) {
-                // Attach scroll event for private container
-                privateContainer.addEventListener('scroll', handlePrivateScroll);
-                // Initial check for scroll position
-                setTimeout(handlePrivateScroll, 100);
-            } else if (privateContainer) {
-                // Remove scroll event when not in private container
-                privateContainer.removeEventListener('scroll', handlePrivateScroll);
-                // Hide the go-top button when switching away
-                if (privateGoTopBtn) {
-                    privateGoTopBtn.style.display = 'none';
-                    privateGoTopBtn.classList.remove('visible');
-                }
-            }
-        }
-
         // Updated hideContainer function
         function hideContainer(containerId) {
             const container = document.getElementById(containerId);
@@ -2962,23 +2920,6 @@
             
             // Show chat container and input after closing any section
             showContainer('chat');
-        }
-
-        // Zoom functions remain the same
-        function openZoom(src) {
-            document.body.style.overflow = 'hidden';
-            const overlay = document.getElementById('zoom-overlay');
-            const zoomImage = document.getElementById('zoom-image');
-            if (!overlay || !zoomImage) return;
-            
-            zoomImage.src = src;
-            overlay.style.display = 'flex';
-        }
-
-        function closeZoom() {
-            document.body.style.overflow = '';
-            const overlay = document.getElementById('zoom-overlay');
-            if (overlay) overlay.style.display = 'none';
         }
 
         const overlay = document.getElementById('overlay');
