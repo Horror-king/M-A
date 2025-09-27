@@ -250,14 +250,14 @@
             scroll-behavior: smooth;
             box-sizing: border-box;
             /* Ensure it takes full available height minus input */
-            height: calc(100vh - 50px - 60px); /* viewport - menu - input */
-            max-height: calc(100vh - 50px - 60px);
+            height: calc(100vh - 50px - 70px); /* viewport - menu - input */
+            max-height: calc(100vh - 50px - 70px);
         }
 
-        /* FIXED: Chat input positioning - simplified */
+        /* FIXED: Chat input positioning - ALWAYS VISIBLE */
         .chat-input {
             flex-shrink: 0;
-            display: flex;
+            display: flex !important; /* Force display */
             align-items: center;
             padding: 10px 15px;
             border-top: 1px solid #e4e6eb;
@@ -1112,8 +1112,8 @@
             /* Adjust padding for mobile to ensure messages are visible */
             .chat-messages, #private-ai-container {
                 padding-bottom: 20px; /* Extra space at bottom */
-                height: calc(100vh - 50px - 60px - env(safe-area-inset-bottom));
-                max-height: calc(100vh - 50px - 60px - env(safe-area-inset-bottom));
+                height: calc(100vh - 50px - 70px - env(safe-area-inset-bottom));
+                max-height: calc(100vh - 50px - 70px - env(safe-area-inset-bottom));
             }
             
             .main-chat-interface {
@@ -1208,7 +1208,7 @@
             <div class="chat-messages" id="chat-container"></div>
             <div id="reply-preview-container"></div>
 
-            <!-- Chat input must be inside the container -->
+            <!-- FIXED: Chat input - REMOVED display: none from HTML -->
             <div class="chat-input">
                 <textarea id="user-input" placeholder="Type your message..."></textarea>
                 <button id="send-button" onclick="sendMessage()" disabled>
@@ -1232,7 +1232,8 @@
             <div class="chat-messages" id="private-ai-container"></div>
             <div id="private-reply-preview-container"></div>
         
-            <div class="chat-input" style="display: none;">
+            <!-- FIXED: Private chat input - REMOVED display: none from HTML -->
+            <div class="chat-input">
                 <textarea id="private-user-input" placeholder="Type your private message..."></textarea>
                 <button id="private-send-button" onclick="sendPrivateMessage()" disabled>
                     <i class="fas fa-paper-plane"></i>
@@ -1786,25 +1787,19 @@
             }
         });
 
-        // MODIFIED showContainer FUNCTION
+        // FIXED: showContainer FUNCTION - REMOVED chat input hiding logic
         function showContainer(containerId) {
             // Hide all containers
             document.querySelectorAll('.main-chat-interface').forEach(container => {
                 container.style.display = 'none';
             });
-            // Hide all chat inputs
-            document.querySelectorAll('.chat-input').forEach(input => {
-                input.style.display = 'none';
-            });
+            
             // Show the selected container
             const container = document.getElementById(containerId);
             if (container) {
                 container.style.display = 'block';
-                // Show its input if it's a chat container
-                if (containerId === 'chat' || containerId === 'private-ai') {
-                    container.querySelector('.chat-input').style.display = 'flex';
-                }
             }
+            
             // Handle scroll events for private container
             if (containerId === 'private-ai' && privateContainer) {
                 // Attach scroll event for private container
@@ -2547,7 +2542,7 @@
             downloadingAlert.style.backgroundColor = '#333';
             downloadingAlert.style.color = '#fff';
             downloadingAlert.style.fontSize = '16px';
-            downloadingAlert.style.borderRadius = '8px';
+            downloadingAlert.style.border-radius = '8px';
             downloadingAlert.style.zIndex = '9999';
             document.body.appendChild(downloadingAlert);
 
@@ -2851,11 +2846,6 @@
             const kebabDropdown = document.querySelector('.kebab-dropdown');
             if (kebabDropdown) kebabDropdown.classList.remove('active');
             
-            // Hide all chat inputs
-            document.querySelectorAll('.chat-input').forEach(input => {
-                input.style.display = 'none';
-            });
-            
             // Show auth container
             document.getElementById('auth-container').style.display = 'flex';
             
@@ -2911,28 +2901,17 @@
             }
         }
 
-        // Updated showContainer function with proper menu handling
+        // FIXED: Updated showContainer function - REMOVED chat input hiding logic
         function showContainer(containerId) {
             const containers = document.querySelectorAll('.main-chat-interface');
             containers.forEach(container => {
                 container.style.display = 'none';
             });
             
-            // Hide all chat inputs first
-            document.querySelectorAll('.chat-input').forEach(input => {
-                input.style.display = 'none';
-            });
-            
             // Show the selected container
             const container = document.getElementById(containerId);
             if (container) {
                 container.style.display = 'block';
-                
-                // Show the appropriate chat input
-                if (containerId === 'chat' || containerId === 'private-ai') {
-                    const chatInput = container.querySelector('.chat-input');
-                    if (chatInput) chatInput.style.display = 'flex';
-                }
             }
             
             // Close all menus when showing any container
@@ -3017,9 +2996,6 @@
         const currentUser = localStorage.getItem('currentUser');
         if (currentUser) {
             showContainer('chat');
-            
-            const chatInput = document.querySelector('.chat-input');
-            if (chatInput) chatInput.style.display = 'flex';
             
             updateProfileSection();
             
