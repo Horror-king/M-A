@@ -22,9 +22,9 @@ const io = new Server(server, {
   }
 });
 
-// Track online users
+// Track online users - 3 MINUTE TIMEOUT
 const onlineUsers = new Map();
-const onlineStatusTimeout = 15000; // Reduced to 15 seconds for faster cleanup
+const onlineStatusTimeout = 180000; // 3 minutes = 180000 milliseconds
 
 // Global setup
 global.GoatBot = { config };
@@ -341,7 +341,7 @@ app.get('/online-users', (req, res) => {
   res.json(onlineUsersArray);
 });
 
-// Socket.io connection handling - IMPROVED ONLINE/OFFLINE TRACKING
+// Socket.io connection handling - 3 MINUTE ONLINE STATUS
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
@@ -395,22 +395,31 @@ io.on('connection', (socket) => {
     }
   });
 
-  // IMPROVED: Handle disconnect properly
+  // Handle disconnect properly
   socket.on('disconnect', (reason) => {
     console.log('User disconnected:', socket.id, 'Reason:', reason);
     
-    // Find user by socket ID and remove them
+    // Find user by socket ID but DON'T remove them immediately
+    // They stay in the list for 3 minutes due to the timeout
     let foundUsername = null;
     for (let [username, data] of onlineUsers.entries()) {
       if (data.socketId === socket.id) {
         foundUsername = username;
+        // Update last seen but keep in list
+        data.lastSeen = Date.now();
+        data.isOnline = false;
+        console.log('User marked as inactive:', username);
         break;
       }
     }
     
+    // Don't remove from list immediately - let the timeout handle it
     if (foundUsername) {
-      console.log('Removing user on disconnect:', foundUsername);
-      removeUserFromOnlineList(foundUsername);
+      io.emit('user-status-change', { 
+        username: foundUsername, 
+        status: 'away',
+        onlineUsers: Array.from(onlineUsers.keys())
+      });
     }
   });
   
@@ -447,15 +456,15 @@ io.on('connection', (socket) => {
   }
 });
 
-// More aggressive cleanup for inactive users - REDUCED TIMEOUT
+// 3 MINUTE CLEANUP - Remove users after 3 minutes of inactivity
 setInterval(() => {
   const now = Date.now();
   const removedUsers = [];
   
   for (let [username, data] of onlineUsers.entries()) {
-    // Reduce timeout to 15 seconds for faster cleanup
-    if (now - data.lastSeen > 15000) {
-      console.log('Removing inactive user:', username);
+    // 3 minute timeout (180000 milliseconds)
+    if (now - data.lastSeen > onlineStatusTimeout) {
+      console.log('Removing inactive user (3 minutes):', username);
       onlineUsers.delete(username);
       removedUsers.push(username);
     }
@@ -471,16 +480,16 @@ setInterval(() => {
         onlineUsers: onlineUsersArray
       });
     });
-    console.log('Cleaned up inactive users:', removedUsers);
+    console.log('Cleaned up inactive users (3min timeout):', removedUsers);
     console.log('Current online users after cleanup:', onlineUsersArray);
   }
-}, 5000); // Check every 5 seconds instead of 10
+}, 30000); // Check every 30 seconds
 
 // Start server
 server.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
   console.log(`🔹 Command prefix: "${PREFIX}"`);
-  console.log(`👥 Online users tracking: ACTIVE`);
+  console.log(`👥 Online users tracking: ACTIVE (3 minute timeout)`);
   if (isRender && renderExternalUrl) {
     console.log(`🌐 Render External URL: ${renderExternalUrl}`);
     console.log(`⏱️ UptimeRobot monitoring URL: ${renderExternalUrl}/health`);
