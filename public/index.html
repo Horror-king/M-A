@@ -329,47 +329,60 @@ html, body {
     white-space: pre-wrap;
 }
 
-/* Improved avatar styling */
-/* Message avatars */
+/* PERFECT CIRCLE AVATARS - CLEAN SOLUTION */
+.profile-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    margin-right: 12px;
+    border: 2px solid #e4e6eb;
+    background-color: #f0f2f5;
+}
+
+.profile-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.online-user-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    overflow: hidden;
+    margin-bottom: 6px;
+    position: relative;
+    border: 2px solid white;
+    background-color: #f0f2f5;
+}
+
+.online-user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
 .message .avatar {
     width: 26px;
     height: 26px;
-    border-radius: 50% !important;
+    border-radius: 50%;
     flex-shrink: 0;
     align-self: flex-start;
     margin-top: 6px;
     border: 2px solid #fff;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-    overflow: hidden !important;
+    overflow: hidden;
     background-color: #f0f2f5;
 }
-        
 
-
-/* PERFECT AVATAR FIX - FORCE CIRCLE FIT */
 .message .avatar img {
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: cover !important;
-    object-position: center !important;
-    display: block !important;
-    border-radius: 0 !important;
-    min-width: 100% !important;
-    min-height: 100% !important;
-    max-width: 100% !important;
-    max-height: 100% !important;
-}
-
-/* FORCE REMOVE ANY POTENTIAL TRANSFORMS OR ANIMATIONS */
-.profile-avatar,
-.online-user-avatar,
-.message .avatar,
-.profile-avatar img,
-.online-user-avatar img,
-.message .avatar img {
-    transform: none !important;
-    transition: none !important;
-    animation: none !important;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
 }
 
 /* Improved username with status indicator */
@@ -885,30 +898,6 @@ html, body {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-/* PERFECT AVATAR FIX - FORCE FIT INSIDE CIRCLE */
-.profile-avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50% !important;
-    overflow: hidden !important;
-    margin-right: 12px;
-    border: 2px solid #e4e6eb;
-    background-color: #f0f2f5;
-    position: relative;
-}
-.profile-avatar img {
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: cover !important;
-    object-position: center !important;
-    display: block !important;
-    border-radius: 0 !important;
-    min-width: 100% !important;
-    min-height: 100% !important;
-    max-width: 100% !important;
-    max-height: 100% !important;
-}
-
 .profile-info {
     flex-grow: 1;
 }
@@ -1025,32 +1014,6 @@ html, body {
     transform: translateY(-1px);
 }
 
-/* Online user avatars */
-.online-user-avatar {
-    width: 42px;
-    height: 42px;
-    border-radius: 50%;
-    overflow: hidden;
-    margin-bottom: 6px;
-    position: relative;
-    border: 2px solid white;
-    background-color: #f0f2f5;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.online-user-avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center;
-    display: block;
-    min-width: 100%;
-    min-height: 100%;
-    flex-shrink: 0;
-}
-
 /* GREEN DOT INDICATOR */
 .online-dot {
     position: absolute;
@@ -1115,16 +1078,6 @@ html, body {
         padding: 5px 6px;
     }
     
-    .online-user-avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center;
-    display: block;
-    min-width: 100%;
-    min-height: 100%;
-    flex-shrink: 0;
-}
     .online-dot {
         width: 10px;
         z-index: 100;
@@ -1164,7 +1117,6 @@ html, body {
     </style>
 </head>
 <body>
-    <!-- The rest of your HTML remains exactly the same -->
     <div class="loader" id="loader">
         <div class="spinner"></div>
     </div>
@@ -1206,10 +1158,10 @@ html, body {
     <div class="dropdown" id="dropdown" style="display: none;">
         <div class="profile-panel">
             <div class="profile-avatar">
-                <img src="https://i.pravatar.cc/50?u=${encodeURIComponent(currentUsername)}" alt="Profile">
+                <img src="https://i.pravatar.cc/50?u=user" alt="Profile" id="profile-avatar-img">
             </div>
             <div class="profile-info">
-                <div class="profile-username">${currentUsername}</div>
+                <div class="profile-username" id="profile-username">User</div>
                 <div class="profile-status online">
                     <span class="status-dot"></span>
                     <span>Online</span>
@@ -2985,10 +2937,10 @@ function updateProfileSection() {
         profileSection.className = 'profile-panel';
         profileSection.innerHTML = `
             <div class="profile-avatar">
-                <img src="https://i.pravatar.cc/50?u=${encodeURIComponent(currentUsername)}" alt="Profile">
+                <img src="https://i.pravatar.cc/50?u=${encodeURIComponent(currentUsername)}" alt="Profile" id="profile-avatar-img">
             </div>
             <div class="profile-info">
-                <div class="profile-username">${currentUsername}</div>
+                <div class="profile-username" id="profile-username">${currentUsername}</div>
                 <div class="profile-status online">
                     <span class="status-dot"></span>
                     <span>Online</span>
