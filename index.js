@@ -336,45 +336,78 @@ app.post("/api/command", async (req, res) => {
 
 // Add endpoint to get online users
 app.get('/online-users', (req, res) => {
-  res.json(Array.from(onlineUsers.keys()));
+  const onlineUsersArray = Array.from(onlineUsers.keys());
+  console.log('Current online users:', onlineUsersArray);
+  res.json(onlineUsersArray);
 });
 
-// Socket.io connection handling
+// Socket.io connection handling - UPDATED WITH PROPER ONLINE/OFFLINE TRACKING
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
-  
+
   socket.on('user-online', (username) => {
     if (username) {
+      console.log('User online:', username);
+      
+      // Update or add user to online users
       onlineUsers.set(username, {
         socketId: socket.id,
+        username: username,
         lastSeen: Date.now()
       });
+      
+      // Get current online users list
+      const onlineUsersArray = Array.from(onlineUsers.keys());
+      console.log('Updated online users:', onlineUsersArray);
       
       // Broadcast to all users that this user is online
       io.emit('user-status-change', { 
         username, 
         status: 'online',
+        onlineUsers: onlineUsersArray
+      });
+    }
+  });
+
+  socket.on('user-away', (username) => {
+    if (username && onlineUsers.has(username)) {
+      console.log('User away:', username);
+      
+      // Mark user as away but keep in list
+      const userData = onlineUsers.get(username);
+      userData.lastSeen = Date.now();
+      
+      // Broadcast away status
+      io.emit('user-status-change', { 
+        username, 
+        status: 'away',
         onlineUsers: Array.from(onlineUsers.keys())
       });
     }
   });
-  
+
+  socket.on('user-offline', (username) => {
+    if (username) {
+      console.log('User offline:', username);
+      removeUserFromOnlineList(username);
+    }
+  });
+
   socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+    
     // Find user by socket ID and remove them
+    let foundUsername = null;
     for (let [username, data] of onlineUsers.entries()) {
       if (data.socketId === socket.id) {
-        onlineUsers.delete(username);
-        
-        // Broadcast that user went offline
-        io.emit('user-status-change', { 
-          username, 
-          status: 'offline',
-          onlineUsers: Array.from(onlineUsers.keys())
-        });
+        foundUsername = username;
         break;
       }
     }
-    console.log('User disconnected:', socket.id);
+    
+    if (foundUsername) {
+      removeUserFromOnlineList(foundUsername);
+    }
   });
   
   socket.on('typing-start', (data) => {
@@ -390,20 +423,51 @@ io.on('connection', (socket) => {
       isTyping: false
     });
   });
+
+  // Helper function to remove user from online list
+  function removeUserFromOnlineList(username) {
+    if (onlineUsers.has(username)) {
+      onlineUsers.delete(username);
+      
+      // Get updated online users list
+      const onlineUsersArray = Array.from(onlineUsers.keys());
+      console.log('After removal, online users:', onlineUsersArray);
+      
+      // Broadcast that user went offline
+      io.emit('user-status-change', { 
+        username, 
+        status: 'offline',
+        onlineUsers: onlineUsersArray
+      });
+    }
+  }
 });
 
 // Periodically clean up users who haven't sent a heartbeat
 setInterval(() => {
   const now = Date.now();
+  const removedUsers = [];
+  
   for (let [username, data] of onlineUsers.entries()) {
     if (now - data.lastSeen > onlineStatusTimeout) {
+      console.log('Removing inactive user:', username);
       onlineUsers.delete(username);
+      removedUsers.push(username);
+    }
+  }
+  
+  // Notify clients about removed users
+  if (removedUsers.length > 0) {
+    const onlineUsersArray = Array.from(onlineUsers.keys());
+    removedUsers.forEach(username => {
       io.emit('user-status-change', { 
         username, 
         status: 'offline',
-        onlineUsers: Array.from(onlineUsers.keys())
+        onlineUsers: onlineUsersArray
       });
-    }
+    });
+    console.log('Cleaned up inactive users:', removedUsers);
+    console.log('Current online users after cleanup:', onlineUsersArray);
   }
 }, 10000); // Check every 10 seconds
 
@@ -411,6 +475,7 @@ setInterval(() => {
 server.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
   console.log(`🔹 Command prefix: "${PREFIX}"`);
+  console.log(`👥 Online users tracking: ACTIVE`);
   if (isRender && renderExternalUrl) {
     console.log(`🌐 Render External URL: ${renderExternalUrl}`);
     console.log(`⏱️ UptimeRobot monitoring URL: ${renderExternalUrl}/health`);
