@@ -231,7 +231,7 @@ html, body {
 /* FIXED: Chat messages container with proper scrolling and padding */
 .chat-messages, #private-ai-container {
     flex: 1;
-    padding: 6px 10px;
+    padding: 5px 15px;
     overflow-y: auto;
     height: 100%;
     display: flex;
@@ -247,9 +247,9 @@ html, body {
     gap: 2px;
     box-sizing: border-box;
     /* FIXED: Much larger bottom padding to ensure messages are visible above input */
-    padding-bottom: 119px; /* Increased significantly from 120px */
+    padding-bottom: 125px; /* Increased significantly from 120px */
     /* FIXED: Add margin at the bottom to create space for the input */
-    margin-bottom: 64px;
+    margin-bottom: 65px;
 }
  /* FIXED: Ensure the chat container itself has proper spacing */
 .chat-container {
@@ -261,7 +261,7 @@ html, body {
     overflow: hidden;
     position: relative;
     /* FIXED: Add padding at the bottom of the container */
-    padding-bottom: 60px;
+    padding-bottom: 65px;
 }
 
 #private-ai {
@@ -273,7 +273,7 @@ html, body {
     overflow: hidden;
     position: relative;
     /* FIXED: Add padding at the bottom of the container */
-    padding-bottom: 50px;
+    padding-bottom: 45px;
 }
         
 /* Improved message styling with better avatar alignment */
@@ -1106,13 +1106,13 @@ html, body {
     
     /* FIXED: Increased padding for mobile to ensure messages are visible */
     .chat-messages, #private-ai-container {
-        padding-bottom: 119px; /* Even more padding for mobile */
-        margin-bottom: 61px; /* More margin for mobile */
+        padding-bottom: 125px; /* Even more padding for mobile */
+        margin-bottom: 63px; /* More margin for mobile */
     }
     
     /* FIXED: Adjust container padding for mobile */
     .chat-container, #private-ai {
-        padding-bottom: 50px;
+        padding-bottom: 45px;
     }
 }
     </style>
