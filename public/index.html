@@ -360,25 +360,29 @@ html, body {
 }
 
 /* PERFECT AVATAR FIX - FORCE CIRCLE FIT */
+/* Avatar wrapper */
 .profile-avatar,
 .online-user-avatar,
 .message .avatar {
-    border-radius: 50%;
-    overflow: hidden;
-    position: relative;
+  width: 40px;   /* adjust size */
+  height: 40px;
+  border-radius: 50%;  /* makes wrapper circular */
+  overflow: hidden;    /* hides image overflow */
+  border: 2px solid #fff;
+  display: inline-block;
+  position: relative;
 }
 
+/* Avatar image */
 .profile-avatar img,
 .online-user-avatar img,
 .message .avatar img {
-    position: absolute;       /* lock inside parent */
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;        /* crop evenly */
-    object-position: center;  /* center face */
-    display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;   /* extra safety */
+  object-fit: cover;    /* crop correctly */
+  object-position: center;
+  display: block;
 }
 
 /* Improved username with status indicator */
