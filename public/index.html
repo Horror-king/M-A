@@ -1422,40 +1422,46 @@ if (currentUsername && elements.usernameInput) {
     elements.usernameInput.value = currentUsername;
 }
 
-// ===== BUTTON INITIALIZATION FUNCTION =====
+// ===== IMPROVED BUTTON INITIALIZATION FUNCTION =====
 function initializeButtons() {
+    console.log('Initializing buttons...');
+    
     // Initialize main chat scroll button
     scrollToBottomBtn = document.getElementById('scrollToBottomBtn');
     if (scrollToBottomBtn) {
+        console.log('Found main chat scroll button');
         scrollToBottomBtn.style.position = 'fixed';
         scrollToBottomBtn.style.bottom = '80px';
         scrollToBottomBtn.style.right = '20px';
         scrollToBottomBtn.style.zIndex = '1000';
-        scrollToBottomBtn.style.display = 'none'; // Start hidden
+        scrollToBottomBtn.style.display = 'none';
         scrollToBottomBtn.addEventListener('click', scrollToBottomMain);
+        
+        // Add proper scroll event listener to main chat
+        const chatContainer = document.getElementById('chat-container');
+        if (chatContainer) {
+            chatContainer.addEventListener('scroll', updateScrollState);
+            console.log('Added scroll listener to main chat');
+        }
+    } else {
+        console.log('Main chat scroll button NOT found');
     }
 
     // Initialize private AI go-top button
     privateGoTopBtn = document.getElementById('private-go-top');
     privateContainer = document.getElementById('private-ai-container');
     if (privateGoTopBtn) {
+        console.log('Found private AI go-top button');
         privateGoTopBtn.style.position = 'fixed';
         privateGoTopBtn.style.bottom = '80px';
         privateGoTopBtn.style.right = '20px';
         privateGoTopBtn.style.zIndex = '1000';
-        privateGoTopBtn.style.display = 'none'; // Start hidden
+        privateGoTopBtn.style.display = 'none';
         privateGoTopBtn.addEventListener('click', scrollPrivateToTop);
     }
 
-    // Initially hide both buttons
-    if (scrollToBottomBtn) {
-        scrollToBottomBtn.style.display = 'none';
-        scrollToBottomBtn.classList.remove('visible');
-    }
-    if (privateGoTopBtn) {
-        privateGoTopBtn.style.display = 'none';
-        privateGoTopBtn.classList.remove('visible');
-    }
+    // Force initial state update
+    setTimeout(updateScrollState, 100);
 }
 
 // ===== SIMPLE AND RELIABLE AUTO-SCROLL FUNCTIONS =====
@@ -1499,7 +1505,12 @@ function scrollToBottomMain() {
     isAtBottom = true;
     newMessagesCount = 0;
     if (newMessagesCountEl) newMessagesCountEl.textContent = '0';
-    if (scrollToBottomBtn) scrollToBottomBtn.classList.remove('visible');
+    if (scrollToBottomBtn) {
+        scrollToBottomBtn.classList.remove('visible');
+        setTimeout(() => {
+            scrollToBottomBtn.style.display = 'none';
+        }, 300);
+    }
 }
 
 // Scroll to bottom for private AI
@@ -1695,17 +1706,56 @@ function checkIfAtBottom(container) {
     return Math.abs(scrollHeight - scrollPosition) <= threshold;
 }
 
-// Update scroll state function
+// IMPROVED Update scroll state function
 function updateScrollState() {
     const chatContainer = document.getElementById('chat-container');
-    isAtBottom = checkIfAtBottom(chatContainer);
-    if (isAtBottom) {
+    if (!chatContainer || !scrollToBottomBtn) return;
+    
+    const scrollTop = chatContainer.scrollTop;
+    const scrollHeight = chatContainer.scrollHeight;
+    const clientHeight = chatContainer.clientHeight;
+    
+    // Calculate if we're at the bottom (within 50px threshold)
+    const isAtBottomNow = Math.abs(scrollHeight - scrollTop - clientHeight) <= 50;
+    
+    console.log('Scroll state:', {
+        scrollTop,
+        scrollHeight, 
+        clientHeight,
+        isAtBottomNow,
+        wasAtBottom: isAtBottom
+    });
+    
+    if (!isAtBottomNow) {
+        // User has scrolled up - show the button
+        if (!scrollToBottomBtn.classList.contains('visible')) {
+            scrollToBottomBtn.style.display = 'flex';
+            setTimeout(() => {
+                scrollToBottomBtn.classList.add('visible');
+            }, 10);
+        }
+        
+        // Update new messages count if we're receiving messages while scrolled up
+        if (isAtBottom && !isAtBottomNow) {
+            newMessagesCount++;
+            if (newMessagesCountEl) {
+                newMessagesCountEl.textContent = newMessagesCount;
+            }
+        }
+    } else {
+        // User is at bottom - hide the button
+        if (scrollToBottomBtn.classList.contains('visible')) {
+            scrollToBottomBtn.classList.remove('visible');
+            setTimeout(() => {
+                scrollToBottomBtn.style.display = 'none';
+            }, 300);
+        }
         newMessagesCount = 0;
         if (newMessagesCountEl) newMessagesCountEl.textContent = '0';
-        if (scrollToBottomBtn) scrollToBottomBtn.classList.remove('visible');
-    } else {
-        if (scrollToBottomBtn) scrollToBottomBtn.classList.add('visible');
     }
+    
+    isAtBottom = isAtBottomNow;
+    lastScrollPosition = scrollTop;
 }
 
 // Save scroll position when leaving page
@@ -1848,7 +1898,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// MODIFIED showContainer FUNCTION with proper button visibility
+// IMPROVED showContainer FUNCTION with proper button visibility
 function showContainer(containerId) {
     // Hide all containers
     document.querySelectorAll('.main-chat-interface').forEach(container => {
@@ -1871,6 +1921,17 @@ function showContainer(containerId) {
     
     // Handle button visibility based on container
     if (containerId === 'chat') {
+        console.log('Showing main chat container');
+        // Re-initialize scroll button for main chat
+        setTimeout(() => {
+            initializeButtons();
+            // Force scroll to bottom and update state
+            setTimeout(() => {
+                forceScrollToBottom('chat-container');
+                updateScrollState();
+            }, 200);
+        }, 100);
+        
         // Show main chat scroll button, hide private AI button
         if (scrollToBottomBtn) {
             scrollToBottomBtn.style.display = 'flex';
