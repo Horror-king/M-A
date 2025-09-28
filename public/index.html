@@ -627,27 +627,68 @@ html, body {
     text-decoration: underline;
 }
 
-#private-ai .gotopbtn {
-    position: absolute;
-    width: 30px;
-    height: 30px;
-    background: transparent;
-    bottom: 90px;
+/* FIXED: Specific positioning for Private AI go-top button */
+#private-ai .go-top-btn {
+    position: fixed;
+    width: 40px;
+    height: 40px;
+    background: #128C7E;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    z-index: 999;
+    bottom: 80px;
     right: 20px;
-    text-decoration: none;
-    text-align: center;
-    line-height: 30px;
-    color: black;
-    font-size: 14px;
-    border-radius: 15px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-    transition: background 0.3s, transform 0.3s;
-    z-index: 1000;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.3s ease;
     display: none;
 }
 
-#private-ai .gotopbtn:hover {
-    background: rgba(0, 0, 0, 0.2);
+#private-ai .go-top-btn.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+#private-ai .go-top-btn:hover {
+    background: #075E54;
+}
+
+/* FIXED: Specific positioning for main chat scroll-to-bottom button */
+#chat .scroll-to-bottom-btn {
+    position: fixed;
+    width: 40px;
+    height: 40px;
+    background: #128C7E;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    z-index: 999;
+    bottom: 80px;
+    right: 20px;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.3s ease;
+    display: none;
+}
+
+#chat .scroll-to-bottom-btn.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+#chat .scroll-to-bottom-btn:hover {
+    background: #075E54;
 }
 
 .about-container, .features-container, .help-container {
@@ -878,36 +919,6 @@ html, body {
 }
 
 /* WhatsApp-style scroll button */
-.scroll-to-bottom-btn {
-    position: fixed;
-    width: 40px;
-    height: 40px;
-    background: #128C7E;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 20px;
-    cursor: pointer;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-    z-index: 999;
-    bottom: 80px;
-    right: 20px;
-    opacity: 0;
-    transform: translateY(20px);
-    transition: all 0.3s ease;
-}
-
-.scroll-to-bottom-btn.visible {
-    opacity: 1;
-    transform: translateY(0);
-}
-
-.scroll-to-bottom-btn:hover {
-    background: #075E54;
-}
-
 .new-messages-notification {
     position: absolute;
     top: -10px;
@@ -1045,38 +1056,6 @@ html, body {
 
 .online-users-list::-webkit-scrollbar-thumb:hover {
     background: #a8a8a8;
-}
-
-/* FIXED: Go to Top button for private AI */
-.go-top-btn {
-    position: fixed;
-    width: 40px;
-    height: 40px;
-    background: #128C7E;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 20px;
-    cursor: pointer;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-    z-index: 999;
-    bottom: 80px;
-    right: 20px;
-    opacity: 0;
-    transform: translateY(20px);
-    transition: all 0.3s ease;
-    display: none;
-}
-
-.go-top-btn.visible {
-    opacity: 1;
-    transform: translateY(0);
-}
-
-.go-top-btn:hover {
-    background: #075E54;
 }
 
 /* Responsive adjustments for mobile */
@@ -1221,6 +1200,12 @@ html, body {
                 <i class="fas fa-paper-plane"></i>
             </button>
         </div>
+        
+        <!-- FIXED: Scroll to bottom button specifically for main chat -->
+        <div class="scroll-to-bottom-btn" id="scrollToBottomBtn">
+            <i class="fas fa-chevron-down"></i>
+            <div class="new-messages-notification" id="newMessagesCount">0</div>
+        </div>
     </div>
 
     <!-- MODIFIED: Added online users panel to private AI container -->
@@ -1244,6 +1229,8 @@ html, body {
                 <i class="fas fa-paper-plane"></i>
             </button>
         </div>
+        
+        <!-- FIXED: Go to top button specifically for private AI -->
         <div class="go-top-btn" id="private-go-top">
             <i class="fas fa-arrow-up"></i>
         </div>
@@ -1256,11 +1243,6 @@ html, body {
     <div class="news-container" id="news-container">
         <div class="news-header">Latest News</div>
         <div class="news-items" id="news-items"></div>
-    </div>
-  
-    <div class="scroll-to-bottom-btn" id="scrollToBottomBtn">
-        <i class="fas fa-chevron-down"></i>
-        <div class="new-messages-notification" id="newMessagesCount">0</div>
     </div>
 
     <div id="zoom-overlay" style="
@@ -1682,7 +1664,7 @@ function handlePrivateScroll() {
     const scrollTop = privateContainer.scrollTop;
     // Show button if scrolled more than 200px, else hide
     if (scrollTop > 200) {
-        privateGoTopBtn.style.display = 'block';
+        privateGoTopBtn.style.display = 'flex';
         privateGoTopBtn.classList.add('visible');
     } else {
         privateGoTopBtn.style.display = 'none';
@@ -1708,7 +1690,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector('.news-toggle').style.display = 'block';
 
         // Show scroll button after login
-        if (scrollToBottomBtn) scrollToBottomBtn.style.display = 'block';
+        if (scrollToBottomBtn) scrollToBottomBtn.style.display = 'flex';
         showContainer('chat');
 
         // Set flag to restore scroll position after messages load
@@ -1796,6 +1778,7 @@ function showContainer(containerId) {
     document.querySelectorAll('.chat-input').forEach(input => {
         input.style.display = 'none';
     });
+    
     // Show the selected container
     const container = document.getElementById(containerId);
     if (container) {
@@ -1805,23 +1788,48 @@ function showContainer(containerId) {
             container.querySelector('.chat-input').style.display = 'flex';
         }
     }
-    // Handle scroll events for private container
-    if (containerId === 'private-ai' && privateContainer) {
+    
+    // Handle button visibility based on container
+    if (containerId === 'chat') {
+        // Show main chat scroll button, hide private AI button
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'flex';
+            updateScrollState(); // Update visibility based on scroll position
+        }
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.classList.remove('visible');
+        }
+    } else if (containerId === 'private-ai') {
+        // Show private AI button, hide main chat scroll button
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'flex';
+            handlePrivateScroll(); // Update visibility based on scroll position
+        }
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'none';
+            scrollToBottomBtn.classList.remove('visible');
+        }
         // Attach scroll event for private container
-        privateContainer.addEventListener('scroll', handlePrivateScroll);
-        // Initial check for scroll position
-        setTimeout(handlePrivateScroll, 100);
-        // Scroll to bottom when switching to private AI
-        setTimeout(() => forceScrollToBottom('private-ai-container'), 200);
-    } else if (privateContainer) {
-        // Remove scroll event when not in private container
-        privateContainer.removeEventListener('scroll', handlePrivateScroll);
-        // Hide the go-top button when switching away
+        if (privateContainer) {
+            privateContainer.addEventListener('scroll', handlePrivateScroll);
+            // Initial check for scroll position
+            setTimeout(handlePrivateScroll, 100);
+            // Scroll to bottom when switching to private AI
+            setTimeout(() => forceScrollToBottom('private-ai-container'), 200);
+        }
+    } else {
+        // For other containers, hide both buttons
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'none';
+            scrollToBottomBtn.classList.remove('visible');
+        }
         if (privateGoTopBtn) {
             privateGoTopBtn.style.display = 'none';
             privateGoTopBtn.classList.remove('visible');
         }
     }
+    
     // Set scroll restore flag for chat container
     if (containerId === 'chat') {
         shouldRestoreScroll = true;
@@ -1902,7 +1910,7 @@ async function handleAuth() {
                     document.querySelector('.menu').style.display = 'flex';
                     document.querySelector('.news-toggle').style.display = 'block';
                     // Show scroll button after successful login
-                    if (scrollToBottomBtn) scrollToBottomBtn.style.display = 'block';
+                    if (scrollToBottomBtn) scrollToBottomBtn.style.display = 'flex';
                     showContainer('chat');
                     updateProfileSection();
                     initializeChat();
@@ -3033,7 +3041,7 @@ function clearReply() {
             
             // Show scroll button
             const scrollBtn = document.getElementById('scrollToBottomBtn');
-            if (scrollBtn) scrollBtn.style.display = 'block';
+            if (scrollBtn) scrollBtn.style.display = 'flex';
         }
     </script>
 </body>
