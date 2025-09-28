@@ -331,58 +331,45 @@ html, body {
 
 /* Improved avatar styling */
 /* Message avatars */
-/* Message avatars - FORCE PERFECT FIT */
 .message .avatar {
     width: 26px;
     height: 26px;
-    border-radius: 50%;
+    border-radius: 50% !important;
     flex-shrink: 0;
     align-self: flex-start;
     margin-top: 6px;
     border: 2px solid #fff;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-    overflow: hidden;
+    overflow: hidden !important;
     background-color: #f0f2f5;
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
         
-.message .avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center;
-    display: block;
-    min-width: 100%;
-    min-height: 100%;
-    flex-shrink: 0;
-}
+
 
 /* PERFECT AVATAR FIX - FORCE CIRCLE FIT */
-/* Avatar wrapper */
-.profile-avatar,
-.online-user-avatar,
-.message .avatar {
-  width: 40px;   /* adjust size */
-  height: 40px;
-  border-radius: 50%;  /* makes wrapper circular */
-  overflow: hidden;    /* hides image overflow */
-  border: 2px solid #fff;
-  display: inline-block;
-  position: relative;
+.message .avatar img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    object-position: center !important;
+    display: block !important;
+    border-radius: 0 !important;
+    min-width: 100% !important;
+    min-height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
 }
 
-/* Avatar image */
+/* FORCE REMOVE ANY POTENTIAL TRANSFORMS OR ANIMATIONS */
+.profile-avatar,
+.online-user-avatar,
+.message .avatar,
 .profile-avatar img,
 .online-user-avatar img,
 .message .avatar img {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;   /* extra safety */
-  object-fit: cover;    /* crop correctly */
-  object-position: center;
-  display: block;
+    transform: none !important;
+    transition: none !important;
+    animation: none !important;
 }
 
 /* Improved username with status indicator */
@@ -902,26 +889,24 @@ html, body {
 .profile-avatar {
     width: 40px;
     height: 40px;
-    border-radius: 50%;
-    overflow: hidden;
+    border-radius: 50% !important;
+    overflow: hidden !important;
     margin-right: 12px;
     border: 2px solid #e4e6eb;
     background-color: #f0f2f5;
     position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
-
 .profile-avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center;
-    display: block;
-    min-width: 100%;
-    min-height: 100%;
-    flex-shrink: 0;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    object-position: center !important;
+    display: block !important;
+    border-radius: 0 !important;
+    min-width: 100% !important;
+    min-height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
 }
 
 .profile-info {
