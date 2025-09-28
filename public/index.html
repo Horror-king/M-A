@@ -229,10 +229,9 @@ html, body {
 }
 
 /* FIXED: Chat messages container with proper scrolling and padding */
-/* FIXED: Chat messages container with reduced padding */
 .chat-messages, #private-ai-container {
     flex: 1;
-    padding: 8px 14px; /* Reduced from 10px 15px */
+    padding: 5px 13px;
     overflow-y: auto;
     height: 100%;
     display: flex;
@@ -247,13 +246,12 @@ html, body {
     touch-action: auto;
     gap: 2px;
     box-sizing: border-box;
-    /* FIXED: Much reduced bottom padding */
-    padding-bottom: 104px; /* Reduced from 180px */
-    /* FIXED: Reduced margin at the bottom */
-    margin-bottom: 54px; /* Reduced from 70px */
+    /* FIXED: Much larger bottom padding to ensure messages are visible above input */
+    padding-bottom: 125px; /* Increased significantly from 120px */
+    /* FIXED: Add margin at the bottom to create space for the input */
+    margin-bottom: 65px;
 }
-
-/* FIXED: Ensure the chat container itself has reduced spacing */
+ /* FIXED: Ensure the chat container itself has proper spacing */
 .chat-container {
     flex: 1;
     display: flex;
@@ -262,8 +260,8 @@ html, body {
     background-color: white;
     overflow: hidden;
     position: relative;
-    /* FIXED: Reduced padding at the bottom of the container */
-    padding-bottom: 54px; /* Reduced from 70px */
+    /* FIXED: Add padding at the bottom of the container */
+    padding-bottom: 65px;
 }
 
 #private-ai {
@@ -274,9 +272,10 @@ html, body {
     background-color: white;
     overflow: hidden;
     position: relative;
-    /* FIXED: Reduced padding at the bottom of the container */
-    padding-bottom: 54px; /* Reduced from 70px */
+    /* FIXED: Add padding at the bottom of the container */
+    padding-bottom: 70px;
 }
+        
 /* Improved message styling with better avatar alignment */
 .message {
     padding: 6px 10px;
@@ -1107,13 +1106,13 @@ html, body {
     
     /* FIXED: Increased padding for mobile to ensure messages are visible */
     .chat-messages, #private-ai-container {
-        padding-bottom: 124px; /* Even more padding for mobile */
-        margin-bottom: 64px; /* More margin for mobile */
+        padding-bottom: 123px; /* Even more padding for mobile */
+        margin-bottom: 65px; /* More margin for mobile */
     }
     
     /* FIXED: Adjust container padding for mobile */
     .chat-container, #private-ai {
-        padding-bottom: 63px;
+        padding-bottom: 65px;
     }
 }
     </style>
@@ -1371,7 +1370,7 @@ html, body {
         </div>
     </div>
      <script>
- // --- CUT HERE ---
+// --- CUT HERE ---
          let isLogin = true;
 let users = JSON.parse(localStorage.getItem('users')) || {};
 let longPressTimer;
