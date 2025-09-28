@@ -1508,6 +1508,7 @@ function scrollPrivateToBottom() {
 }
 
 // ===== IMPROVED REAL-TIME ACTIVE STATUS FUNCTIONS =====
+// Initialize socket connection
 function initSocket() {
     socket = io();
     
@@ -1531,20 +1532,22 @@ function initSocket() {
 
     socket.on('disconnect', (reason) => {
         console.log('Socket disconnected:', reason);
-        // When socket disconnects, remove user from online list immediately
+        // When socket disconnects, user will stay online for 3 minutes
         const username = localStorage.getItem('chat_username');
         if (username) {
-            removeOfflineUser(username);
+            // User will remain in online list for 3 minutes due to server timeout
+            console.log('User disconnected but will remain online for 3 minutes');
         }
     });
 
-    // Send heartbeat every 15 seconds to stay online
+    // Send heartbeat every 2 minutes to stay online
     const heartbeatInterval = setInterval(() => {
         const username = localStorage.getItem('chat_username');
         if (username && socket.connected) {
             socket.emit('user-online', username);
+            console.log('Heartbeat sent - keeping user online');
         }
-    }, 15000);
+    }, 120000); // 2 minutes
 
     // Cleanup interval on page unload
     window.addEventListener('beforeunload', () => {
@@ -1552,7 +1555,7 @@ function initSocket() {
     });
 }
 
-// IMPROVED: Update online users lists - ONLY SHOW ACTUALLY ONLINE USERS
+// Update online users lists
 function updateOnlineUsersList(onlineUsers) {
     console.log('Updating online users list:', onlineUsers);
     
@@ -1590,7 +1593,7 @@ function updateSingleOnlineList(listElementId, countElementId, onlineUsers) {
     }
 }
 
-// IMPROVED: Remove offline user from the lists
+// Remove offline user from the lists
 function removeOfflineUser(username) {
     console.log('Removing offline user from UI:', username);
     
@@ -1623,7 +1626,7 @@ function removeUserFromSingleList(listElementId, countElementId, username) {
     }
 }
 
-// UPDATED: Update status indicator for a specific user
+// Update status indicator for a specific user
 function updateUserStatusIndicator(username, status) {
     // Find all messages from this user and update their status
     const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
@@ -1752,7 +1755,7 @@ function scrollPrivateToTop(e) {
 
 // ===== END of Private AI Go to Top button functions =====
 
-// IMPROVED page visibility and unload handlers
+// Page visibility and unload handlers
 function handleVisibilityChange() {
     const username = localStorage.getItem('chat_username');
     if (username && socket) {
@@ -1770,10 +1773,8 @@ function handleVisibilityChange() {
 function handleBeforeUnload() {
     const username = localStorage.getItem('chat_username');
     if (username && socket) {
-        // Send immediate offline event
-        socket.emit('user-offline', username);
-        // Force the event to be sent
-        socket.volatile.emit('user-offline', username);
+        // Send away status instead of offline
+        socket.emit('user-away', username);
     }
     saveScrollPosition();
 }
@@ -1781,9 +1782,8 @@ function handleBeforeUnload() {
 function handlePageHide() {
     const username = localStorage.getItem('chat_username');
     if (username && socket) {
-        // Send immediate offline event for page hide
-        socket.emit('user-offline', username);
-        socket.volatile.emit('user-offline', username);
+        // Send away status instead of offline
+        socket.emit('user-away', username);
     }
     saveScrollPosition();
 }
@@ -1808,7 +1808,7 @@ document.addEventListener('DOMContentLoaded', () => {
         initSocket();
         setupTypingHandlers();
         
-        // Add improved page event listeners
+        // Add page event listeners
         document.addEventListener('visibilitychange', handleVisibilityChange);
         window.addEventListener('beforeunload', handleBeforeUnload);
         window.addEventListener('pagehide', handlePageHide);
@@ -2000,7 +2000,7 @@ async function handleAuth() {
                     initSocket();
                     setupTypingHandlers();
                     
-                    // Add improved page event listeners
+                    // Add page event listeners
                     document.addEventListener('visibilitychange', handleVisibilityChange);
                     window.addEventListener('beforeunload', handleBeforeUnload);
                     window.addEventListener('pagehide', handlePageHide);
@@ -3137,7 +3137,7 @@ if (currentUser) {
     initSocket();
     setupTypingHandlers();
     
-    // Add improved page event listeners
+    // Add page event listeners
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', handleBeforeUnload);
     window.addEventListener('pagehide', handlePageHide);
