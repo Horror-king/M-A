@@ -231,7 +231,7 @@ html, body {
 /* FIXED: Chat messages container with proper scrolling and padding */
 .chat-messages, #private-ai-container {
     flex: 1;
-    padding: 5px 13px;
+    padding: 10px 15px;
     overflow-y: auto;
     height: 100%;
     display: flex;
@@ -247,9 +247,9 @@ html, body {
     gap: 2px;
     box-sizing: border-box;
     /* FIXED: Much larger bottom padding to ensure messages are visible above input */
-    padding-bottom: 125px; /* Increased significantly from 120px */
+    padding-bottom: 180px; /* Increased significantly from 120px */
     /* FIXED: Add margin at the bottom to create space for the input */
-    margin-bottom: 65px;
+    margin-bottom: 70px;
 }
  /* FIXED: Ensure the chat container itself has proper spacing */
 .chat-container {
@@ -261,7 +261,7 @@ html, body {
     overflow: hidden;
     position: relative;
     /* FIXED: Add padding at the bottom of the container */
-    padding-bottom: 65px;
+    padding-bottom: 70px;
 }
 
 #private-ai {
@@ -1106,13 +1106,13 @@ html, body {
     
     /* FIXED: Increased padding for mobile to ensure messages are visible */
     .chat-messages, #private-ai-container {
-        padding-bottom: 123px; /* Even more padding for mobile */
-        margin-bottom: 65px; /* More margin for mobile */
+        padding-bottom: 200px; /* Even more padding for mobile */
+        margin-bottom: 80px; /* More margin for mobile */
     }
     
     /* FIXED: Adjust container padding for mobile */
     .chat-container, #private-ai {
-        padding-bottom: 65px;
+        padding-bottom: 80px;
     }
 }
     </style>
@@ -1370,8 +1370,7 @@ html, body {
         </div>
     </div>
      <script>
-// --- CUT HERE ---
-         let isLogin = true;
+let isLogin = true;
 let users = JSON.parse(localStorage.getItem('users')) || {};
 let longPressTimer;
 let isLongPress = false;
@@ -1508,11 +1507,12 @@ function scrollPrivateToBottom() {
     scrollToBottom('private-ai-container');
 }
 
-// ===== REAL-TIME ACTIVE STATUS FUNCTIONS =====
-// Initialize socket connection
+// ===== IMPROVED REAL-TIME ACTIVE STATUS FUNCTIONS =====
 function initSocket() {
     socket = io();
+    
     socket.on('connect', () => {
+        console.log('Socket connected');
         const username = localStorage.getItem('chat_username');
         if (username) {
             socket.emit('user-online', username);
@@ -1520,6 +1520,7 @@ function initSocket() {
     });
 
     socket.on('user-status-change', (data) => {
+        console.log('User status change:', data);
         updateOnlineUsersList(data.onlineUsers);
         updateUserStatusIndicator(data.username, data.status);
     });
@@ -1528,19 +1529,44 @@ function initSocket() {
         showTypingIndicator(data.username, data.isTyping);
     });
 
-    // Send heartbeat every 20 seconds to stay online
-    setInterval(() => {
+    socket.on('disconnect', (reason) => {
+        console.log('Socket disconnected:', reason);
+        // When socket disconnects, remove user from online list immediately
+        const username = localStorage.getItem('chat_username');
+        if (username) {
+            removeOfflineUser(username);
+        }
+    });
+
+    // Send heartbeat every 15 seconds to stay online
+    const heartbeatInterval = setInterval(() => {
         const username = localStorage.getItem('chat_username');
         if (username && socket.connected) {
             socket.emit('user-online', username);
         }
-    }, 20000);
+    }, 15000);
+
+    // Cleanup interval on page unload
+    window.addEventListener('beforeunload', () => {
+        clearInterval(heartbeatInterval);
+    });
 }
 
-// MODIFIED: Update both online users lists (main chat and private AI)
+// IMPROVED: Update online users lists - ONLY SHOW ACTUALLY ONLINE USERS
 function updateOnlineUsersList(onlineUsers) {
+    console.log('Updating online users list:', onlineUsers);
+    
     // Update main chat online list
-    const onlineList = document.getElementById('online-users-list');
+    updateSingleOnlineList('online-users-list', 'online-count', onlineUsers);
+    
+    // Update private AI online list
+    updateSingleOnlineList('private-online-users-list', 'private-online-count', onlineUsers);
+}
+
+function updateSingleOnlineList(listElementId, countElementId, onlineUsers) {
+    const onlineList = document.getElementById(listElementId);
+    const onlineCount = document.getElementById(countElementId);
+    
     if (onlineList) {
         onlineList.innerHTML = '';
         onlineUsers.forEach(user => {
@@ -1557,51 +1583,60 @@ function updateOnlineUsersList(onlineUsers) {
             `;
             onlineList.appendChild(userElement);
         });
-        // Update online count for main chat
-        const onlineCount = document.getElementById('online-count');
-        if (onlineCount) {
-            onlineCount.textContent = onlineUsers.length;
-        }
     }
-    // Update private AI online list
-    const privateOnlineList = document.getElementById('private-online-users-list');
-    if (privateOnlineList) {
-        privateOnlineList.innerHTML = '';
-        onlineUsers.forEach(user => {
-            const userElement = document.createElement('div');
-            userElement.className = 'online-user';
-            userElement.innerHTML = `
-                <div class="online-user-avatar">
-                    <img src="https://i.pravatar.cc/50?u=${encodeURIComponent(user)}" alt="${user}">
-                    <div class="online-dot"></div>
-                </div>
-                <div class="online-user-info">
-                    <div class="online-user-name">${user}</div>
-                </div>
-            `;
-            privateOnlineList.appendChild(userElement);
+    
+    if (onlineCount) {
+        onlineCount.textContent = onlineUsers.length;
+    }
+}
+
+// IMPROVED: Remove offline user from the lists
+function removeOfflineUser(username) {
+    console.log('Removing offline user from UI:', username);
+    
+    // Remove from main chat online list
+    removeUserFromSingleList('online-users-list', 'online-count', username);
+    
+    // Remove from private AI online list
+    removeUserFromSingleList('private-online-users-list', 'private-online-count', username);
+    
+    // Update status indicator in messages to offline
+    updateUserStatusIndicator(username, 'offline');
+}
+
+function removeUserFromSingleList(listElementId, countElementId, username) {
+    const onlineList = document.getElementById(listElementId);
+    if (onlineList) {
+        const userElements = onlineList.querySelectorAll('.online-user');
+        userElements.forEach(userElement => {
+            const userNameElement = userElement.querySelector('.online-user-name');
+            if (userNameElement && userNameElement.textContent === username) {
+                userElement.remove();
+            }
         });
-        // Update online count for private AI
-        const privateOnlineCount = document.getElementById('private-online-count');
-        if (privateOnlineCount) {
-            privateOnlineCount.textContent = onlineUsers.length;
+        // Update online count
+        const onlineCount = document.getElementById(countElementId);
+        if (onlineCount) {
+            const currentCount = parseInt(onlineCount.textContent) || 0;
+            onlineCount.textContent = Math.max(0, currentCount - 1);
         }
     }
 }
 
-// Update status indicator for a specific user
+// UPDATED: Update status indicator for a specific user
 function updateUserStatusIndicator(username, status) {
     // Find all messages from this user and update their status
     const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
     userMessages.forEach(msg => {
-        const statusIndicator = msg.querySelector('.user-status-indicator') || createStatusIndicator();
-        statusIndicator.className = `user-status-indicator ${status}`;
-        if (!msg.contains(statusIndicator)) {
+        let statusIndicator = msg.querySelector('.user-status-indicator');
+        if (!statusIndicator) {
+            statusIndicator = createStatusIndicator();
             const usernameDiv = msg.querySelector('.username');
             if (usernameDiv) {
                 usernameDiv.appendChild(statusIndicator);
             }
         }
+        statusIndicator.className = `user-status-indicator ${status}`;
     });
 }
 
@@ -1717,6 +1752,42 @@ function scrollPrivateToTop(e) {
 
 // ===== END of Private AI Go to Top button functions =====
 
+// IMPROVED page visibility and unload handlers
+function handleVisibilityChange() {
+    const username = localStorage.getItem('chat_username');
+    if (username && socket) {
+        if (document.visibilityState === 'hidden') {
+            // User switched tabs or minimized browser - mark as away
+            socket.emit('user-away', username);
+            saveScrollPosition();
+        } else {
+            // User came back to the tab - mark as online
+            socket.emit('user-online', username);
+        }
+    }
+}
+
+function handleBeforeUnload() {
+    const username = localStorage.getItem('chat_username');
+    if (username && socket) {
+        // Send immediate offline event
+        socket.emit('user-offline', username);
+        // Force the event to be sent
+        socket.volatile.emit('user-offline', username);
+    }
+    saveScrollPosition();
+}
+
+function handlePageHide() {
+    const username = localStorage.getItem('chat_username');
+    if (username && socket) {
+        // Send immediate offline event for page hide
+        socket.emit('user-offline', username);
+        socket.volatile.emit('user-offline', username);
+    }
+    saveScrollPosition();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize buttons first
     initializeButtons();
@@ -1736,6 +1807,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // Initialize real-time features after login
         initSocket();
         setupTypingHandlers();
+        
+        // Add improved page event listeners
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        window.addEventListener('pagehide', handlePageHide);
     } else {
         document.getElementById('auth-container').style.display = 'flex';
         document.querySelector('.menu').style.display = 'none';
@@ -1754,17 +1830,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (elements.chatContainer) {
         elements.chatContainer.addEventListener('scroll', updateScrollState);
     }
-
-    // Set up page visibility listeners
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') {
-            saveScrollPosition();
-        }
-    });
-
-    window.addEventListener('beforeunload', () => {
-        saveScrollPosition();
-    });
 
     // Initialize Private AI input handler
     if (elements.privateInput) {
@@ -1934,6 +1999,11 @@ async function handleAuth() {
                     // Initialize real-time features after login
                     initSocket();
                     setupTypingHandlers();
+                    
+                    // Add improved page event listeners
+                    document.addEventListener('visibilitychange', handleVisibilityChange);
+                    window.addEventListener('beforeunload', handleBeforeUnload);
+                    window.addEventListener('pagehide', handlePageHide);
 
                     // Set flag to restore scroll position after messages load
                     shouldRestoreScroll = true;
@@ -2484,583 +2554,597 @@ function clearReply() {
     }
 }
 
-// --- CUT HERE ---
-        function copyToClipboard(text, button) {  
-            const textarea = document.createElement('textarea');  
-            textarea.value = text;  
-            document.body.appendChild(textarea);  
-            textarea.select();  
-            document.execCommand('copy');  
-            document.body.removeChild(textarea);  
+function copyToClipboard(text, button) {  
+    const textarea = document.createElement('textarea');  
+    textarea.value = text;  
+    document.body.appendChild(textarea);  
+    textarea.select();  
+    document.execCommand('copy');  
+    document.body.removeChild(textarea);  
 
-            button.innerHTML = '<span style="font-size: 15px;">Copied!</span>';  
-            setTimeout(() => {  
-                button.innerHTML = 'Copy';  
-            }, 2000);  
-        }  
+    button.innerHTML = '<span style="font-size: 15px;">Copied!</span>';  
+    setTimeout(() => {  
+        button.innerHTML = 'Copy';  
+    }, 2000);  
+}  
 
-        function toggleKebabMenu(event) {
-            event.stopPropagation();
-            const dropdown = document.querySelector('.kebab-dropdown');
-            if (dropdown) {
-                dropdown.classList.toggle('active');
-            }
-        }
+function toggleKebabMenu(event) {
+    event.stopPropagation();
+    const dropdown = document.querySelector('.kebab-dropdown');
+    if (dropdown) {
+        dropdown.classList.toggle('active');
+    }
+}
 
-        document.addEventListener('click', function(event) {
-            const dropdown = document.querySelector('.kebab-dropdown');
-            if (dropdown && dropdown.classList.contains('active')) {
-                dropdown.classList.remove('active');
-            }
-        });
+document.addEventListener('click', function(event) {
+    const dropdown = document.querySelector('.kebab-dropdown');
+    if (dropdown && dropdown.classList.contains('active')) {
+        dropdown.classList.remove('active');
+    }
+});
 
-        function toggleTheme() {
-            document.body.classList.toggle('dark-theme');
-            const dropdown = document.querySelector('.kebab-dropdown');
-            if (dropdown) {
-                dropdown.classList.remove('active');
-            }
-        }
+function toggleTheme() {
+    document.body.classList.toggle('dark-theme');
+    const dropdown = document.querySelector('.kebab-dropdown');
+    if (dropdown) {
+        dropdown.classList.remove('active');
+    }
+}
 
-        function clearChat() {
-            const chatContainer = document.getElementById('chat-container');
-            if (chatContainer) {
-                chatContainer.innerHTML = '';
-            }
-            const dropdown = document.querySelector('.kebab-dropdown');
-            if (dropdown) {
-                dropdown.classList.remove('active');
-            }
-        }
+function clearChat() {
+    const chatContainer = document.getElementById('chat-container');
+    if (chatContainer) {
+        chatContainer.innerHTML = '';
+    }
+    const dropdown = document.querySelector('.kebab-dropdown');
+    if (dropdown) {
+        dropdown.classList.remove('active');
+    }
+}
 
-        function exportChat() {
-            const chatContainer = document.getElementById('chat-container');
-            if (!chatContainer) return;
-            
-            const messages = chatContainer.innerText;
-            const blob = new Blob([messages], { type: 'text/plain' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'chat-export.txt';
-            a.click();
-            window.URL.revokeObjectURL(url);
-            const dropdown = document.querySelector('.kebab-dropdown');
-            if (dropdown) {
-                dropdown.classList.remove('active');
-            }
-        }
+function exportChat() {
+    const chatContainer = document.getElementById('chat-container');
+    if (!chatContainer) return;
+    
+    const messages = chatContainer.innerText;
+    const blob = new Blob([messages], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'chat-export.txt';
+    a.click();
+    window.URL.revokeObjectURL(url);
+    const dropdown = document.querySelector('.kebab-dropdown');
+    if (dropdown) {
+        dropdown.classList.remove('active');
+    }
+}
 
-        function exportChatPDF() {
-            const chatContainer = document.getElementById('chat-container');
-            if (!chatContainer) return;
-            
-            const dropdown = document.querySelector('.kebab-dropdown');
-            if (!dropdown) return;
+function exportChatPDF() {
+    const chatContainer = document.getElementById('chat-container');
+    if (!chatContainer) return;
+    
+    const dropdown = document.querySelector('.kebab-dropdown');
+    if (!dropdown) return;
 
-            const clone = chatContainer.cloneNode(true);
+    const clone = chatContainer.cloneNode(true);
 
-            // Show downloading alert
-            const downloadingAlert = document.createElement('div');
-            downloadingAlert.id = 'downloading-alert';
-            downloadingAlert.textContent = 'Preparing download, please wait...';
-            downloadingAlert.style.position = 'fixed';
-            downloadingAlert.style.top = '20px';
-            downloadingAlert.style.left = '50%';
-            downloadingAlert.style.transform = 'translateX(-50%)';
-            downloadingAlert.style.padding = '10px 20px';
-            downloadingAlert.style.backgroundColor = '#333';
-            downloadingAlert.style.color = '#fff';
-            downloadingAlert.style.fontSize = '16px';
-            downloadingAlert.style.borderRadius = '8px';
-            downloadingAlert.style.zIndex = '9999';
-            document.body.appendChild(downloadingAlert);
+    // Show downloading alert
+    const downloadingAlert = document.createElement('div');
+    downloadingAlert.id = 'downloading-alert';
+    downloadingAlert.textContent = 'Preparing download, please wait...';
+    downloadingAlert.style.position = 'fixed';
+    downloadingAlert.style.top = '20px';
+    downloadingAlert.style.left = '50%';
+    downloadingAlert.style.transform = 'translateX(-50%)';
+    downloadingAlert.style.padding = '10px 20px';
+    downloadingAlert.style.backgroundColor = '#333';
+    downloadingAlert.style.color = '#fff';
+    downloadingAlert.style.fontSize = '16px';
+    downloadingAlert.style.borderRadius = '8px';
+    downloadingAlert.style.zIndex = '9999';
+    document.body.appendChild(downloadingAlert);
 
-            // Find all images and replace src with base64
-            const images = clone.querySelectorAll('img');
-            const promises = [];
+    // Find all images and replace src with base64
+    const images = clone.querySelectorAll('img');
+    const promises = [];
 
-            images.forEach(img => {
-                const promise = new Promise((resolve, reject) => {
-                    const canvas = document.createElement('canvas');
-                    const context = canvas.getContext('2d');
-                    const originalImage = new Image();
-                    originalImage.crossOrigin = 'anonymous';
-                    originalImage.src = img.src;
+    images.forEach(img => {
+        const promise = new Promise((resolve, reject) => {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            const originalImage = new Image();
+            originalImage.crossOrigin = 'anonymous';
+            originalImage.src = img.src;
 
-                    originalImage.onload = () => {
-                        try {
-                            // Store original display style to restore later
-                            const originalDisplay = img.style.display;
-                            const originalWidth = img.style.width;
-                            const originalHeight = img.style.height;
+            originalImage.onload = () => {
+                try {
+                    // Store original display style to restore later
+                    const originalDisplay = img.style.display;
+                    const originalWidth = img.style.width;
+                    const originalHeight = img.style.height;
 
-                            // Temporarily make image visible and full size for capture
-                            img.style.display = 'block';
-                            img.style.width = 'auto';
-                            img.style.height = 'auto';
-                            img.style.maxWidth = 'none';
-                            img.style.maxHeight = 'none';
-
-                            canvas.width = originalImage.naturalWidth;
-                            canvas.height = originalImage.naturalHeight;
-                            context.drawImage(originalImage, 0, 0);
-
-                            const dataURL = canvas.toDataURL('image/png');
-                            img.src = dataURL;
-
-                            // Restore original styles
-                            img.style.display = originalDisplay;
-                            img.style.width = originalWidth;
-                            img.style.height = originalHeight;
-
-                            resolve();
-                        } catch (error) {
-                            console.error('Error converting image:', error);
-                            resolve();
-                        }
-                    };
-
-                    originalImage.onerror = () => {
-                        console.error('Error loading image:', img.src);
-                        resolve();
-                    };
-                });
-                promises.push(promise);
-            });
-
-            Promise.all(promises).then(() => {
-                const opt = {
-                    margin: 10,
-                    filename: 'chat-export.pdf',
-                    image: { type: 'jpeg', quality: 1 },
-                    html2canvas: { 
-                        scale: 2,
-                        useCORS: true,
-                        allowTaint: true,
-                        scrollX: 0,
-                        scrollY: 0,
-                        windowWidth: document.documentElement.scrollWidth,
-                        windowHeight: document.documentElement.scrollHeight
-                    },
-                    jsPDF: { 
-                        unit: 'mm',
-                        format: 'a4',
-                        orientation: 'portrait',
-                        hotfixes: ['px_scaling'] 
-                    },
-                    pagebreak: { 
-                        mode: ['avoid-all', 'css', 'legacy'],
-                        before: '.page-break' 
-                    }
-                };
-
-                // Temporarily modify image styles for PDF generation
-                const allImages = clone.querySelectorAll('img');
-                allImages.forEach(img => {
-                    img.style.maxWidth = '100%';
-                    img.style.height = 'auto';
+                    // Temporarily make image visible and full size for capture
                     img.style.display = 'block';
-                });
+                    img.style.width = 'auto';
+                    img.style.height = 'auto';
+                    img.style.maxWidth = 'none';
+                    img.style.maxHeight = 'none';
 
-                html2pdf().set(opt).from(clone).save().then(() => {
-                    downloadingAlert.remove();
-                }).catch((error) => {
-                    console.error('Error generating PDF:', error);
-                    downloadingAlert.remove();
-                });
+                    canvas.width = originalImage.naturalWidth;
+                    canvas.height = originalImage.naturalHeight;
+                    context.drawImage(originalImage, 0, 0);
 
-                dropdown.classList.remove('active');
-            });
-        }
+                    const dataURL = canvas.toDataURL('image/png');
+                    img.src = dataURL;
 
-        function showSettings() {
-            alert('Settings panel coming soon!');
-            const dropdown = document.querySelector('.kebab-dropdown');
-            if (dropdown) {
-                dropdown.classList.remove('active');
-            }
-        }
-             
-        function toggleNews() {
-            const newsContainer = document.getElementById('news-container');
-            if (newsContainer) {
-                // Toggle the display of the news container
-                if (newsContainer.style.display === 'none' || newsContainer.style.display === '') {
-                    newsContainer.style.display = 'block';
-                    // Make sure it's populated with news items
-                    populateNews();
-                } else {
-                    newsContainer.style.display = 'none';
+                    // Restore original styles
+                    img.style.display = originalDisplay;
+                    img.style.width = originalWidth;
+                    img.style.height = originalHeight;
+
+                    resolve();
+                } catch (error) {
+                    console.error('Error converting image:', error);
+                    resolve();
                 }
-            }
-        }
+            };
 
-        const sampleNews = [
-            {
-                title: "New AI Features Released",
-                description: "We've added exciting new capabilities to our chatbot!",
-                date: "2025-01-15"
+            originalImage.onerror = () => {
+                console.error('Error loading image:', img.src);
+                resolve();
+            };
+        });
+        promises.push(promise);
+    });
+
+    Promise.all(promises).then(() => {
+        const opt = {
+            margin: 10,
+            filename: 'chat-export.pdf',
+            image: { type: 'jpeg', quality: 1 },
+            html2canvas: { 
+                scale: 2,
+                useCORS: true,
+                allowTaint: true,
+                scrollX: 0,
+                scrollY: 0,
+                windowWidth: document.documentElement.scrollWidth,
+                windowHeight: document.documentElement.scrollHeight
             },
-            {
-                title: "System Update",
-                description: "Performance improvements and bug fixes",
-                date: "2025-03-14"
+            jsPDF: { 
+                unit: 'mm',
+                format: 'a4',
+                orientation: 'portrait',
+                hotfixes: ['px_scaling'] 
             },
-            {
-                title: "Maintenance Notice",
-                description: "Scheduled maintenance on January 20th",
-                date: "2025-03-13"
+            pagebreak: { 
+                mode: ['avoid-all', 'css', 'legacy'],
+                before: '.page-break' 
             }
-        ];
+        };
 
-        function populateNews() {
-            const newsItems = document.getElementById('news-items');
-            if (!newsItems) return;
-            
-            newsItems.innerHTML = '';
-
-            sampleNews.forEach(news => {
-                const newsItem = document.createElement('div');
-                newsItem.className = 'news-item';
-                newsItem.innerHTML = `
-                    <h3>${news.title}</h3>
-                    <p>${news.description}</p>
-                    <small>${news.date}</small>
-                `;
-                newsItems.appendChild(newsItem);
-            });
-        }
-
-        document.addEventListener('click', function (e) {
-            if (e.target.tagName === 'IMG' && e.target.closest('.message')) {
-                openZoom(e.target.src);
-            }
+        // Temporarily modify image styles for PDF generation
+        const allImages = clone.querySelectorAll('img');
+        allImages.forEach(img => {
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            img.style.display = 'block';
         });
 
-        function openZoom(src) {
-            document.body.style.overflow = 'hidden';
-            const overlay = document.getElementById('zoom-overlay');
-            const zoomImage = document.getElementById('zoom-image');
-            const downloadBtn = document.getElementById('download-btn');
+        html2pdf().set(opt).from(clone).save().then(() => {
+            downloadingAlert.remove();
+        }).catch((error) => {
+            console.error('Error generating PDF:', error);
+            downloadingAlert.remove();
+        });
 
-            if (!overlay || !zoomImage || !downloadBtn) return;
-            
-            zoomImage.src = src;
+        dropdown.classList.remove('active');
+    });
+}
 
-            // Force download filename
-            downloadBtn.href = src;
-            downloadBtn.setAttribute('download', 'image.jpg');
-
-            overlay.style.display = 'flex';
-        }
-
-        function closeZoom() {
-            document.body.style.overflow = '';
-            const overlay = document.getElementById('zoom-overlay');
-            if (overlay) {
-                overlay.style.display = 'none';
-            }
-        }
-
-        function autoResize(textarea) {
-            if (textarea) {
-                textarea.style.height = 'auto';
-                textarea.style.height = (textarea.scrollHeight > 100 ? 100 : textarea.scrollHeight) + 'px';
-            }
-        }
-
-        if (document.getElementById("year")) {
-            document.getElementById("year").textContent = new Date().getFullYear();
-        }
-
-        document.addEventListener('DOMContentLoaded', function () {
+function showSettings() {
+    alert('Settings panel coming soon!');
+    const dropdown = document.querySelector('.kebab-dropdown');
+    if (dropdown) {
+        dropdown.classList.remove('active');
+    }
+}
+ 
+function toggleNews() {
+    const newsContainer = document.getElementById('news-container');
+    if (newsContainer) {
+        // Toggle the display of the news container
+        if (newsContainer.style.display === 'none' || newsContainer.style.display === '') {
+            newsContainer.style.display = 'block';
+            // Make sure it's populated with news items
             populateNews();
-
-            const currentUser = localStorage.getItem('currentUser');
-            if (currentUser) {
-                const newsToggle = document.querySelector('.news-toggle');
-                if (newsToggle) newsToggle.style.display = 'block';
-            } else {
-                const newsToggle = document.querySelector('.news-toggle');
-                if (newsToggle) newsToggle.style.display = 'none';
-                
-                const newsContainer = document.querySelector('.news-container');
-                if (newsContainer) newsContainer.style.display = 'none';
-            }
-        });
-
-        // UPDATED function to update the profile section with new design
-        function updateProfileSection() {
-            const dropdown = document.getElementById('dropdown');
-            if (!dropdown) return;
-            
-            const currentUsername = localStorage.getItem('currentUser');
-            
-            // Remove existing profile section if it exists
-            const existingProfile = document.querySelector('.profile-section');
-            const existingDivider = document.querySelector('.menu-divider');
-            if (existingProfile) existingProfile.remove();
-            if (existingDivider) existingDivider.remove();
-            
-            // Only add profile section if user is logged in
-            if (currentUsername) {
-                const profileSection = document.createElement('div');
-                profileSection.className = 'profile-panel';
-                profileSection.innerHTML = `
-                    <div class="profile-avatar">
-                        <img src="https://i.pravatar.cc/50?u=${encodeURIComponent(currentUsername)}" alt="Profile">
-                    </div>
-                    <div class="profile-info">
-                        <div class="profile-username">${currentUsername}</div>
-                        <div class="profile-status online">
-                            <span class="status-dot"></span>
-                            <span>Online</span>
-                        </div>
-                    </div>
-                `;
-                
-                const divider = document.createElement('div');
-                divider.className = 'menu-divider';
-                
-                // Insert at the beginning of dropdown
-                dropdown.insertBefore(divider, dropdown.firstChild);
-                dropdown.insertBefore(profileSection, dropdown.firstChild);
-            }
+        } else {
+            newsContainer.style.display = 'none';
         }
+    }
+}
 
-        // Improved click handler for dropdown
-        document.addEventListener('click', function(event) {
-            const dropdown = document.getElementById('dropdown');
-            const hamburger = document.querySelector('.hamburger');
-            const kebabMenu = document.querySelector('.kebab-menu');
-            
-            // Close dropdown if clicking outside of it and not on menu controls
-            if (dropdown && dropdown.style.display === 'block' && 
-                !dropdown.contains(event.target) && 
-                event.target !== hamburger &&
-                !kebabMenu.contains(event.target)) {
-                dropdown.style.display = 'none';
-            }
-            
-            // Close kebab menu if clicking outside
-            const kebabDropdown = document.querySelector('.kebab-dropdown');
-            if (kebabDropdown && kebabDropdown.classList.contains('active') && 
-                !kebabMenu.contains(event.target) && 
-                !kebabDropdown.contains(event.target)) {
-                kebabDropdown.classList.remove('active');
-            }
-        });
+const sampleNews = [
+    {
+        title: "New AI Features Released",
+        description: "We've added exciting new capabilities to our chatbot!",
+        date: "2025-01-15"
+    },
+    {
+        title: "System Update",
+        description: "Performance improvements and bug fixes",
+        date: "2025-03-14"
+    },
+    {
+        title: "Maintenance Notice",
+        description: "Scheduled maintenance on January 20th",
+        date: "2025-03-13"
+    }
+];
 
-        function logout() {
-            // Disconnect socket when logging out
-            if (socket) {
-                socket.disconnect();
-            }
-            
-            // Clear user data
-            localStorage.removeItem('currentUser');
-            localStorage.removeItem('chat_username');
-            
-            // Hide all containers and menus
-            document.querySelectorAll('.main-chat-interface').forEach(container => {
-                container.style.display = 'none';
-            });
-            
-            const menu = document.querySelector('.menu');
-            if (menu) menu.style.display = 'none';
-            
-            const dropdown = document.getElementById('dropdown');
-            if (dropdown) dropdown.style.display = 'none';
-            
-            const kebabDropdown = document.querySelector('.kebab-dropdown');
-            if (kebabDropdown) kebabDropdown.classList.remove('active');
-            
-            // Hide all chat inputs
-            document.querySelectorAll('.chat-input').forEach(input => {
-                input.style.display = 'none';
-            });
-            
-            // Show auth container
-            document.getElementById('auth-container').style.display = 'flex';
-            
-            // Hide news toggle
-            const newsToggle = document.querySelector('.news-toggle');
-            if (newsToggle) newsToggle.style.display = 'none';
-            
-            const newsContainer = document.querySelector('.news-container');
-            if (newsContainer) newsContainer.style.display = 'none';
-            
-            // Hide both buttons on logout
-            if (scrollToBottomBtn) {
-                scrollToBottomBtn.style.display = 'none';
-                scrollToBottomBtn.classList.remove('visible');
-            }
-            if (privateGoTopBtn) {
-                privateGoTopBtn.style.display = 'none';
-                privateGoTopBtn.classList.remove('visible');
-            }
-            
-            // Reset auth form
-            isLogin = true;
-            const authTitle = document.getElementById('auth-title');
-            if (authTitle) authTitle.textContent = 'Login';
-            
-            const authButton = document.querySelector('.auth-box button');
-            if (authButton) authButton.textContent = 'Login';
-            
-            const toggleText = document.getElementById('toggle-text');
-            if (toggleText) toggleText.textContent = "Don't have an account? ";
-            
-            const toggleLink = document.getElementById('toggle-link');
-            if (toggleLink) toggleLink.textContent = 'Sign Up';
-            
-            // Clear profile section
-            const profileSection = document.querySelector('.profile-panel');
-            const divider = document.querySelector('.menu-divider');
-            if (profileSection) profileSection.remove();
-            if (divider) divider.remove();
-        }
+function populateNews() {
+    const newsItems = document.getElementById('news-items');
+    if (!newsItems) return;
+    
+    newsItems.innerHTML = '';
 
-        // Improved toggleDropdown function
-        function toggleDropdown() {
-            const dropdown = document.getElementById('dropdown');
-            if (!dropdown) return;
-            
-            const isVisible = dropdown.style.display === 'block';
-            
-            // Close all other menus first
-            const kebabDropdown = document.querySelector('.kebab-dropdown');
-            if (kebabDropdown) kebabDropdown.classList.remove('active');
-            
-            // Toggle dropdown
-            dropdown.style.display = isVisible ? 'none' : 'block';
-            
-            // Close if clicking the same button while open
-            if (isVisible) {
-                dropdown.style.display = 'none';
-            }
-        }
+    sampleNews.forEach(news => {
+        const newsItem = document.createElement('div');
+        newsItem.className = 'news-item';
+        newsItem.innerHTML = `
+            <h3>${news.title}</h3>
+            <p>${news.description}</p>
+            <small>${news.date}</small>
+        `;
+        newsItems.appendChild(newsItem);
+    });
+}
 
-        // Updated showContainer function with proper menu handling
-        function showContainer(containerId) {
-            const containers = document.querySelectorAll('.main-chat-interface');
-            containers.forEach(container => {
-                container.style.display = 'none';
-            });
-            
-            // Hide all chat inputs first
-            document.querySelectorAll('.chat-input').forEach(input => {
-                input.style.display = 'none';
-            });
-            
-            // Show the selected container
-            const container = document.getElementById(containerId);
-            if (container) {
-                container.style.display = 'block';
-                
-                // Show the appropriate chat input
-                if (containerId === 'chat' || containerId === 'private-ai') {
-                    const chatInput = container.querySelector('.chat-input');
-                    if (chatInput) chatInput.style.display = 'flex';
-                }
-            }
-            
-            // Close all menus when showing any container
-            const dropdown = document.getElementById('dropdown');
-            if (dropdown) dropdown.style.display = 'none';
-            
-            const kebabDropdown = document.querySelector('.kebab-dropdown');
-            if (kebabDropdown) kebabDropdown.classList.remove('active');
-            
-            currentUsername = localStorage.getItem('chat_username') || '';
-            
-            // Set scroll restore flag for chat container
-            if (containerId === 'chat') {
-                shouldRestoreScroll = true;
-            }
-            
-            // Handle scroll events for private container
-            if (containerId === 'private-ai' && privateContainer) {
-                // Attach scroll event for private container
-                privateContainer.addEventListener('scroll', handlePrivateScroll);
-                // Initial check for scroll position
-                setTimeout(handlePrivateScroll, 100);
-            } else if (privateContainer) {
-                // Remove scroll event when not in private container
-                privateContainer.removeEventListener('scroll', handlePrivateScroll);
-                // Hide the go-top button when switching away
-                if (privateGoTopBtn) {
-                    privateGoTopBtn.style.display = 'none';
-                    privateGoTopBtn.classList.remove('visible');
-                }
-            }
-        }
+document.addEventListener('click', function (e) {
+    if (e.target.tagName === 'IMG' && e.target.closest('.message')) {
+        openZoom(e.target.src);
+    }
+});
 
-        // Updated hideContainer function
-        function hideContainer(containerId) {
-            const container = document.getElementById(containerId);
-            if (container) container.style.display = 'none';
-            
-            const overlay = document.getElementById('overlay');
-            if (overlay) overlay.style.display = 'none';
-            
-            // Close all menus when hiding any container
-            const dropdown = document.getElementById('dropdown');
-            if (dropdown) dropdown.style.display = 'none';
-            
-            const kebabDropdown = document.querySelector('.kebab-dropdown');
-            if (kebabDropdown) kebabDropdown.classList.remove('active');
-            
-            // Show chat container and input after closing any section
-            showContainer('chat');
-        }
+function openZoom(src) {
+    document.body.style.overflow = 'hidden';
+    const overlay = document.getElementById('zoom-overlay');
+    const zoomImage = document.getElementById('zoom-image');
+    const downloadBtn = document.getElementById('download-btn');
 
-        // Zoom functions remain the same
-        function openZoom(src) {
-            document.body.style.overflow = 'hidden';
-            const overlay = document.getElementById('zoom-overlay');
-            const zoomImage = document.getElementById('zoom-image');
-            if (!overlay || !zoomImage) return;
-            
-            zoomImage.src = src;
-            overlay.style.display = 'flex';
-        }
+    if (!overlay || !zoomImage || !downloadBtn) return;
+    
+    zoomImage.src = src;
 
-        function closeZoom() {
-            document.body.style.overflow = '';
-            const overlay = document.getElementById('zoom-overlay');
-            if (overlay) overlay.style.display = 'none';
-        }
+    // Force download filename
+    downloadBtn.href = src;
+    downloadBtn.setAttribute('download', 'image.jpg');
 
-        const overlay = document.getElementById('overlay');
-        if (overlay) {
-            overlay.addEventListener('click', function() {
-                document.querySelectorAll('.about-container, .features-container, .help-container').forEach(container => {
-                    container.style.display = 'none';
-                });
-                this.style.display = 'none';
-                showContainer('chat');
-            });
-        }
+    overlay.style.display = 'flex';
+}
 
-        // Initialize if user is logged in
-        const currentUser = localStorage.getItem('currentUser');
-        if (currentUser) {
-            showContainer('chat');
-            
-            const chatInput = document.querySelector('.chat-input');
+function closeZoom() {
+    document.body.style.overflow = '';
+    const overlay = document.getElementById('zoom-overlay');
+    if (overlay) {
+        overlay.style.display = 'none';
+    }
+}
+
+function autoResize(textarea) {
+    if (textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = (textarea.scrollHeight > 100 ? 100 : textarea.scrollHeight) + 'px';
+    }
+}
+
+if (document.getElementById("year")) {
+    document.getElementById("year").textContent = new Date().getFullYear();
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    populateNews();
+
+    const currentUser = localStorage.getItem('currentUser');
+    if (currentUser) {
+        const newsToggle = document.querySelector('.news-toggle');
+        if (newsToggle) newsToggle.style.display = 'block';
+    } else {
+        const newsToggle = document.querySelector('.news-toggle');
+        if (newsToggle) newsToggle.style.display = 'none';
+        
+        const newsContainer = document.querySelector('.news-container');
+        if (newsContainer) newsContainer.style.display = 'none';
+    }
+});
+
+// UPDATED function to update the profile section with new design
+function updateProfileSection() {
+    const dropdown = document.getElementById('dropdown');
+    if (!dropdown) return;
+    
+    const currentUsername = localStorage.getItem('currentUser');
+    
+    // Remove existing profile section if it exists
+    const existingProfile = document.querySelector('.profile-section');
+    const existingDivider = document.querySelector('.menu-divider');
+    if (existingProfile) existingProfile.remove();
+    if (existingDivider) existingDivider.remove();
+    
+    // Only add profile section if user is logged in
+    if (currentUsername) {
+        const profileSection = document.createElement('div');
+        profileSection.className = 'profile-panel';
+        profileSection.innerHTML = `
+            <div class="profile-avatar">
+                <img src="https://i.pravatar.cc/50?u=${encodeURIComponent(currentUsername)}" alt="Profile">
+            </div>
+            <div class="profile-info">
+                <div class="profile-username">${currentUsername}</div>
+                <div class="profile-status online">
+                    <span class="status-dot"></span>
+                    <span>Online</span>
+                </div>
+            </div>
+        `;
+        
+        const divider = document.createElement('div');
+        divider.className = 'menu-divider';
+        
+        // Insert at the beginning of dropdown
+        dropdown.insertBefore(divider, dropdown.firstChild);
+        dropdown.insertBefore(profileSection, dropdown.firstChild);
+    }
+}
+
+// Improved click handler for dropdown
+document.addEventListener('click', function(event) {
+    const dropdown = document.getElementById('dropdown');
+    const hamburger = document.querySelector('.hamburger');
+    const kebabMenu = document.querySelector('.kebab-menu');
+    
+    // Close dropdown if clicking outside of it and not on menu controls
+    if (dropdown && dropdown.style.display === 'block' && 
+        !dropdown.contains(event.target) && 
+        event.target !== hamburger &&
+        !kebabMenu.contains(event.target)) {
+        dropdown.style.display = 'none';
+    }
+    
+    // Close kebab menu if clicking outside
+    const kebabDropdown = document.querySelector('.kebab-dropdown');
+    if (kebabDropdown && kebabDropdown.classList.contains('active') && 
+        !kebabMenu.contains(event.target) && 
+        !kebabDropdown.contains(event.target)) {
+        kebabDropdown.classList.remove('active');
+    }
+});
+
+// IMPROVED logout function with proper cleanup
+function logout() {
+    const username = localStorage.getItem('chat_username');
+    
+    // Notify server that user is going offline
+    if (username && socket) {
+        socket.emit('user-offline', username);
+        // Disconnect socket
+        socket.disconnect();
+    }
+    
+    // Clear user data
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('chat_username');
+    
+    // Remove page event listeners
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    window.removeEventListener('beforeunload', handleBeforeUnload);
+    window.removeEventListener('pagehide', handlePageHide);
+    
+    // Hide all containers and menus
+    document.querySelectorAll('.main-chat-interface').forEach(container => {
+        container.style.display = 'none';
+    });
+    
+    const menu = document.querySelector('.menu');
+    if (menu) menu.style.display = 'none';
+    
+    const dropdown = document.getElementById('dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    
+    const kebabDropdown = document.querySelector('.kebab-dropdown');
+    if (kebabDropdown) kebabDropdown.classList.remove('active');
+    
+    // Hide all chat inputs
+    document.querySelectorAll('.chat-input').forEach(input => {
+        input.style.display = 'none';
+    });
+    
+    // Show auth container
+    document.getElementById('auth-container').style.display = 'flex';
+    
+    // Hide news toggle
+    const newsToggle = document.querySelector('.news-toggle');
+    if (newsToggle) newsToggle.style.display = 'none';
+    
+    const newsContainer = document.querySelector('.news-container');
+    if (newsContainer) newsContainer.style.display = 'none';
+    
+    // Hide both buttons on logout
+    if (scrollToBottomBtn) {
+        scrollToBottomBtn.style.display = 'none';
+        scrollToBottomBtn.classList.remove('visible');
+    }
+    if (privateGoTopBtn) {
+        privateGoTopBtn.style.display = 'none';
+        privateGoTopBtn.classList.remove('visible');
+    }
+    
+    // Reset auth form
+    isLogin = true;
+    const authTitle = document.getElementById('auth-title');
+    if (authTitle) authTitle.textContent = 'Login';
+    
+    const authButton = document.querySelector('.auth-box button');
+    if (authButton) authButton.textContent = 'Login';
+    
+    const toggleText = document.getElementById('toggle-text');
+    if (toggleText) toggleText.textContent = "Don't have an account? ";
+    
+    const toggleLink = document.getElementById('toggle-link');
+    if (toggleLink) toggleLink.textContent = 'Sign Up';
+    
+    // Clear profile section
+    const profileSection = document.querySelector('.profile-panel');
+    const divider = document.querySelector('.menu-divider');
+    if (profileSection) profileSection.remove();
+    if (divider) divider.remove();
+}
+
+// Improved toggleDropdown function
+function toggleDropdown() {
+    const dropdown = document.getElementById('dropdown');
+    if (!dropdown) return;
+    
+    const isVisible = dropdown.style.display === 'block';
+    
+    // Close all other menus first
+    const kebabDropdown = document.querySelector('.kebab-dropdown');
+    if (kebabDropdown) kebabDropdown.classList.remove('active');
+    
+    // Toggle dropdown
+    dropdown.style.display = isVisible ? 'none' : 'block';
+    
+    // Close if clicking the same button while open
+    if (isVisible) {
+        dropdown.style.display = 'none';
+    }
+}
+
+// Updated showContainer function with proper menu handling
+function showContainer(containerId) {
+    const containers = document.querySelectorAll('.main-chat-interface');
+    containers.forEach(container => {
+        container.style.display = 'none';
+    });
+    
+    // Hide all chat inputs first
+    document.querySelectorAll('.chat-input').forEach(input => {
+        input.style.display = 'none';
+    });
+    
+    // Show the selected container
+    const container = document.getElementById(containerId);
+    if (container) {
+        container.style.display = 'block';
+        
+        // Show the appropriate chat input
+        if (containerId === 'chat' || containerId === 'private-ai') {
+            const chatInput = container.querySelector('.chat-input');
             if (chatInput) chatInput.style.display = 'flex';
-            
-            updateProfileSection();
-            
-            // Initialize real-time features
-            initSocket();
-            setupTypingHandlers();
-            
-            // Set flag to restore scroll position after messages load
-            shouldRestoreScroll = true;
         }
+    }
+    
+    // Close all menus when showing any container
+    const dropdown = document.getElementById('dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    
+    const kebabDropdown = document.querySelector('.kebab-dropdown');
+    if (kebabDropdown) kebabDropdown.classList.remove('active');
+    
+    currentUsername = localStorage.getItem('chat_username') || '';
+    
+    // Set scroll restore flag for chat container
+    if (containerId === 'chat') {
+        shouldRestoreScroll = true;
+    }
+    
+    // Handle scroll events for private container
+    if (containerId === 'private-ai' && privateContainer) {
+        // Attach scroll event for private container
+        privateContainer.addEventListener('scroll', handlePrivateScroll);
+        // Initial check for scroll position
+        setTimeout(handlePrivateScroll, 100);
+    } else if (privateContainer) {
+        // Remove scroll event when not in private container
+        privateContainer.removeEventListener('scroll', handlePrivateScroll);
+        // Hide the go-top button when switching away
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.classList.remove('visible');
+        }
+    }
+}
+
+// Updated hideContainer function
+function hideContainer(containerId) {
+    const container = document.getElementById(containerId);
+    if (container) container.style.display = 'none';
+    
+    const overlay = document.getElementById('overlay');
+    if (overlay) overlay.style.display = 'none';
+    
+    // Close all menus when hiding any container
+    const dropdown = document.getElementById('dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    
+    const kebabDropdown = document.querySelector('.kebab-dropdown');
+    if (kebabDropdown) kebabDropdown.classList.remove('active');
+    
+    // Show chat container and input after closing any section
+    showContainer('chat');
+}
+
+// Zoom functions remain the same
+function openZoom(src) {
+    document.body.style.overflow = 'hidden';
+    const overlay = document.getElementById('zoom-overlay');
+    const zoomImage = document.getElementById('zoom-image');
+    if (!overlay || !zoomImage) return;
+    
+    zoomImage.src = src;
+    overlay.style.display = 'flex';
+}
+
+function closeZoom() {
+    document.body.style.overflow = '';
+    const overlay = document.getElementById('zoom-overlay');
+    if (overlay) overlay.style.display = 'none';
+}
+
+const overlay = document.getElementById('overlay');
+if (overlay) {
+    overlay.addEventListener('click', function() {
+        document.querySelectorAll('.about-container, .features-container, .help-container').forEach(container => {
+            container.style.display = 'none';
+        });
+        this.style.display = 'none';
+        showContainer('chat');
+    });
+}
+
+// Initialize if user is logged in
+const currentUser = localStorage.getItem('currentUser');
+if (currentUser) {
+    showContainer('chat');
+    
+    const chatInput = document.querySelector('.chat-input');
+    if (chatInput) chatInput.style.display = 'flex';
+    
+    updateProfileSection();
+    
+    // Initialize real-time features
+    initSocket();
+    setupTypingHandlers();
+    
+    // Add improved page event listeners
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
+    
+    // Set flag to restore scroll position after messages load
+    shouldRestoreScroll = true;
+}
     </script>
 </body>
 </html>
