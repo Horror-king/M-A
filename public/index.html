@@ -330,6 +330,7 @@ html, body {
 }
 
 /* Improved avatar styling */
+/* Message avatars */
 .message .avatar {
     width: 26px;
     height: 26px;
@@ -342,13 +343,16 @@ html, body {
     margin-top: 6px;
     border: 2px solid #fff;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    overflow: hidden; /* Ensure no overflow */
+    background-color: #f0f2f5; /* Fallback background */
 }
-
+        
 .message .avatar img {
     width: 100%;
     height: 100%;
     border-radius: 50%;
     display: block;
+    object-fit: cover; /* Ensures perfect fit */
 }
 
 /* Improved username with status indicator */
