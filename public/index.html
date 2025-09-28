@@ -359,13 +359,26 @@ html, body {
     flex-shrink: 0;
 }
 
-/* ADD THIS FOR EXTRA SAFETY - FORCE IMAGE CONTAINMENT */
+/* PERFECT AVATAR FIX - FORCE CIRCLE FIT */
+.profile-avatar,
+.online-user-avatar,
+.message .avatar {
+    border-radius: 50%;
+    overflow: hidden;
+    position: relative;
+}
+
 .profile-avatar img,
 .online-user-avatar img,
 .message .avatar img {
-    image-rendering: -webkit-optimize-contrast;
-    image-rendering: crisp-edges;
-    -ms-interpolation-mode: bicubic;
+    position: absolute;       /* lock inside parent */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;        /* crop evenly */
+    object-position: center;  /* center face */
+    display: block;
 }
 
 /* Improved username with status indicator */
