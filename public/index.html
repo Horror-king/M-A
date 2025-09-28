@@ -875,12 +875,15 @@ html, body {
     overflow: hidden;
     margin-right: 12px;
     border: 2px solid #e4e6eb;
+    background-color: #f0f2f5; /* Fallback background */
+    position: relative;
 }
 
 .profile-avatar img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: cover; /* This ensures the image fills the circle without distortion */
+    display: block;
 }
 
 .profile-info {
@@ -1078,10 +1081,12 @@ html, body {
         padding: 5px 6px;
     }
     
-    .online-user-avatar {
-        width: 38px;
-        height: 38px;
-    }
+    .online-user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Ensures perfect fit */
+    display: block;
+}
     
     .online-dot {
         width: 10px;
