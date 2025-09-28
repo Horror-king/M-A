@@ -1370,7 +1370,7 @@ html, body {
         </div>
     </div>
      <script>
-// --- CUT HERE ---
+ // --- CUT HERE ---
          let isLogin = true;
 let users = JSON.parse(localStorage.getItem('users')) || {};
 let longPressTimer;
@@ -1393,7 +1393,7 @@ let isSending = false;
 // Scroll state variables
 let isAtBottom = true;
 let newMessagesCount = 0;
-let scrollToBottomBtn = document.getElementById('scrollToBottomBtn');
+let scrollToBottomBtn;
 let newMessagesCountEl = document.getElementById('newMessagesCount');
 
 // Scroll position management
@@ -1421,6 +1421,42 @@ let replyToText = null;
 let currentUsername = localStorage.getItem('chat_username') || '';
 if (currentUsername && elements.usernameInput) {
     elements.usernameInput.value = currentUsername;
+}
+
+// ===== BUTTON INITIALIZATION FUNCTION =====
+function initializeButtons() {
+    // Initialize main chat scroll button
+    scrollToBottomBtn = document.getElementById('scrollToBottomBtn');
+    if (scrollToBottomBtn) {
+        scrollToBottomBtn.style.position = 'fixed';
+        scrollToBottomBtn.style.bottom = '80px';
+        scrollToBottomBtn.style.right = '20px';
+        scrollToBottomBtn.style.zIndex = '1000';
+        scrollToBottomBtn.style.display = 'none'; // Start hidden
+        scrollToBottomBtn.addEventListener('click', scrollToBottomMain);
+    }
+
+    // Initialize private AI go-top button
+    privateGoTopBtn = document.getElementById('private-go-top');
+    privateContainer = document.getElementById('private-ai-container');
+    if (privateGoTopBtn) {
+        privateGoTopBtn.style.position = 'fixed';
+        privateGoTopBtn.style.bottom = '80px';
+        privateGoTopBtn.style.right = '20px';
+        privateGoTopBtn.style.zIndex = '1000';
+        privateGoTopBtn.style.display = 'none'; // Start hidden
+        privateGoTopBtn.addEventListener('click', scrollPrivateToTop);
+    }
+
+    // Initially hide both buttons
+    if (scrollToBottomBtn) {
+        scrollToBottomBtn.style.display = 'none';
+        scrollToBottomBtn.classList.remove('visible');
+    }
+    if (privateGoTopBtn) {
+        privateGoTopBtn.style.display = 'none';
+        privateGoTopBtn.classList.remove('visible');
+    }
 }
 
 // ===== SIMPLE AND RELIABLE AUTO-SCROLL FUNCTIONS =====
@@ -1682,6 +1718,9 @@ function scrollPrivateToTop(e) {
 // ===== END of Private AI Go to Top button functions =====
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Initialize buttons first
+    initializeButtons();
+    
     const savedUser = localStorage.getItem('currentUser');
     if (savedUser) {
         localStorage.setItem('chat_username', savedUser);
@@ -1689,8 +1728,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector('.menu').style.display = 'flex';
         document.querySelector('.news-toggle').style.display = 'block';
 
-        // Show scroll button after login
-        if (scrollToBottomBtn) scrollToBottomBtn.style.display = 'flex';
         showContainer('chat');
 
         // Set flag to restore scroll position after messages load
@@ -1703,8 +1740,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('auth-container').style.display = 'flex';
         document.querySelector('.menu').style.display = 'none';
         document.querySelector('.news-toggle').style.display = 'none';
-        // Hide scroll button before login
-        if (scrollToBottomBtn) scrollToBottomBtn.style.display = 'none';
     }
 
     if ('Notification' in window) {
@@ -1713,31 +1748,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Initialize Private AI Go to Top button
-    privateGoTopBtn = document.getElementById('private-go-top');
-    privateContainer = document.getElementById('private-ai-container');
-    if (privateGoTopBtn) {
-        // Set fixed positioning for the button
-        privateGoTopBtn.style.position = 'fixed';
-        privateGoTopBtn.style.bottom = '90px';
-        privateGoTopBtn.style.right = '20px';
-        privateGoTopBtn.style.zIndex = '1000';
-        privateGoTopBtn.addEventListener('click', scrollPrivateToTop);
-        // Initially hide the button
-        privateGoTopBtn.style.display = 'none';
-        privateGoTopBtn.classList.remove('visible');
-    }
-
     initializeChat();
 
     // Add scroll event listener for main chat
     if (elements.chatContainer) {
         elements.chatContainer.addEventListener('scroll', updateScrollState);
-    }
-
-    // Add click event to scroll button
-    if (scrollToBottomBtn) {
-        scrollToBottomBtn.addEventListener('click', scrollToBottomMain);
     }
 
     // Set up page visibility listeners
@@ -1768,7 +1783,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// MODIFIED showContainer FUNCTION
+// MODIFIED showContainer FUNCTION with proper button visibility
 function showContainer(containerId) {
     // Hide all containers
     document.querySelectorAll('.main-chat-interface').forEach(container => {
@@ -1909,8 +1924,9 @@ async function handleAuth() {
                     document.getElementById('auth-container').style.display = 'none';
                     document.querySelector('.menu').style.display = 'flex';
                     document.querySelector('.news-toggle').style.display = 'block';
-                    // Show scroll button after successful login
-                    if (scrollToBottomBtn) scrollToBottomBtn.style.display = 'flex';
+                    
+                    // Initialize buttons after successful login
+                    initializeButtons();
                     showContainer('chat');
                     updateProfileSection();
                     initializeChat();
@@ -2875,9 +2891,15 @@ function clearReply() {
             const newsContainer = document.querySelector('.news-container');
             if (newsContainer) newsContainer.style.display = 'none';
             
-            // Hide scroll button
-            const scrollBtn = document.getElementById('scrollToBottomBtn');
-            if (scrollBtn) scrollBtn.style.display = 'none';
+            // Hide both buttons on logout
+            if (scrollToBottomBtn) {
+                scrollToBottomBtn.style.display = 'none';
+                scrollToBottomBtn.classList.remove('visible');
+            }
+            if (privateGoTopBtn) {
+                privateGoTopBtn.style.display = 'none';
+                privateGoTopBtn.classList.remove('visible');
+            }
             
             // Reset auth form
             isLogin = true;
@@ -3038,10 +3060,6 @@ function clearReply() {
             
             // Set flag to restore scroll position after messages load
             shouldRestoreScroll = true;
-            
-            // Show scroll button
-            const scrollBtn = document.getElementById('scrollToBottomBtn');
-            if (scrollBtn) scrollBtn.style.display = 'flex';
         }
     </script>
 </body>
