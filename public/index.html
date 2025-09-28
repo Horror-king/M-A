@@ -1127,19 +1127,17 @@ html, body {
         height: 36px;
     }
     
-    /* Adjust padding for mobile to ensure messages are visible */
+    /* FIXED: Increased padding for mobile to ensure messages are visible */
     .chat-messages, #private-ai-container {
-        padding-bottom: 90px; /* Increased for mobile */
+        padding-bottom: 200px; /* Even more padding for mobile */
+        margin-bottom: 80px; /* More margin for mobile */
+    }
+    
+    /* FIXED: Adjust container padding for mobile */
+    .chat-container, #private-ai {
+        padding-bottom: 80px;
     }
 }
-
-#typing-indicator {
-    padding: 5px 15px;
-    font-style: italic;
-    color: #666;
-    font-size: 0.9em;
-}
-// --- CUT HERE ---
     </style>
 </head>
 <body>
