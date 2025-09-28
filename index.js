@@ -24,7 +24,7 @@ const io = new Server(server, {
 
 // Track online users
 const onlineUsers = new Map();
-const onlineStatusTimeout = 30000; // 30 seconds
+const onlineStatusTimeout = 15000; // Reduced to 15 seconds for faster cleanup
 
 // Global setup
 global.GoatBot = { config };
@@ -341,7 +341,7 @@ app.get('/online-users', (req, res) => {
   res.json(onlineUsersArray);
 });
 
-// Socket.io connection handling - UPDATED WITH PROPER ONLINE/OFFLINE TRACKING
+// Socket.io connection handling - IMPROVED ONLINE/OFFLINE TRACKING
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
@@ -353,7 +353,8 @@ io.on('connection', (socket) => {
       onlineUsers.set(username, {
         socketId: socket.id,
         username: username,
-        lastSeen: Date.now()
+        lastSeen: Date.now(),
+        isOnline: true
       });
       
       // Get current online users list
@@ -373,9 +374,10 @@ io.on('connection', (socket) => {
     if (username && onlineUsers.has(username)) {
       console.log('User away:', username);
       
-      // Mark user as away but keep in list
+      // Update last seen but keep user in list
       const userData = onlineUsers.get(username);
       userData.lastSeen = Date.now();
+      userData.isOnline = false;
       
       // Broadcast away status
       io.emit('user-status-change', { 
@@ -388,13 +390,14 @@ io.on('connection', (socket) => {
 
   socket.on('user-offline', (username) => {
     if (username) {
-      console.log('User offline:', username);
+      console.log('User offline (manual):', username);
       removeUserFromOnlineList(username);
     }
   });
 
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
+  // IMPROVED: Handle disconnect properly
+  socket.on('disconnect', (reason) => {
+    console.log('User disconnected:', socket.id, 'Reason:', reason);
     
     // Find user by socket ID and remove them
     let foundUsername = null;
@@ -406,6 +409,7 @@ io.on('connection', (socket) => {
     }
     
     if (foundUsername) {
+      console.log('Removing user on disconnect:', foundUsername);
       removeUserFromOnlineList(foundUsername);
     }
   });
@@ -443,13 +447,14 @@ io.on('connection', (socket) => {
   }
 });
 
-// Periodically clean up users who haven't sent a heartbeat
+// More aggressive cleanup for inactive users - REDUCED TIMEOUT
 setInterval(() => {
   const now = Date.now();
   const removedUsers = [];
   
   for (let [username, data] of onlineUsers.entries()) {
-    if (now - data.lastSeen > onlineStatusTimeout) {
+    // Reduce timeout to 15 seconds for faster cleanup
+    if (now - data.lastSeen > 15000) {
       console.log('Removing inactive user:', username);
       onlineUsers.delete(username);
       removedUsers.push(username);
@@ -469,7 +474,7 @@ setInterval(() => {
     console.log('Cleaned up inactive users:', removedUsers);
     console.log('Current online users after cleanup:', onlineUsersArray);
   }
-}, 10000); // Check every 10 seconds
+}, 5000); // Check every 5 seconds instead of 10
 
 // Start server
 server.listen(port, () => {
