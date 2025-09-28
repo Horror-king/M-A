@@ -247,7 +247,7 @@ html, body {
     gap: 2px;
     box-sizing: border-box;
     /* FIXED: Much larger bottom padding to ensure messages are visible above input */
-    padding-bottom: 130px; /* Increased significantly from 120px */
+    padding-bottom: 180px; /* Increased significantly from 120px */
     /* FIXED: Add margin at the bottom to create space for the input */
     margin-bottom: 70px;
 }
@@ -1370,7 +1370,7 @@ html, body {
         </div>
     </div>
      <script>
- // --- CUT HERE ---
+// --- CUT HERE ---
          let isLogin = true;
 let users = JSON.parse(localStorage.getItem('users')) || {};
 let longPressTimer;
@@ -1512,7 +1512,9 @@ function scrollPrivateToBottom() {
 // Initialize socket connection
 function initSocket() {
     socket = io();
+    
     socket.on('connect', () => {
+        console.log('Socket connected');
         const username = localStorage.getItem('chat_username');
         if (username) {
             socket.emit('user-online', username);
@@ -1520,12 +1522,19 @@ function initSocket() {
     });
 
     socket.on('user-status-change', (data) => {
+        console.log('User status change:', data);
         updateOnlineUsersList(data.onlineUsers);
         updateUserStatusIndicator(data.username, data.status);
     });
 
     socket.on('user-typing', (data) => {
         showTypingIndicator(data.username, data.isTyping);
+    });
+
+    // NEW: Handle user going offline
+    socket.on('user-offline', (data) => {
+        console.log('User went offline:', data);
+        removeOfflineUser(data.username);
     });
 
     // Send heartbeat every 20 seconds to stay online
@@ -1537,13 +1546,16 @@ function initSocket() {
     }, 20000);
 }
 
-// MODIFIED: Update both online users lists (main chat and private AI)
+// MODIFIED: Update both online users lists (main chat and private AI) - ONLY SHOW ONLINE USERS
 function updateOnlineUsersList(onlineUsers) {
+    console.log('Updating online users list:', onlineUsers);
+    
     // Update main chat online list
     const onlineList = document.getElementById('online-users-list');
     if (onlineList) {
         onlineList.innerHTML = '';
         onlineUsers.forEach(user => {
+            // Only add users that are actually online
             const userElement = document.createElement('div');
             userElement.className = 'online-user';
             userElement.innerHTML = `
@@ -1563,11 +1575,13 @@ function updateOnlineUsersList(onlineUsers) {
             onlineCount.textContent = onlineUsers.length;
         }
     }
+    
     // Update private AI online list
     const privateOnlineList = document.getElementById('private-online-users-list');
     if (privateOnlineList) {
         privateOnlineList.innerHTML = '';
         onlineUsers.forEach(user => {
+            // Only add users that are actually online
             const userElement = document.createElement('div');
             userElement.className = 'online-user';
             userElement.innerHTML = `
@@ -1589,7 +1603,51 @@ function updateOnlineUsersList(onlineUsers) {
     }
 }
 
-// Update status indicator for a specific user
+// NEW: Remove offline user from the lists
+function removeOfflineUser(username) {
+    console.log('Removing offline user:', username);
+    
+    // Remove from main chat online list
+    const onlineList = document.getElementById('online-users-list');
+    if (onlineList) {
+        const userElements = onlineList.querySelectorAll('.online-user');
+        userElements.forEach(userElement => {
+            const userNameElement = userElement.querySelector('.online-user-name');
+            if (userNameElement && userNameElement.textContent === username) {
+                userElement.remove();
+            }
+        });
+        // Update online count for main chat
+        const onlineCount = document.getElementById('online-count');
+        if (onlineCount) {
+            const currentCount = parseInt(onlineCount.textContent) || 0;
+            onlineCount.textContent = Math.max(0, currentCount - 1);
+        }
+    }
+    
+    // Remove from private AI online list
+    const privateOnlineList = document.getElementById('private-online-users-list');
+    if (privateOnlineList) {
+        const userElements = privateOnlineList.querySelectorAll('.online-user');
+        userElements.forEach(userElement => {
+            const userNameElement = userElement.querySelector('.online-user-name');
+            if (userNameElement && userNameElement.textContent === username) {
+                userElement.remove();
+            }
+        });
+        // Update online count for private AI
+        const privateOnlineCount = document.getElementById('private-online-count');
+        if (privateOnlineCount) {
+            const currentCount = parseInt(privateOnlineCount.textContent) || 0;
+            privateOnlineCount.textContent = Math.max(0, currentCount - 1);
+        }
+    }
+    
+    // Update status indicator in messages to offline
+    updateUserStatusIndicator(username, 'offline');
+}
+
+// UPDATED: Update status indicator for a specific user
 function updateUserStatusIndicator(username, status) {
     // Find all messages from this user and update their status
     const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
@@ -1601,6 +1659,11 @@ function updateUserStatusIndicator(username, status) {
             if (usernameDiv) {
                 usernameDiv.appendChild(statusIndicator);
             }
+        }
+        
+        // If user is offline, remove the green dot from online list
+        if (status === 'offline') {
+            removeOfflineUser(username);
         }
     });
 }
@@ -1757,12 +1820,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Set up page visibility listeners
     document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') {
-            saveScrollPosition();
+        const username = localStorage.getItem('chat_username');
+        if (username && socket) {
+            if (document.visibilityState === 'hidden') {
+                // User switched tabs or minimized browser
+                socket.emit('user-away', username);
+                saveScrollPosition();
+            } else {
+                // User came back to the tab
+                socket.emit('user-online', username);
+            }
         }
     });
 
     window.addEventListener('beforeunload', () => {
+        const username = localStorage.getItem('chat_username');
+        if (username && socket) {
+            socket.emit('user-offline', username);
+        }
         saveScrollPosition();
     });
 
@@ -2853,6 +2928,12 @@ function clearReply() {
         });
 
         function logout() {
+            // Notify server that user is going offline
+            const username = localStorage.getItem('chat_username');
+            if (username && socket) {
+                socket.emit('user-offline', username);
+            }
+            
             // Disconnect socket when logging out
             if (socket) {
                 socket.disconnect();
