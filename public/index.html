@@ -1369,6 +1369,7 @@ html, body {
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
+// --- CUT HERE ---
      <script>
 let isLogin = true;
 let users = JSON.parse(localStorage.getItem('users')) || {};
@@ -2454,7 +2455,8 @@ async function fetchChatResponse(userInput) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                message: userInput
+                message: userInput,
+                source: 'main-chat'  // NEW: Added source parameter
             }),
         });
         const data = await response.json();
@@ -2478,7 +2480,8 @@ async function fetchPrivateAIResponse(userInput) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                message: userInput
+                message: userInput,
+                source: 'private-ai'  // NEW: Added source parameter
             }),
         });
         const data = await response.json();
