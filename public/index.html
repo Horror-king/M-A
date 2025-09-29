@@ -2176,11 +2176,13 @@ function showNotification(username, message) {
     };
 }
 
+// MODIFIED: displayPrivateMessage function now includes copy button for AI responses
 function displayPrivateMessage(text, sender, repliedTo = null, username = 'Private AI', messageId = null) {
     const container = document.getElementById('private-ai-container');
     if (!container) return;
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${sender}`;
+    messageDiv.dataset.content = text;
 
     // Only create avatar for received messages
     if (sender === 'received') {
@@ -2240,6 +2242,16 @@ function displayPrivateMessage(text, sender, repliedTo = null, username = 'Priva
 
     messageBody.appendChild(contentDiv);
     messageDiv.appendChild(messageBody);
+    
+    // ADD COPY BUTTON FOR AI RESPONSES (received messages) in Private AI
+    if (sender === 'received') {
+        const copyButton = document.createElement('button');
+        copyButton.className = 'copy-btn';
+        copyButton.innerHTML = '<span class="material-symbols-outlined">content_copy</span>';
+        copyButton.onclick = () => copyToClipboard(text, copyButton);
+        contentDiv.appendChild(copyButton);
+    }
+    
     container.appendChild(messageDiv);
 
     // ALWAYS scroll to bottom for private chat - FORCE IT
@@ -2310,6 +2322,14 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
             audio.src = match[0];
             contentDiv.appendChild(audio);
         });
+        
+        // ADD COPY BUTTON FOR AI RESPONSES
+        const copyButton = document.createElement('button');
+        copyButton.className = 'copy-btn';
+        copyButton.innerHTML = '<span class="material-symbols-outlined">content_copy</span>';
+        copyButton.onclick = () => copyToClipboard(text, copyButton);
+        contentDiv.appendChild(copyButton);
+        
         messageBody.appendChild(contentDiv);
         messageDiv.appendChild(messageBody);
     } else {
