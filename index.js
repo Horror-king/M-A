@@ -249,10 +249,10 @@ app.delete('/messages/:id', async (req, res) => {
   }
 });
 
-// Command API handler
+// Command API handler - MODIFIED TO SUPPORT SOURCE PARAMETER
 app.post("/api/command", async (req, res) => {
   try {
-    const { message } = req.body;
+    const { message, source = 'main-chat' } = req.body; // Added source parameter with default
     if (!message) return res.status(400).json({ reply: "❌ Message is required" });
 
     if (message.trim().toLowerCase() === "prefix") {
@@ -290,15 +290,42 @@ app.post("/api/command", async (req, res) => {
           responseData = response.data;
         }
 
+        let aiResponse;
         if (responseData.response) {
-          return res.json({ reply: responseData.response });
+          aiResponse = responseData.response;
         } else if (responseData.message) {
-          return res.json({ reply: responseData.message });
+          aiResponse = responseData.message;
         } else if (responseData.data) {
-          return res.json({ reply: responseData.data });
+          aiResponse = responseData.data;
         } else {
-          return res.json({ reply: JSON.stringify(responseData) || "⚠️ No recognizable response format" });
+          aiResponse = JSON.stringify(responseData) || "⚠️ No recognizable response format";
         }
+
+        // NEW: Save AI response to Supabase ONLY if source is main-chat
+        if (source === 'main-chat') {
+          try {
+            const { data, error } = await supabase
+              .from('chatter')
+              .insert([{ 
+                content: aiResponse, 
+                username: 'AI',
+                reply_to: cmd.text // Store the original question as reply_to for context
+              }])
+              .select();
+
+            if (error) {
+              console.error("Error saving AI response to Supabase:", error);
+            } else {
+              console.log("AI response saved to Supabase for main chat");
+            }
+          } catch (dbError) {
+            console.error("Database error when saving AI response:", dbError);
+          }
+        } else {
+          console.log("AI response NOT saved to Supabase (private chat)");
+        }
+
+        return res.json({ reply: aiResponse });
       } catch (aiError) {
         console.error("AI Processing Error:", aiError);
         return res.status(500).json({ 
