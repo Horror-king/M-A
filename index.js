@@ -166,7 +166,7 @@ app.get('/messages', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('chatter')
-      .select('id, content, username, created_at, image_url')
+      .select('id, content, username, created_at, image_url, reply_to')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -176,10 +176,10 @@ app.get('/messages', async (req, res) => {
   }
 });
 
-// POST messages
+// POST messages - UPDATED TO MATCH YOUR TABLE STRUCTURE
 app.post('/messages', async (req, res) => {
   try {
-    const { content, username, image_url } = req.body;
+    const { content, username, image_url, reply_to } = req.body;
 
     if ((!content && !image_url) || !username) {
       return res.status(400).json({ error: "Content or image, and username required" });
@@ -187,12 +187,22 @@ app.post('/messages', async (req, res) => {
 
     const { data, error } = await supabase
       .from('chatter')
-      .insert([{ content, username, image_url }])
+      .insert([{ 
+        content, 
+        username, 
+        image_url,
+        reply_to 
+      }])
       .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Database insert error:', error);
+      throw error;
+    }
+    
     res.status(201).json(data[0]);
   } catch (error) {
+    console.error('❌ Failed to save message:', error);
     res.status(500).json({ error: "Failed to save message" });
   }
 });
@@ -249,7 +259,7 @@ app.delete('/messages/:id', async (req, res) => {
   }
 });
 
-// NEW: Function to save AI response to Supabase
+// NEW: Function to save AI response to Supabase - UPDATED FOR YOUR SCHEMA
 async function saveAIResponseToSupabase(content, originalQuestion) {
   try {
     console.log('🔄 Attempting to save AI response to Supabase...');
@@ -267,10 +277,11 @@ async function saveAIResponseToSupabase(content, originalQuestion) {
 
     if (error) {
       console.error('❌ Supabase insertion error:', error);
+      console.error('❌ Error details:', JSON.stringify(error, null, 2));
       throw error;
     }
     
-    console.log('✅ AI response saved to Supabase:', data);
+    console.log('✅ AI response saved to Supabase. ID:', data[0]?.id);
     return data;
   } catch (error) {
     console.error('❌ Error saving AI response to Supabase:', error);
@@ -278,7 +289,47 @@ async function saveAIResponseToSupabase(content, originalQuestion) {
   }
 }
 
-// Command API handler - MODIFIED TO FIX SAVING ISSUE
+// TEST ENDPOINT: Check if we can save to Supabase
+app.post('/test-supabase', async (req, res) => {
+  try {
+    console.log('🧪 Testing Supabase connection...');
+    
+    const testData = {
+      content: 'Test message from server',
+      username: 'TestBot',
+      reply_to: 'Test question'
+    };
+    
+    const { data, error } = await supabase
+      .from('chatter')
+      .insert([testData])
+      .select();
+
+    if (error) {
+      console.error('❌ Test failed:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: error.message,
+        details: error 
+      });
+    }
+    
+    console.log('✅ Test successful! Saved message ID:', data[0]?.id);
+    res.json({ 
+      success: true, 
+      message: 'Supabase connection test successful',
+      data: data[0] 
+    });
+  } catch (error) {
+    console.error('❌ Test error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Command API handler - FIXED FOR YOUR SCHEMA
 app.post("/api/command", async (req, res) => {
   try {
     const { message, source = 'main-chat' } = req.body;
@@ -291,7 +342,12 @@ app.post("/api/command", async (req, res) => {
     }
 
     const cmd = handleCommand(message);
-    if (!cmd) return res.end();
+    if (!cmd) {
+      console.log('❌ Not a command or wrong prefix');
+      return res.end();
+    }
+
+    console.log('🔍 Command detected:', cmd.commandName);
 
     if (cmd.commandName === "ai") {
       try {
@@ -336,14 +392,18 @@ app.post("/api/command", async (req, res) => {
           }
         }
 
-        console.log('🤖 AI Response received:', aiResponse);
+        console.log('🤖 AI Response received:', aiResponse.substring(0, 100) + '...');
 
         // NEW: Save AI response to Supabase ONLY if source is main-chat
         if (source === 'main-chat') {
           console.log('💾 Saving AI response to Supabase for main chat...');
           try {
-            await saveAIResponseToSupabase(aiResponse, cmd.text);
-            console.log('✅ AI response successfully saved to Supabase');
+            const savedData = await saveAIResponseToSupabase(aiResponse, cmd.text);
+            if (savedData && savedData[0]) {
+              console.log('✅ AI response successfully saved to Supabase with ID:', savedData[0].id);
+            } else {
+              console.log('⚠️ AI response saved but no data returned');
+            }
           } catch (saveError) {
             console.error('❌ Failed to save AI response to Supabase:', saveError);
             // Don't fail the request if saving fails, just log it
@@ -545,9 +605,11 @@ server.listen(port, () => {
   console.log(`🔹 Command prefix: "${PREFIX}"`);
   console.log(`👥 Online users tracking: ACTIVE (3 minute timeout)`);
   console.log(`💾 AI response saving: ENABLED for main chat`);
+  console.log(`🧪 Test Supabase: POST http://localhost:${port}/test-supabase`);
   if (isRender && renderExternalUrl) {
     console.log(`🌐 Render External URL: ${renderExternalUrl}`);
     console.log(`⏱️ UptimeRobot monitoring URL: ${renderExternalUrl}/health`);
+    console.log(`🧪 Test Supabase: POST ${renderExternalUrl}/test-supabase`);
   }
 });
 
