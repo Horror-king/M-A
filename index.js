@@ -289,15 +289,83 @@ async function saveAIResponseToSupabase(content, originalQuestion) {
   }
 }
 
-// TEST ENDPOINT: Check if we can save to Supabase
+// TEST ENDPOINTS: Check if we can save to Supabase
+app.get('/test-supabase', async (req, res) => {
+  try {
+    console.log('🧪 Testing Supabase connection (GET)...');
+    
+    // Test 1: Check if we can read from Supabase
+    const { data: readData, error: readError } = await supabase
+      .from('chatter')
+      .select('*')
+      .limit(5)
+      .order('created_at', { ascending: false });
+
+    if (readError) {
+      console.error('❌ Read test failed:', readError);
+      return res.status(500).json({ 
+        success: false, 
+        test: 'read',
+        error: readError.message
+      });
+    }
+
+    // Test 2: Try to insert a test message
+    const testData = {
+      content: 'Test message from server GET endpoint',
+      username: 'TestBot',
+      reply_to: 'Test question from GET'
+    };
+    
+    const { data: insertData, error: insertError } = await supabase
+      .from('chatter')
+      .insert([testData])
+      .select();
+
+    if (insertError) {
+      console.error('❌ Insert test failed:', insertError);
+      return res.status(500).json({ 
+        success: false, 
+        test: 'insert',
+        error: insertError.message,
+        details: insertError
+      });
+    }
+    
+    console.log('✅ All tests successful!');
+    res.json({ 
+      success: true, 
+      message: 'Supabase connection test successful',
+      tests: {
+        read: {
+          success: true,
+          messageCount: readData?.length || 0
+        },
+        insert: {
+          success: true,
+          insertedId: insertData[0]?.id
+        }
+      },
+      recentMessages: readData,
+      insertedMessage: insertData[0]
+    });
+  } catch (error) {
+    console.error('❌ Test error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
 app.post('/test-supabase', async (req, res) => {
   try {
-    console.log('🧪 Testing Supabase connection...');
+    console.log('🧪 Testing Supabase connection (POST)...');
     
     const testData = {
-      content: 'Test message from server',
+      content: 'Test message from server POST endpoint',
       username: 'TestBot',
-      reply_to: 'Test question'
+      reply_to: 'Test question from POST'
     };
     
     const { data, error } = await supabase
@@ -322,6 +390,56 @@ app.post('/test-supabase', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Test error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// DEBUG ENDPOINT: Check current table structure
+app.get('/debug-table', async (req, res) => {
+  try {
+    console.log('🔍 Debugging table structure...');
+    
+    // Get table info by trying to insert and read
+    const { data, error } = await supabase
+      .from('chatter')
+      .select('*')
+      .limit(1);
+
+    if (error) {
+      console.error('❌ Table debug failed:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: error.message,
+        hint: 'Check if table exists and RLS policies'
+      });
+    }
+
+    // Try to get table schema info by inserting a test record
+    const testRecord = {
+      content: 'Debug test',
+      username: 'DebugBot'
+    };
+
+    const { data: insertData, error: insertError } = await supabase
+      .from('chatter')
+      .insert([testRecord])
+      .select();
+
+    res.json({
+      success: true,
+      tableInfo: {
+        sampleRecord: data?.[0],
+        columns: data?.[0] ? Object.keys(data[0]) : ['unknown'],
+        insertTest: insertError ? { error: insertError.message } : { success: true, id: insertData[0]?.id }
+      },
+      message: 'Table structure check completed'
+    });
+
+  } catch (error) {
+    console.error('❌ Debug error:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -605,11 +723,13 @@ server.listen(port, () => {
   console.log(`🔹 Command prefix: "${PREFIX}"`);
   console.log(`👥 Online users tracking: ACTIVE (3 minute timeout)`);
   console.log(`💾 AI response saving: ENABLED for main chat`);
-  console.log(`🧪 Test Supabase: POST http://localhost:${port}/test-supabase`);
+  console.log(`🧪 Test Supabase (GET): http://localhost:${port}/test-supabase`);
+  console.log(`🔍 Debug Table: http://localhost:${port}/debug-table`);
   if (isRender && renderExternalUrl) {
     console.log(`🌐 Render External URL: ${renderExternalUrl}`);
     console.log(`⏱️ UptimeRobot monitoring URL: ${renderExternalUrl}/health`);
-    console.log(`🧪 Test Supabase: POST ${renderExternalUrl}/test-supabase`);
+    console.log(`🧪 Test Supabase: ${renderExternalUrl}/test-supabase`);
+    console.log(`🔍 Debug Table: ${renderExternalUrl}/debug-table`);
   }
 });
 
