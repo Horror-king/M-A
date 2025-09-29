@@ -358,88 +358,76 @@ app.get('/test-supabase', async (req, res) => {
   }
 });
 
-app.post('/test-supabase', async (req, res) => {
+// DEBUG: Check what's happening with AI commands
+app.get('/debug-ai', async (req, res) => {
   try {
-    console.log('🧪 Testing Supabase connection (POST)...');
+    console.log('🔍 Debugging AI message saving...');
     
-    const testData = {
-      content: 'Test message from server POST endpoint',
-      username: 'TestBot',
-      reply_to: 'Test question from POST'
-    };
-    
-    const { data, error } = await supabase
-      .from('chatter')
-      .insert([testData])
-      .select();
-
-    if (error) {
-      console.error('❌ Test failed:', error);
-      return res.status(500).json({ 
-        success: false, 
-        error: error.message,
-        details: error 
-      });
-    }
-    
-    console.log('✅ Test successful! Saved message ID:', data[0]?.id);
-    res.json({ 
-      success: true, 
-      message: 'Supabase connection test successful',
-      data: data[0] 
-    });
-  } catch (error) {
-    console.error('❌ Test error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
-    });
-  }
-});
-
-// DEBUG ENDPOINT: Check current table structure
-app.get('/debug-table', async (req, res) => {
-  try {
-    console.log('🔍 Debugging table structure...');
-    
-    // Get table info by trying to insert and read
-    const { data, error } = await supabase
-      .from('chatter')
-      .select('*')
-      .limit(1);
-
-    if (error) {
-      console.error('❌ Table debug failed:', error);
-      return res.status(500).json({ 
-        success: false, 
-        error: error.message,
-        hint: 'Check if table exists and RLS policies'
-      });
-    }
-
-    // Try to get table schema info by inserting a test record
-    const testRecord = {
-      content: 'Debug test',
-      username: 'DebugBot'
+    // Simulate an AI command from main chat
+    const testAICommand = {
+      message: '!ai hello world',
+      source: 'main-chat'
     };
 
-    const { data: insertData, error: insertError } = await supabase
-      .from('chatter')
-      .insert([testRecord])
-      .select();
+    console.log('🧪 Testing AI command simulation:', testAICommand);
+
+    // Manually call the AI processing logic
+    const response = await axios.get(
+      `https://yau-ai-runing-station.vercel.app/ai?prompt=${encodeURIComponent('hello world')}&cb=${Date.now()}`,
+      { 
+        headers: { 
+          Accept: "application/json",
+          "User-Agent": "GoatBot/1.0"
+        },
+        timeout: 15000,
+        validateStatus: () => true
+      }
+    );
+
+    let responseData;
+    let aiResponse;
+
+    if (typeof response.data === 'string') {
+      try {
+        responseData = JSON.parse(response.data);
+      } catch (e) {
+        aiResponse = response.data;
+      }
+    } else {
+      responseData = response.data;
+    }
+
+    if (!aiResponse) {
+      if (responseData.response) {
+        aiResponse = responseData.response;
+      } else if (responseData.message) {
+        aiResponse = responseData.message;
+      } else if (responseData.data) {
+        aiResponse = responseData.data;
+      } else {
+        aiResponse = JSON.stringify(responseData) || "⚠️ No recognizable response format";
+      }
+    }
+
+    console.log('🤖 AI Response received:', aiResponse);
+
+    // Try to save the AI response
+    console.log('💾 Attempting to save AI response...');
+    const savedData = await saveAIResponseToSupabase(aiResponse, 'hello world');
 
     res.json({
       success: true,
-      tableInfo: {
-        sampleRecord: data?.[0],
-        columns: data?.[0] ? Object.keys(data[0]) : ['unknown'],
-        insertTest: insertError ? { error: insertError.message } : { success: true, id: insertData[0]?.id }
+      test: {
+        aiCommand: testAICommand,
+        aiResponse: aiResponse,
+        savedToSupabase: !!savedData,
+        savedData: savedData
       },
-      message: 'Table structure check completed'
+      message: 'AI debug test completed'
     });
 
   } catch (error) {
-    console.error('❌ Debug error:', error);
+    console.error('❌ AI debug error:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -447,7 +435,7 @@ app.get('/debug-table', async (req, res) => {
   }
 });
 
-// Command API handler - FIXED FOR YOUR SCHEMA
+// Command API handler - COMPLETELY REWRITTEN TO FIX AI SAVING
 app.post("/api/command", async (req, res) => {
   try {
     const { message, source = 'main-chat' } = req.body;
@@ -466,6 +454,7 @@ app.post("/api/command", async (req, res) => {
     }
 
     console.log('🔍 Command detected:', cmd.commandName);
+    console.log('📍 Source:', source);
 
     if (cmd.commandName === "ai") {
       try {
@@ -510,24 +499,25 @@ app.post("/api/command", async (req, res) => {
           }
         }
 
-        console.log('🤖 AI Response received:', aiResponse.substring(0, 100) + '...');
+        console.log('🤖 AI Response received:', aiResponse.substring(0, 200) + '...');
 
-        // NEW: Save AI response to Supabase ONLY if source is main-chat
+        // CRITICAL FIX: Save AI response to Supabase ONLY if source is main-chat
+        // This is the key part that was likely failing
         if (source === 'main-chat') {
-          console.log('💾 Saving AI response to Supabase for main chat...');
+          console.log('💾 ✅ Source is main-chat - SAVING AI response to Supabase...');
           try {
             const savedData = await saveAIResponseToSupabase(aiResponse, cmd.text);
             if (savedData && savedData[0]) {
-              console.log('✅ AI response successfully saved to Supabase with ID:', savedData[0].id);
+              console.log('🎉 SUCCESS: AI response saved to Supabase with ID:', savedData[0].id);
             } else {
-              console.log('⚠️ AI response saved but no data returned');
+              console.log('⚠️ WARNING: AI response saved but no data returned');
             }
           } catch (saveError) {
-            console.error('❌ Failed to save AI response to Supabase:', saveError);
+            console.error('❌ FAILED to save AI response to Supabase:', saveError);
             // Don't fail the request if saving fails, just log it
           }
         } else {
-          console.log('🚫 AI response NOT saved to Supabase (private chat)');
+          console.log('🚫 SKIPPING: AI response NOT saved to Supabase (source is private chat)');
         }
 
         return res.json({ reply: aiResponse });
@@ -724,12 +714,12 @@ server.listen(port, () => {
   console.log(`👥 Online users tracking: ACTIVE (3 minute timeout)`);
   console.log(`💾 AI response saving: ENABLED for main chat`);
   console.log(`🧪 Test Supabase (GET): http://localhost:${port}/test-supabase`);
-  console.log(`🔍 Debug Table: http://localhost:${port}/debug-table`);
+  console.log(`🔍 Debug AI Saving: http://localhost:${port}/debug-ai`);
   if (isRender && renderExternalUrl) {
     console.log(`🌐 Render External URL: ${renderExternalUrl}`);
     console.log(`⏱️ UptimeRobot monitoring URL: ${renderExternalUrl}/health`);
     console.log(`🧪 Test Supabase: ${renderExternalUrl}/test-supabase`);
-    console.log(`🔍 Debug Table: ${renderExternalUrl}/debug-table`);
+    console.log(`🔍 Debug AI: ${renderExternalUrl}/debug-ai`);
   }
 });
 
