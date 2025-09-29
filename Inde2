@@ -1,0 +1,511 @@
+inde2const express = require('express');
+const cors = require('cors');
+const { createClient } = require('@supabase/supabase-js');
+const multer = require('multer');
+const path = require('path');
+const axios = require('axios');
+const fs = require('fs-extra');
+const config = require('./config.json');
+const http = require('http');
+const { Server } = require('socket.io');
+
+// Initialize apps
+const app = express();
+const server = http.createServer(app);
+const port = process.env.PORT || 3000;
+
+// Initialize Socket.io
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+// Track online users - 3 MINUTE TIMEOUT
+const onlineUsers = new Map();
+const onlineStatusTimeout = 180000; // 3 minutes = 180000 milliseconds
+
+// Global setup
+global.GoatBot = { config };
+global.utils = {
+  log: {
+    info: (...args) => console.log("[INFO]", ...args),
+    err: (...args) => console.error("[ERROR]", ...args)
+  },
+  getText: () => "✅ Bot is running smoothly"
+};
+
+// Initialize Supabase
+const supabase = createClient(
+  'https://tgcovkjghbqyoenxzjyp.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnY292a2pnaGJxeW9lbnh6anlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg0ODM5NTUsImV4cCI6MjA3NDA1OTk1NX0.yKr6C9QMdTyXzxCIK-D5k-kJI3NeJoJjuIEiABFtAr8',
+);
+
+// Configure multer for file uploads
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+    files: 1
+  },
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png|gif|webp/;
+    const mimetype = filetypes.test(file.mimetype);
+    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+
+    if (mimetype && extname) {
+      return cb(null, true);
+    }
+    cb(new Error('Only image files are allowed (jpeg, jpg, png, gif, webp)'));
+  }
+});
+
+// Render-specific configuration
+const isRender = process.env.RENDER === 'true';
+const renderExternalUrl = process.env.RENDER_EXTERNAL_URL;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.static('public'));
+
+// Enhanced Uptime System for Render
+if (config.autoUptime?.enable || isRender) {
+  const myUrl = renderExternalUrl || config.autoUptime?.url || `http://localhost:${port}`;
+
+  global.utils.log.info("RENDER UPTIME", `Monitoring endpoint available at: ${myUrl}/uptime`);
+  global.utils.log.info("UPTIMEROBOT TIP", `Add this URL to UptimeRobot: ${myUrl}/health`);
+
+  // Simple keep-alive endpoint
+  app.get("/uptime", (req, res) => {
+    res.status(200).json({
+      status: "OK",
+      timestamp: Date.now(),
+      uptime: process.uptime(),
+      platform: "Render",
+      monitor: "UptimeRobot"
+    });
+  });
+
+  // Comprehensive health check
+  app.get("/health", (req, res) => {
+    res.json({
+      status: "healthy",
+      version: require('./package.json').version,
+      node: process.version,
+      memory: process.memoryUsage(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || "development",
+      platform: process.platform,
+      render: isRender,
+      endpoints: {
+        uptime: `${myUrl}/uptime`,
+        api: `${myUrl}/api/command`
+      }
+    });
+  });
+
+  // Auto-ping for Render's inactivity timeout
+  if (isRender) {
+    const pingInterval = setInterval(() => {
+      axios.get(`${myUrl}/uptime`)
+        .then(() => global.utils.log.info("RENDER PING", "Keeping Render instance alive"))
+        .catch(err => global.utils.log.err("RENDER PING", err.message));
+    }, 4 * 60 * 1000); // Ping every 4 minutes
+
+    process.on('exit', () => clearInterval(pingInterval));
+  }
+}
+
+// Command loader setup
+const COMMANDS_DIR = path.join(__dirname, "commands");
+const PREFIX = config.prefix || "!";
+const commands = {};
+
+function loadCommands() {
+  Object.keys(require.cache).forEach((key) => {
+    if (key.startsWith(COMMANDS_DIR)) delete require.cache[key];
+  });
+
+  const commandFiles = fs.readdirSync(COMMANDS_DIR).filter(file => file.endsWith(".js"));
+  commandFiles.forEach(file => {
+    try {
+      const cmd = require(path.join(COMMANDS_DIR, file));
+      if (cmd.config?.name) {
+        commands[cmd.config.name] = cmd;
+        if (Array.isArray(cmd.config.aliases)) {
+          cmd.config.aliases.forEach(alias => commands[alias] = cmd);
+        }
+        console.log(`✅ Loaded command: ${PREFIX}${cmd.config.name}`);
+      }
+    } catch (err) {
+      console.error(`❌ Failed to load ${file}:`, err);
+    }
+  });
+}
+
+// Create commands directory if it doesn't exist
+fs.ensureDirSync(COMMANDS_DIR);
+loadCommands();
+
+// Handle input
+function handleCommand(input) {
+  if (!input.startsWith(PREFIX)) return null;
+  const args = input.slice(PREFIX.length).trim().split(/\s+/);
+  const commandName = args.shift().toLowerCase();
+  const text = args.join(" ");
+  return { commandName, args, text };
+}
+
+// Chat API Endpoints
+
+// GET messages
+app.get('/messages', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('chatter')
+      .select('id, content, username, created_at, image_url')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST messages
+app.post('/messages', async (req, res) => {
+  try {
+    const { content, username, image_url } = req.body;
+
+    if ((!content && !image_url) || !username) {
+      return res.status(400).json({ error: "Content or image, and username required" });
+    }
+
+    const { data, error } = await supabase
+      .from('chatter')
+      .insert([{ content, username, image_url }])
+      .select();
+
+    if (error) throw error;
+    res.status(201).json(data[0]);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to save message" });
+  }
+});
+
+// Image upload endpoint
+app.post('/upload', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file provided' });
+    }
+
+    const fileBuffer = req.file.buffer;
+    const fileName = `${Date.now()}-${req.file.originalname}`;
+    const filePath = `images/${fileName}`;
+
+    // Upload to Supabase Storage
+    const { data, error } = await supabase.storage
+      .from('chat-images')
+      .upload(filePath, fileBuffer, {
+        contentType: req.file.mimetype,
+        upsert: false
+      });
+
+    if (error) throw error;
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('chat-images')
+      .getPublicUrl(filePath);
+
+    res.json({ 
+      imageUrl: urlData.publicUrl,
+      message: 'Image uploaded successfully'
+    });
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ error: error.message || 'Failed to upload image' });
+  }
+});
+
+// DELETE messages
+app.delete('/messages/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { error } = await supabase
+      .from('chatter')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    res.status(200).json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete message" });
+  }
+});
+
+// Command API handler
+app.post("/api/command", async (req, res) => {
+  try {
+    const { message } = req.body;
+    if (!message) return res.status(400).json({ reply: "❌ Message is required" });
+
+    if (message.trim().toLowerCase() === "prefix") {
+      return res.json({ reply: `🔹 My command prefix is: \`${PREFIX}\`` });
+    }
+
+    const cmd = handleCommand(message);
+    if (!cmd) return res.end();
+
+    if (cmd.commandName === "ai") {
+      try {
+        const response = await axios.get(
+          `https://yau-ai-runing-station.vercel.app/ai?prompt=${encodeURIComponent(cmd.text)}&cb=${Date.now()}`,
+          { 
+            headers: { 
+              Accept: "application/json",
+              "User-Agent": "GoatBot/1.0"
+            },
+            timeout: 15000,
+            validateStatus: () => true
+          }
+        );
+
+        let responseData;
+        if (typeof response.data === 'string') {
+          try {
+            responseData = JSON.parse(response.data);
+          } catch (e) {
+            if (response.data.includes('error') || response.status !== 200) {
+              throw new Error(response.data || `API returned status ${response.status}`);
+            }
+            return res.json({ reply: response.data });
+          }
+        } else {
+          responseData = response.data;
+        }
+
+        if (responseData.response) {
+          return res.json({ reply: responseData.response });
+        } else if (responseData.message) {
+          return res.json({ reply: responseData.message });
+        } else if (responseData.data) {
+          return res.json({ reply: responseData.data });
+        } else {
+          return res.json({ reply: JSON.stringify(responseData) || "⚠️ No recognizable response format" });
+        }
+      } catch (aiError) {
+        console.error("AI Processing Error:", aiError);
+        return res.status(500).json({ 
+          reply: `❌ AI Error: ${aiError.message.replace(/[\n\r]/g, ' ').substring(0, 200)}` 
+        });
+      }
+    }
+
+    const command = commands[cmd.commandName];
+    if (!command) return res.json({ reply: "❌ Command not found" });
+    if (typeof command.onStart !== "function") {
+      return res.json({ reply: "❌ This command does not support execution" });
+    }
+
+    const replies = [];
+    await command.onStart({
+      api: {
+        sendMessage: (msg) => replies.push(typeof msg === "string" ? msg : JSON.stringify(msg))
+      },
+      event: { body: cmd.text },
+      args: cmd.args,
+      message: {
+        reply: (content) => replies.push(content)
+      }
+    });
+
+    if (!res.headersSent) {
+      res.json({ reply: replies.length === 1 ? replies[0] : replies });
+    }
+  } catch (error) {
+    console.error("Server Error:", error);
+    res.status(500).json({ reply: `❌ Server Error: ${error.message}` });
+  }
+});
+
+// Add endpoint to get online users
+app.get('/online-users', (req, res) => {
+  const onlineUsersArray = Array.from(onlineUsers.keys());
+  console.log('Current online users:', onlineUsersArray);
+  res.json(onlineUsersArray);
+});
+
+// Socket.io connection handling - 3 MINUTE ONLINE STATUS
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+
+  socket.on('user-online', (username) => {
+    if (username) {
+      console.log('User online:', username);
+      
+      // Update or add user to online users
+      onlineUsers.set(username, {
+        socketId: socket.id,
+        username: username,
+        lastSeen: Date.now(),
+        isOnline: true
+      });
+      
+      // Get current online users list
+      const onlineUsersArray = Array.from(onlineUsers.keys());
+      console.log('Updated online users:', onlineUsersArray);
+      
+      // Broadcast to all users that this user is online
+      io.emit('user-status-change', { 
+        username, 
+        status: 'online',
+        onlineUsers: onlineUsersArray
+      });
+    }
+  });
+
+  socket.on('user-away', (username) => {
+    if (username && onlineUsers.has(username)) {
+      console.log('User away:', username);
+      
+      // Update last seen but keep user in list
+      const userData = onlineUsers.get(username);
+      userData.lastSeen = Date.now();
+      userData.isOnline = false;
+      
+      // Broadcast away status
+      io.emit('user-status-change', { 
+        username, 
+        status: 'away',
+        onlineUsers: Array.from(onlineUsers.keys())
+      });
+    }
+  });
+
+  socket.on('user-offline', (username) => {
+    if (username) {
+      console.log('User offline (manual):', username);
+      removeUserFromOnlineList(username);
+    }
+  });
+
+  // Handle disconnect properly
+  socket.on('disconnect', (reason) => {
+    console.log('User disconnected:', socket.id, 'Reason:', reason);
+    
+    // Find user by socket ID but DON'T remove them immediately
+    // They stay in the list for 3 minutes due to the timeout
+    let foundUsername = null;
+    for (let [username, data] of onlineUsers.entries()) {
+      if (data.socketId === socket.id) {
+        foundUsername = username;
+        // Update last seen but keep in list
+        data.lastSeen = Date.now();
+        data.isOnline = false;
+        console.log('User marked as inactive:', username);
+        break;
+      }
+    }
+    
+    // Don't remove from list immediately - let the timeout handle it
+    if (foundUsername) {
+      io.emit('user-status-change', { 
+        username: foundUsername, 
+        status: 'away',
+        onlineUsers: Array.from(onlineUsers.keys())
+      });
+    }
+  });
+  
+  socket.on('typing-start', (data) => {
+    socket.broadcast.emit('user-typing', {
+      username: data.username,
+      isTyping: true
+    });
+  });
+  
+  socket.on('typing-stop', (data) => {
+    socket.broadcast.emit('user-typing', {
+      username: data.username,
+      isTyping: false
+    });
+  });
+
+  // Helper function to remove user from online list
+  function removeUserFromOnlineList(username) {
+    if (onlineUsers.has(username)) {
+      onlineUsers.delete(username);
+      
+      // Get updated online users list
+      const onlineUsersArray = Array.from(onlineUsers.keys());
+      console.log('After removal, online users:', onlineUsersArray);
+      
+      // Broadcast that user went offline
+      io.emit('user-status-change', { 
+        username, 
+        status: 'offline',
+        onlineUsers: onlineUsersArray
+      });
+    }
+  }
+});
+
+// 3 MINUTE CLEANUP - Remove users after 3 minutes of inactivity
+setInterval(() => {
+  const now = Date.now();
+  const removedUsers = [];
+  
+  for (let [username, data] of onlineUsers.entries()) {
+    // 3 minute timeout (180000 milliseconds)
+    if (now - data.lastSeen > onlineStatusTimeout) {
+      console.log('Removing inactive user (3 minutes):', username);
+      onlineUsers.delete(username);
+      removedUsers.push(username);
+    }
+  }
+  
+  // Notify clients about removed users
+  if (removedUsers.length > 0) {
+    const onlineUsersArray = Array.from(onlineUsers.keys());
+    removedUsers.forEach(username => {
+      io.emit('user-status-change', { 
+        username, 
+        status: 'offline',
+        onlineUsers: onlineUsersArray
+      });
+    });
+    console.log('Cleaned up inactive users (3min timeout):', removedUsers);
+    console.log('Current online users after cleanup:', onlineUsersArray);
+  }
+}, 30000); // Check every 30 seconds
+
+// Start server
+server.listen(port, () => {
+  console.log(`🚀 Server running on port ${port}`);
+  console.log(`🔹 Command prefix: "${PREFIX}"`);
+  console.log(`👥 Online users tracking: ACTIVE (3 minute timeout)`);
+  if (isRender && renderExternalUrl) {
+    console.log(`🌐 Render External URL: ${renderExternalUrl}`);
+    console.log(`⏱️ UptimeRobot monitoring URL: ${renderExternalUrl}/health`);
+  }
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received. Shutting down gracefully...');
+  process.exit(0);
+});
+
+process.on('unhandledRejection', (err) => {
+  global.utils.log.err("UNHANDLED REJECTION", err);
+});
+
+process.on('uncaughtException', (err) => {
+  global.utils.log.err("UNCAUGHT EXCEPTION", err);
+});
