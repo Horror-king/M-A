@@ -249,10 +249,41 @@ app.delete('/messages/:id', async (req, res) => {
   }
 });
 
-// Command API handler - MODIFIED TO SUPPORT SOURCE PARAMETER
+// NEW: Function to save AI response to Supabase
+async function saveAIResponseToSupabase(content, originalQuestion) {
+  try {
+    console.log('🔄 Attempting to save AI response to Supabase...');
+    console.log('Content:', content);
+    console.log('Original Question:', originalQuestion);
+    
+    const { data, error } = await supabase
+      .from('chatter')
+      .insert([{ 
+        content: content, 
+        username: 'AI',
+        reply_to: originalQuestion
+      }])
+      .select();
+
+    if (error) {
+      console.error('❌ Supabase insertion error:', error);
+      throw error;
+    }
+    
+    console.log('✅ AI response saved to Supabase:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Error saving AI response to Supabase:', error);
+    throw error;
+  }
+}
+
+// Command API handler - MODIFIED TO FIX SAVING ISSUE
 app.post("/api/command", async (req, res) => {
   try {
-    const { message, source = 'main-chat' } = req.body; // Added source parameter with default
+    const { message, source = 'main-chat' } = req.body;
+    console.log('📨 Received command:', { message, source });
+    
     if (!message) return res.status(400).json({ reply: "❌ Message is required" });
 
     if (message.trim().toLowerCase() === "prefix") {
@@ -264,6 +295,7 @@ app.post("/api/command", async (req, res) => {
 
     if (cmd.commandName === "ai") {
       try {
+        console.log('🤖 Processing AI command:', cmd.text);
         const response = await axios.get(
           `https://yau-ai-runing-station.vercel.app/ai?prompt=${encodeURIComponent(cmd.text)}&cb=${Date.now()}`,
           { 
@@ -277,6 +309,8 @@ app.post("/api/command", async (req, res) => {
         );
 
         let responseData;
+        let aiResponse;
+
         if (typeof response.data === 'string') {
           try {
             responseData = JSON.parse(response.data);
@@ -284,50 +318,43 @@ app.post("/api/command", async (req, res) => {
             if (response.data.includes('error') || response.status !== 200) {
               throw new Error(response.data || `API returned status ${response.status}`);
             }
-            return res.json({ reply: response.data });
+            aiResponse = response.data;
           }
         } else {
           responseData = response.data;
         }
 
-        let aiResponse;
-        if (responseData.response) {
-          aiResponse = responseData.response;
-        } else if (responseData.message) {
-          aiResponse = responseData.message;
-        } else if (responseData.data) {
-          aiResponse = responseData.data;
-        } else {
-          aiResponse = JSON.stringify(responseData) || "⚠️ No recognizable response format";
+        if (!aiResponse) {
+          if (responseData.response) {
+            aiResponse = responseData.response;
+          } else if (responseData.message) {
+            aiResponse = responseData.message;
+          } else if (responseData.data) {
+            aiResponse = responseData.data;
+          } else {
+            aiResponse = JSON.stringify(responseData) || "⚠️ No recognizable response format";
+          }
         }
+
+        console.log('🤖 AI Response received:', aiResponse);
 
         // NEW: Save AI response to Supabase ONLY if source is main-chat
         if (source === 'main-chat') {
+          console.log('💾 Saving AI response to Supabase for main chat...');
           try {
-            const { data, error } = await supabase
-              .from('chatter')
-              .insert([{ 
-                content: aiResponse, 
-                username: 'AI',
-                reply_to: cmd.text // Store the original question as reply_to for context
-              }])
-              .select();
-
-            if (error) {
-              console.error("Error saving AI response to Supabase:", error);
-            } else {
-              console.log("AI response saved to Supabase for main chat");
-            }
-          } catch (dbError) {
-            console.error("Database error when saving AI response:", dbError);
+            await saveAIResponseToSupabase(aiResponse, cmd.text);
+            console.log('✅ AI response successfully saved to Supabase');
+          } catch (saveError) {
+            console.error('❌ Failed to save AI response to Supabase:', saveError);
+            // Don't fail the request if saving fails, just log it
           }
         } else {
-          console.log("AI response NOT saved to Supabase (private chat)");
+          console.log('🚫 AI response NOT saved to Supabase (private chat)');
         }
 
         return res.json({ reply: aiResponse });
       } catch (aiError) {
-        console.error("AI Processing Error:", aiError);
+        console.error("❌ AI Processing Error:", aiError);
         return res.status(500).json({ 
           reply: `❌ AI Error: ${aiError.message.replace(/[\n\r]/g, ' ').substring(0, 200)}` 
         });
@@ -356,7 +383,7 @@ app.post("/api/command", async (req, res) => {
       res.json({ reply: replies.length === 1 ? replies[0] : replies });
     }
   } catch (error) {
-    console.error("Server Error:", error);
+    console.error("❌ Server Error:", error);
     res.status(500).json({ reply: `❌ Server Error: ${error.message}` });
   }
 });
@@ -517,6 +544,7 @@ server.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
   console.log(`🔹 Command prefix: "${PREFIX}"`);
   console.log(`👥 Online users tracking: ACTIVE (3 minute timeout)`);
+  console.log(`💾 AI response saving: ENABLED for main chat`);
   if (isRender && renderExternalUrl) {
     console.log(`🌐 Render External URL: ${renderExternalUrl}`);
     console.log(`⏱️ UptimeRobot monitoring URL: ${renderExternalUrl}/health`);
