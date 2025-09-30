@@ -38,8 +38,8 @@ global.utils = {
 
 // Initialize Supabase
 const supabase = createClient(
-  'https://tgcovkjghbqyoenxzjyp.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnY292a2pnaGJxeW9lbnh6anlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg0ODM5NTUsImV4cCI6MjA3NDA1OTk1NX0.yKr6C9QMdTyXzxCIK-D5k-kJI3NeJoJjuIEiABFtAr8',
+  'https://rqissetffrnkfzfgsngm.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxaXNzZXRmZnJua2Z6ZmdzbmdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNzU2NzIsImV4cCI6MjA3NDc1MTY3Mn0.6tCuI4yhn3EXlua9na4kkgMqX6PL00GxjEuY0QG2bTg',
 );
 
 // Configure multer for file uploads
@@ -259,20 +259,29 @@ app.delete('/messages/:id', async (req, res) => {
   }
 });
 
-// NEW: Function to save AI response to Supabase - UPDATED FOR YOUR SCHEMA
+// FIXED: Function to save AI response to Supabase - CORRECTED FOR TEXT TYPE
 async function saveAIResponseToSupabase(content, originalQuestion) {
   try {
     console.log('🔄 Attempting to save AI response to Supabase...');
     console.log('Content:', content);
     console.log('Original Question:', originalQuestion);
     
+    // Prepare insert data - CORRECTED: reply_to is TEXT type in your schema
+    const insertData = {
+      content: content, 
+      username: 'AI'
+    };
+    
+    // Only add reply_to if we have an original question
+    if (originalQuestion && originalQuestion.trim() !== '') {
+      insertData.reply_to = originalQuestion; // This is TEXT, not array
+    }
+    
+    console.log('📝 Insert data:', insertData);
+    
     const { data, error } = await supabase
       .from('chatter')
-      .insert([{ 
-        content: content, 
-        username: 'AI',
-        reply_to: originalQuestion
-      }])
+      .insert([insertData])
       .select();
 
     if (error) {
@@ -411,7 +420,7 @@ app.get('/debug-ai', async (req, res) => {
 
     console.log('🤖 AI Response received:', aiResponse);
 
-    // Try to save the AI response
+    // Try to save the AI response using the FIXED function
     console.log('💾 Attempting to save AI response...');
     const savedData = await saveAIResponseToSupabase(aiResponse, 'hello world');
 
@@ -435,7 +444,7 @@ app.get('/debug-ai', async (req, res) => {
   }
 });
 
-// Command API handler - COMPLETELY REWRITTEN TO FIX AI SAVING
+// Command API handler - FIXED AI SAVING
 app.post("/api/command", async (req, res) => {
   try {
     const { message, source = 'main-chat' } = req.body;
@@ -501,8 +510,7 @@ app.post("/api/command", async (req, res) => {
 
         console.log('🤖 AI Response received:', aiResponse.substring(0, 200) + '...');
 
-        // CRITICAL FIX: Save AI response to Supabase ONLY if source is main-chat
-        // This is the key part that was likely failing
+        // FIXED: Save AI response to Supabase ONLY if source is main-chat
         if (source === 'main-chat') {
           console.log('💾 ✅ Source is main-chat - SAVING AI response to Supabase...');
           try {
