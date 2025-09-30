@@ -38,8 +38,8 @@ global.utils = {
 
 // Initialize Supabase
 const supabase = createClient(
-  'https://rqissetffrnkfzfgsngm.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxaXNzZXRmZnJua2Z6ZmdzbmdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNzU2NzIsImV4cCI6MjA3NDc1MTY3Mn0.6tCuI4yhn3EXlua9na4kkgMqX6PL00GxjEuY0QG2bTg',
+  'https://tgcovkjghbqyoenxzjyp.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnY292a2pnaGJxeW9lbnh6anlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg0ODM5NTUsImV4cCI6MjA3NDA1OTk1NX0.yKr6C9QMdTyXzxCIK-D5k-kJI3NeJoJjuIEiABFtAr8',
 );
 
 // Configure multer for file uploads
@@ -176,7 +176,7 @@ app.get('/messages', async (req, res) => {
   }
 });
 
-// POST messages - UPDATED TO MATCH YOUR TABLE STRUCTURE
+// POST messages - FIXED: Explicitly set image_url to null if not provided
 app.post('/messages', async (req, res) => {
   try {
     const { content, username, image_url, reply_to } = req.body;
@@ -185,14 +185,19 @@ app.post('/messages', async (req, res) => {
       return res.status(400).json({ error: "Content or image, and username required" });
     }
 
+    // FIXED: Ensure all required columns are provided
+    const insertData = {
+      content: content || null,
+      username: username,
+      image_url: image_url || null, // Explicitly set to null if not provided
+      reply_to: reply_to || null
+    };
+
+    console.log('📝 Inserting message:', insertData);
+
     const { data, error } = await supabase
       .from('chatter')
-      .insert([{ 
-        content, 
-        username, 
-        image_url,
-        reply_to 
-      }])
+      .insert([insertData])
       .select();
 
     if (error) {
@@ -259,23 +264,20 @@ app.delete('/messages/:id', async (req, res) => {
   }
 });
 
-// FIXED: Function to save AI response to Supabase - CORRECTED FOR TEXT TYPE
+// FIXED: Function to save AI response to Supabase - HANDLES ALL COLUMNS
 async function saveAIResponseToSupabase(content, originalQuestion) {
   try {
     console.log('🔄 Attempting to save AI response to Supabase...');
     console.log('Content:', content);
     console.log('Original Question:', originalQuestion);
     
-    // Prepare insert data - CORRECTED: reply_to is TEXT type in your schema
+    // FIXED: Explicitly set all required columns
     const insertData = {
       content: content, 
-      username: 'AI'
+      username: 'AI',
+      image_url: null, // Explicitly set image_url to null
+      reply_to: originalQuestion || null
     };
-    
-    // Only add reply_to if we have an original question
-    if (originalQuestion && originalQuestion.trim() !== '') {
-      insertData.reply_to = originalQuestion; // This is TEXT, not array
-    }
     
     console.log('📝 Insert data:', insertData);
     
@@ -287,6 +289,26 @@ async function saveAIResponseToSupabase(content, originalQuestion) {
     if (error) {
       console.error('❌ Supabase insertion error:', error);
       console.error('❌ Error details:', JSON.stringify(error, null, 2));
+      
+      // If there's a column mismatch, try a more basic insert
+      if (error.message.includes('column') || error.message.includes('null value')) {
+        console.log('🔄 Retrying with minimal columns...');
+        const minimalData = {
+          content: content,
+          username: 'AI'
+        };
+        
+        const { data: retryData, error: retryError } = await supabase
+          .from('chatter')
+          .insert([minimalData])
+          .select();
+          
+        if (retryError) {
+          throw retryError;
+        }
+        console.log('✅ AI response saved to Supabase (minimal columns). ID:', retryData[0]?.id);
+        return retryData;
+      }
       throw error;
     }
     
@@ -319,10 +341,11 @@ app.get('/test-supabase', async (req, res) => {
       });
     }
 
-    // Test 2: Try to insert a test message
+    // Test 2: Try to insert a test message with explicit nulls
     const testData = {
       content: 'Test message from server GET endpoint',
       username: 'TestBot',
+      image_url: null,
       reply_to: 'Test question from GET'
     };
     
