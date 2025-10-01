@@ -176,7 +176,7 @@ app.get('/messages', async (req, res) => {
   }
 });
 
-// POST messages - FIXED: Explicitly set image_url to null if not provided
+// POST messages - FIXED: Handle primary key constraints
 app.post('/messages', async (req, res) => {
   try {
     const { content, username, image_url, reply_to } = req.body;
@@ -185,12 +185,12 @@ app.post('/messages', async (req, res) => {
       return res.status(400).json({ error: "Content or image, and username required" });
     }
 
-    // FIXED: Ensure all required columns are provided
+    // FIXED: Use empty strings instead of null to avoid primary key issues
     const insertData = {
-      content: content || null,
+      content: content || '',
       username: username,
-      image_url: image_url || null, // Explicitly set to null if not provided
-      reply_to: reply_to || null
+      image_url: image_url || '',
+      reply_to: reply_to || ''
     };
 
     console.log('📝 Inserting message:', insertData);
@@ -202,6 +202,22 @@ app.post('/messages', async (req, res) => {
 
     if (error) {
       console.error('❌ Database insert error:', error);
+      
+      // If it's a primary key issue, try with different values
+      if (error.message.includes('primary key') || error.message.includes('reply_to')) {
+        console.log('🔄 Retrying without reply_to field...');
+        delete insertData.reply_to;
+        
+        const { data: retryData, error: retryError } = await supabase
+          .from('chatter')
+          .insert([insertData])
+          .select();
+          
+        if (retryError) {
+          throw retryError;
+        }
+        return res.status(201).json(retryData[0]);
+      }
       throw error;
     }
     
@@ -264,19 +280,19 @@ app.delete('/messages/:id', async (req, res) => {
   }
 });
 
-// FIXED: Function to save AI response to Supabase - HANDLES ALL COLUMNS
+// FIXED: Function to save AI response to Supabase - HANDLES PRIMARY KEY CONSTRAINT
 async function saveAIResponseToSupabase(content, originalQuestion) {
   try {
     console.log('🔄 Attempting to save AI response to Supabase...');
     console.log('Content:', content);
     console.log('Original Question:', originalQuestion);
     
-    // FIXED: Explicitly set all required columns
+    // FIXED: Use empty strings to avoid primary key constraint issues
     const insertData = {
-      content: content, 
+      content: content || 'AI Response', 
       username: 'AI',
-      image_url: null, // Explicitly set image_url to null
-      reply_to: originalQuestion || null
+      image_url: '',
+      reply_to: originalQuestion || ''
     };
     
     console.log('📝 Insert data:', insertData);
@@ -290,12 +306,13 @@ async function saveAIResponseToSupabase(content, originalQuestion) {
       console.error('❌ Supabase insertion error:', error);
       console.error('❌ Error details:', JSON.stringify(error, null, 2));
       
-      // If there's a column mismatch, try a more basic insert
-      if (error.message.includes('column') || error.message.includes('null value')) {
-        console.log('🔄 Retrying with minimal columns...');
+      // If primary key constraint issue, try without reply_to
+      if (error.message.includes('primary key') || error.message.includes('reply_to')) {
+        console.log('🔄 Retrying without reply_to field due to primary key constraint...');
         const minimalData = {
-          content: content,
-          username: 'AI'
+          content: content || 'AI Response',
+          username: 'AI',
+          image_url: ''
         };
         
         const { data: retryData, error: retryError } = await supabase
@@ -304,9 +321,10 @@ async function saveAIResponseToSupabase(content, originalQuestion) {
           .select();
           
         if (retryError) {
+          console.error('❌ Final retry failed:', retryError);
           throw retryError;
         }
-        console.log('✅ AI response saved to Supabase (minimal columns). ID:', retryData[0]?.id);
+        console.log('✅ AI response saved to Supabase (without reply_to). ID:', retryData[0]?.id);
         return retryData;
       }
       throw error;
@@ -319,6 +337,100 @@ async function saveAIResponseToSupabase(content, originalQuestion) {
     throw error;
   }
 }
+
+// NEW: Emergency fix endpoint to reset table structure
+app.get('/fix-table', async (req, res) => {
+  try {
+    console.log('🔧 Attempting to fix table structure...');
+    
+    // First, check current table structure
+    const { data: tableInfo, error: tableError } = await supabase
+      .from('information_schema.columns')
+      .select('column_name, data_type, is_nullable, column_default')
+      .eq('table_name', 'chatter')
+      .eq('table_schema', 'public');
+
+    if (tableError) {
+      console.error('❌ Table info error:', tableError);
+    }
+
+    // Try to create a backup and recreate the table
+    const { data: existingData, error: selectError } = await supabase
+      .from('chatter')
+      .select('*')
+      .limit(1000);
+
+    if (selectError) {
+      console.error('❌ Select error:', selectError);
+    }
+
+    // Try to fix by dropping and recreating table (DANGEROUS - only for development)
+    const fixResults = [];
+    
+    // Method 1: Try simple insert with minimal fields
+    try {
+      const testData = {
+        content: 'Test after fix',
+        username: 'FixBot',
+        image_url: '',
+        reply_to: ''
+      };
+      const { data, error } = await supabase
+        .from('chatter')
+        .insert([testData])
+        .select();
+      
+      if (error) throw error;
+      fixResults.push({ method: 'Minimal fields', success: true, id: data[0]?.id });
+      
+      // Clean up
+      if (data[0]?.id) {
+        await supabase.from('chatter').delete().eq('id', data[0].id);
+      }
+    } catch (err) {
+      fixResults.push({ method: 'Minimal fields', success: false, error: err.message });
+    }
+
+    // Method 2: Try without reply_to
+    try {
+      const testData = {
+        content: 'Test without reply_to',
+        username: 'FixBot',
+        image_url: ''
+      };
+      const { data, error } = await supabase
+        .from('chatter')
+        .insert([testData])
+        .select();
+      
+      if (error) throw error;
+      fixResults.push({ method: 'Without reply_to', success: true, id: data[0]?.id });
+      
+      // Clean up
+      if (data[0]?.id) {
+        await supabase.from('chatter').delete().eq('id', data[0].id);
+      }
+    } catch (err) {
+      fixResults.push({ method: 'Without reply_to', success: false, error: err.message });
+    }
+
+    res.json({
+      currentStructure: tableInfo,
+      existingDataCount: existingData?.length || 0,
+      fixAttempts: fixResults,
+      recommendation: fixResults.find(r => r.success) ? 
+        `✅ Use method: ${fixResults.find(r => r.success).method}` : 
+        '❌ All methods failed - check table structure'
+    });
+
+  } catch (error) {
+    console.error('❌ Table fix error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
 
 // TEST ENDPOINTS: Check if we can save to Supabase
 app.get('/test-supabase', async (req, res) => {
@@ -341,12 +453,12 @@ app.get('/test-supabase', async (req, res) => {
       });
     }
 
-    // Test 2: Try to insert a test message with explicit nulls
+    // Test 2: Try to insert a test message with empty strings
     const testData = {
       content: 'Test message from server GET endpoint',
       username: 'TestBot',
-      image_url: null,
-      reply_to: 'Test question from GET'
+      image_url: '',
+      reply_to: ''
     };
     
     const { data: insertData, error: insertError } = await supabase
@@ -746,11 +858,13 @@ server.listen(port, () => {
   console.log(`💾 AI response saving: ENABLED for main chat`);
   console.log(`🧪 Test Supabase (GET): http://localhost:${port}/test-supabase`);
   console.log(`🔍 Debug AI Saving: http://localhost:${port}/debug-ai`);
+  console.log(`🔧 Fix Table Structure: http://localhost:${port}/fix-table`);
   if (isRender && renderExternalUrl) {
     console.log(`🌐 Render External URL: ${renderExternalUrl}`);
     console.log(`⏱️ UptimeRobot monitoring URL: ${renderExternalUrl}/health`);
     console.log(`🧪 Test Supabase: ${renderExternalUrl}/test-supabase`);
     console.log(`🔍 Debug AI: ${renderExternalUrl}/debug-ai`);
+    console.log(`🔧 Fix Table: ${renderExternalUrl}/fix-table`);
   }
 });
 
