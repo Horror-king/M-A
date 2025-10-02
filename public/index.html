@@ -229,10 +229,9 @@ html, body {
 }
 
 /* FIXED: Chat messages container with proper scrolling and padding */
-/* FIXED: Chat messages container with PROPERLY REDUCED padding */
 .chat-messages, #private-ai-container {
     flex: 1;
-    padding: 5px 10px !important; /* FORCE reduced padding */
+    padding: 5px 15px;
     overflow-y: auto;
     height: 100%;
     display: flex;
@@ -241,18 +240,18 @@ html, body {
     background-color: white;
     position: relative;
     margin-top: 0;
-    font-size: 15px; /* Slightly smaller font */
+    font-size: 16px;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
     touch-action: auto;
-    gap: 0px !important; /* Remove gap completely */
+    gap: 2px;
     box-sizing: border-box;
-    /* FORCE reduced bottom padding */
-    padding-bottom: 90px !important; 
-    margin-bottom: 50px !important;
+    /* FIXED: Much larger bottom padding to ensure messages are visible above input */
+    padding-bottom: 125px; /* Increased significantly from 120px */
+    /* FIXED: Add margin at the bottom to create space for the input */
+    margin-bottom: 65px;
 }
-
-/* FORCE reduced container padding */
+ /* FIXED: Ensure the chat container itself has proper spacing */
 .chat-container {
     flex: 1;
     display: flex;
@@ -261,7 +260,8 @@ html, body {
     background-color: white;
     overflow: hidden;
     position: relative;
-    padding-bottom: 90px !important;
+    /* FIXED: Add padding at the bottom of the container */
+    padding-bottom: 65px;
 }
 
 #private-ai {
@@ -272,7 +272,8 @@ html, body {
     background-color: white;
     overflow: hidden;
     position: relative;
-    padding-bottom: 80px !important;
+    /* FIXED: Add padding at the bottom of the container */
+    padding-bottom: 45px;
 }
         
 /* Improved message styling with better avatar alignment */
@@ -1105,7 +1106,7 @@ html, body {
     
     /* FIXED: Increased padding for mobile to ensure messages are visible */
     .chat-messages, #private-ai-container {
-        padding-bottom: 123px; /* Even more padding for mobile */
+        padding-bottom: 125px; /* Even more padding for mobile */
         margin-bottom: 63px; /* More margin for mobile */
     }
     
