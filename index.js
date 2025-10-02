@@ -176,24 +176,31 @@ app.get('/messages', async (req, res) => {
   }
 });
 
-// POST messages - FIXED: Handle primary key constraints
+// POST messages - FIXED: Proper handling for regular messages
 app.post('/messages', async (req, res) => {
   try {
     const { content, username, image_url, reply_to } = req.body;
 
-    if ((!content && !image_url) || !username) {
-      return res.status(400).json({ error: "Content or image, and username required" });
+    console.log('📨 Received message:', { content, username, image_url, reply_to });
+
+    // FIXED: Better validation - allow empty content if there's an image
+    if ((!content || content.trim() === '') && !image_url) {
+      return res.status(400).json({ error: "Content or image is required" });
     }
 
-    // FIXED: Use empty strings instead of null to avoid primary key issues
+    if (!username || username.trim() === '') {
+      return res.status(400).json({ error: "Username is required" });
+    }
+
+    // FIXED: Proper data preparation for regular messages
     const insertData = {
-      content: content || '',
-      username: username,
+      content: (content && content.trim() !== '') ? content.trim() : '',
+      username: username.trim(),
       image_url: image_url || '',
       reply_to: reply_to || ''
     };
 
-    console.log('📝 Inserting message:', insertData);
+    console.log('📝 Inserting message to Supabase:', insertData);
 
     const { data, error } = await supabase
       .from('chatter')
@@ -203,28 +210,39 @@ app.post('/messages', async (req, res) => {
     if (error) {
       console.error('❌ Database insert error:', error);
       
-      // If it's a primary key issue, try with different values
-      if (error.message.includes('primary key') || error.message.includes('reply_to')) {
-        console.log('🔄 Retrying without reply_to field...');
-        delete insertData.reply_to;
+      // If there's still an issue, try minimal insert
+      if (error.message.includes('null value') || error.message.includes('primary key')) {
+        console.log('🔄 Retrying with minimal fields...');
+        const minimalData = {
+          content: (content && content.trim() !== '') ? content.trim() : 'Message',
+          username: username.trim()
+        };
         
         const { data: retryData, error: retryError } = await supabase
           .from('chatter')
-          .insert([insertData])
+          .insert([minimalData])
           .select();
           
         if (retryError) {
           throw retryError;
         }
+        console.log('✅ Message saved with minimal fields. ID:', retryData[0]?.id);
+        
+        // Broadcast new message via Socket.io
+        io.emit('new-message', retryData[0]);
         return res.status(201).json(retryData[0]);
       }
       throw error;
     }
     
+    console.log('✅ Message saved successfully. ID:', data[0]?.id);
+    
+    // Broadcast new message via Socket.io
+    io.emit('new-message', data[0]);
     res.status(201).json(data[0]);
   } catch (error) {
     console.error('❌ Failed to save message:', error);
-    res.status(500).json({ error: "Failed to save message" });
+    res.status(500).json({ error: "Failed to save message: " + error.message });
   }
 });
 
@@ -274,25 +292,28 @@ app.delete('/messages/:id', async (req, res) => {
       .eq('id', id);
 
     if (error) throw error;
+    
+    // Broadcast deletion via Socket.io
+    io.emit('message-deleted', id);
     res.status(200).json({ success: true });
   } catch (error) {
     res.status(500).json({ error: "Failed to delete message" });
   }
 });
 
-// FIXED: Function to save AI response to Supabase - HANDLES PRIMARY KEY CONSTRAINT
-async function saveAIResponseToSupabase(content, originalQuestion) {
+// FIXED: Function to save ANY bot response to Supabase
+async function saveBotResponseToSupabase(content, originalCommand, commandType = 'AI') {
   try {
-    console.log('🔄 Attempting to save AI response to Supabase...');
+    console.log(`🔄 Attempting to save ${commandType} response to Supabase...`);
     console.log('Content:', content);
-    console.log('Original Question:', originalQuestion);
+    console.log('Original Command:', originalCommand);
     
-    // FIXED: Use empty strings to avoid primary key constraint issues
+    // FIXED: Use proper values for all fields
     const insertData = {
-      content: content || 'AI Response', 
-      username: 'AI',
+      content: content || `${commandType} Response`, 
+      username: commandType === 'AI' ? 'AI' : 'Bot',
       image_url: '',
-      reply_to: originalQuestion || ''
+      reply_to: originalCommand || ''
     };
     
     console.log('📝 Insert data:', insertData);
@@ -306,13 +327,12 @@ async function saveAIResponseToSupabase(content, originalQuestion) {
       console.error('❌ Supabase insertion error:', error);
       console.error('❌ Error details:', JSON.stringify(error, null, 2));
       
-      // If primary key constraint issue, try without reply_to
-      if (error.message.includes('primary key') || error.message.includes('reply_to')) {
-        console.log('🔄 Retrying without reply_to field due to primary key constraint...');
+      // If there's an issue, try minimal insert
+      if (error.message.includes('null value') || error.message.includes('primary key')) {
+        console.log('🔄 Retrying with minimal fields...');
         const minimalData = {
-          content: content || 'AI Response',
-          username: 'AI',
-          image_url: ''
+          content: content || `${commandType} Response`,
+          username: commandType === 'AI' ? 'AI' : 'Bot'
         };
         
         const { data: retryData, error: retryError } = await supabase
@@ -321,116 +341,27 @@ async function saveAIResponseToSupabase(content, originalQuestion) {
           .select();
           
         if (retryError) {
-          console.error('❌ Final retry failed:', retryError);
           throw retryError;
         }
-        console.log('✅ AI response saved to Supabase (without reply_to). ID:', retryData[0]?.id);
+        console.log(`✅ ${commandType} response saved to Supabase (minimal fields). ID:`, retryData[0]?.id);
+        
+        // Broadcast bot response via Socket.io
+        io.emit('new-message', retryData[0]);
         return retryData;
       }
       throw error;
     }
     
-    console.log('✅ AI response saved to Supabase. ID:', data[0]?.id);
+    console.log(`✅ ${commandType} response saved to Supabase. ID:`, data[0]?.id);
+    
+    // Broadcast bot response via Socket.io
+    io.emit('new-message', data[0]);
     return data;
   } catch (error) {
-    console.error('❌ Error saving AI response to Supabase:', error);
+    console.error(`❌ Error saving ${commandType} response to Supabase:`, error);
     throw error;
   }
 }
-
-// NEW: Emergency fix endpoint to reset table structure
-app.get('/fix-table', async (req, res) => {
-  try {
-    console.log('🔧 Attempting to fix table structure...');
-    
-    // First, check current table structure
-    const { data: tableInfo, error: tableError } = await supabase
-      .from('information_schema.columns')
-      .select('column_name, data_type, is_nullable, column_default')
-      .eq('table_name', 'chatter')
-      .eq('table_schema', 'public');
-
-    if (tableError) {
-      console.error('❌ Table info error:', tableError);
-    }
-
-    // Try to create a backup and recreate the table
-    const { data: existingData, error: selectError } = await supabase
-      .from('chatter')
-      .select('*')
-      .limit(1000);
-
-    if (selectError) {
-      console.error('❌ Select error:', selectError);
-    }
-
-    // Try to fix by dropping and recreating table (DANGEROUS - only for development)
-    const fixResults = [];
-    
-    // Method 1: Try simple insert with minimal fields
-    try {
-      const testData = {
-        content: 'Test after fix',
-        username: 'FixBot',
-        image_url: '',
-        reply_to: ''
-      };
-      const { data, error } = await supabase
-        .from('chatter')
-        .insert([testData])
-        .select();
-      
-      if (error) throw error;
-      fixResults.push({ method: 'Minimal fields', success: true, id: data[0]?.id });
-      
-      // Clean up
-      if (data[0]?.id) {
-        await supabase.from('chatter').delete().eq('id', data[0].id);
-      }
-    } catch (err) {
-      fixResults.push({ method: 'Minimal fields', success: false, error: err.message });
-    }
-
-    // Method 2: Try without reply_to
-    try {
-      const testData = {
-        content: 'Test without reply_to',
-        username: 'FixBot',
-        image_url: ''
-      };
-      const { data, error } = await supabase
-        .from('chatter')
-        .insert([testData])
-        .select();
-      
-      if (error) throw error;
-      fixResults.push({ method: 'Without reply_to', success: true, id: data[0]?.id });
-      
-      // Clean up
-      if (data[0]?.id) {
-        await supabase.from('chatter').delete().eq('id', data[0].id);
-      }
-    } catch (err) {
-      fixResults.push({ method: 'Without reply_to', success: false, error: err.message });
-    }
-
-    res.json({
-      currentStructure: tableInfo,
-      existingDataCount: existingData?.length || 0,
-      fixAttempts: fixResults,
-      recommendation: fixResults.find(r => r.success) ? 
-        `✅ Use method: ${fixResults.find(r => r.success).method}` : 
-        '❌ All methods failed - check table structure'
-    });
-
-  } catch (error) {
-    console.error('❌ Table fix error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
-    });
-  }
-});
 
 // TEST ENDPOINTS: Check if we can save to Supabase
 app.get('/test-supabase', async (req, res) => {
@@ -453,9 +384,9 @@ app.get('/test-supabase', async (req, res) => {
       });
     }
 
-    // Test 2: Try to insert a test message with empty strings
+    // Test 2: Try to insert a regular message
     const testData = {
-      content: 'Test message from server GET endpoint',
+      content: 'Test regular message from server',
       username: 'TestBot',
       image_url: '',
       reply_to: ''
@@ -502,76 +433,58 @@ app.get('/test-supabase', async (req, res) => {
   }
 });
 
-// DEBUG: Check what's happening with AI commands
-app.get('/debug-ai', async (req, res) => {
+// DEBUG: Check what's happening with ALL commands
+app.get('/debug-all-commands', async (req, res) => {
   try {
-    console.log('🔍 Debugging AI message saving...');
+    console.log('🔍 Debugging ALL command responses...');
     
-    // Simulate an AI command from main chat
-    const testAICommand = {
-      message: '!ai hello world',
-      source: 'main-chat'
-    };
+    // Test different commands
+    const testCommands = [
+      { message: '!help', source: 'main-chat' },
+      { message: '!ping', source: 'main-chat' },
+      { message: '!ai hello world', source: 'main-chat' }
+    ];
 
-    console.log('🧪 Testing AI command simulation:', testAICommand);
+    const results = [];
 
-    // Manually call the AI processing logic
-    const response = await axios.get(
-      `https://yau-ai-runing-station.vercel.app/ai?prompt=${encodeURIComponent('hello world')}&cb=${Date.now()}`,
-      { 
-        headers: { 
-          Accept: "application/json",
-          "User-Agent": "GoatBot/1.0"
-        },
-        timeout: 15000,
-        validateStatus: () => true
-      }
-    );
-
-    let responseData;
-    let aiResponse;
-
-    if (typeof response.data === 'string') {
+    for (const testCmd of testCommands) {
       try {
-        responseData = JSON.parse(response.data);
-      } catch (e) {
-        aiResponse = response.data;
+        console.log(`🧪 Testing command: ${testCmd.message}`);
+        
+        const response = await axios.post('http://localhost:3000/api/command', testCmd, {
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        results.push({
+          command: testCmd.message,
+          success: true,
+          response: response.data.reply || response.data
+        });
+      } catch (error) {
+        results.push({
+          command: testCmd.message,
+          success: false,
+          error: error.message
+        });
       }
-    } else {
-      responseData = response.data;
     }
 
-    if (!aiResponse) {
-      if (responseData.response) {
-        aiResponse = responseData.response;
-      } else if (responseData.message) {
-        aiResponse = responseData.message;
-      } else if (responseData.data) {
-        aiResponse = responseData.data;
-      } else {
-        aiResponse = JSON.stringify(responseData) || "⚠️ No recognizable response format";
-      }
-    }
-
-    console.log('🤖 AI Response received:', aiResponse);
-
-    // Try to save the AI response using the FIXED function
-    console.log('💾 Attempting to save AI response...');
-    const savedData = await saveAIResponseToSupabase(aiResponse, 'hello world');
+    // Check what got saved to database
+    const { data: savedMessages } = await supabase
+      .from('chatter')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(10);
 
     res.json({
       success: true,
-      test: {
-        aiCommand: testAICommand,
-        aiResponse: aiResponse,
-        savedToSupabase: !!savedData,
-        savedData: savedData
-      },
-      message: 'AI debug test completed'
+      commandTests: results,
+      savedMessages: savedMessages,
+      message: 'All command debug test completed'
     });
 
   } catch (error) {
-    console.error('❌ AI debug error:', error);
+    console.error('❌ All commands debug error:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -579,7 +492,57 @@ app.get('/debug-ai', async (req, res) => {
   }
 });
 
-// Command API handler - FIXED AI SAVING
+// NEW: Test regular message endpoint
+app.post('/test-message', async (req, res) => {
+  try {
+    const { content, username } = req.body;
+    
+    console.log('🧪 Testing regular message:', { content, username });
+
+    if (!content || !username) {
+      return res.status(400).json({ error: "Content and username required" });
+    }
+
+    const testData = {
+      content: content,
+      username: username,
+      image_url: '',
+      reply_to: ''
+    };
+
+    const { data, error } = await supabase
+      .from('chatter')
+      .insert([testData])
+      .select();
+
+    if (error) {
+      console.error('❌ Test message failed:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: error.message 
+      });
+    }
+
+    console.log('✅ Test message saved:', data[0]);
+    
+    // Broadcast via Socket.io
+    io.emit('new-message', data[0]);
+    res.json({ 
+      success: true, 
+      message: 'Test message saved successfully',
+      data: data[0]
+    });
+
+  } catch (error) {
+    console.error('❌ Test message error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Command API handler - FIXED: Saves ALL command responses
 app.post("/api/command", async (req, res) => {
   try {
     const { message, source = 'main-chat' } = req.body;
@@ -588,7 +551,19 @@ app.post("/api/command", async (req, res) => {
     if (!message) return res.status(400).json({ reply: "❌ Message is required" });
 
     if (message.trim().toLowerCase() === "prefix") {
-      return res.json({ reply: `🔹 My command prefix is: \`${PREFIX}\`` });
+      const reply = `🔹 My command prefix is: \`${PREFIX}\``;
+      
+      // ✅ SAVE ALL COMMAND RESPONSES: Save prefix command response
+      if (source === 'main-chat') {
+        console.log('💾 ✅ Saving prefix command response to Supabase...');
+        try {
+          await saveBotResponseToSupabase(reply, 'prefix', 'Bot');
+        } catch (saveError) {
+          console.error('❌ Failed to save prefix response:', saveError);
+        }
+      }
+      
+      return res.json({ reply });
     }
 
     const cmd = handleCommand(message);
@@ -645,37 +620,66 @@ app.post("/api/command", async (req, res) => {
 
         console.log('🤖 AI Response received:', aiResponse.substring(0, 200) + '...');
 
-        // FIXED: Save AI response to Supabase ONLY if source is main-chat
+        // ✅ SAVE ALL COMMAND RESPONSES: Save AI response
         if (source === 'main-chat') {
-          console.log('💾 ✅ Source is main-chat - SAVING AI response to Supabase...');
+          console.log('💾 ✅ Saving AI response to Supabase...');
           try {
-            const savedData = await saveAIResponseToSupabase(aiResponse, cmd.text);
-            if (savedData && savedData[0]) {
-              console.log('🎉 SUCCESS: AI response saved to Supabase with ID:', savedData[0].id);
-            } else {
-              console.log('⚠️ WARNING: AI response saved but no data returned');
-            }
+            await saveBotResponseToSupabase(aiResponse, cmd.text, 'AI');
           } catch (saveError) {
-            console.error('❌ FAILED to save AI response to Supabase:', saveError);
-            // Don't fail the request if saving fails, just log it
+            console.error('❌ Failed to save AI response:', saveError);
           }
-        } else {
-          console.log('🚫 SKIPPING: AI response NOT saved to Supabase (source is private chat)');
         }
 
         return res.json({ reply: aiResponse });
       } catch (aiError) {
         console.error("❌ AI Processing Error:", aiError);
-        return res.status(500).json({ 
-          reply: `❌ AI Error: ${aiError.message.replace(/[\n\r]/g, ' ').substring(0, 200)}` 
-        });
+        const errorReply = `❌ AI Error: ${aiError.message.replace(/[\n\r]/g, ' ').substring(0, 200)}`;
+        
+        // ✅ SAVE ALL COMMAND RESPONSES: Save AI error response too!
+        if (source === 'main-chat') {
+          console.log('💾 ✅ Saving AI error response to Supabase...');
+          try {
+            await saveBotResponseToSupabase(errorReply, cmd.text, 'AI');
+          } catch (saveError) {
+            console.error('❌ Failed to save AI error response:', saveError);
+          }
+        }
+        
+        return res.status(500).json({ reply: errorReply });
       }
     }
 
     const command = commands[cmd.commandName];
-    if (!command) return res.json({ reply: "❌ Command not found" });
+    if (!command) {
+      const notFoundReply = "❌ Command not found";
+      
+      // ✅ SAVE ALL COMMAND RESPONSES: Save "command not found" response
+      if (source === 'main-chat') {
+        console.log('💾 ✅ Saving "command not found" response to Supabase...');
+        try {
+          await saveBotResponseToSupabase(notFoundReply, cmd.commandName, 'Bot');
+        } catch (saveError) {
+          console.error('❌ Failed to save command not found response:', saveError);
+        }
+      }
+      
+      return res.json({ reply: notFoundReply });
+    }
+    
     if (typeof command.onStart !== "function") {
-      return res.json({ reply: "❌ This command does not support execution" });
+      const noSupportReply = "❌ This command does not support execution";
+      
+      // ✅ SAVE ALL COMMAND RESPONSES: Save "no support" response
+      if (source === 'main-chat') {
+        console.log('💾 ✅ Saving "no support" response to Supabase...');
+        try {
+          await saveBotResponseToSupabase(noSupportReply, cmd.commandName, 'Bot');
+        } catch (saveError) {
+          console.error('❌ Failed to save no support response:', saveError);
+        }
+      }
+      
+      return res.json({ reply: noSupportReply });
     }
 
     const replies = [];
@@ -690,12 +694,39 @@ app.post("/api/command", async (req, res) => {
       }
     });
 
+    // ✅ SAVE ALL COMMAND RESPONSES: Save ALL command responses
+    if (source === 'main-chat' && replies.length > 0) {
+      console.log('💾 ✅ Saving command response to Supabase...');
+      try {
+        // Save each reply as a separate message
+        for (const reply of replies) {
+          if (reply && reply.trim() !== '') {
+            await saveBotResponseToSupabase(reply, cmd.commandName, 'Bot');
+          }
+        }
+      } catch (saveError) {
+        console.error('❌ Failed to save command response:', saveError);
+      }
+    }
+
     if (!res.headersSent) {
       res.json({ reply: replies.length === 1 ? replies[0] : replies });
     }
   } catch (error) {
     console.error("❌ Server Error:", error);
-    res.status(500).json({ reply: `❌ Server Error: ${error.message}` });
+    const errorReply = `❌ Server Error: ${error.message}`;
+    
+    // ✅ SAVE ALL COMMAND RESPONSES: Even save error responses!
+    if (source === 'main-chat') {
+      console.log('💾 ✅ Saving server error response to Supabase...');
+      try {
+        await saveBotResponseToSupabase(errorReply, 'unknown', 'Bot');
+      } catch (saveError) {
+        console.error('❌ Failed to save server error response:', saveError);
+      }
+    }
+    
+    res.status(500).json({ reply: errorReply });
   }
 });
 
@@ -788,6 +819,52 @@ io.on('connection', (socket) => {
     }
   });
   
+  // Listen for new messages from clients
+  socket.on('send-message', async (data) => {
+    try {
+      console.log('💬 Received message via socket:', data);
+      
+      const { content, username, image_url } = data;
+      
+      if ((!content || content.trim() === '') && !image_url) {
+        socket.emit('message-error', 'Content or image is required');
+        return;
+      }
+
+      if (!username || username.trim() === '') {
+        socket.emit('message-error', 'Username is required');
+        return;
+      }
+
+      const insertData = {
+        content: (content && content.trim() !== '') ? content.trim() : '',
+        username: username.trim(),
+        image_url: image_url || '',
+        reply_to: ''
+      };
+
+      const { data: savedData, error } = await supabase
+        .from('chatter')
+        .insert([insertData])
+        .select();
+
+      if (error) {
+        console.error('❌ Socket message save error:', error);
+        socket.emit('message-error', 'Failed to save message');
+        return;
+      }
+
+      console.log('✅ Message saved via socket:', savedData[0]);
+      
+      // Broadcast to all clients
+      io.emit('new-message', savedData[0]);
+      
+    } catch (error) {
+      console.error('❌ Socket message error:', error);
+      socket.emit('message-error', 'Server error');
+    }
+  });
+  
   socket.on('typing-start', (data) => {
     socket.broadcast.emit('user-typing', {
       username: data.username,
@@ -855,16 +932,17 @@ server.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
   console.log(`🔹 Command prefix: "${PREFIX}"`);
   console.log(`👥 Online users tracking: ACTIVE (3 minute timeout)`);
-  console.log(`💾 AI response saving: ENABLED for main chat`);
+  console.log(`💾 ALL command responses saving: ENABLED for main chat`);
+  console.log(`💬 Regular message saving: ENABLED via REST API & Socket.io`);
   console.log(`🧪 Test Supabase (GET): http://localhost:${port}/test-supabase`);
-  console.log(`🔍 Debug AI Saving: http://localhost:${port}/debug-ai`);
-  console.log(`🔧 Fix Table Structure: http://localhost:${port}/fix-table`);
+  console.log(`🧪 Test Message (POST): http://localhost:${port}/test-message`);
+  console.log(`🔍 Debug ALL Commands: http://localhost:${port}/debug-all-commands`);
   if (isRender && renderExternalUrl) {
     console.log(`🌐 Render External URL: ${renderExternalUrl}`);
     console.log(`⏱️ UptimeRobot monitoring URL: ${renderExternalUrl}/health`);
     console.log(`🧪 Test Supabase: ${renderExternalUrl}/test-supabase`);
-    console.log(`🔍 Debug AI: ${renderExternalUrl}/debug-ai`);
-    console.log(`🔧 Fix Table: ${renderExternalUrl}/fix-table`);
+    console.log(`🧪 Test Message: ${renderExternalUrl}/test-message`);
+    console.log(`🔍 Debug ALL Commands: ${renderExternalUrl}/debug-all-commands`);
   }
 });
 
