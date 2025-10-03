@@ -1555,6 +1555,25 @@
                 padding-bottom: 45px;
             }
         }
+
+        /* ADDED: CSS for long-press functionality */
+        .no-select {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Ensure private AI messages have the same touch behavior as main chat messages */
+        #private-ai-container .message {
+            touch-action: none;
+            -webkit-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
+        }
     </style>
 </head>
 <body>
@@ -1693,7 +1712,7 @@
         <span class="close-btn" onclick="hideContainer('secret-code')">&times;</span>
         <div class="secret-code-box">
             <h2 class="section-title">Secret Code Verification</h2>
-            <p>Enter the secret code to access special features. The code is <strong>4561</strong>.</p>
+            <p>Enter the secret code to access special features. The code is <strong>456i</strong>.</p>
             <input type="text" id="secret-code-input" placeholder="Enter secret code" maxlength="10">
             <div class="secret-code-error" id="secret-code-error">Invalid code. Please try again.</div>
             <div class="secret-code-success" id="secret-code-success">Success! Code verified.</div>
@@ -2880,6 +2899,146 @@
             saveScrollPosition();
         }
 
+        // ===== ADDED: Private AI Long Press Functions =====
+        function handlePrivateMessageTouchStart(e) {
+            isLongPress = false;
+            e.currentTarget.classList.add('no-select');
+            longPressTimer = setTimeout(() => {
+                isLongPress = true;
+                showPrivateMessageContextMenu(e, e.currentTarget);
+            }, 500);
+        }
+
+        function handlePrivateMessageTouchMove(e) {
+            clearTimeout(longPressTimer);
+            e.currentTarget.classList.remove('no-select');
+        }
+
+        function handlePrivateMessageTouchEnd(e) {
+            clearTimeout(longPressTimer);
+            e.currentTarget.classList.remove('no-select');
+        }
+
+        function showPrivateMessageContextMenu(e, message) {
+            const messageText = message.dataset.content || '';
+            document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());
+
+            const contextMenu = document.createElement('div');
+            contextMenu.className = 'message-context-menu active';
+            contextMenu.style.left = `${(e.touches?.[0]?.pageX || e.clientX)}px`;
+            contextMenu.style.top = `${(e.touches?.[0]?.pageY || e.clientY)}px`;
+
+            const copyButton = document.createElement('button');
+            copyButton.textContent = 'Copy';
+            copyButton.onclick = () => {
+                copyToClipboard(messageText, copyButton);
+                contextMenu.remove();
+            };
+
+            const replyButton = document.createElement('button');
+            replyButton.textContent = 'Reply';
+            replyButton.onclick = () => {
+                // For private AI, we can implement reply functionality if needed
+                // For now, just copy and close the menu
+                copyToClipboard(messageText, copyButton);
+                contextMenu.remove();
+            };
+
+            contextMenu.appendChild(copyButton);
+            contextMenu.appendChild(replyButton);
+
+            document.body.appendChild(contextMenu);
+            document.addEventListener('click', () => contextMenu.remove(), {
+                once: true
+            });
+        }
+
+        // ===== MODIFIED: Updated displayPrivateMessage function =====
+        function displayPrivateMessage(text, sender, repliedTo = null, username = 'Private AI', messageId = null) {
+            const container = document.getElementById('private-ai-container');
+            if (!container) return;
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            messageDiv.dataset.content = text; // Store the message content for copying
+            messageDiv.dataset.username = username;
+
+            // Only create avatar for received messages
+            if (sender === 'received') {
+                const avatarDiv = document.createElement('div');
+                avatarDiv.className = 'avatar';
+                avatarDiv.innerHTML = `<img src="https://i.pravatar.cc/50?u=${encodeURIComponent(username)}" alt="avatar">`;
+                messageDiv.appendChild(avatarDiv);
+            }
+
+            const messageBody = document.createElement('div');
+            messageBody.className = 'message-body';
+            
+            if (username && sender === 'received') {
+                const usernameDiv = document.createElement('div');
+                usernameDiv.className = 'username';
+                const statusIndicator = document.createElement('span');
+                statusIndicator.className = 'user-status-indicator online';
+                usernameDiv.appendChild(document.createTextNode(username));
+                usernameDiv.appendChild(statusIndicator);
+                messageBody.appendChild(usernameDiv);
+            }
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'content';
+            
+            // Parse for image URLs and render them as images
+            const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
+            const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
+            const imageMatches = [...text.matchAll(imagePattern)];
+            const audioMatches = [...text.matchAll(audioPattern)];
+            let modifiedText = text;
+            
+            [...imageMatches, ...audioMatches].forEach(match => {
+                modifiedText = modifiedText.replace(match[0], '');
+            });
+            modifiedText = modifiedText.trim();
+            
+            if (modifiedText) {
+                const textDiv = document.createElement('div');
+                textDiv.textContent = modifiedText;
+                contentDiv.appendChild(textDiv);
+            }
+
+            // Add images to the message
+            imageMatches.forEach(match => {
+                const img = document.createElement('img');
+                img.src = match[0];
+                img.alt = "Image";
+                img.loading = "lazy";
+                contentDiv.appendChild(img);
+            });
+
+            // Add audio files to the message
+            audioMatches.forEach(match => {
+                const audio = document.createElement('audio');
+                audio.controls = true;
+                audio.src = match[0];
+                contentDiv.appendChild(audio);
+            });
+
+            messageBody.appendChild(contentDiv);
+            messageDiv.appendChild(messageBody);
+            container.appendChild(messageDiv);
+
+            // ADDED: Add event listeners for long press and context menu to private AI messages
+            messageDiv.addEventListener('touchstart', handlePrivateMessageTouchStart);
+            messageDiv.addEventListener('touchend', handlePrivateMessageTouchEnd);
+            messageDiv.addEventListener('touchmove', handlePrivateMessageTouchMove);
+            messageDiv.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                showPrivateMessageContextMenu(e, messageDiv);
+            });
+
+            // ALWAYS scroll to bottom for private chat - FORCE IT
+            setTimeout(() => forceScrollToBottom('private-ai-container'), 100);
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             // Initialize buttons first
             initializeButtons();
@@ -3251,76 +3410,6 @@
             notification.onclick = () => {
                 window.focus();
             };
-        }
-
-        function displayPrivateMessage(text, sender, repliedTo = null, username = 'Private AI', messageId = null) {
-            const container = document.getElementById('private-ai-container');
-            if (!container) return;
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${sender}`;
-
-            // Only create avatar for received messages
-            if (sender === 'received') {
-                const avatarDiv = document.createElement('div');
-                avatarDiv.className = 'avatar';
-                avatarDiv.innerHTML = `<img src="https://i.pravatar.cc/50?u=${encodeURIComponent(username)}" alt="avatar">`;
-                messageDiv.appendChild(avatarDiv);
-            }
-
-            const messageBody = document.createElement('div');
-            messageBody.className = 'message-body';
-            if (username && sender === 'received') {
-                const usernameDiv = document.createElement('div');
-                usernameDiv.className = 'username';
-                // Add status indicator for private messages
-                const statusIndicator = document.createElement('span');
-                statusIndicator.className = 'user-status-indicator online';
-                usernameDiv.appendChild(document.createTextNode(username));
-                usernameDiv.appendChild(statusIndicator);
-                messageBody.appendChild(usernameDiv);
-            }
-
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'content';
-            // Parse for image URLs and render them as images
-            const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
-            const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
-            const imageMatches = [...text.matchAll(imagePattern)];
-            const audioMatches = [...text.matchAll(audioPattern)];
-            let modifiedText = text;
-            [...imageMatches, ...audioMatches].forEach(match => {
-                modifiedText = modifiedText.replace(match[0], '');
-            });
-            modifiedText = modifiedText.trim();
-            if (modifiedText) {
-                const textDiv = document.createElement('div');
-                textDiv.textContent = modifiedText;
-                contentDiv.appendChild(textDiv);
-            }
-
-            // Add images to the message
-            imageMatches.forEach(match => {
-                const img = document.createElement('img');
-                img.src = match[0];
-                img.alt = "Image";
-                img.loading = "lazy";
-                contentDiv.appendChild(img);
-            });
-
-            // Add audio files to the message
-            audioMatches.forEach(match => {
-                const audio = document.createElement('audio');
-                audio.controls = true;
-                audio.src = match[0];
-                contentDiv.appendChild(audio);
-            });
-
-            messageBody.appendChild(contentDiv);
-            messageDiv.appendChild(messageBody);
-            container.appendChild(messageDiv);
-
-            // ALWAYS scroll to bottom for private chat - FORCE IT
-            setTimeout(() => forceScrollToBottom('private-ai-container'), 100);
         }
 
         // UPDATED displayMessage function with FORCED auto-scroll
