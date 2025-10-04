@@ -460,6 +460,37 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
 
+        /* FIXED: Image loading styles - Remove transitions and ensure immediate display */
+        .message img {
+            width: 100%;
+            margin: 4px 0 0 0;
+            display: block;
+            border-radius: 10px;
+            object-fit: cover;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            /* REMOVE transitions that cause slow reveal */
+            transition: none !important;
+            opacity: 1 !important;
+            animation: none !important;
+            /* Force immediate rendering */
+            visibility: visible !important;
+        }
+
+        /* Ensure images are always fully visible */
+        .message img[src] {
+            opacity: 1 !important;
+            visibility: visible !important;
+        }
+
+        /* Preload helper for images */
+        .img-preload {
+            position: absolute;
+            opacity: 0;
+            visibility: hidden;
+            width: 0;
+            height: 0;
+        }
+
         /* Rest of your existing styles remain the same */
         body {
             font-family: Arial, sans-serif;
@@ -867,21 +898,6 @@
 
         .message.sent .username {
             display: none !important;
-        }
-
-        .message img {
-            width: 100%;
-            margin: 4px 0 0 0;
-            display: block;
-            border-radius: 10px;
-            object-fit: cover;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        .message img:hover {
-            transform: scale(1.02);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
 
         .message.received .content {
@@ -2953,7 +2969,36 @@
             });
         }
 
-        // ===== MODIFIED: Updated displayPrivateMessage function =====
+        // ===== FIXED: Image loading function for immediate display =====
+        function displayImageImmediately(imgUrl, container) {
+            return new Promise((resolve) => {
+                const img = document.createElement('img');
+                img.src = imgUrl;
+                img.alt = "Image";
+                img.loading = "eager"; // Force immediate loading
+                img.style.opacity = "1";
+                img.style.transition = "none";
+                img.style.width = "100%";
+                img.style.borderRadius = "10px";
+                img.style.objectFit = "cover";
+                
+                // Force immediate display
+                img.onload = function() {
+                    container.appendChild(img);
+                    resolve(img);
+                };
+                
+                // Fallback in case onload doesn't fire
+                setTimeout(() => {
+                    if (!img.parentNode) {
+                        container.appendChild(img);
+                    }
+                    resolve(img);
+                }, 100);
+            });
+        }
+
+        // ===== MODIFIED: Updated displayPrivateMessage function with immediate image loading =====
         function displayPrivateMessage(text, sender, repliedTo = null, username = 'Private AI', messageId = null) {
             const container = document.getElementById('private-ai-container');
             if (!container) return;
@@ -3005,13 +3050,9 @@
                 contentDiv.appendChild(textDiv);
             }
 
-            // Add images to the message
+            // Add images to the message - FIXED: Use immediate loading
             imageMatches.forEach(match => {
-                const img = document.createElement('img');
-                img.src = match[0];
-                img.alt = "Image";
-                img.loading = "lazy";
-                contentDiv.appendChild(img);
+                displayImageImmediately(match[0], contentDiv);
             });
 
             // Add audio files to the message
@@ -3037,6 +3078,20 @@
 
             // ALWAYS scroll to bottom for private chat - FORCE IT
             setTimeout(() => forceScrollToBottom('private-ai-container'), 100);
+        }
+
+        // ===== FIXED: Force image rendering function =====
+        function forceImageRendering() {
+            document.querySelectorAll('.message img').forEach(img => {
+                // Force reflow and repaint
+                img.style.display = 'none';
+                img.offsetHeight; // Trigger reflow
+                img.style.display = 'block';
+                
+                // Ensure full opacity
+                img.style.opacity = '1';
+                img.style.visibility = 'visible';
+            });
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -3412,7 +3467,7 @@
             };
         }
 
-        // UPDATED displayMessage function with FORCED auto-scroll
+        // ===== FIXED: UPDATED displayMessage function with immediate image loading =====
         function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
             if (!elements.chatContainer) return;
             const messageDiv = document.createElement('div');
@@ -3463,11 +3518,9 @@
                     contentDiv.appendChild(textDiv);
                 }
 
+                // FIXED: Use immediate image loading instead of lazy loading
                 imageMatches.forEach(match => {
-                    const img = document.createElement('img');
-                    img.src = match[0];
-                    img.alt = "Image";
-                    contentDiv.appendChild(img);
+                    displayImageImmediately(match[0], contentDiv);
                 });
 
                 audioMatches.forEach(match => {
@@ -3501,6 +3554,9 @@
                 e.preventDefault();
                 showMessageContextMenu(e, messageDiv);
             });
+
+            // Force image rendering after adding message
+            setTimeout(forceImageRendering, 50);
 
             // FORCE SCROLL TO BOTTOM FOR EVERY NEW MESSAGE
             if (isNew) {
@@ -4346,6 +4402,7 @@
             showContainer('chat');
         }
 
+       // --- CUT HERE ---
         // Zoom functions remain the same
         function openZoom(src) {
             document.body.style.overflow = 'hidden';
