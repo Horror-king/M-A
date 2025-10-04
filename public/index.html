@@ -711,7 +711,6 @@
             flex: 1;
             padding: 5px 15px;
             overflow-y: auto;
-            justify-content: flex-start; /* Messages start from top */
             height: 100%;
             display: flex;
             flex-direction: column;
@@ -2329,7 +2328,7 @@
             setTimeout(updateScrollState, 0);
         }
 
-        // ===== MODIFIED INITIALIZATION =====
+        // ===== FIXED INITIALIZATION =====
         document.addEventListener('DOMContentLoaded', () => {
             console.log('🚀 Initializing application...');
             
@@ -2344,6 +2343,7 @@
                 document.querySelector('.menu').style.display = 'flex';
                 document.querySelector('.news-toggle').style.display = 'block';
 
+                // FIXED: Show chat container immediately to prevent layout shift
                 showContainer('chat');
 
                 // Set flag to restore scroll position after messages load
@@ -2405,9 +2405,12 @@
         // ===== FIXED RENDER MESSAGES FUNCTION =====
         function renderMessages(messages) {
             if (!elements.chatContainer) return;
+            
+            // FIXED: Clear container but maintain scroll position
             elements.chatContainer.innerHTML = '';
             
-            // FIXED: Remove messages.reverse() - display messages in correct chronological order
+            // FIXED: Display messages in correct chronological order (oldest to newest)
+            // NO MORE messages.reverse() - this was causing the reverse order issue
             messages.forEach(msg => {
                 const isOwn = msg.username?.trim().toLowerCase() === currentUsername?.trim().toLowerCase();
                 displayMessage(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id, false);
@@ -2421,8 +2424,13 @@
                 setTimeout(restoreScrollPosition, 100);
             }
 
-            // ALWAYS scroll to bottom after loading messages - FORCE IT
-            setTimeout(() => forceScrollToBottom('chat-container'), 300);
+            // FIXED: IMMEDIATELY scroll to bottom after loading messages
+            setTimeout(() => {
+                forceScrollToBottom('chat-container');
+                // Additional scroll attempts to ensure it works
+                setTimeout(() => forceScrollToBottom('chat-container'), 100);
+                setTimeout(() => forceScrollToBottom('chat-container'), 200);
+            }, 10);
         }
 
         // ===== FIXED DISPLAY PRIVATE MESSAGE FUNCTION =====
@@ -2505,8 +2513,11 @@
                 showPrivateMessageContextMenu(e, messageDiv);
             });
 
-            // ALWAYS scroll to bottom for private chat
-            setTimeout(() => forceScrollToBottom('private-ai-container'), 100);
+            // FIXED: IMMEDIATELY scroll to bottom for private chat
+            setTimeout(() => {
+                forceScrollToBottom('private-ai-container');
+                setTimeout(() => forceScrollToBottom('private-ai-container'), 50);
+            }, 10);
         }
 
         // ===== ALL YOUR EXISTING FUNCTIONS REMAIN THE SAME =====
@@ -4456,5 +4467,5 @@
             }
         }
     </script>
-   </body>
+ </body>
 </html>
