@@ -711,6 +711,7 @@
             flex: 1;
             padding: 5px 15px;
             overflow-y: auto;
+            justify-content: flex-start; /* Messages start from top */
             height: 100%;
             display: flex;
             flex-direction: column;
@@ -2187,7 +2188,7 @@
             await fetchPrivateAIResponse(content);
         }
 
-        // ===== MODIFIED LOAD MESSAGES FUNCTION =====
+        // ===== FIXED LOAD MESSAGES FUNCTION =====
         async function loadMessages() {
             try {
                 console.log('📥 Loading messages...');
@@ -2197,7 +2198,7 @@
 
                 // Check for new messages to show notification
                 if (data.length > 0) {
-                    const latestMessage = data[0];
+                    const latestMessage = data[data.length - 1]; // FIXED: Get the actual latest message from the end
                     if (latestMessage.id !== lastMessageId && 
                         latestMessage.username !== currentUsername && 
                         document.visibilityState !== 'visible') {
@@ -2217,7 +2218,7 @@
             }
         }
 
-        // ===== MODIFIED DISPLAY MESSAGE FUNCTION WITH DUPLICATE PREVENTION =====
+        // ===== FIXED DISPLAY MESSAGE FUNCTION =====
         function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
             if (!elements.chatContainer) return;
             
@@ -2304,7 +2305,10 @@
                 contentDiv.appendChild(textDiv);
                 messageDiv.appendChild(contentDiv);
             }
+            
+            // FIXED: Always append new messages to the bottom
             elements.chatContainer.appendChild(messageDiv);
+            
             messageDiv.addEventListener('touchstart', handleTouchStart);
             messageDiv.addEventListener('touchend', handleTouchEnd);
             messageDiv.addEventListener('touchmove', handleTouchMove);
@@ -2397,6 +2401,113 @@
 
             console.log('🎯 Application initialization complete');
         });
+
+        // ===== FIXED RENDER MESSAGES FUNCTION =====
+        function renderMessages(messages) {
+            if (!elements.chatContainer) return;
+            elements.chatContainer.innerHTML = '';
+            
+            // FIXED: Remove messages.reverse() - display messages in correct chronological order
+            messages.forEach(msg => {
+                const isOwn = msg.username?.trim().toLowerCase() === currentUsername?.trim().toLowerCase();
+                displayMessage(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id, false);
+            });
+
+            // Update scroll state after rendering messages
+            setTimeout(updateScrollState, 0);
+
+            // Restore scroll position if needed
+            if (shouldRestoreScroll) {
+                setTimeout(restoreScrollPosition, 100);
+            }
+
+            // ALWAYS scroll to bottom after loading messages - FORCE IT
+            setTimeout(() => forceScrollToBottom('chat-container'), 300);
+        }
+
+        // ===== FIXED DISPLAY PRIVATE MESSAGE FUNCTION =====
+        function displayPrivateMessage(text, sender, repliedTo = null, username = 'Private AI', messageId = null) {
+            const container = document.getElementById('private-ai-container');
+            if (!container) return;
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            messageDiv.dataset.content = text; // Store the message content for copying
+            messageDiv.dataset.username = username;
+
+            // Only create avatar for received messages
+            if (sender === 'received') {
+                const avatarDiv = document.createElement('div');
+                avatarDiv.className = 'avatar';
+                avatarDiv.innerHTML = `<img src="https://i.pravatar.cc/50?u=${encodeURIComponent(username)}" alt="avatar">`;
+                messageDiv.appendChild(avatarDiv);
+            }
+
+            const messageBody = document.createElement('div');
+            messageBody.className = 'message-body';
+            
+            if (username && sender === 'received') {
+                const usernameDiv = document.createElement('div');
+                usernameDiv.className = 'username';
+                const statusIndicator = document.createElement('span');
+                statusIndicator.className = 'user-status-indicator online';
+                usernameDiv.appendChild(document.createTextNode(username));
+                usernameDiv.appendChild(statusIndicator);
+                messageBody.appendChild(usernameDiv);
+            }
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'content';
+            
+            // Parse for image URLs and render them as images
+            const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
+            const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
+            const imageMatches = [...text.matchAll(imagePattern)];
+            const audioMatches = [...text.matchAll(audioPattern)];
+            let modifiedText = text;
+            
+            [...imageMatches, ...audioMatches].forEach(match => {
+                modifiedText = modifiedText.replace(match[0], '');
+            });
+            modifiedText = modifiedText.trim();
+            
+            if (modifiedText) {
+                const textDiv = document.createElement('div');
+                textDiv.textContent = modifiedText;
+                contentDiv.appendChild(textDiv);
+            }
+
+            // Add images to the message - FIXED: Use immediate loading
+            imageMatches.forEach(match => {
+                displayImageImmediately(match[0], contentDiv);
+            });
+
+            // Add audio files to the message
+            audioMatches.forEach(match => {
+                const audio = document.createElement('audio');
+                audio.controls = true;
+                audio.src = match[0];
+                contentDiv.appendChild(audio);
+            });
+
+            messageBody.appendChild(contentDiv);
+            messageDiv.appendChild(messageBody);
+            
+            // FIXED: Always append to the bottom of private chat container
+            container.appendChild(messageDiv);
+
+            // ADDED: Add event listeners for long press and context menu to private AI messages
+            messageDiv.addEventListener('touchstart', handlePrivateMessageTouchStart);
+            messageDiv.addEventListener('touchend', handlePrivateMessageTouchEnd);
+            messageDiv.addEventListener('touchmove', handlePrivateMessageTouchMove);
+            messageDiv.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                showPrivateMessageContextMenu(e, messageDiv);
+            });
+
+            // ALWAYS scroll to bottom for private chat
+            setTimeout(() => forceScrollToBottom('private-ai-container'), 100);
+        }
 
         // ===== ALL YOUR EXISTING FUNCTIONS REMAIN THE SAME =====
 
@@ -3363,88 +3474,6 @@
             });
         }
 
-        // MODIFIED: Updated displayPrivateMessage function with immediate image loading
-        function displayPrivateMessage(text, sender, repliedTo = null, username = 'Private AI', messageId = null) {
-            const container = document.getElementById('private-ai-container');
-            if (!container) return;
-            
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${sender}`;
-            messageDiv.dataset.content = text; // Store the message content for copying
-            messageDiv.dataset.username = username;
-
-            // Only create avatar for received messages
-            if (sender === 'received') {
-                const avatarDiv = document.createElement('div');
-                avatarDiv.className = 'avatar';
-                avatarDiv.innerHTML = `<img src="https://i.pravatar.cc/50?u=${encodeURIComponent(username)}" alt="avatar">`;
-                messageDiv.appendChild(avatarDiv);
-            }
-
-            const messageBody = document.createElement('div');
-            messageBody.className = 'message-body';
-            
-            if (username && sender === 'received') {
-                const usernameDiv = document.createElement('div');
-                usernameDiv.className = 'username';
-                const statusIndicator = document.createElement('span');
-                statusIndicator.className = 'user-status-indicator online';
-                usernameDiv.appendChild(document.createTextNode(username));
-                usernameDiv.appendChild(statusIndicator);
-                messageBody.appendChild(usernameDiv);
-            }
-
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'content';
-            
-            // Parse for image URLs and render them as images
-            const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
-            const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
-            const imageMatches = [...text.matchAll(imagePattern)];
-            const audioMatches = [...text.matchAll(audioPattern)];
-            let modifiedText = text;
-            
-            [...imageMatches, ...audioMatches].forEach(match => {
-                modifiedText = modifiedText.replace(match[0], '');
-            });
-            modifiedText = modifiedText.trim();
-            
-            if (modifiedText) {
-                const textDiv = document.createElement('div');
-                textDiv.textContent = modifiedText;
-                contentDiv.appendChild(textDiv);
-            }
-
-            // Add images to the message - FIXED: Use immediate loading
-            imageMatches.forEach(match => {
-                displayImageImmediately(match[0], contentDiv);
-            });
-
-            // Add audio files to the message
-            audioMatches.forEach(match => {
-                const audio = document.createElement('audio');
-                audio.controls = true;
-                audio.src = match[0];
-                contentDiv.appendChild(audio);
-            });
-
-            messageBody.appendChild(contentDiv);
-            messageDiv.appendChild(messageBody);
-            container.appendChild(messageDiv);
-
-            // ADDED: Add event listeners for long press and context menu to private AI messages
-            messageDiv.addEventListener('touchstart', handlePrivateMessageTouchStart);
-            messageDiv.addEventListener('touchend', handlePrivateMessageTouchEnd);
-            messageDiv.addEventListener('touchmove', handlePrivateMessageTouchMove);
-            messageDiv.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                showPrivateMessageContextMenu(e, messageDiv);
-            });
-
-            // ALWAYS scroll to bottom for private chat - FORCE IT
-            setTimeout(() => forceScrollToBottom('private-ai-container'), 100);
-        }
-
         // FIXED: Force image rendering function
         function forceImageRendering() {
             document.querySelectorAll('.message img').forEach(img => {
@@ -3714,26 +3743,6 @@
                 textarea.style.height = 'auto';
                 textarea.style.height = (textarea.scrollHeight > 100 ? 100 : textarea.scrollHeight) + 'px';
             }
-        }
-
-        function renderMessages(messages) {
-            if (!elements.chatContainer) return;
-            elements.chatContainer.innerHTML = '';
-            messages.reverse().forEach(msg => {
-                const isOwn = msg.username?.trim().toLowerCase() === currentUsername?.trim().toLowerCase();
-                displayMessage(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id, false);
-            });
-
-            // Update scroll state after rendering messages
-            setTimeout(updateScrollState, 0);
-
-            // Restore scroll position if needed
-            if (shouldRestoreScroll) {
-                setTimeout(restoreScrollPosition, 100);
-            }
-
-            // ALWAYS scroll to bottom after loading messages - FORCE IT
-            setTimeout(() => forceScrollToBottom('chat-container'), 300);
         }
 
         function showNotification(username, message) {
@@ -4447,5 +4456,5 @@
             }
         }
     </script>
-  </body>
+   </body>
 </html>
