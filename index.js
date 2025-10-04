@@ -228,7 +228,7 @@ app.post('/messages', async (req, res) => {
         }
         console.log('✅ Message saved with minimal fields. ID:', retryData[0]?.id);
         
-        // Broadcast new message via Socket.io
+        // BROADCAST NEW MESSAGE TO ALL CLIENTS IMMEDIATELY
         io.emit('new-message', retryData[0]);
         return res.status(201).json(retryData[0]);
       }
@@ -237,7 +237,7 @@ app.post('/messages', async (req, res) => {
     
     console.log('✅ Message saved successfully. ID:', data[0]?.id);
     
-    // Broadcast new message via Socket.io
+    // BROADCAST NEW MESSAGE TO ALL CLIENTS IMMEDIATELY
     io.emit('new-message', data[0]);
     res.status(201).json(data[0]);
   } catch (error) {
@@ -345,7 +345,7 @@ async function saveBotResponseToSupabase(content, originalCommand, commandType =
         }
         console.log(`✅ ${commandType} response saved to Supabase (minimal fields). ID:`, retryData[0]?.id);
         
-        // Broadcast bot response via Socket.io
+        // BROADCAST BOT RESPONSE TO ALL CLIENTS IMMEDIATELY
         io.emit('new-message', retryData[0]);
         return retryData;
       }
@@ -354,7 +354,7 @@ async function saveBotResponseToSupabase(content, originalCommand, commandType =
     
     console.log(`✅ ${commandType} response saved to Supabase. ID:`, data[0]?.id);
     
-    // Broadcast bot response via Socket.io
+    // BROADCAST BOT RESPONSE TO ALL CLIENTS IMMEDIATELY
     io.emit('new-message', data[0]);
     return data;
   } catch (error) {
@@ -737,13 +737,32 @@ app.get('/online-users', (req, res) => {
   res.json(onlineUsersArray);
 });
 
+// ===== ENHANCED SOCKET.IO REAL-TIME MESSAGING =====
+
 // Socket.io connection handling - 3 MINUTE ONLINE STATUS
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
+  console.log('🔌 User connected:', socket.id);
+
+  // Send existing messages to newly connected client
+  socket.on('request-messages', async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chatter')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      
+      if (!error && data) {
+        socket.emit('chat-messages', data.reverse());
+      }
+    } catch (error) {
+      console.error('Error sending messages to client:', error);
+    }
+  });
 
   socket.on('user-online', (username) => {
     if (username) {
-      console.log('User online:', username);
+      console.log('👤 User online:', username);
       
       // Update or add user to online users
       onlineUsers.set(username, {
@@ -755,7 +774,7 @@ io.on('connection', (socket) => {
       
       // Get current online users list
       const onlineUsersArray = Array.from(onlineUsers.keys());
-      console.log('Updated online users:', onlineUsersArray);
+      console.log('📊 Updated online users:', onlineUsersArray);
       
       // Broadcast to all users that this user is online
       io.emit('user-status-change', { 
@@ -768,7 +787,7 @@ io.on('connection', (socket) => {
 
   socket.on('user-away', (username) => {
     if (username && onlineUsers.has(username)) {
-      console.log('User away:', username);
+      console.log('⏸️ User away:', username);
       
       // Update last seen but keep user in list
       const userData = onlineUsers.get(username);
@@ -786,85 +805,12 @@ io.on('connection', (socket) => {
 
   socket.on('user-offline', (username) => {
     if (username) {
-      console.log('User offline (manual):', username);
+      console.log('🔴 User offline (manual):', username);
       removeUserFromOnlineList(username);
     }
   });
 
-  // Handle disconnect properly
-  socket.on('disconnect', (reason) => {
-    console.log('User disconnected:', socket.id, 'Reason:', reason);
-    
-    // Find user by socket ID but DON'T remove them immediately
-    // They stay in the list for 3 minutes due to the timeout
-    let foundUsername = null;
-    for (let [username, data] of onlineUsers.entries()) {
-      if (data.socketId === socket.id) {
-        foundUsername = username;
-        // Update last seen but keep in list
-        data.lastSeen = Date.now();
-        data.isOnline = false;
-        console.log('User marked as inactive:', username);
-        break;
-      }
-    }
-    
-    // Don't remove from list immediately - let the timeout handle it
-    if (foundUsername) {
-      io.emit('user-status-change', { 
-        username: foundUsername, 
-        status: 'away',
-        onlineUsers: Array.from(onlineUsers.keys())
-      });
-    }
-  });
-  
-  // Listen for new messages from clients
-  socket.on('send-message', async (data) => {
-    try {
-      console.log('💬 Received message via socket:', data);
-      
-      const { content, username, image_url } = data;
-      
-      if ((!content || content.trim() === '') && !image_url) {
-        socket.emit('message-error', 'Content or image is required');
-        return;
-      }
-
-      if (!username || username.trim() === '') {
-        socket.emit('message-error', 'Username is required');
-        return;
-      }
-
-      const insertData = {
-        content: (content && content.trim() !== '') ? content.trim() : '',
-        username: username.trim(),
-        image_url: image_url || '',
-        reply_to: ''
-      };
-
-      const { data: savedData, error } = await supabase
-        .from('chatter')
-        .insert([insertData])
-        .select();
-
-      if (error) {
-        console.error('❌ Socket message save error:', error);
-        socket.emit('message-error', 'Failed to save message');
-        return;
-      }
-
-      console.log('✅ Message saved via socket:', savedData[0]);
-      
-      // Broadcast to all clients
-      io.emit('new-message', savedData[0]);
-      
-    } catch (error) {
-      console.error('❌ Socket message error:', error);
-      socket.emit('message-error', 'Server error');
-    }
-  });
-  
+  // Handle typing indicators
   socket.on('typing-start', (data) => {
     socket.broadcast.emit('user-typing', {
       username: data.username,
@@ -879,6 +825,63 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Handle private AI messages
+  socket.on('send-private-message', async (data) => {
+    try {
+      console.log('🤫 Private message received:', data);
+      
+      // Process private AI response
+      const response = await axios.post('http://localhost:3000/api/command', {
+        message: data.content,
+        source: 'private-ai'
+      }, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.data.reply) {
+        // Send private AI response back to the specific user
+        socket.emit('new-private-message', {
+          content: response.data.reply,
+          username: 'Private AI'
+        });
+      }
+    } catch (error) {
+      console.error('❌ Private message error:', error);
+      socket.emit('new-private-message', {
+        content: "Error: Could not process your private message",
+        username: 'Private AI'
+      });
+    }
+  });
+
+  // Handle disconnect properly
+  socket.on('disconnect', (reason) => {
+    console.log('🔌 User disconnected:', socket.id, 'Reason:', reason);
+    
+    // Find user by socket ID but DON'T remove them immediately
+    // They stay in the list for 3 minutes due to the timeout
+    let foundUsername = null;
+    for (let [username, data] of onlineUsers.entries()) {
+      if (data.socketId === socket.id) {
+        foundUsername = username;
+        // Update last seen but keep in list
+        data.lastSeen = Date.now();
+        data.isOnline = false;
+        console.log('⏸️ User marked as inactive:', username);
+        break;
+      }
+    }
+    
+    // Don't remove from list immediately - let the timeout handle it
+    if (foundUsername) {
+      io.emit('user-status-change', { 
+        username: foundUsername, 
+        status: 'away',
+        onlineUsers: Array.from(onlineUsers.keys())
+      });
+    }
+  });
+  
   // Helper function to remove user from online list
   function removeUserFromOnlineList(username) {
     if (onlineUsers.has(username)) {
@@ -886,7 +889,7 @@ io.on('connection', (socket) => {
       
       // Get updated online users list
       const onlineUsersArray = Array.from(onlineUsers.keys());
-      console.log('After removal, online users:', onlineUsersArray);
+      console.log('🗑️ After removal, online users:', onlineUsersArray);
       
       // Broadcast that user went offline
       io.emit('user-status-change', { 
@@ -906,7 +909,7 @@ setInterval(() => {
   for (let [username, data] of onlineUsers.entries()) {
     // 3 minute timeout (180000 milliseconds)
     if (now - data.lastSeen > onlineStatusTimeout) {
-      console.log('Removing inactive user (3 minutes):', username);
+      console.log('⏰ Removing inactive user (3 minutes):', username);
       onlineUsers.delete(username);
       removedUsers.push(username);
     }
@@ -922,8 +925,8 @@ setInterval(() => {
         onlineUsers: onlineUsersArray
       });
     });
-    console.log('Cleaned up inactive users (3min timeout):', removedUsers);
-    console.log('Current online users after cleanup:', onlineUsersArray);
+    console.log('🧹 Cleaned up inactive users (3min timeout):', removedUsers);
+    console.log('📊 Current online users after cleanup:', onlineUsersArray);
   }
 }, 30000); // Check every 30 seconds
 
@@ -933,7 +936,8 @@ server.listen(port, () => {
   console.log(`🔹 Command prefix: "${PREFIX}"`);
   console.log(`👥 Online users tracking: ACTIVE (3 minute timeout)`);
   console.log(`💾 ALL command responses saving: ENABLED for main chat`);
-  console.log(`💬 Regular message saving: ENABLED via REST API & Socket.io`);
+  console.log(`💬 Real-time messaging: ENABLED via Socket.io`);
+  console.log(`🔌 Socket.io events: new-message, message-deleted, user-status-change`);
   console.log(`🧪 Test Supabase (GET): http://localhost:${port}/test-supabase`);
   console.log(`🧪 Test Message (POST): http://localhost:${port}/test-message`);
   console.log(`🔍 Debug ALL Commands: http://localhost:${port}/debug-all-commands`);
