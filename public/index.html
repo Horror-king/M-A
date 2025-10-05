@@ -1969,7 +1969,7 @@
         elements.usernameInput.value = currentUsername;
     }
 
-    // ===== ENHANCED REAL-TIME MESSAGING FUNCTIONS =====
+    // ===== FIXED: MESSAGE ORDER AND SECTION MANAGEMENT =====
 
     // Initialize socket connection for real-time messaging
     function initSocket() {
@@ -2058,7 +2058,7 @@
         });
     }
 
-    // ===== MODIFIED MESSAGE FUNCTIONS FOR REAL-TIME =====
+    // ===== FIXED: MESSAGE FUNCTIONS WITH CORRECT ORDER =====
 
     async function sendMessage() {
         if (isSending) return;
@@ -2190,7 +2190,7 @@
         }, 1000);
     }
 
-    // ===== FIXED LOAD MESSAGES FUNCTION =====
+    // ===== FIXED: LOAD MESSAGES WITH CORRECT ORDER =====
     async function loadMessages() {
         try {
             console.log('📥 Loading messages...');
@@ -2220,7 +2220,7 @@
         }
     }
 
-    // ===== FIXED DISPLAY MESSAGE FUNCTION =====
+    // ===== FIXED: DISPLAY MESSAGE WITH CORRECT ORDER =====
     function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
         if (!elements.chatContainer) return;
         
@@ -2331,7 +2331,7 @@
         setTimeout(updateScrollState, 0);
     }
 
-    // ===== FIXED INITIALIZATION =====
+    // ===== FIXED: INITIALIZATION =====
     document.addEventListener('DOMContentLoaded', () => {
         console.log('🚀 Initializing application...');
         
@@ -2405,7 +2405,7 @@
         console.log('🎯 Application initialization complete');
     });
 
-    // ===== FIXED RENDER MESSAGES FUNCTION =====
+    // ===== FIXED: RENDER MESSAGES WITH CORRECT ORDER =====
     function renderMessages(messages) {
         if (!elements.chatContainer) return;
         
@@ -2413,6 +2413,7 @@
         elements.chatContainer.innerHTML = '';
         
         // FIXED: Display messages in correct chronological order (oldest to newest)
+        // NO REVERSING - messages should be in correct order from server
         messages.forEach(msg => {
             const isOwn = msg.username?.trim().toLowerCase() === currentUsername?.trim().toLowerCase();
             displayMessage(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id, false);
@@ -2435,7 +2436,7 @@
         }, 10);
     }
 
-    // ===== FIXED DISPLAY PRIVATE MESSAGE FUNCTION =====
+    // ===== FIXED: DISPLAY PRIVATE MESSAGE FUNCTION =====
     function displayPrivateMessage(text, sender, repliedTo = null, username = 'Private AI', messageId = null) {
         const container = document.getElementById('private-ai-container');
         if (!container) return;
@@ -2521,6 +2522,182 @@
             setTimeout(() => forceScrollToBottom('private-ai-container'), 50);
         }, 10);
     }
+
+    // ===== FIXED: SECTION MANAGEMENT - CLOSE SECTIONS PROPERLY =====
+
+    // UPDATED showContainer FUNCTION with proper section closing
+    function showContainer(containerId) {
+        console.log('🔄 Showing container:', containerId);
+        
+        // Hide all containers
+        document.querySelectorAll('.main-chat-interface').forEach(container => {
+            container.style.display = 'none';
+        });
+        
+        // Hide all info containers
+        document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container').forEach(container => {
+            container.style.display = 'none';
+        });
+        
+        // Hide all chat inputs
+        document.querySelectorAll('.chat-input').forEach(input => {
+            input.style.display = 'none';
+        });
+        
+        // Show the selected container
+        const container = document.getElementById(containerId);
+        if (container) {
+            container.style.display = 'block';
+            
+            // Show the appropriate chat input
+            if (containerId === 'chat' || containerId === 'private-ai') {
+                const chatInput = container.querySelector('.chat-input');
+                if (chatInput) chatInput.style.display = 'flex';
+            }
+            
+            // Initialize secret code if showing that container
+            if (containerId === 'secret-code') {
+                resetSecretCodeForm();
+                initializeSecretCodeVerification();
+            }
+            
+            // Initialize SQL editor if showing that container
+            if (containerId === 'sql-editor-container') {
+                // Check if user has verified the secret code
+                if (!hasVerifiedCode()) {
+                    showError('Access denied. Please verify the secret code first.');
+                    showContainer('secret-code');
+                    return;
+                }
+                initializeSQLEditor();
+            }
+        }
+        
+        // Show overlay for non-chat containers
+        const overlay = document.getElementById('overlay');
+        if (overlay) {
+            if (containerId === 'chat' || containerId === 'private-ai') {
+                overlay.style.display = 'none';
+            } else {
+                overlay.style.display = 'block';
+            }
+        }
+        
+        // Handle button visibility based on container
+        if (containerId === 'chat') {
+            console.log('Showing main chat container');
+            // Re-initialize scroll button for main chat
+            setTimeout(() => {
+                initializeButtons();
+                // Force scroll to bottom and update state
+                setTimeout(() => {
+                    forceScrollToBottom('chat-container');
+                    updateScrollState();
+                }, 200);
+            }, 100);
+            
+            // Show main chat scroll button, hide private AI button
+            if (scrollToBottomBtn) {
+                scrollToBottomBtn.style.display = 'flex';
+                updateScrollState(); // Update visibility based on scroll position
+            }
+            if (privateGoTopBtn) {
+                privateGoTopBtn.style.display = 'none';
+                privateGoTopBtn.classList.remove('visible');
+            }
+        } else if (containerId === 'private-ai') {
+            // Show private AI button, hide main chat scroll button
+            if (privateGoTopBtn) {
+                privateGoTopBtn.style.display = 'flex';
+                handlePrivateScroll(); // Update visibility based on scroll position
+            }
+            if (scrollToBottomBtn) {
+                scrollToBottomBtn.style.display = 'none';
+                scrollToBottomBtn.classList.remove('visible');
+            }
+            // Attach scroll event for private container
+            if (privateContainer) {
+                privateContainer.addEventListener('scroll', handlePrivateScroll);
+                // Initial check for scroll position
+                setTimeout(handlePrivateScroll, 100);
+                // Scroll to bottom when switching to private AI
+                setTimeout(() => forceScrollToBottom('private-ai-container'), 200);
+            }
+        } else {
+            // For other containers, hide both buttons
+            if (scrollToBottomBtn) {
+                scrollToBottomBtn.style.display = 'none';
+                scrollToBottomBtn.classList.remove('visible');
+            }
+            if (privateGoTopBtn) {
+                privateGoTopBtn.style.display = 'none';
+                privateGoTopBtn.classList.remove('visible');
+            }
+        }
+        
+        // Set scroll restore flag for chat container
+        if (containerId === 'chat') {
+            shouldRestoreScroll = true;
+            // Scroll to bottom when switching to main chat
+            setTimeout(() => forceScrollToBottom('chat-container'), 200);
+        }
+
+        // Close dropdown menu when switching containers
+        const dropdown = document.getElementById('dropdown');
+        if (dropdown) dropdown.style.display = 'none';
+        
+        const kebabDropdown = document.querySelector('.kebab-dropdown');
+        if (kebabDropdown) kebabDropdown.classList.remove('active');
+    }
+
+    // FIXED: hideContainer function to properly close sections
+    function hideContainer(containerId) {
+        console.log('🔄 Hiding container:', containerId);
+        const container = document.getElementById(containerId);
+        if (container) container.style.display = 'none';
+        
+        const overlay = document.getElementById('overlay');
+        if (overlay) overlay.style.display = 'none';
+        
+        // Close all menus when hiding any container
+        const dropdown = document.getElementById('dropdown');
+        if (dropdown) dropdown.style.display = 'none';
+        
+        const kebabDropdown = document.querySelector('.kebab-dropdown');
+        if (kebabDropdown) kebabDropdown.classList.remove('active');
+        
+        // Show chat container and input after closing any section
+        showContainer('chat');
+    }
+
+    // ===== FIXED: OVERLAY CLICK HANDLER =====
+    document.addEventListener('DOMContentLoaded', function() {
+        const overlay = document.getElementById('overlay');
+        if (overlay) {
+            overlay.addEventListener('click', function() {
+                console.log('🔘 Overlay clicked - closing all sections');
+                // Hide all info containers
+                document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container').forEach(container => {
+                    container.style.display = 'none';
+                });
+                this.style.display = 'none';
+                // Show main chat
+                showContainer('chat');
+            });
+        }
+
+        // Close sections when clicking escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const overlay = document.getElementById('overlay');
+                if (overlay && overlay.style.display === 'block') {
+                    hideContainer('chat');
+                }
+            }
+        });
+    });
+
+    // ===== REST OF THE FUNCTIONS REMAIN THE SAME =====
 
     // SQL EDITOR FUNCTIONS
     function initializeSQLEditor() {
@@ -3499,112 +3676,6 @@
         });
     }
 
-    // UPDATED showContainer FUNCTION with SQL editor support
-    function showContainer(containerId) {
-        // Hide all containers
-        document.querySelectorAll('.main-chat-interface').forEach(container => {
-            container.style.display = 'none';
-        });
-        
-        // Hide all info containers
-        document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container').forEach(container => {
-            container.style.display = 'none';
-        });
-        
-        // Hide all chat inputs
-        document.querySelectorAll('.chat-input').forEach(input => {
-            input.style.display = 'none';
-        });
-        
-        // Show the selected container
-        const container = document.getElementById(containerId);
-        if (container) {
-            container.style.display = 'block';
-            
-            // Show the appropriate chat input
-            if (containerId === 'chat' || containerId === 'private-ai') {
-                const chatInput = container.querySelector('.chat-input');
-                if (chatInput) chatInput.style.display = 'flex';
-            }
-            
-            // Initialize secret code if showing that container
-            if (containerId === 'secret-code') {
-                resetSecretCodeForm();
-                initializeSecretCodeVerification();
-            }
-            
-            // Initialize SQL editor if showing that container
-            if (containerId === 'sql-editor-container') {
-                // Check if user has verified the secret code
-                if (!hasVerifiedCode()) {
-                    showError('Access denied. Please verify the secret code first.');
-                    showContainer('secret-code');
-                    return;
-                }
-                initializeSQLEditor();
-            }
-        }
-        
-        // Handle button visibility based on container
-        if (containerId === 'chat') {
-            console.log('Showing main chat container');
-            // Re-initialize scroll button for main chat
-            setTimeout(() => {
-                initializeButtons();
-                // Force scroll to bottom and update state
-                setTimeout(() => {
-                    forceScrollToBottom('chat-container');
-                    updateScrollState();
-                }, 200);
-            }, 100);
-            
-            // Show main chat scroll button, hide private AI button
-            if (scrollToBottomBtn) {
-                scrollToBottomBtn.style.display = 'flex';
-                updateScrollState(); // Update visibility based on scroll position
-            }
-            if (privateGoTopBtn) {
-                privateGoTopBtn.style.display = 'none';
-                privateGoTopBtn.classList.remove('visible');
-            }
-        } else if (containerId === 'private-ai') {
-            // Show private AI button, hide main chat scroll button
-            if (privateGoTopBtn) {
-                privateGoTopBtn.style.display = 'flex';
-                handlePrivateScroll(); // Update visibility based on scroll position
-            }
-            if (scrollToBottomBtn) {
-                scrollToBottomBtn.style.display = 'none';
-                scrollToBottomBtn.classList.remove('visible');
-            }
-            // Attach scroll event for private container
-            if (privateContainer) {
-                privateContainer.addEventListener('scroll', handlePrivateScroll);
-                // Initial check for scroll position
-                setTimeout(handlePrivateScroll, 100);
-                // Scroll to bottom when switching to private AI
-                setTimeout(() => forceScrollToBottom('private-ai-container'), 200);
-            }
-        } else {
-            // For other containers, hide both buttons
-            if (scrollToBottomBtn) {
-                scrollToBottomBtn.style.display = 'none';
-                scrollToBottomBtn.classList.remove('visible');
-            }
-            if (privateGoTopBtn) {
-                privateGoTopBtn.style.display = 'none';
-                privateGoTopBtn.classList.remove('visible');
-            }
-        }
-        
-        // Set scroll restore flag for chat container
-        if (containerId === 'chat') {
-            shouldRestoreScroll = true;
-            // Scroll to bottom when switching to main chat
-            setTimeout(() => forceScrollToBottom('chat-container'), 200);
-        }
-    }
-
     function toggleAuth() {
         isLogin = !isLogin;
         const authTitle = document.getElementById('auth-title');
@@ -4384,25 +4455,6 @@
         }
     }
 
-    // UPDATED hideContainer function with SQL editor support
-    function hideContainer(containerId) {
-        const container = document.getElementById(containerId);
-        if (container) container.style.display = 'none';
-        
-        const overlay = document.getElementById('overlay');
-        if (overlay) overlay.style.display = 'none';
-        
-        // Close all menus when hiding any container
-        const dropdown = document.getElementById('dropdown');
-        if (dropdown) dropdown.style.display = 'none';
-        
-        const kebabDropdown = document.querySelector('.kebab-dropdown');
-        if (kebabDropdown) kebabDropdown.classList.remove('active');
-        
-        // Show chat container and input after closing any section
-        showContainer('chat');
-    }
-
     // Zoom functions remain the same
     function openZoom(src) {
         document.body.style.overflow = 'hidden';
@@ -4418,17 +4470,6 @@
         document.body.style.overflow = '';
         const overlay = document.getElementById('zoom-overlay');
         if (overlay) overlay.style.display = 'none';
-    }
-
-    const overlay = document.getElementById('overlay');
-    if (overlay) {
-        overlay.addEventListener('click', function() {
-            document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container').forEach(container => {
-                container.style.display = 'none';
-            });
-            this.style.display = 'none';
-            showContainer('chat');
-        });
     }
 
     // Initialize if user is logged in
