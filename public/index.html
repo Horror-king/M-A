@@ -1904,6 +1904,8 @@
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
+
+// --- CUT HERE ---
 <script>
     let isLogin = true;
     let users = JSON.parse(localStorage.getItem('users')) || {};
@@ -1969,7 +1971,7 @@
         elements.usernameInput.value = currentUsername;
     }
 
-    // ===== FIXED: PREVENT DOUBLE AI RESPONSES =====
+    // ===== FIXED: MESSAGE ORDER AND SECTION MANAGEMENT =====
 
     // Initialize socket connection for real-time messaging
     function initSocket() {
@@ -2058,7 +2060,7 @@
         });
     }
 
-    // ===== FIXED: REMOVED DUPLICATE AI RESPONSE CALLS =====
+    // ===== FIXED: MESSAGE FUNCTIONS WITH CORRECT ORDER =====
 
     async function sendMessage() {
         if (isSending) return;
@@ -2138,8 +2140,8 @@
             // Display message immediately for the sender
             displayMessage(content, 'sent', replyToText, username, null, true);
             
-            // FIXED: REMOVED fetchChatResponse call - let server handle AI response
-            // The server will send AI response via socket automatically
+            // Get AI response
+            fetchChatResponse(content);
             
             // Clear input
             elements.messageInput.value = '';
@@ -2175,16 +2177,8 @@
         elements.privateSendButton.classList.remove('enabled');
 
         try {
-            // FIXED: REMOVED fetchPrivateAIResponse call - let server handle private AI response
-            // The server will send private AI response via socket automatically
-            
-            // Emit private message via socket to trigger server-side AI response
-            if (socket && socket.connected) {
-                socket.emit('send-private-message', {
-                    content: content,
-                    username: currentUsername
-                });
-            }
+            // Get AI response directly instead of using socket for private messages
+            await fetchPrivateAIResponse(content);
         } catch (error) {
             console.error('Error sending private message:', error);
             showError('Could not process your private message. Please try again.');
@@ -2704,10 +2698,6 @@
             }
         });
     });
-
-    // ===== REMOVED: DUPLICATE AI RESPONSE FUNCTIONS =====
-    // Removed fetchChatResponse and fetchPrivateAIResponse function calls
-    // The server will handle AI responses automatically via socket
 
     // ===== REST OF THE FUNCTIONS REMAIN THE SAME =====
 
@@ -3850,9 +3840,64 @@
         };
     }
 
-    // ===== REMOVED: fetchChatResponse and fetchPrivateAIResponse functions =====
-    // These functions were causing duplicate AI responses
-    // The server now handles AI responses automatically via socket events
+    async function fetchChatResponse(userInput) {
+        try {
+            const response = await fetch('/api/command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: userInput,
+                    source: 'main-chat'
+                }),
+            });
+            const data = await response.json();
+            if (data.reply) {
+                if (Array.isArray(data.reply)) {
+                    data.reply.forEach(reply => displayMessage(reply, 'received', null, 'AI', null, true));
+                } else {
+                    displayMessage(data.reply, 'received', null, 'AI', null, true);
+                }
+            }
+        } catch (error) {
+            console.error("Error fetching AI response:", error);
+        }
+    }
+
+    async function fetchPrivateAIResponse(userInput) {
+        try {
+            const response = await fetch('/api/command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: userInput,
+                    source: 'private-ai'
+                }),
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            if (data.reply) {
+                // Display in private AI container
+                if (Array.isArray(data.reply)) {
+                    data.reply.forEach(reply => displayPrivateMessage(reply, 'received'));
+                } else {
+                    displayPrivateMessage(data.reply, 'received');
+                }
+            } else {
+                throw new Error('No reply from AI');
+            }
+        } catch (error) {
+            console.error("Error fetching Private AI response:", error);
+            displayPrivateMessage("Sorry, I encountered an error processing your message. Please try again.", 'received');
+        }
+    }
 
     function handleTouchStart(e) {
         isLongPress = false;
