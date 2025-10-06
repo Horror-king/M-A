@@ -1,4506 +1,969 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MessageMate</title>
-    <meta property="og:image" content="https://i.ibb.co/p6LrrNRK/1746227326721.jpg" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="MessageMate" />
-    <meta name="twitter:description" content="Chat smarter with MessageMate – Hassan powered messaging companion." />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script src="/socket.io/socket.io.js"></script>
-    <style>
-        /* COMPLETELY FIXED: Secret Code Container */
-        .secret-code-container {
-            padding: 20px;
-            width: 100vw;
-            height: 100vh;
-            max-width: 100vw;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: white;
-            border-radius: 0;
-            box-shadow: none;
-            overflow-y: auto;
-            overflow-x: hidden;
-            display: none;
-            z-index: 1002;
-            box-sizing: border-box;
-        }
-
-        .secret-code-box {
-            background-color: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.1);
-            width: calc(100% - 40px);
-            max-width: 400px;
-            margin: 50px auto;
-            text-align: center;
-            box-sizing: border-box;
-        }
-
-        .secret-code-box h2 {
-            color: #1c1e21;
-            margin-bottom: 20px;
-            font-weight: 600;
-        }
-
-        .secret-code-box p {
-            color: #65676b;
-            margin-bottom: 25px;
-            font-size: 15px;
-            line-height: 1.5;
-        }
-
-        .secret-code-box input {
-            width: 100%;
-            height: 50px;
-            padding: 0 15px;
-            margin-bottom: 20px;
-            border: 1px solid #DADAF2;
-            background: #F8F8FB;
-            border-radius: 8px;
-            outline: none;
-            font-size: 16px;
-            transition: 0.2s ease;
-            text-align: center;
-            letter-spacing: 2px;
-            font-family: monospace;
-            font-size: 18px;
-            box-sizing: border-box;
-            max-width: 100%;
-        }
-
-        .secret-code-box input:focus {
-            border-color: #4267B2;
-            background-color: #fff;
-            box-shadow: 0 0 0 2px rgba(66, 103, 178, 0.2);
-        }
-
-        .secret-code-box button {
-            width: 100%;
-            height: 50px;
-            background-color: #4267B2;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 500;
-            transition: 0.3s ease;
-        }
-
-        .secret-code-box button:hover {
-            background-color: #365899;
-        }
-
-        .secret-code-box button:disabled {
-            background-color: #a0a4ab;
-            cursor: not-allowed;
-        }
-
-        .secret-code-error {
-            color: #e53e3e;
-            font-size: 0.875rem;
-            margin-top: 0.5rem;
-            display: none;
-        }
-
-        .secret-code-success {
-            color: #2f855a;
-            font-size: 0.875rem;
-            margin-top: 0.5rem;
-            display: none;
-        }
-
-        .attempts-warning {
-            color: #ed8936;
-            font-size: 0.8rem;
-            margin-top: 10px;
-            display: none;
-        }
-
-        .lockout-message {
-            color: #e53e3e;
-            font-size: 0.9rem;
-            margin-top: 15px;
-            display: none;
-            background: #fed7d7;
-            padding: 10px;
-            border-radius: 5px;
-        }
-
-        .code-hint {
-            font-size: 0.8rem;
-            color: #718096;
-            margin-top: 15px;
-            font-style: italic;
-        }
-
-        /* COMPLETELY FIXED: SQL Editor Container */
-        .sql-editor-container {
-            padding: 20px;
-            width: 100vw;
-            height: 100vh;
-            max-width: 100vw;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: white;
-            border-radius: 0;
-            box-shadow: none;
-            overflow-y: auto;
-            overflow-x: hidden;
-            display: none;
-            z-index: 1002;
-            box-sizing: border-box;
-        }
-
-        .sql-editor-box {
-            background-color: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.1);
-            width: calc(100% - 40px);
-            max-width: 1000px;
-            margin: 50px auto;
-            box-sizing: border-box;
-        }
-
-        /* FIXED: Ensure all elements inside don't cause overflow */
-        .sql-editor-box * {
-            max-width: 100%;
-        }
-
-        .sql-editor-toolbar {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-
-        .sql-btn {
-            padding: 8px 16px;
-            border: 1px solid #ddd;
-            background: #f8f9fa;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .sql-btn.primary {
-            background: #4267B2;
-            color: white;
-            border-color: #4267B2;
-        }
-
-        .sql-btn:hover {
-            background: #e9ecef;
-        }
-
-        .sql-btn.primary:hover {
-            background: #365899;
-        }
-
-        #sql-textarea {
-            width: 100%;
-            height: 150px;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-family: monospace;
-            font-size: 14px;
-            resize: vertical;
-            margin-bottom: 20px;
-            box-sizing: border-box;
-            max-width: 100%;
-            overflow-x: auto;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-
-        .sql-results-container {
-            margin-bottom: 20px;
-        }
-
-        .sql-results {
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            padding: 15px;
-            min-height: 100px;
-            max-height: 400px;
-            overflow-y: auto;
-            background: #f8f9fa;
-        }
-
-        .sql-result-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 10px;
-        }
-
-        .sql-result-table th,
-        .sql-result-table td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-
-        .sql-result-table th {
-            background: #e9ecef;
-            font-weight: bold;
-        }
-
-        .sql-result-table tr:nth-child(even) {
-            background: #f8f9fa;
-        }
-
-        .sql-row-count {
-            font-size: 12px;
-            color: #666;
-            margin-top: 10px;
-        }
-
-        .sql-success-message {
-            color: #2f855a;
-            background: #f0fff4;
-            padding: 10px;
-            border-radius: 4px;
-            border: 1px solid #9ae6b4;
-        }
-
-        .sql-error-message {
-            color: #e53e3e;
-            background: #fed7d7;
-            padding: 10px;
-            border-radius: 4px;
-            border: 1px solid #feb2b2;
-        }
-
-        .saved-queries-container {
-            margin-bottom: 20px;
-        }
-
-        .saved-queries-list {
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-
-        .saved-query-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 15px;
-            border-bottom: 1px solid #eee;
-        }
-
-        .saved-query-item:last-child {
-            border-bottom: none;
-        }
-
-        .query-name {
-            font-weight: 500;
-        }
-
-        .query-actions {
-            display: flex;
-            gap: 5px;
-        }
-
-        .query-btn {
-            padding: 4px 8px;
-            font-size: 12px;
-            border: 1px solid #ddd;
-            background: white;
-            border-radius: 3px;
-            cursor: pointer;
-        }
-
-        .load-btn {
-            color: #4267B2;
-            border-color: #4267B2;
-        }
-
-        .delete-btn {
-            color: #e53e3e;
-            border-color: #e53e3e;
-        }
-
-        .no-queries {
-            padding: 20px;
-            text-align: center;
-            color: #666;
-            font-style: italic;
-        }
-
-        .sql-help {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 4px;
-            border: 1px solid #e9ecef;
-        }
-
-        .sql-help h4 {
-            margin: 10px 0 5px 0;
-            color: #333;
-        }
-
-        .sql-help ul {
-            margin: 0;
-            padding-left: 20px;
-        }
-
-        .sql-help li {
-            margin: 5px 0;
-            font-size: 14px;
-        }
-
-        .sql-help code {
-            background: #e9ecef;
-            padding: 2px 4px;
-            border-radius: 3px;
-            font-family: monospace;
-        }
-
-        /* MOBILE FIXES */
-        @media (max-width: 768px) {
-            .secret-code-container,
-            .sql-editor-container {
-                padding: 15px;
-                width: 100vw;
-            }
-            
-            .secret-code-box,
-            .sql-editor-box {
-                padding: 20px 15px;
-                margin: 20px auto;
-                width: calc(100% - 30px);
-                max-width: calc(100% - 30px);
-            }
-            
-            .sql-editor-toolbar {
-                flex-wrap: wrap;
-                gap: 5px;
-            }
-            
-            .sql-btn {
-                padding: 8px 12px;
-                font-size: 14px;
-                flex: 1;
-                min-width: 120px;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .secret-code-container,
-            .sql-editor-container {
-                padding: 10px;
-            }
-            
-            .secret-code-box,
-            .sql-editor-box {
-                padding: 15px 10px;
-                margin: 10px auto;
-                width: calc(100% - 20px);
-                max-width: calc(100% - 20px);
-                border-radius: 8px;
-            }
-            
-            .sql-editor-toolbar {
-                flex-direction: column;
-            }
-            
-            .sql-btn {
-                width: 100%;
-                margin-bottom: 5px;
-            }
-            
-            /* Ensure tables don't cause horizontal scroll */
-            .sql-result-table {
-                font-size: 12px;
-            }
-            
-            .sql-result-table th,
-            .sql-result-table td {
-                padding: 4px 6px;
-            }
-        }
-
-        /* EMERGENCY FIX: If still having issues, add this */
-        body {
-            overflow-x: hidden;
-            max-width: 100vw;
-        }
-
-        /* Fix close button positioning */
-        .close-btn {
-            position: fixed;
-            top: 15px;
-            right: 15px;
-            font-size: 30px;
-            cursor: pointer;
-            color: #333;
-            z-index: 1003;
-            background: white;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-
-        /* FIXED: Image loading styles - Remove transitions and ensure immediate display */
-        .message img {
-            width: 100%;
-            margin: 4px 0 0 0;
-            display: block;
-            border-radius: 10px;
-            object-fit: cover;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            /* REMOVE transitions that cause slow reveal */
-            transition: none !important;
-            opacity: 1 !important;
-            animation: none !important;
-            /* Force immediate rendering */
-            visibility: visible !important;
-        }
-
-        /* Ensure images are always fully visible */
-        .message img[src] {
-            opacity: 1 !important;
-            visibility: visible !important;
-        }
-
-        /* Preload helper for images */
-        .img-preload {
-            position: absolute;
-            opacity: 0;
-            visibility: hidden;
-            width: 0;
-            height: 0;
-        }
-
-        /* Rest of your existing styles remain the same */
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f0f2f5;
-            margin: 0;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .loader {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(255, 255, 255, 0.9);
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .error-message {
-            color: #e53e3e;
-            font-size: 0.875rem;
-            margin-top: 0.5rem;
-            display: none;
-        }
-
-        .success-message {
-            color: #2f855a;
-            font-size: 0.875rem;
-            margin-top: 0.5rem;
-            display: none;
-        }
-
-        .menu {
-            display: none;
-            justify-content: space-between;
-            align-items: center;
-            background-color: white;
-            padding: 3px 10px;
-            border-bottom: 1px solid #dddfe2;
-            position: fixed;
-            top: 0;
-            width: 100%;
-            z-index: 1000;
-            box-sizing: border-box;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            height: 50px;
-        }
-
-        .menu .hamburger {
-            font-size: 24px;
-            color: #1c1e21;
-            cursor: pointer;
-            padding: 5px;
-            border-radius: 4px;
-            transition: background-color 0.2s;
-        }
-
-        .menu .hamburger:hover {
-            background-color: #f5f5f5;
-        }
-
-        .menu .title {
-            font-size: 18px;
-            color: #1c1e21;
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
-            margin: 0;
-            font-weight: 500;
-        }
-
-        .kebab-menu {
-            position: absolute;
-            right: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            cursor: pointer;
-            z-index: 1001;
-        }
-
-        .kebab-menu .dots {
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-            padding: 5px;
-        }
-
-        .kebab-menu .dot {
-            width: 4px;
-            height: 4px;
-            background-color: #1c1e21;
-            border-radius: 50%;
-        }
-
-        .kebab-dropdown {
-            position: absolute;
-            top: 100%;
-            right: 0;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            display: none;
-            min-width: 150px;
-            z-index: 1002;
-            border: 1px solid #e4e6eb;
-        }
-
-        .kebab-dropdown.active {
-            display: block;
-        }
-
-        .kebab-dropdown a {
-            display: block;
-            padding: 10px 15px;
-            color: #1c1e21;
-            text-decoration: none;
-            transition: background-color 0.2s;
-            border-bottom: 1px solid #f0f2f5;
-        }
-
-        .kebab-dropdown a:hover {
-            background-color: #f0f2f5;
-        }
-
-        .kebab-dropdown a:last-child {
-            border-bottom: none;
-        }
-
-        .title {
-            font-size: 1.5rem;
-            font-weight: bold;
-        }
-
-        .dropdown {
-            display: none;
-            background-color: white;
-            position: fixed;
-            top: 50px;
-            width: 60%;
-            left: 0;
-            z-index: 999;
-            box-sizing: border-box;
-            height: auto;
-            border-radius: 0 7px 7px 0;
-            box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
-            border: 1px solid #e4e6eb;
-        }
-
-        .dropdown a {
-            color: #1c1e21;
-            padding: 10px 15px;
-            text-decoration: none;
-            display: block;
-            border-bottom: 1px solid #f0f2f5;
-        }
-
-        .dropdown a:hover {
-            background-color: #f0f2f5;
-            color: #1c1e21;
-        }
-
-        .dropdown a:last-child {
-            border-bottom: none;
-        }
-
-        .container {
-            display: none;
-            background: white;
-        }
-
-        .active {
-            display: block;
-            background: white;
-        }
-
-        html, body {
-            overflow: auto;
-            height: 100%;
-        }
-
-        /* FIXED: Main chat container that includes both online users and messages */
-        .main-chat-interface {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            max-width: 600px;
-            margin: 50px auto 0;
-            width: 100%;
-            height: calc(100vh - 50px);
-            background-color: white;
-            position: relative;
-            overflow: hidden;
-            border-radius: 0;
-            box-shadow: none;
-        }
-
-        /* FIXED: Chat messages container with proper scrolling and padding */
-        .chat-messages, #private-ai-container {
-            flex: 1;
-            padding: 5px 15px;
-            overflow-y: auto;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            scroll-behavior: smooth;
-            background-color: white;
-            position: relative;
-            margin-top: 0;
-            font-size: 16px;
-            -webkit-overflow-scrolling: touch;
-            overscroll-behavior: contain;
-            touch-action: auto;
-            gap: 2px;
-            box-sizing: border-box;
-            /* FIXED: Much larger bottom padding to ensure messages are visible above input */
-            padding-bottom: 125px; /* Increased significantly from 120px */
-            /* FIXED: Add margin at the bottom to create space for the input */
-            margin-bottom: 65px;
-        }
-         /* FIXED: Ensure the chat container itself has proper spacing */
-        .chat-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            background-color: white;
-            overflow: hidden;
-            position: relative;
-            /* FIXED: Add padding at the bottom of the container */
-            padding-bottom: 65px;
-        }
-
-        #private-ai {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            background-color: white;
-            overflow: hidden;
-            position: relative;
-            /* FIXED: Add padding at the bottom of the container */
-            padding-bottom: 45px;
-        }
-                
-        /* Improved message styling with better avatar alignment */
-        .message {
-            padding: 6px 10px;
-            border-radius: 18px;
-            margin-bottom: 2px;
-            max-width: 85%;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            word-break: break-word;
-            white-space: pre-wrap;
-            position: relative;
-            display: flex;
-            align-items: flex-start;
-            gap: 6px;
-            touch-action: none;
-            -webkit-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
-            touch-action: manipulation;
-            box-sizing: border-box;
-        }
-
-        .content {
-            user-select: none;
-            flex-grow: 1;
-            padding: 8px 12px;
-            border-radius: 14px;
-            position: relative;
-            overflow: hidden;
-            background-color: #f2f3f5;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-            max-width: 100%;
-            overflow-wrap: break-word;
-            word-break: break-word;
-            box-sizing: border-box;
-        }
-
-        .message.sent .content {
-            background-color: #dcf8c6;
-        }
-
-        .reply-preview {
-            font-size: 0.8em;
-            color: #555;
-            background-color: #eee;
-            padding: 4px 8px;
-            border-left: 3px solid #888;
-            margin-bottom: 4px;
-            border-radius: 5px;
-            max-width: 90%;
-            white-space: pre-wrap;
-        }
-
-        /* Improved avatar styling */
-       .message .avatar {
-           width: 26px; /* Changed from 28px */
-           height: 26px; /* Changed from 28px */
-           border-radius: 50%;
-           flex-shrink: 0;
-           background-size: cover;
-           background-position: center;
-           background-repeat: no-repeat;
-           align-self: flex-start;
-           margin-top: 6px; /* Changed from 10px */
-        }
-
-        .message.sent .avatar {
-    display: block;
-    order: 2;
-    margin-top: 6px; /* Changed from 10px */
-}
-        .message .avatar img {
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            display: block;
-        }
-
-        /* Improved username with status indicator */
-        .message .username {
-            font-size: 0.68rem;
-            font-weight: bold;
-            color: #777;
-            margin-bottom: 2px;
-            line-height: 1;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .user-status-indicator {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            display: inline-block;
-        }
-
-        .user-status-indicator.online {
-            background-color: #4CAF50;
-            box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
-        }
-
-        .user-status-indicator.offline {
-            background-color: #ccc;
-        }
-
-        .user-status-indicator.away {
-            background-color: #FFC107;
-        }
-
-        /* Message body improvements */
-        .message-body {
-            display: flex;
-            flex-direction: column;
-            flex-grow: 1;
-            min-width: 0; /* Prevent flex overflow */
-        }
-
-        /* Received messages (left aligned) */
-        .message.received {
-    align-self: flex-start;
-    margin-left: -10px; /* Changed from -15px */
-    flex-direction: row;
-}
-        /* Sent messages (right aligned) - HIDE AVATAR FOR SENT MESSAGES */
-        .message.sent {
-    align-self: flex-end;
-    margin-right: -10px; /* Changed from -15px */
-    flex-direction: row;
-    justify-content: flex-end;
-}
-  
-       .message.sent .content {
-    order: 1;
+const express = require('express');
+const cors = require('cors');
+const { createClient } = require('@supabase/supabase-js');
+const multer = require('multer');
+const path = require('path');
+const axios = require('axios');
+const fs = require('fs-extra');
+const config = require('./config.json');
+const http = require('http');
+const { Server } = require('socket.io');
+
+// Initialize apps
+const app = express();
+const server = http.createServer(app);
+const port = process.env.PORT || 3000;
+
+// Initialize Socket.io
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+// Track online users - 3 MINUTE TIMEOUT
+const onlineUsers = new Map();
+const onlineStatusTimeout = 180000; // 3 minutes = 180000 milliseconds
+
+// Global setup
+global.GoatBot = { config };
+global.utils = {
+  log: {
+    info: (...args) => console.log("[INFO]", ...args),
+    err: (...args) => console.error("[ERROR]", ...args)
+  },
+  getText: () => "✅ Bot is running smoothly"
+};
+
+// Initialize Supabase
+const supabase = createClient(
+  'https://rqissetffrnkfzfgsngm.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxaXNzZXRmZnJua2Z6ZmdzbmdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNzU2NzIsImV4cCI6MjA3NDc1MTY3Mn0.6tCuI4yhn3EXlua9na4kkgMqX6PL00GxjEuY0QG2bTg',
+);
+
+// Configure multer for file uploads
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+    files: 1
+  },
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png|gif|webp/;
+    const mimetype = filetypes.test(file.mimetype);
+    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+
+    if (mimetype && extname) {
+      return cb(null, true);
+    }
+    cb(new Error('Only image files are allowed (jpeg, jpg, png, gif, webp)'));
+  }
+});
+
+// Render-specific configuration
+const isRender = process.env.RENDER === 'true';
+const renderExternalUrl = process.env.RENDER_EXTERNAL_URL;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.static('public'));
+
+// Enhanced Uptime System for Render
+if (config.autoUptime?.enable || isRender) {
+  const myUrl = renderExternalUrl || config.autoUptime?.url || `http://localhost:${port}`;
+
+  global.utils.log.info("RENDER UPTIME", `Monitoring endpoint available at: ${myUrl}/uptime`);
+  global.utils.log.info("UPTIMEROBOT TIP", `Add this URL to UptimeRobot: ${myUrl}/health`);
+
+  // Simple keep-alive endpoint
+  app.get("/uptime", (req, res) => {
+    res.status(200).json({
+      status: "OK",
+      timestamp: Date.now(),
+      uptime: process.uptime(),
+      platform: "Render",
+      monitor: "UptimeRobot"
+    });
+  });
+
+  // Comprehensive health check
+  app.get("/health", (req, res) => {
+    res.json({
+      status: "healthy",
+      version: require('./package.json').version,
+      node: process.version,
+      memory: process.memoryUsage(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || "development",
+      platform: process.platform,
+      render: isRender,
+      endpoints: {
+        uptime: `${myUrl}/uptime`,
+        api: `${myUrl}/api/command`
+      }
+    });
+  });
+
+  // Auto-ping for Render's inactivity timeout
+  if (isRender) {
+    const pingInterval = setInterval(() => {
+      axios.get(`${myUrl}/uptime`)
+        .then(() => global.utils.log.info("RENDER PING", "Keeping Render instance alive"))
+        .catch(err => global.utils.log.err("RENDER PING", err.message));
+    }, 4 * 60 * 1000); // Ping every 4 minutes
+
+    process.on('exit', () => clearInterval(pingInterval));
+  }
 }
 
+// Command loader setup
+const COMMANDS_DIR = path.join(__dirname, "commands");
+const PREFIX = config.prefix || "!";
+const commands = {};
 
-        /* Hide avatar and username for sent messages */
-        .message.sent .avatar {
-            display: none !important;
-        }
+function loadCommands() {
+  Object.keys(require.cache).forEach((key) => {
+    if (key.startsWith(COMMANDS_DIR)) delete require.cache[key];
+  });
 
-        .message.sent .username {
-            display: none !important;
+  const commandFiles = fs.readdirSync(COMMANDS_DIR).filter(file => file.endsWith(".js"));
+  commandFiles.forEach(file => {
+    try {
+      const cmd = require(path.join(COMMANDS_DIR, file));
+      if (cmd.config?.name) {
+        commands[cmd.config.name] = cmd;
+        if (Array.isArray(cmd.config.aliases)) {
+          cmd.config.aliases.forEach(alias => commands[alias] = cmd);
         }
-
-        .message.received .content {
-            background-color: #f0f0f0;
-        }
-
-        .message-context-menu {
-            position: absolute;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            padding: 8px 0;
-            z-index: 1000;
-            display: none;
-        }
-
-        .message-context-menu.active {
-            display: block;
-        }
-
-        .message-context-menu button {
-            display: block;
-            width: 100%;
-            padding: 8px 16px;
-            border: none;
-            background: none;
-            text-align: left;
-            cursor: pointer;
-            font-size: 14px;
-            color: #333;
-        }
-
-        .message-context-menu button:hover {
-            background-color: #f5f5f5;
-        }
-
-        .copy-btn {
-            position: absolute;
-            bottom: -19px;
-            left: 10px;
-            background: none;
-            color: black;
-            border: none;
-            padding: 0;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .copy-btn span {
-            margin-right: 5px;
-        }
-
-        .copy-btn:hover {
-            background-color: white;
-        }
-
-        .copy-btn:focus {
-            outline: none;
-        }
-
-        /* FIXED: Chat input positioning - Now properly positioned without hiding messages */
-        .chat-input {
-            display: none;
-            align-items: center;
-            padding: 5px;
-            border-top: 1px solid #e4e6eb;
-            background-color: white;
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            max-width: 600px;
-            box-sizing: border-box;
-            z-index: 1000;
-            height: auto;
-            min-height: 55px;
-        }
-        .chat-input textarea {
-            flex: 1;
-            padding: .2rem 1.25rem;
-            border-radius: 20px;
-            border: none;
-            scrollbar-width: none;
-            align-items: center;
-            outline: none;
-            gap: 10px;
-            font-size: 17px;
-            max-height: 150px;
-            color: #1c1e21;
-            background-color: #f0f2f5;
-            overflow-y: scroll;
-            position: relative;
-            margin-bottom: -0px;
-            width: 100%;
-            border: 1px solid #f0f2f5;
-            box-sizing: border-box;
-            font-family: Arial, sans-serif;
-        }
-
-        .chat-input button {
-            background: none;
-            border: none;
-            cursor: pointer;
-            padding: 0 10px;
-        }
-
-        .chat-input button i {
-            font-size: 24px;
-            color: #888;
-            transition: color 0.3s;
-        }
-
-        .chat-input button.enabled i {
-            color: #4267B2;
-        }
-
-        /* Fix for Private AI send button */
-        #private-ai .chat-input button.enabled i {
-            color: #4267B2 !important;
-        }
-
-        .auth-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            background-color: #f0f2f5;
-            padding: 0 10px;
-        }
-
-        .auth-box {
-            background-color: white;
-            padding: 41px 30px;
-            border-radius: 10px;
-            box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.15);
-            width: 100%;
-            max-width: 300px;
-            text-align: center;
-        }
-
-        .auth-box input {
-            width: 90%;
-            height: 57px;
-            padding: 0 20px;
-            margin-bottom: 20px;
-            border: 1px solid #DADAF2;
-            background: #F8F8FB;
-            border-radius: 5px;
-            outline: none;
-            font-size: 16px;
-            transition: 0.2s ease;
-        }
-
-        .auth-box input:focus {
-            border-color: #626cd6;
-            background-color: #fff;
-        }
-
-        .auth-box button {
-            width: 100%;
-            height: 56px;
-            background-color: #4267B2;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 18px;
-            font-weight: 500;
-            text-transform: uppercase;
-            transition: 0.3s ease;
-            margin-top: 10px;
-        }
-
-        .auth-box button:hover {
-            background-color: #365899;
-        }
-
-        .logout {
-            color: red;
-            font-weight: 600;
-            display: inline-block;
-            margin-top: 15px;
-        }
-
-        .auth-toggle {
-            margin-top: 15px;
-        }
-
-        .auth-toggle a {
-            color: #4267B2;
-            text-decoration: none;
-            font-weight: 500;
-            transition: 0.3s ease;
-        }
-
-        .auth-toggle a:hover {
-            text-decoration: underline;
-        }
-
-        /* FIXED: Specific positioning for Private AI go-top button */
-        #private-ai .go-top-btn {
-            position: fixed;
-            width: 40px;
-            height: 40px;
-            background: #128C7E;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 20px;
-            cursor: pointer;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-            z-index: 999;
-            bottom: 80px;
-            right: 20px;
-            opacity: 0;
-            transform: translateY(20px);
-            transition: all 0.3s ease;
-            display: none;
-        }
-
-        #private-ai .go-top-btn.visible {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        #private-ai .go-top-btn:hover {
-            background: #075E54;
-        }
-
-        /* FIXED: Specific positioning for main chat scroll-to-bottom button */
-        #chat .scroll-to-bottom-btn {
-            position: fixed;
-            width: 40px;
-            height: 40px;
-            background: #128C7E;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 20px;
-            cursor: pointer;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-            z-index: 999;
-            bottom: 80px;
-            right: 20px;
-            opacity: 0;
-            transform: translateY(20px);
-            transition: all 0.3s ease;
-            display: none;
-        }
-
-        #chat .scroll-to-bottom-btn.visible {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        #chat .scroll-to-bottom-btn:hover {
-            background: #075E54;
-        }
-
-        .about-container, .features-container, .help-container {
-            padding: 20px;
-            width: 90%;
-            height: 100vh;
-            max-width: none;
-            max-height: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            background: white;
-            border-radius: 0;
-            box-shadow: none;
-            overflow-y: auto;
-            display: none;
-            z-index: 1002;
-        }
-
-        .overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-        }
-
-        .section-title {
-            color: #333;
-            margin-bottom: 20px;
-            font-size: 24px;
-            border-bottom: 2px solid #4267B2;
-            padding-bottom: 10px;
-        }
-
-        .section-content {
-            line-height: 1.6;
-            color: #666;
-        }
-
-        .features-list {
-            list-style: none;
-            padding: 0;
-        }
-
-        .features-list li {
-            margin: 15px 0;
-            padding-left: 25px;
-            position: relative;
-        }
-
-        .features-list li:before {
-            content: '✓';
-            color: #4267B2;
-            position: absolute;
-            left: 0;
-        }
-
-        .help-section {
-            margin-bottom: 20px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-        }
-
-        .help-question {
-            font-weight: bold;
-            color: #4267B2;
-            margin-bottom: 10px;
-        }
-
-        .help-answer {
-            margin-left: 20px;
-            color: #666;
-        }
-
-        .news-container {
-            position: fixed;
-            right: 20px;
-            top: 80px;
-            width: 300px;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            z-index: 100;
-            display: none;
-        }
-
-        .news-header {
-            padding: 15px;
-            border-bottom: 1px solid #eee;
-            font-weight: bold;
-            color: #333;
-        }
-
-        .news-items {
-            max-height: 400px;
-            overflow-y: auto;
-            padding: 10px;
-        }
-
-        .news-item {
-            padding: 10px;
-            border-bottom: 1px solid #eee;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-
-        .news-item:hover {
-            background-color: #f5f5f5;
-        }
-
-        .news-item h3 {
-            margin: 0 0 5px 0;
-            font-size: 14px;
-            color: #333;
-        }
-
-        .news-item p {
-            margin: 0;
-            font-size: 12px;
-            color: #666;
-        }
-
-        .news-toggle {
-            position: fixed;
-            right: 44px;
-            top: 17px;
-            background: transparent;
-            color: #333;
-            border: none;
-            width: auto;
-            height: auto;
-            border-radius: 0;
-            cursor: pointer;
-            z-index: 101;
-            padding: 0;
-            transition: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index:1000;
-        }
-
-        .news-toggle i {
-            font-size: 20px;
-        }
-
-        /* Improved profile panel styling - Facebook-like white theme */
-        .profile-panel {
-            display: flex;
-            align-items: center;
-            padding: 15px;
-            background: white;
-            color: #1c1e21;
-            border-bottom: 1px solid #e4e6eb;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        }
-
-        .profile-avatar {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    overflow: hidden;
-    margin-right: 10px;
+        console.log(`✅ Loaded command: ${PREFIX}${cmd.config.name}`);
+      }
+    } catch (err) {
+      console.error(`❌ Failed to load ${file}:`, err);
+    }
+  });
 }
 
-        .profile-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
+// Create commands directory if it doesn't exist
+fs.ensureDirSync(COMMANDS_DIR);
+loadCommands();
 
-        .profile-info {
-            flex-grow: 1;
-        }
+// Handle input
+function handleCommand(input) {
+  if (!input.startsWith(PREFIX)) return null;
+  const args = input.slice(PREFIX.length).trim().split(/\s+/);
+  const commandName = args.shift().toLowerCase();
+  const text = args.join(" ");
+  return { commandName, args, text };
+}
 
-        .profile-username {
-            font-weight: 600;
-            font-size: 16px;
-            margin-bottom: 2px;
-            color: #1c1e21;
-        }
+// Chat API Endpoints
 
-        .profile-status {
-            font-size: 12px;
-            color: #65676b;
-            display: flex;
-            align-items: center;
-        }
+// GET messages
+app.get('/messages', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('chatter')
+      .select('id, content, username, created_at, image_url, reply_to')
+      .order('created_at', { ascending: false });
 
-        .profile-status .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            margin-right: 5px;
-        }
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
-        .profile-status.online .status-dot {
-            background-color: #31a24c;
-        }
+// POST messages - FIXED: Proper handling for regular messages
+app.post('/messages', async (req, res) => {
+  try {
+    const { content, username, image_url, reply_to } = req.body;
 
-        .profile-status.offline .status-dot {
-            background-color: #bcc0c4;
-        }
+    console.log('📨 Received message:', { content, username, image_url, reply_to });
 
-        .menu-divider {
-            height: 1px;
-            background-color: #e4e6eb;
-            margin: 5px 0;
-        }
+    // FIXED: Better validation - allow empty content if there's an image
+    if ((!content || content.trim() === '') && !image_url) {
+      return res.status(400).json({ error: "Content or image is required" });
+    }
 
-        /* WhatsApp-style scroll button */
-        .new-messages-notification {
-            position: absolute;
-            top: -10px;
-            right: -10px;
-            background: #dcf8c6;
-            color: #128C7E;
-            font-size: 12px;
-            font-weight: bold;
-            border-radius: 50%;
-            width: 22px;
-            height: 22px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-        }
+    if (!username || username.trim() === '') {
+      return res.status(400).json({ error: "Username is required" });
+    }
 
-        .scroll-to-bottom-btn i {
-            transition: transform 0.2s ease;
-        }
-
-        .scroll-to-bottom-btn:hover i {
-            transform: translateY(2px);
-        }
-
-        @media (max-width: 600px) {
-            .scroll-to-bottom-btn {
-                bottom: 70px;
-                right: 15px;
-            }
-        }
-
-        /* FIXED: INTEGRATED ONLINE USERS PANEL - NOW PART OF CHAT CONTAINER */
-        .online-users-panel {
-            background: white;
-            border-radius: 0;
-            padding: 12px 15px;
-            margin: 0;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            overflow-x: auto;
-            border-bottom: 1px solid #e4e6eb;
-            flex-shrink: 0; /* Prevent shrinking */
-            height: auto; /* Let it take the space it needs */
-        }
-
-        .online-users-list {
-            display: flex;
-            gap: 4px;
-            padding: 5px 0;
-            overflow-x: auto;
-            max-width: 100%;
-            flex-wrap: nowrap;
-            align-items: center;
-            justify-content: flex-start;
-        }
-
-        .online-user {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 6px 8px;
-            border-radius: 15px;
-            background: #f0f2f5;
-            min-width: 60px;
-            transition: all 0.3s ease;
-            border: 1px solid transparent;
-            position: relative;
-            flex-shrink: 0;
-        }
-
-        .online-user:hover {
-            background: #e4e6eb;
-            border-color: #4267B2;
-            transform: translateY(-1px);
-        }
-
-        .online-user-avatar {
-            width: 42px;
-            height: 42px;
-            border-radius: 50%;
-            overflow: hidden;
-            margin-bottom: 6px;
-            position: relative;
-        }
-
-        .online-user-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        /* GREEN DOT INDICATOR */
-        .online-dot {
-            position: absolute;
-            bottom: 2px;
-            right: 2px;
-            width: 12px;
-            height: 12px;
-            background: #4CAF50;
-            border-radius: 50%;
-            border: 2px solid white;
-            z-index: 2;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-        }
-
-        .online-user-info {
-            text-align: center;
-            flex-grow: 1;
-        }
-
-        .online-user-name {
-            font-weight: 600;
-            font-size: 12px;
-            color: #1c1e21;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 55px;
-        }
-
-        /* Scrollbar styling for horizontal scroll */
-        .online-users-list::-webkit-scrollbar {
-            height: 4px;
-        }
-
-        .online-users-list::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 2px;
-        }
-
-        .online-users-list::-webkit-scrollbar-thumb {
-            background: #c1c1c1;
-            border-radius: 2px;
-        }
-
-        .online-users-list::-webkit-scrollbar-thumb:hover {
-            background: #a8a8a8;
-        }
-
-        /* Responsive adjustments for mobile */
-        @media (max-width: 480px) {
-            .online-users-panel {
-                padding: 10px 12px;
-                margin: 0;
-            }
-            
-            .online-users-list {
-                gap: 3px;
-            }
-            
-            .online-user {
-                min-width: 55px;
-                padding: 5px 6px;
-            }
-            
-            .online-user-avatar {
-                width: 38px;
-                height: 38px;
-            }
-            
-            .online-dot {
-                width: 10px;
-                z-index: 100;
-                height: 10px;
-            }
-            
-            .online-user-name {
-                font-size: 11px;
-                max-width: 50px;
-            }
-            
-            .message .avatar {
-                width: 24px;
-                height: 24px;
-            }
-            
-            .profile-panel {
-                padding: 12px;
-            }
-            
-            .profile-avatar {
-                width: 36px;
-                height: 36px;
-            }
-            
-            /* FIXED: Increased padding for mobile to ensure messages are visible */
-            .chat-messages, #private-ai-container {
-                padding-bottom: 125px; /* Even more padding for mobile */
-                margin-bottom: 63px; /* More margin for mobile */
-            }
-            
-            /* FIXED: Adjust container padding for mobile */
-            .chat-container, #private-ai {
-                padding-bottom: 45px;
-            }
-        }
-
-        /* ADDED: CSS for long-press functionality */
-        .no-select {
-            -webkit-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
-            -webkit-touch-callout: none;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        /* Ensure private AI messages have the same touch behavior as main chat messages */
-        #private-ai-container .message {
-            touch-action: none;
-            -webkit-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
-            touch-action: manipulation;
-        }
-    </style>
-</head>
-<body>
-    <div class="loader" id="loader">
-        <div class="spinner"></div>
-    </div>
-
-    <div class="auth-container" id="auth-container">
-        <div class="auth-box">
-            <h2 id="auth-title">Login</h2>
-            <input type="text" id="auth-username" placeholder="Username">
-            <input type="password" id="auth-password" placeholder="Password">
-            <div class="error-message" id="error-message"></div>
-            <div class="success-message" id="success-message"></div>
-            <button onclick="handleAuth()">Login</button>
-            <div class="auth-toggle">
-                <span id="toggle-text">Don't have an account? </span>
-                <a href="#" id="toggle-link" onclick="toggleAuth()">Sign Up</a>
-            </div>
-        </div>
-    </div>
-
-    <div class="menu">
-        <div class="hamburger" onclick="toggleDropdown()">☰</div>
-        <div class="title">MessageMate&#9662;</div>
-        <div class="kebab-menu" onclick="toggleKebabMenu(event)">
-            <div class="dots">
-                <div class="dot"></div>
-                <div class="dot"></div>
-                <div class="dot"></div>
-            </div>
-            <div class="kebab-dropdown">
-                <a href="#" onclick="toggleTheme()">Toggle Theme</a>
-                <a href="#" onclick="clearChat()">Clear Chat</a>
-                <a href="#" onclick="exportChat()">Export Chat</a>
-                <a href="#" onclick="exportChatPDF()">Download PDF</a>
-                <a href="#" onclick="showSettings()">Settings</a>
-            </div>
-        </div>
-    </div>
-
-    <div class="dropdown" id="dropdown" style="display: none;">
-        <div class="profile-panel">
-            <div class="profile-avatar">
-                <img src="https://i.pravatar.cc/50?u=${encodeURIComponent(currentUsername)}" alt="Profile">
-            </div>
-            <div class="profile-info">
-                <div class="profile-username">${currentUsername}</div>
-                <div class="profile-status online">
-                    <span class="status-dot"></span>
-                    <span>Online</span>
-                </div>
-            </div>
-        </div>
-        <div class="menu-divider"></div>
-        <a href="#" onclick="showContainer('chat')">Chat with AI</a>
-        <a href="#" onclick="showContainer('private-ai')">Private AI</a>
-        <a href="#" onclick="showContainer('about')">About</a>
-        <a href="#" onclick="showContainer('features')">Features</a>
-        <a href="#" onclick="showContainer('help')">Help</a>
-        <!-- ADDED: Secret Code menu item -->
-        <a href="#" onclick="showContainer('secret-code')">Secret Code</a>
-        <!-- ADDED: SQL Editor menu item -->
-        <a href="#" onclick="showContainer('sql-editor-container')">🔍 SQL Editor</a>
-        <a href="#" onclick="logout()" style="color: #ff4444;">Logout</a>
-    </div>
-
-    <!-- FIXED: Moved online users panel INSIDE the main chat interface -->
-    <div id="chat" class="main-chat-interface container" style="display: none;">
-        <div class="online-users-panel">
-            <h3 style="margin: 0 0 12px 0; font-size: 16px; color: #1c1e21; display: flex; align-items: center; gap: 8px;">
-                Online Users 
-                <span id="online-count" style="background: #4CAF50; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px;">0</span>
-            </h3>
-            <div id="online-users-list" class="online-users-list"></div>
-        </div>
-        
-        <div class="chat-container">
-            <div class="chat-messages" id="chat-container"></div>
-            <div id="reply-preview-container"></div>
-        </div>
-        
-        <div class="chat-input" style="display: none;">
-            <textarea id="user-input" placeholder="Type your message..."></textarea>
-            <button id="send-button" onclick="sendMessage()" disabled>
-                <i class="fas fa-paper-plane"></i>
-            </button>
-        </div>
-        
-        <!-- FIXED: Scroll to bottom button specifically for main chat -->
-        <div class="scroll-to-bottom-btn" id="scrollToBottomBtn">
-            <i class="fas fa-chevron-down"></i>
-            <div class="new-messages-notification" id="newMessagesCount">0</div>
-        </div>
-    </div>
-
-    <!-- MODIFIED: Added online users panel to private AI container -->
-    <div id="private-ai" class="main-chat-interface container" style="display: none;">
-        <div class="online-users-panel">
-            <h3 style="margin: 0 0 12px 0; font-size: 16px; color: #1c1e21; display: flex; align-items: center; gap: 8px;">
-                Online Users 
-                <span id="private-online-count" style="background: #4CAF50; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px;">0</span>
-            </h3>
-            <div id="private-online-users-list" class="online-users-list"></div>
-        </div>
-        
-        <div class="chat-container">
-            <div class="chat-messages" id="private-ai-container"></div>
-            <div id="private-reply-preview-container"></div>
-        </div>
-        
-        <div class="chat-input" style="display: none;">
-            <textarea id="private-user-input" placeholder="Type your private message..."></textarea>
-            <button id="private-send-button" onclick="sendPrivateMessage()" disabled>
-                <i class="fas fa-paper-plane"></i>
-            </button>
-        </div>
-        
-        <!-- FIXED: Go to top button specifically for private AI -->
-        <div class="go-top-btn" id="private-go-top">
-            <i class="fas fa-arrow-up"></i>
-        </div>
-    </div>
-  
-    <button class="news-toggle" onclick="toggleNews()" title="Toggle News" style="display: none;">
-        <i class="fas fa-newspaper"></i>
-    </button>
-  
-    <div class="news-container" id="news-container">
-        <div class="news-header">Latest News</div>
-        <div class="news-items" id="news-items"></div>
-    </div>
-
-    <!-- ADDED: Secret Code Container -->
-    <div id="secret-code" class="secret-code-container">
-        <span class="close-btn" onclick="hideContainer('secret-code')">&times;</span>
-        <div class="secret-code-box">
-            <h2 class="section-title">Secret Code Verification</h2>
-            <p>Enter the secret code to access special features. The code is <strong>456i</strong>.</p>
-            <input type="text" id="secret-code-input" placeholder="Enter secret code" maxlength="10">
-            <div class="secret-code-error" id="secret-code-error">Invalid code. Please try again.</div>
-            <div class="secret-code-success" id="secret-code-success">Success! Code verified.</div>
-            <div class="attempts-warning" id="attempts-warning">Warning: <span id="attempts-left">3</span> attempts remaining</div>
-            <div class="lockout-message" id="lockout-message">Too many failed attempts. Please try again in <span id="lockout-time">5</span> minutes.</div>
-            <button id="verify-code-btn" onclick="verifySecretCode()">Verify Code</button>
-            <div class="code-hint">Hint: The code contains numbers and letters</div>
-        </div>
-    </div>
- 
-     <!-- FIXED: SQL Editor Container -->
-    <div id="sql-editor-container" class="sql-editor-container">
-        <span class="close-btn" onclick="hideContainer('sql-editor-container')">&times;</span>
-        <div class="sql-editor-box">
-            <h2 class="section-title">SQL Editor</h2>
-            <p>Execute SQL queries against the sample database. Supported operations: SELECT, INSERT, UPDATE, DELETE.</p>
-            
-            <div class="sql-editor-toolbar">
-                <button id="run-sql" class="sql-btn primary">Run Query</button>
-                <button id="save-sql" class="sql-btn">Save Query</button>
-                <button id="clear-sql" class="sql-btn">Clear</button>
-            </div>
-            
-            <textarea id="sql-textarea" placeholder="Enter your SQL query here... Example: SELECT * FROM users"></textarea>
-            
-            <div class="sql-results-container">
-                <h3>Results</h3>
-                <div id="sql-results" class="sql-results"></div>
-            </div>
-            
-            <div class="saved-queries-container">
-                <h3>Saved Queries</h3>
-                <div id="saved-queries-list" class="saved-queries-list"></div>
-            </div>
-            
-            <div class="sql-help">
-                <h4>Available Tables:</h4>
-                <ul>
-                    <li><strong>users</strong> - id, username, email, status, created_at</li>
-                    <li><strong>messages</strong> - id, user_id, content, timestamp</li>
-                </ul>
-                <h4>Sample Queries:</h4>
-                <ul>
-                    <li><code>SELECT * FROM users</code></li>
-                    <li><code>SELECT * FROM users WHERE status = 'active'</code></li>
-                    <li><code>SELECT COUNT(*) FROM users</code></li>
-                </ul>
-            </div>
-        </div>
-    </div>
-  
-    <div id="zoom-overlay" style="
-        display: none;
-        justify-content: center;
-        align-items: center;
-        position: fixed;
-        top: 0; left: 0;
-        width: 100vw; height: 100vh;
-        background: rgba(0, 0, 0, 0.95);
-        z-index: 9999;
-    ">
-        <div id="zoom-content" style="
-            position: relative;
-            z-index: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        ">
-            <div style="
-                position: absolute;
-                top: 15px;
-                right: 20px;
-                display: flex;
-                gap: 16px;
-                z-index: 2;
-            ">
-                <button onclick="closeZoom()" style="
-                    background: none;
-                    border: none;
-                    cursor: pointer;
-                    padding: 0;
-                ">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                </button>
-
-                <a id="download-btn" download style="
-                    background: none;
-                    border: none;
-                    cursor: pointer;
-                    padding: 0;
-                ">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="7 10 12 15 17 10" />
-                        <line x1="12" y1="15" x2="12" y2="3" />
-                    </svg>
-                </a>
-            </div>
-
-            <img id="zoom-image" style="
-                width: 100vw;
-                height: 100vh;
-                object-fit: contain;
-                border-radius: 0;
-                z-index: 1;
-            " />
-        </div>
-
-        <div onclick="closeZoom()" style="
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            top: 0;
-            left: 0;
-            z-index: 0;
-        "></div>
-    </div>
-
-    <div class="overlay" id="overlay"></div>
-
-    <div id="about" class="about-container">
-        <span class="close-btn" onclick="hideContainer('about')">&times;</span>
-        <h2 class="section-title">About this AI Chatbot</h2>
-        <div class="section-content">
-            <p>This advanced AI chatbot is designed to provide intelligent conversations and assist users with various tasks. Built with cutting-edge technology, it offers a seamless and intuitive experience.</p>
-            <p>Our mission is to make AI accessible and helpful for everyone, providing accurate and relevant responses while maintaining user privacy and data security.</p>
-            <p>For support, please contact us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></p>
-            <p>©<span id="year"></span> AI Chatbot. All rights reserved.</p>
-        </div>
-    </div>
-
-    <div id="features" class="features-container">
-        <span class="close-btn" onclick="hideContainer('features')">&times;</span>
-        <h2 class="section-title">Features</h2>
-        <ul class="features-list">
-            <li>Natural Language Processing for human-like conversations</li>
-            <li>Real-time response generation</li>
-            <li>Multi-language support</li>
-            <li>Context-aware conversations</li>
-            <li>Secure user authentication</li>
-            <li>Message history and copying</li>
-            <li>Customizable interface</li>
-            <li>Dark mode support</li>
-            <li>Responsive design for all devices</li>
-        </ul>
-    </div>
-
-    <div id="help" class="help-container">
-        <span class="close-btn" onclick="hideContainer('help')">&times;</span>
-        <h2 class="section-title">Help Center</h2>
-        <div class="help-section">
-            <div class="help-question">How do I start a conversation?</div>
-            <div class="help-answer">Simply type your message in the chat input box and press enter or click the send button.</div>
-        </div>
-        <div class="help-section">
-            <div class="help-question">Can I copy the bot's responses?</div>
-            <div class="help-answer">Yes, click the copy button below any bot message to copy its content to your clipboard.</div>
-        </div>
-        <div class="help-section">
-            <div class="help-question">How do I change my settings?</div>
-            <div class="help-answer">Navigate to the Settings section through the menu to customize your experience.</div>
-        </div>
-        <div class="help-section">
-            <div class="help-question">Is my data secure?</div>
-            <div class="help-answer">Yes, we use secure authentication and encryption to protect your conversations and personal data.</div>
-        </div>
-        <div class="help-section">
-            <div class="help-question">How can I contact support?</div>
-            <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
-        </div>
-    </div>
-
-// --- CUT HERE ---
-<script>
-    let isLogin = true;
-    let users = JSON.parse(localStorage.getItem('users')) || {};
-    let longPressTimer;
-    let isLongPress = false;
-    const badWords = ['fuck', 'nigga', 'shit', 'bitch', 'asshole'];
-    const spamTracker = {};
-    const SPAM_LIMIT = 5;
-    const SPAM_WINDOW = 10000;
-    const BAN_DURATION = 60000;
-    const bannedUsers = {};
-    const warnedUsers = {};
-
-    // SECRET CODE VERIFICATION VARIABLES
-    const SECRET_CODE = "456i";
-    let failedAttempts = 0;
-    const MAX_ATTEMPTS = 3;
-    let isLockedOut = false;
-    let lockoutTimeout = null;
-
-    // SQL Editor Variables
-    let sqlEditor = null;
-    let sqlResults = [];
-    let savedQueries = JSON.parse(localStorage.getItem('savedQueries')) || [];
-
-    // Notification variables
-    let lastMessageId = null;
-    let notificationPermissionGranted = false;
-
-    // Flag to prevent duplicate sends
-    let isSending = false;
-
-    // Scroll state variables
-    let isAtBottom = true;
-    let newMessagesCount = 0;
-    let scrollToBottomBtn;
-    let newMessagesCountEl = document.getElementById('newMessagesCount');
-
-    // Scroll position management
-    let lastScrollPosition = 0;
-    let shouldRestoreScroll = false;
-
-    // Real-time active status variables
-    let socket;
-    let isTyping = false;
-    let typingTimer;
-
-    const elements = {
-        usernameInput: document.getElementById('auth-username'),
-        messageInput: document.getElementById('user-input'),
-        sendButton: document.getElementById('send-button'),
-        chatContainer: document.getElementById('chat-container'),
-        replyPreview: document.getElementById('reply-preview-container'),
-        errorDisplay: document.getElementById('error-message'),
-        successDisplay: document.getElementById('success-message'),
-        privateInput: document.getElementById('private-user-input'),
-        privateSendButton: document.getElementById('private-send-button')
+    // FIXED: Proper data preparation for regular messages
+    const insertData = {
+      content: (content && content.trim() !== '') ? content.trim() : '',
+      username: username.trim(),
+      image_url: image_url || '',
+      reply_to: reply_to || ''
     };
 
-    let replyToText = null;
-    let currentUsername = localStorage.getItem('chat_username') || '';
-    if (currentUsername && elements.usernameInput) {
-        elements.usernameInput.value = currentUsername;
+    console.log('📝 Inserting message to Supabase:', insertData);
+
+    const { data, error } = await supabase
+      .from('chatter')
+      .insert([insertData])
+      .select();
+
+    if (error) {
+      console.error('❌ Database insert error:', error);
+      
+      // If there's still an issue, try minimal insert
+      if (error.message.includes('null value') || error.message.includes('primary key')) {
+        console.log('🔄 Retrying with minimal fields...');
+        const minimalData = {
+          content: (content && content.trim() !== '') ? content.trim() : 'Message',
+          username: username.trim()
+        };
+        
+        const { data: retryData, error: retryError } = await supabase
+          .from('chatter')
+          .insert([minimalData])
+          .select();
+          
+        if (retryError) {
+          throw retryError;
+        }
+        console.log('✅ Message saved with minimal fields. ID:', retryData[0]?.id);
+        
+        // BROADCAST NEW MESSAGE TO ALL CLIENTS IMMEDIATELY
+        io.emit('new-message', retryData[0]);
+        return res.status(201).json(retryData[0]);
+      }
+      throw error;
+    }
+    
+    console.log('✅ Message saved successfully. ID:', data[0]?.id);
+    
+    // BROADCAST NEW MESSAGE TO ALL CLIENTS IMMEDIATELY
+    io.emit('new-message', data[0]);
+    res.status(201).json(data[0]);
+  } catch (error) {
+    console.error('❌ Failed to save message:', error);
+    res.status(500).json({ error: "Failed to save message: " + error.message });
+  }
+});
+
+// Image upload endpoint
+app.post('/upload', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file provided' });
     }
 
-    // ===== FIXED: MESSAGE ORDER AND SECTION MANAGEMENT =====
+    const fileBuffer = req.file.buffer;
+    const fileName = `${Date.now()}-${req.file.originalname}`;
+    const filePath = `images/${fileName}`;
 
-    // Initialize socket connection for real-time messaging
-    function initSocket() {
-        console.log('🔌 Initializing socket connection...');
-        socket = io();
-        
-        socket.on('connect', () => {
-            console.log('✅ Socket connected');
-            const username = localStorage.getItem('chat_username');
-            if (username) {
-                socket.emit('user-online', username);
-                // Request existing messages when connecting
-                socket.emit('request-messages');
-            }
-        });
+    // Upload to Supabase Storage
+    const { data, error } = await supabase.storage
+      .from('chat-images')
+      .upload(filePath, fileBuffer, {
+        contentType: req.file.mimetype,
+        upsert: false
+      });
 
-        // Listen for new messages in real-time
-        socket.on('new-message', (message) => {
-            console.log('💬 New message received via socket:', message);
-            
-            // Only display if message is from another user or if it's an AI/bot response
-            const isOwnMessage = message.username === currentUsername;
-            const isAIResponse = message.username === 'AI' || message.username === 'Bot';
-            
-            if (!isOwnMessage || isAIResponse) {
-                // Check if message already exists to prevent duplicates
-                const existingMessage = document.querySelector(`[data-id="${message.id}"]`);
-                if (!existingMessage) {
-                    // Display message immediately
-                    displayMessage(
-                        message.content, 
-                        isOwnMessage ? 'sent' : 'received', 
-                        message.reply_to, 
-                        message.username, 
-                        message.id, 
-                        true
-                    );
-                    
-                    // Show notification if page is not focused
-                    if (document.visibilityState !== 'visible' && !isOwnMessage) {
-                        showNotification(message.username, message.content);
-                    }
-                }
-            }
-        });
+    if (error) throw error;
 
-        // Listen for message history when first connecting
-        socket.on('chat-messages', (messages) => {
-            console.log('📨 Received message history:', messages.length, 'messages');
-            renderMessages(messages);
-        });
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('chat-images')
+      .getPublicUrl(filePath);
 
-        // Listen for new private AI messages
-        socket.on('new-private-message', (message) => {
-            console.log('🤫 Private message received:', message);
-            displayPrivateMessage(message.content, 'received', null, 'Private AI');
-        });
-
-        // User status updates
-        socket.on('user-status-change', (data) => {
-            console.log('👤 User status change:', data);
-            updateOnlineUsersList(data.onlineUsers);
-            updateUserStatusIndicator(data.username, data.status);
-        });
-
-        socket.on('user-typing', (data) => {
-            showTypingIndicator(data.username, data.isTyping);
-        });
-
-        socket.on('disconnect', (reason) => {
-            console.log('🔌 Socket disconnected:', reason);
-        });
-
-        // Send heartbeat every 2 minutes to stay online
-        const heartbeatInterval = setInterval(() => {
-            const username = localStorage.getItem('chat_username');
-            if (username && socket.connected) {
-                socket.emit('user-online', username);
-                console.log('💓 Heartbeat sent - keeping user online');
-            }
-        }, 120000); // 2 minutes
-
-        // Cleanup interval on page unload
-        window.addEventListener('beforeunload', () => {
-            clearInterval(heartbeatInterval);
-        });
-    }
-
-    // ===== FIXED: MESSAGE FUNCTIONS WITH CORRECT ORDER =====
-
-    async function sendMessage() {
-        if (isSending) return;
-        isSending = true;
-        
-        const content = elements.messageInput.value.trim();
-        currentUsername = localStorage.getItem('chat_username') || '';
-        const username = currentUsername;
-        
-        if (!content || !username) {
-            isSending = false;
-            return showError('Please enter both username and message');
-        }
-
-        // Bad word filtering
-        const lowerContent = content.toLowerCase();
-        if (badWords.some(word => lowerContent.includes(word))) {
-            if (!warnedUsers[username]) {
-                warnedUsers[username] = true;
-                isSending = false;
-                return showError('Warning: bad word detected! If you repeat, you will be banned.');
-            } else {
-                bannedUsers[username] = Date.now() + BAN_DURATION;
-                delete users[username];
-                localStorage.setItem('users', JSON.stringify(users));
-                localStorage.removeItem('currentUser');
-                localStorage.removeItem('chat_username');
-                showError('You used bad words again. Account deleted and banned.');
-                isSending = false;
-                setTimeout(() => {
-                    location.reload();
-                }, 2000);
-                return;
-            }
-        }
-
-        // Spam protection
-        const now = Date.now();
-        if (bannedUsers[username] && bannedUsers[username] > now) {
-            isSending = false;
-            return showError(`You're banned. Wait ${Math.ceil((bannedUsers[username] - now) / 1000)}s.`);
-        }
-        
-        if (!spamTracker[username]) {
-            spamTracker[username] = [];
-        }
-        spamTracker[username].push(now);
-        spamTracker[username] = spamTracker[username].filter(ts => now - ts <= SPAM_WINDOW);
-        
-        if (spamTracker[username].length > SPAM_LIMIT) {
-            bannedUsers[username] = now + BAN_DURATION;
-            isSending = false;
-            return showError("You're banned for spamming.");
-        }
-
-        try {
-            elements.sendButton.disabled = true;
-            elements.sendButton.classList.remove('enabled');
-            
-            const payload = { 
-                content, 
-                username, 
-                reply_to: replyToText || null 
-            };
-            
-            // Send message to server via HTTP
-            const response = await fetch('/messages', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) throw new Error('Failed to send message');
-
-            // Display message immediately for the sender
-            displayMessage(content, 'sent', replyToText, username, null, true);
-            
-            // Get AI response
-            fetchChatResponse(content);
-            
-            // Clear input
-            elements.messageInput.value = '';
-            autoResize(elements.messageInput);
-            clearReply();
-
-        } catch (error) {
-            showError(error.message);
-        } finally {
-            setTimeout(() => {
-                isSending = false;
-                const hasText = elements.messageInput.value.trim().length > 0;
-                elements.sendButton.disabled = !hasText;
-                elements.sendButton.classList.toggle('enabled', hasText);
-            }, 500);
-        }
-    }
-
-    async function sendPrivateMessage() {
-        const input = document.getElementById('private-user-input');
-        if (!input) return;
-        
-        const content = input.value.trim();
-        if (!content) return;
-
-        // Display user message immediately
-        displayPrivateMessage(content, 'sent');
-        input.value = '';
-        autoResize(input);
-
-        // Disable send button after sending
-        elements.privateSendButton.disabled = true;
-        elements.privateSendButton.classList.remove('enabled');
-
-        try {
-            // Get AI response directly instead of using socket for private messages
-            await fetchPrivateAIResponse(content);
-        } catch (error) {
-            console.error('Error sending private message:', error);
-            showError('Could not process your private message. Please try again.');
-        }
-
-        // Re-enable send button after processing
-        setTimeout(() => {
-            const hasText = input.value.trim().length > 0;
-            elements.privateSendButton.disabled = !hasText;
-            elements.privateSendButton.classList.toggle('enabled', hasText);
-        }, 1000);
-    }
-
-    // ===== FIXED: LOAD MESSAGES WITH CORRECT ORDER =====
-    async function loadMessages() {
-        try {
-            console.log('📥 Loading messages...');
-            const response = await fetch('/messages');
-            if (!response.ok) throw new Error('Failed to load messages');
-            const data = await response.json();
-
-            // Check for new messages to show notification
-            if (data.length > 0) {
-                const latestMessage = data[data.length - 1];
-                if (latestMessage.id !== lastMessageId && 
-                    latestMessage.username !== currentUsername && 
-                    document.visibilityState !== 'visible') {
-                    showNotification(latestMessage.username, latestMessage.content);
-                }
-                lastMessageId = latestMessage.id;
-            }
-            
-            renderMessages(data);
-        } catch (error) {
-            console.error('❌ Error loading messages:', error);
-            showError('Failed to load messages. Using real-time updates only.');
-            // If HTTP fails, rely on socket for real-time messages
-            if (socket && socket.connected) {
-                socket.emit('request-messages');
-            }
-        }
-    }
-
-    // ===== FIXED: DISPLAY MESSAGE WITH CORRECT ORDER =====
-    function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
-        if (!elements.chatContainer) return;
-        
-        // Check if message already exists to prevent duplicates
-        const existingMessage = document.querySelector(`[data-id="${messageId}"]`);
-        if (existingMessage) {
-            console.log('⚠️ Message already exists, skipping:', messageId);
-            return;
-        }
-        
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${sender}`;
-        if (messageId) messageDiv.dataset.id = messageId;
-        messageDiv.dataset.content = text;
-        messageDiv.dataset.username = username;
-
-        // Only create avatar for received messages
-        if (sender === 'received') {
-            const avatarDiv = document.createElement('div');
-            avatarDiv.className = 'avatar';
-            avatarDiv.innerHTML = `<img src="https://i.pravatar.cc/50?u=${encodeURIComponent(username)}" alt="avatar">`;
-            messageDiv.appendChild(avatarDiv);
-
-            const messageBody = document.createElement('div');
-            messageBody.className = 'message-body';
-            // Username with status indicator
-            const usernameDiv = document.createElement('div');
-            usernameDiv.className = 'username';
-            const statusIndicator = document.createElement('span');
-            statusIndicator.className = 'user-status-indicator online';
-            usernameDiv.appendChild(document.createTextNode(username));
-            usernameDiv.appendChild(statusIndicator);
-            messageBody.appendChild(usernameDiv);
-
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'content';
-            if (repliedTo) {
-                const replyBubble = document.createElement('div');
-                replyBubble.className = 'reply-preview';
-                replyBubble.textContent = repliedTo;
-                contentDiv.appendChild(replyBubble);
-            }
-
-            const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
-            const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
-            const imageMatches = [...text.matchAll(imagePattern)];
-            const audioMatches = [...text.matchAll(audioPattern)];
-            let modifiedText = text;
-            [...imageMatches, ...audioMatches].forEach(match => {
-                modifiedText = modifiedText.replace(match[0], '');
-            });
-            modifiedText = modifiedText.trim();
-            if (modifiedText) {
-                const textDiv = document.createElement('div');
-                textDiv.textContent = modifiedText;
-                contentDiv.appendChild(textDiv);
-            }
-
-            // FIXED: Use immediate image loading instead of lazy loading
-            imageMatches.forEach(match => {
-                displayImageImmediately(match[0], contentDiv);
-            });
-
-            audioMatches.forEach(match => {
-                const audio = document.createElement('audio');
-                audio.controls = true;
-                audio.src = match[0];
-                contentDiv.appendChild(audio);
-            });
-            messageBody.appendChild(contentDiv);
-            messageDiv.appendChild(messageBody);
-        } else {
-            // For sent messages - simpler structure without avatar/username
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'content';
-            if (repliedTo) {
-                const replyBubble = document.createElement('div');
-                replyBubble.className = 'reply-preview';
-                replyBubble.textContent = repliedTo;
-                contentDiv.appendChild(replyBubble);
-            }
-            const textDiv = document.createElement('div');
-            textDiv.textContent = text;
-            contentDiv.appendChild(textDiv);
-            messageDiv.appendChild(contentDiv);
-        }
-        
-        // FIXED: Always append new messages to the bottom
-        elements.chatContainer.appendChild(messageDiv);
-        
-        messageDiv.addEventListener('touchstart', handleTouchStart);
-        messageDiv.addEventListener('touchend', handleTouchEnd);
-        messageDiv.addEventListener('touchmove', handleTouchMove);
-        messageDiv.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            showMessageContextMenu(e, messageDiv);
-        });
-
-        // Force image rendering after adding message
-        setTimeout(forceImageRendering, 50);
-
-        // FORCE SCROLL TO BOTTOM FOR EVERY NEW MESSAGE
-        if (isNew) {
-            setTimeout(() => forceScrollToBottom('chat-container'), 50);
-        }
-
-        // Update scroll state after adding message
-        setTimeout(updateScrollState, 0);
-    }
-
-    // ===== FIXED: INITIALIZATION =====
-    document.addEventListener('DOMContentLoaded', () => {
-        console.log('🚀 Initializing application...');
-        
-        // Initialize buttons first
-        initializeButtons();
-        
-        const savedUser = localStorage.getItem('currentUser');
-        if (savedUser) {
-            console.log('✅ User logged in:', savedUser);
-            localStorage.setItem('chat_username', savedUser);
-            document.getElementById('auth-container').style.display = 'none';
-            document.querySelector('.menu').style.display = 'flex';
-            document.querySelector('.news-toggle').style.display = 'block';
-
-            // FIXED: Show chat container immediately to prevent layout shift
-            showContainer('chat');
-
-            // Set flag to restore scroll position after messages load
-            shouldRestoreScroll = true;
-
-            // Initialize real-time features after login
-            initSocket();
-            setupTypingHandlers();
-            
-            // Add page event listeners
-            document.addEventListener('visibilitychange', handleVisibilityChange);
-            window.addEventListener('beforeunload', handleBeforeUnload);
-            window.addEventListener('pagehide', handlePageHide);
-            
-            // Enable SQL Editor access if already verified
-            if (hasVerifiedCode()) {
-                enableSQLEditorAccess();
-            }
-        } else {
-            console.log('❌ No user logged in');
-            document.getElementById('auth-container').style.display = 'flex';
-            document.querySelector('.menu').style.display = 'none';
-            document.querySelector('.news-toggle').style.display = 'none';
-        }
-
-        if ('Notification' in window) {
-            Notification.requestPermission().then(permission => {
-                notificationPermissionGranted = permission === 'granted';
-                console.log('📢 Notification permission:', permission);
-            });
-        }
-
-        initializeChat();
-
-        // Add scroll event listener for main chat
-        if (elements.chatContainer) {
-            elements.chatContainer.addEventListener('scroll', updateScrollState);
-        }
-
-        // Initialize Private AI input handler
-        if (elements.privateInput) {
-            elements.privateInput.addEventListener('input', () => {
-                autoResize(elements.privateInput);
-                const hasText = elements.privateInput.value.trim().length > 0;
-                elements.privateSendButton.disabled = !hasText;
-                elements.privateSendButton.classList.toggle('enabled', hasText);
-            });
-            elements.privateInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendPrivateMessage();
-                }
-            });
-        }
-
-        console.log('🎯 Application initialization complete');
+    res.json({ 
+      imageUrl: urlData.publicUrl,
+      message: 'Image uploaded successfully'
     });
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ error: error.message || 'Failed to upload image' });
+  }
+});
 
-    // ===== FIXED: RENDER MESSAGES WITH CORRECT ORDER =====
-    function renderMessages(messages) {
-        if (!elements.chatContainer) return;
-        
-        // FIXED: Clear container but maintain scroll position
-        elements.chatContainer.innerHTML = '';
-        
-        // FIXED: Display messages in correct chronological order (oldest to newest)
-        // NO REVERSING - messages should be in correct order from server
-        messages.forEach(msg => {
-            const isOwn = msg.username?.trim().toLowerCase() === currentUsername?.trim().toLowerCase();
-            displayMessage(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id, false);
-        });
+// DELETE messages
+app.delete('/messages/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { error } = await supabase
+      .from('chatter')
+      .delete()
+      .eq('id', id);
 
-        // Update scroll state after rendering messages
-        setTimeout(updateScrollState, 0);
+    if (error) throw error;
+    
+    // Broadcast deletion via Socket.io
+    io.emit('message-deleted', id);
+    res.status(200).json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete message" });
+  }
+});
 
-        // Restore scroll position if needed
-        if (shouldRestoreScroll) {
-            setTimeout(restoreScrollPosition, 100);
-        }
+// FIXED: Function to save ANY bot response to Supabase
+async function saveBotResponseToSupabase(content, originalCommand, commandType = 'AI') {
+  try {
+    console.log(`🔄 Attempting to save ${commandType} response to Supabase...`);
+    console.log('Content:', content);
+    console.log('Original Command:', originalCommand);
+    
+    // FIXED: Use proper values for all fields
+    const insertData = {
+      content: content || `${commandType} Response`, 
+      username: commandType === 'AI' ? 'AI' : 'Bot',
+      image_url: '',
+      reply_to: originalCommand || ''
+    };
+    
+    console.log('📝 Insert data:', insertData);
+    
+    const { data, error } = await supabase
+      .from('chatter')
+      .insert([insertData])
+      .select();
 
-        // FIXED: IMMEDIATELY scroll to bottom after loading messages
-        setTimeout(() => {
-            forceScrollToBottom('chat-container');
-            // Additional scroll attempts to ensure it works
-            setTimeout(() => forceScrollToBottom('chat-container'), 100);
-            setTimeout(() => forceScrollToBottom('chat-container'), 200);
-        }, 10);
-    }
-
-    // ===== FIXED: DISPLAY PRIVATE MESSAGE FUNCTION =====
-    function displayPrivateMessage(text, sender, repliedTo = null, username = 'Private AI', messageId = null) {
-        const container = document.getElementById('private-ai-container');
-        if (!container) return;
-        
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${sender}`;
-        messageDiv.dataset.content = text;
-        messageDiv.dataset.username = username;
-
-        // Only create avatar for received messages
-        if (sender === 'received') {
-            const avatarDiv = document.createElement('div');
-            avatarDiv.className = 'avatar';
-            avatarDiv.innerHTML = `<img src="https://i.pravatar.cc/50?u=${encodeURIComponent(username)}" alt="avatar">`;
-            messageDiv.appendChild(avatarDiv);
-        }
-
-        const messageBody = document.createElement('div');
-        messageBody.className = 'message-body';
-        
-        if (username && sender === 'received') {
-            const usernameDiv = document.createElement('div');
-            usernameDiv.className = 'username';
-            const statusIndicator = document.createElement('span');
-            statusIndicator.className = 'user-status-indicator online';
-            usernameDiv.appendChild(document.createTextNode(username));
-            usernameDiv.appendChild(statusIndicator);
-            messageBody.appendChild(usernameDiv);
-        }
-
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'content';
-        
-        // Parse for image URLs and render them as images
-        const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
-        const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
-        const imageMatches = [...text.matchAll(imagePattern)];
-        const audioMatches = [...text.matchAll(audioPattern)];
-        let modifiedText = text;
-        
-        [...imageMatches, ...audioMatches].forEach(match => {
-            modifiedText = modifiedText.replace(match[0], '');
-        });
-        modifiedText = modifiedText.trim();
-        
-        if (modifiedText) {
-            const textDiv = document.createElement('div');
-            textDiv.textContent = modifiedText;
-            contentDiv.appendChild(textDiv);
-        }
-
-        // Add images to the message - FIXED: Use immediate loading
-        imageMatches.forEach(match => {
-            displayImageImmediately(match[0], contentDiv);
-        });
-
-        // Add audio files to the message
-        audioMatches.forEach(match => {
-            const audio = document.createElement('audio');
-            audio.controls = true;
-            audio.src = match[0];
-            contentDiv.appendChild(audio);
-        });
-
-        messageBody.appendChild(contentDiv);
-        messageDiv.appendChild(messageBody);
-        
-        // FIXED: Always append to the bottom of private chat container
-        container.appendChild(messageDiv);
-
-        // ADDED: Add event listeners for long press and context menu to private AI messages
-        messageDiv.addEventListener('touchstart', handlePrivateMessageTouchStart);
-        messageDiv.addEventListener('touchend', handlePrivateMessageTouchEnd);
-        messageDiv.addEventListener('touchmove', handlePrivateMessageTouchMove);
-        messageDiv.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            showPrivateMessageContextMenu(e, messageDiv);
-        });
-
-        // FIXED: IMMEDIATELY scroll to bottom for private chat
-        setTimeout(() => {
-            forceScrollToBottom('private-ai-container');
-            setTimeout(() => forceScrollToBottom('private-ai-container'), 50);
-        }, 10);
-    }
-
-    // ===== FIXED: SECTION MANAGEMENT - CLOSE SECTIONS PROPERLY =====
-
-    // UPDATED showContainer FUNCTION with proper section closing
-    function showContainer(containerId) {
-        console.log('🔄 Showing container:', containerId);
-        
-        // Hide all containers
-        document.querySelectorAll('.main-chat-interface').forEach(container => {
-            container.style.display = 'none';
-        });
-        
-        // Hide all info containers
-        document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container').forEach(container => {
-            container.style.display = 'none';
-        });
-        
-        // Hide all chat inputs
-        document.querySelectorAll('.chat-input').forEach(input => {
-            input.style.display = 'none';
-        });
-        
-        // Show the selected container
-        const container = document.getElementById(containerId);
-        if (container) {
-            container.style.display = 'block';
-            
-            // Show the appropriate chat input
-            if (containerId === 'chat' || containerId === 'private-ai') {
-                const chatInput = container.querySelector('.chat-input');
-                if (chatInput) chatInput.style.display = 'flex';
-            }
-            
-            // Initialize secret code if showing that container
-            if (containerId === 'secret-code') {
-                resetSecretCodeForm();
-                initializeSecretCodeVerification();
-            }
-            
-            // Initialize SQL editor if showing that container
-            if (containerId === 'sql-editor-container') {
-                // Check if user has verified the secret code
-                if (!hasVerifiedCode()) {
-                    showError('Access denied. Please verify the secret code first.');
-                    showContainer('secret-code');
-                    return;
-                }
-                initializeSQLEditor();
-            }
-        }
-        
-        // Show overlay for non-chat containers
-        const overlay = document.getElementById('overlay');
-        if (overlay) {
-            if (containerId === 'chat' || containerId === 'private-ai') {
-                overlay.style.display = 'none';
-            } else {
-                overlay.style.display = 'block';
-            }
-        }
-        
-        // Handle button visibility based on container
-        if (containerId === 'chat') {
-            console.log('Showing main chat container');
-            // Re-initialize scroll button for main chat
-            setTimeout(() => {
-                initializeButtons();
-                // Force scroll to bottom and update state
-                setTimeout(() => {
-                    forceScrollToBottom('chat-container');
-                    updateScrollState();
-                }, 200);
-            }, 100);
-            
-            // Show main chat scroll button, hide private AI button
-            if (scrollToBottomBtn) {
-                scrollToBottomBtn.style.display = 'flex';
-                updateScrollState(); // Update visibility based on scroll position
-            }
-            if (privateGoTopBtn) {
-                privateGoTopBtn.style.display = 'none';
-                privateGoTopBtn.classList.remove('visible');
-            }
-        } else if (containerId === 'private-ai') {
-            // Show private AI button, hide main chat scroll button
-            if (privateGoTopBtn) {
-                privateGoTopBtn.style.display = 'flex';
-                handlePrivateScroll(); // Update visibility based on scroll position
-            }
-            if (scrollToBottomBtn) {
-                scrollToBottomBtn.style.display = 'none';
-                scrollToBottomBtn.classList.remove('visible');
-            }
-            // Attach scroll event for private container
-            if (privateContainer) {
-                privateContainer.addEventListener('scroll', handlePrivateScroll);
-                // Initial check for scroll position
-                setTimeout(handlePrivateScroll, 100);
-                // Scroll to bottom when switching to private AI
-                setTimeout(() => forceScrollToBottom('private-ai-container'), 200);
-            }
-        } else {
-            // For other containers, hide both buttons
-            if (scrollToBottomBtn) {
-                scrollToBottomBtn.style.display = 'none';
-                scrollToBottomBtn.classList.remove('visible');
-            }
-            if (privateGoTopBtn) {
-                privateGoTopBtn.style.display = 'none';
-                privateGoTopBtn.classList.remove('visible');
-            }
-        }
-        
-        // Set scroll restore flag for chat container
-        if (containerId === 'chat') {
-            shouldRestoreScroll = true;
-            // Scroll to bottom when switching to main chat
-            setTimeout(() => forceScrollToBottom('chat-container'), 200);
-        }
-
-        // Close dropdown menu when switching containers
-        const dropdown = document.getElementById('dropdown');
-        if (dropdown) dropdown.style.display = 'none';
-        
-        const kebabDropdown = document.querySelector('.kebab-dropdown');
-        if (kebabDropdown) kebabDropdown.classList.remove('active');
-    }
-
-    // FIXED: hideContainer function to properly close sections
-    function hideContainer(containerId) {
-        console.log('🔄 Hiding container:', containerId);
-        const container = document.getElementById(containerId);
-        if (container) container.style.display = 'none';
-        
-        const overlay = document.getElementById('overlay');
-        if (overlay) overlay.style.display = 'none';
-        
-        // Close all menus when hiding any container
-        const dropdown = document.getElementById('dropdown');
-        if (dropdown) dropdown.style.display = 'none';
-        
-        const kebabDropdown = document.querySelector('.kebab-dropdown');
-        if (kebabDropdown) kebabDropdown.classList.remove('active');
-        
-        // Show chat container and input after closing any section
-        showContainer('chat');
-    }
-
-    // ===== FIXED: OVERLAY CLICK HANDLER =====
-    document.addEventListener('DOMContentLoaded', function() {
-        const overlay = document.getElementById('overlay');
-        if (overlay) {
-            overlay.addEventListener('click', function() {
-                console.log('🔘 Overlay clicked - closing all sections');
-                // Hide all info containers
-                document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container').forEach(container => {
-                    container.style.display = 'none';
-                });
-                this.style.display = 'none';
-                // Show main chat
-                showContainer('chat');
-            });
-        }
-
-        // Close sections when clicking escape key
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                const overlay = document.getElementById('overlay');
-                if (overlay && overlay.style.display === 'block') {
-                    hideContainer('chat');
-                }
-            }
-        });
-    });
-
-    // ===== REST OF THE FUNCTIONS REMAIN THE SAME =====
-
-    // SQL EDITOR FUNCTIONS
-    function initializeSQLEditor() {
-        const sqlTextarea = document.getElementById('sql-textarea');
-        const runSqlBtn = document.getElementById('run-sql');
-        const saveSqlBtn = document.getElementById('save-sql');
-        const clearSqlBtn = document.getElementById('clear-sql');
-        const sqlResultsDiv = document.getElementById('sql-results');
-        const savedQueriesList = document.getElementById('saved-queries-list');
-
-        if (runSqlBtn) {
-            runSqlBtn.addEventListener('click', executeSQL);
-        }
-        
-        if (saveSqlBtn) {
-            saveSqlBtn.addEventListener('click', saveSQLQuery);
-        }
-        
-        if (clearSqlBtn) {
-            clearSqlBtn.addEventListener('click', clearSQLEditor);
-        }
-
-        // Load saved queries
-        loadSavedQueries();
-    }
-
-    function executeSQL() {
-        const sqlTextarea = document.getElementById('sql-textarea');
-        const sqlResultsDiv = document.getElementById('sql-results');
-        
-        if (!sqlTextarea || !sqlResultsDiv) return;
-        
-        const query = sqlTextarea.value.trim();
-        
-        if (!query) {
-            showSQLResult('Please enter a SQL query', 'error');
-            return;
-        }
-
-        // Simulate SQL execution with sample data
-        const result = simulateSQLExecution(query);
-        displaySQLResult(result);
-    }
-
-    function simulateSQLExecution(query) {
-        // Sample database for demonstration
-        const sampleDatabase = {
-            users: [
-                { id: 1, username: 'john_doe', email: 'john@example.com', status: 'active', created_at: '2024-01-15' },
-                { id: 2, username: 'jane_smith', email: 'jane@example.com', status: 'active', created_at: '2024-01-16' },
-                { id: 3, username: 'bob_wilson', email: 'bob@example.com', status: 'inactive', created_at: '2024-01-17' },
-                { id: 4, username: 'alice_brown', email: 'alice@example.com', status: 'active', created_at: '2024-01-18' }
-            ],
-            messages: [
-                { id: 1, user_id: 1, content: 'Hello everyone!', timestamp: '2024-01-15 10:30:00' },
-                { id: 2, user_id: 2, content: 'Hi John!', timestamp: '2024-01-15 10:35:00' },
-                { id: 3, user_id: 1, content: 'How are you?', timestamp: '2024-01-15 10:40:00' },
-                { id: 4, user_id: 3, content: 'Good morning!', timestamp: '2024-01-16 09:15:00' }
-            ]
-        };
-
-        try {
-            const upperQuery = query.toUpperCase();
-            
-            // Basic SQL simulation
-            if (upperQuery.includes('SELECT')) {
-                if (upperQuery.includes('FROM USERS')) {
-                    if (upperQuery.includes('WHERE')) {
-                        if (upperQuery.includes("STATUS = 'ACTIVE'")) {
-                            return {
-                                success: true,
-                                data: sampleDatabase.users.filter(user => user.status === 'active'),
-                                columns: ['id', 'username', 'email', 'status', 'created_at'],
-                                rowCount: sampleDatabase.users.filter(user => user.status === 'active').length
-                            };
-                        }
-                        if (upperQuery.includes("USERNAME LIKE 'J%'")) {
-                            return {
-                                success: true,
-                                data: sampleDatabase.users.filter(user => user.username.toLowerCase().startsWith('j')),
-                                columns: ['id', 'username', 'email', 'status', 'created_at'],
-                                rowCount: sampleDatabase.users.filter(user => user.username.toLowerCase().startsWith('j')).length
-                            };
-                        }
-                    }
-                    return {
-                        success: true,
-                        data: sampleDatabase.users,
-                        columns: ['id', 'username', 'email', 'status', 'created_at'],
-                        rowCount: sampleDatabase.users.length
-                    };
-                }
-                if (upperQuery.includes('FROM MESSAGES')) {
-                    return {
-                        success: true,
-                        data: sampleDatabase.messages,
-                        columns: ['id', 'user_id', 'content', 'timestamp'],
-                        rowCount: sampleDatabase.messages.length
-                    };
-                }
-                if (upperQuery.includes('COUNT(*)')) {
-                    return {
-                        success: true,
-                        data: [{ count: sampleDatabase.users.length }],
-                        columns: ['count'],
-                        rowCount: 1
-                    };
-                }
-            }
-            
-            if (upperQuery.includes('INSERT INTO')) {
-                return {
-                    success: true,
-                    message: 'Query executed successfully. 1 row affected.',
-                    rowCount: 1
-                };
-            }
-            
-            if (upperQuery.includes('UPDATE')) {
-                return {
-                    success: true,
-                    message: 'Query executed successfully. 1 row affected.',
-                    rowCount: 1
-                };
-            }
-            
-            if (upperQuery.includes('DELETE FROM')) {
-                return {
-                    success: true,
-                    message: 'Query executed successfully. 1 row affected.',
-                    rowCount: 1
-                };
-            }
-            
-            return {
-                success: false,
-                error: 'Unsupported SQL operation or syntax error'
-            };
-            
-        } catch (error) {
-            return {
-                success: false,
-                error: 'SQL syntax error: ' + error.message
-            };
-        }
-    }
-
-    function displaySQLResult(result) {
-        const sqlResultsDiv = document.getElementById('sql-results');
-        if (!sqlResultsDiv) return;
-        
-        sqlResultsDiv.innerHTML = '';
-        
-        if (result.success) {
-            if (result.data) {
-                // Display data in table format
-                const table = document.createElement('table');
-                table.className = 'sql-result-table';
-                
-                // Create header
-                const thead = document.createElement('thead');
-                const headerRow = document.createElement('tr');
-                result.columns.forEach(column => {
-                    const th = document.createElement('th');
-                    th.textContent = column;
-                    headerRow.appendChild(th);
-                });
-                thead.appendChild(headerRow);
-                table.appendChild(thead);
-                
-                // Create body
-                const tbody = document.createElement('tbody');
-                result.data.forEach(row => {
-                    const tr = document.createElement('tr');
-                    result.columns.forEach(column => {
-                        const td = document.createElement('td');
-                        td.textContent = row[column] || '';
-                        tr.appendChild(td);
-                    });
-                    tbody.appendChild(tr);
-                });
-                table.appendChild(tbody);
-                
-                sqlResultsDiv.appendChild(table);
-                
-                // Show row count
-                const rowCount = document.createElement('div');
-                rowCount.className = 'sql-row-count';
-                rowCount.textContent = `Rows returned: ${result.rowCount}`;
-                sqlResultsDiv.appendChild(rowCount);
-            } else if (result.message) {
-                const message = document.createElement('div');
-                message.className = 'sql-success-message';
-                message.textContent = result.message;
-                sqlResultsDiv.appendChild(message);
-            }
-        } else {
-            const error = document.createElement('div');
-            error.className = 'sql-error-message';
-            error.textContent = 'Error: ' + result.error;
-            sqlResultsDiv.appendChild(error);
-        }
-    }
-
-    function showSQLResult(message, type) {
-        const sqlResultsDiv = document.getElementById('sql-results');
-        if (!sqlResultsDiv) return;
-        
-        const div = document.createElement('div');
-        div.className = type === 'error' ? 'sql-error-message' : 'sql-success-message';
-        div.textContent = message;
-        sqlResultsDiv.appendChild(div);
-    }
-
-    function saveSQLQuery() {
-        const sqlTextarea = document.getElementById('sql-textarea');
-        if (!sqlTextarea) return;
-        
-        const query = sqlTextarea.value.trim();
-        if (!query) {
-            showSQLResult('Cannot save empty query', 'error');
-            return;
-        }
-        
-        const queryName = prompt('Enter a name for this query:');
-        if (!queryName) return;
-        
-        const newQuery = {
-            id: Date.now(),
-            name: queryName,
-            query: query,
-            createdAt: new Date().toISOString()
+    if (error) {
+      console.error('❌ Supabase insertion error:', error);
+      console.error('❌ Error details:', JSON.stringify(error, null, 2));
+      
+      // If there's an issue, try minimal insert
+      if (error.message.includes('null value') || error.message.includes('primary key')) {
+        console.log('🔄 Retrying with minimal fields...');
+        const minimalData = {
+          content: content || `${commandType} Response`,
+          username: commandType === 'AI' ? 'AI' : 'Bot'
         };
         
-        savedQueries.push(newQuery);
-        localStorage.setItem('savedQueries', JSON.stringify(savedQueries));
+        const { data: retryData, error: retryError } = await supabase
+          .from('chatter')
+          .insert([minimalData])
+          .select();
+          
+        if (retryError) {
+          throw retryError;
+        }
+        console.log(`✅ ${commandType} response saved to Supabase (minimal fields). ID:`, retryData[0]?.id);
         
-        loadSavedQueries();
-        showSQLResult(`Query "${queryName}" saved successfully!`, 'success');
-    }
-
-    function loadSavedQueries() {
-        const savedQueriesList = document.getElementById('saved-queries-list');
-        if (!savedQueriesList) return;
-        
-        savedQueriesList.innerHTML = '';
-        
-        if (savedQueries.length === 0) {
-            savedQueriesList.innerHTML = '<div class="no-queries">No saved queries</div>';
-            return;
-        }
-        
-        savedQueries.forEach(query => {
-            const queryItem = document.createElement('div');
-            queryItem.className = 'saved-query-item';
-            queryItem.innerHTML = `
-                <div class="query-name">${query.name}</div>
-                <div class="query-actions">
-                    <button onclick="loadQuery(${query.id})" class="query-btn load-btn">Load</button>
-                    <button onclick="deleteQuery(${query.id})" class="query-btn delete-btn">Delete</button>
-                </div>
-            `;
-            savedQueriesList.appendChild(queryItem);
-        });
-    }
-
-    function loadQuery(queryId) {
-        const query = savedQueries.find(q => q.id === queryId);
-        if (!query) return;
-        
-        const sqlTextarea = document.getElementById('sql-textarea');
-        if (sqlTextarea) {
-            sqlTextarea.value = query.query;
-        }
-        
-        showSQLResult(`Loaded query: ${query.name}`, 'success');
-    }
-
-    function deleteQuery(queryId) {
-        if (!confirm('Are you sure you want to delete this query?')) return;
-        
-        savedQueries = savedQueries.filter(q => q.id !== queryId);
-        localStorage.setItem('savedQueries', JSON.stringify(savedQueries));
-        
-        loadSavedQueries();
-        showSQLResult('Query deleted successfully', 'success');
-    }
-
-    function clearSQLEditor() {
-        const sqlTextarea = document.getElementById('sql-textarea');
-        const sqlResultsDiv = document.getElementById('sql-results');
-        
-        if (sqlTextarea) sqlTextarea.value = '';
-        if (sqlResultsDiv) sqlResultsDiv.innerHTML = '';
-    }
-
-    // SECRET CODE FUNCTIONS
-    function hasVerifiedCode() {
-        return sessionStorage.getItem('secretCodeVerified') === 'true';
-    }
-
-    function isUserLockedOut() {
-        const lockoutUntil = localStorage.getItem('lockoutUntil');
-        if (lockoutUntil && Date.now() < parseInt(lockoutUntil)) {
-            return true;
-        }
-        // Clear lockout if time has passed
-        if (lockoutUntil) {
-            localStorage.removeItem('lockoutUntil');
-            localStorage.removeItem('failedAttempts');
-        }
-        return false;
-    }
-
-    function initializeSecretCodeVerification() {
-        const secretCodeInput = document.getElementById('secret-code-input');
-        const verifyBtn = document.getElementById('verify-code-btn');
-
-        if (secretCodeInput) {
-            secretCodeInput.addEventListener('input', function() {
-                // Enable/disable button based on input
-                verifyBtn.disabled = this.value.trim().length === 0;
-                
-                // Clear error when user starts typing again
-                if (this.value.trim().length > 0) {
-                    hideSecretCodeError();
-                    hideSecretCodeSuccess();
-                }
-            });
-
-            // Allow pressing Enter to submit
-            secretCodeInput.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter' && !verifyBtn.disabled) {
-                    verifySecretCode();
-                }
-            });
-
-            // Focus on input when container is shown
-            secretCodeInput.addEventListener('focus', function() {
-                this.select();
-            });
-        }
-
-        // Check if user is locked out
-        if (isUserLockedOut()) {
-            showLockoutMessage();
-        } else {
-            // Get failed attempts from localStorage
-            failedAttempts = parseInt(localStorage.getItem('failedAttempts')) || 0;
-            if (failedAttempts > 0) {
-                showAttemptsWarning();
-            }
-        }
-    }
-
-    function verifySecretCode() {
-        if (isLockedOut) return;
-
-        const secretCodeInput = document.getElementById('secret-code-input');
-        const enteredCode = secretCodeInput.value.trim();
-        
-        if (!enteredCode) {
-            showSecretCodeError('Please enter a code');
-            return;
-        }
-
-        if (enteredCode === SECRET_CODE) {
-            // Success
-            showSecretCodeSuccess('Code verified successfully! Access to SQL Editor granted.');
-            sessionStorage.setItem('secretCodeVerified', 'true');
-            
-            // Reset failed attempts
-            failedAttempts = 0;
-            localStorage.removeItem('failedAttempts');
-            localStorage.removeItem('lockoutUntil');
-            
-            // Hide warnings
-            hideAttemptsWarning();
-            hideLockoutMessage();
-            
-            // Disable input and button
-            secretCodeInput.disabled = true;
-            document.getElementById('verify-code-btn').disabled = true;
-            
-            // Enable SQL Editor access
-            enableSQLEditorAccess();
-            
-            console.log('Secret code verified successfully! SQL Editor access granted.');
-            
-        } else {
-            // Failed attempt
-            failedAttempts++;
-            localStorage.setItem('failedAttempts', failedAttempts.toString());
-            
-            if (failedAttempts >= MAX_ATTEMPTS) {
-                // Lock user out
-                const lockoutDuration = 5 * 60 * 1000; // 5 minutes
-                const lockoutUntil = Date.now() + lockoutDuration;
-                localStorage.setItem('lockoutUntil', lockoutUntil.toString());
-                isLockedOut = true;
-                showLockoutMessage();
-            } else {
-                showSecretCodeError('Invalid code. Please try again.');
-                showAttemptsWarning();
-            }
-        }
-    }
-
-    function enableSQLEditorAccess() {
-        // Add SQL Editor to menu if not already there
-        const dropdown = document.getElementById('dropdown');
-        if (dropdown) {
-            // Check if SQL Editor menu item already exists
-            const existingSqlItem = dropdown.querySelector('a[onclick="showContainer(\'sql-editor-container\')"]');
-            if (!existingSqlItem) {
-                const sqlMenuItem = document.createElement('a');
-                sqlMenuItem.href = '#';
-                sqlMenuItem.onclick = function() { showContainer('sql-editor-container'); return false; };
-                sqlMenuItem.innerHTML = '🔍 SQL Editor';
-                
-                // Insert after Secret Code menu item
-                const secretCodeItem = dropdown.querySelector('a[onclick="showContainer(\'secret-code\')"]');
-                if (secretCodeItem) {
-                    secretCodeItem.parentNode.insertBefore(sqlMenuItem, secretCodeItem.nextSibling);
-                } else {
-                    dropdown.appendChild(sqlMenuItem);
-                }
-            }
-        }
-    }
-
-    function showLockoutMessage() {
-        const lockoutMessage = document.getElementById('lockout-message');
-        const lockoutTime = document.getElementById('lockout-time');
-        const lockoutUntil = parseInt(localStorage.getItem('lockoutUntil'));
-        
-        if (lockoutUntil) {
-            const minutesLeft = Math.ceil((lockoutUntil - Date.now()) / (60 * 1000));
-            lockoutTime.textContent = minutesLeft;
-            lockoutMessage.style.display = 'block';
-            
-            // Set timeout to clear lockout
-            setTimeout(() => {
-                isLockedOut = false;
-                localStorage.removeItem('lockoutUntil');
-                localStorage.removeItem('failedAttempts');
-                failedAttempts = 0;
-                hideLockoutMessage();
-                hideAttemptsWarning();
-            }, lockoutUntil - Date.now());
-        }
-    }
-
-    function hideLockoutMessage() {
-        const lockoutMessage = document.getElementById('lockout-message');
-        if (lockoutMessage) lockoutMessage.style.display = 'none';
-    }
-
-    function showAttemptsWarning() {
-        const attemptsWarning = document.getElementById('attempts-warning');
-        const attemptsLeft = document.getElementById('attempts-left');
-        if (attemptsWarning && attemptsLeft) {
-            attemptsLeft.textContent = MAX_ATTEMPTS - failedAttempts;
-            attemptsWarning.style.display = 'block';
-        }
-    }
-
-    function hideAttemptsWarning() {
-        const attemptsWarning = document.getElementById('attempts-warning');
-        if (attemptsWarning) attemptsWarning.style.display = 'none';
-    }
-
-    function showSecretCodeError(message) {
-        const errorElement = document.getElementById('secret-code-error');
-        if (errorElement) {
-            errorElement.textContent = message;
-            errorElement.style.display = 'block';
-        }
-    }
-
-    function hideSecretCodeError() {
-        const errorElement = document.getElementById('secret-code-error');
-        if (errorElement) errorElement.style.display = 'none';
-    }
-
-    function showSecretCodeSuccess(message) {
-        const successElement = document.getElementById('secret-code-success');
-        if (successElement) {
-            successElement.textContent = message;
-            successElement.style.display = 'block';
-        }
-    }
-
-    function hideSecretCodeSuccess() {
-        const successElement = document.getElementById('secret-code-success');
-        if (successElement) successElement.style.display = 'none';
-    }
-
-    function resetSecretCodeForm() {
-        const secretCodeInput = document.getElementById('secret-code-input');
-        const verifyBtn = document.getElementById('verify-code-btn');
-        
-        if (secretCodeInput) {
-            secretCodeInput.value = '';
-            secretCodeInput.disabled = false;
-        }
-        
-        if (verifyBtn) {
-            verifyBtn.disabled = false;
-        }
-        
-        hideSecretCodeError();
-        hideSecretCodeSuccess();
-        hideAttemptsWarning();
-        hideLockoutMessage();
-    }
-
-    // IMPROVED BUTTON INITIALIZATION FUNCTION
-    function initializeButtons() {
-        console.log('Initializing buttons...');
-        
-        // Initialize main chat scroll button
-        scrollToBottomBtn = document.getElementById('scrollToBottomBtn');
-        if (scrollToBottomBtn) {
-            console.log('Found main chat scroll button');
-            scrollToBottomBtn.style.position = 'fixed';
-            scrollToBottomBtn.style.bottom = '80px';
-            scrollToBottomBtn.style.right = '20px';
-            scrollToBottomBtn.style.zIndex = '1000';
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.addEventListener('click', scrollToBottomMain);
-            
-            // Add proper scroll event listener to main chat
-            const chatContainer = document.getElementById('chat-container');
-            if (chatContainer) {
-                chatContainer.addEventListener('scroll', updateScrollState);
-                console.log('Added scroll listener to main chat');
-            }
-        } else {
-            console.log('Main chat scroll button NOT found');
-        }
-
-        // Initialize private AI go-top button
-        privateGoTopBtn = document.getElementById('private-go-top');
-        privateContainer = document.getElementById('private-ai-container');
-        if (privateGoTopBtn) {
-            console.log('Found private AI go-top button');
-            privateGoTopBtn.style.position = 'fixed';
-            privateGoTopBtn.style.bottom = '80px';
-            privateGoTopBtn.style.right = '20px';
-            privateGoTopBtn.style.zIndex = '1000';
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.addEventListener('click', scrollPrivateToTop);
-        }
-
-        // Force initial state update
-        setTimeout(updateScrollState, 100);
-    }
-
-    // SIMPLE AND RELIABLE AUTO-SCROLL FUNCTIONS
-    function scrollToBottom(containerId) {
-        const container = document.getElementById(containerId);
-        if (container) {
-            // Use multiple methods to ensure scrolling works
-            setTimeout(() => {
-                container.scrollTop = container.scrollHeight;
-                // Additional methods for reliability
-                setTimeout(() => {
-                    container.scrollTop = container.scrollHeight;
-                }, 50);
-                setTimeout(() => {
-                    container.scrollTop = container.scrollHeight;
-                }, 100);
-            }, 10);
-        }
-    }
-
-    // Force scroll to bottom - more aggressive approach
-    function forceScrollToBottom(containerId) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-        // Multiple attempts to ensure scroll works
-        const attemptScroll = (attempts = 0) => {
-            if (attempts >= 5) return;
-            container.scrollTop = container.scrollHeight;
-            // Check if we actually scrolled to bottom
-            const isAtBottom = Math.abs(container.scrollHeight - container.scrollTop - container.clientHeight) < 10;
-            if (!isAtBottom) {
-                setTimeout(() => attemptScroll(attempts + 1), 50);
-            }
-        };
-        attemptScroll();
-    }
-
-    // Scroll to bottom for main chat
-    function scrollToBottomMain() {
-        scrollToBottom('chat-container');
-        isAtBottom = true;
-        newMessagesCount = 0;
-        if (newMessagesCountEl) newMessagesCountEl.textContent = '0';
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.classList.remove('visible');
-            setTimeout(() => {
-                scrollToBottomBtn.style.display = 'none';
-            }, 300);
-        }
-    }
-
-    // Scroll to bottom for private AI
-    function scrollPrivateToBottom() {
-        scrollToBottom('private-ai-container');
-    }
-
-    // Update online users lists
-    function updateOnlineUsersList(onlineUsers) {
-        console.log('Updating online users list:', onlineUsers);
-        
-        // Update main chat online list
-        updateSingleOnlineList('online-users-list', 'online-count', onlineUsers);
-        
-        // Update private AI online list
-        updateSingleOnlineList('private-online-users-list', 'private-online-count', onlineUsers);
-    }
-
-    function updateSingleOnlineList(listElementId, countElementId, onlineUsers) {
-        const onlineList = document.getElementById(listElementId);
-        const onlineCount = document.getElementById(countElementId);
-        
-        if (onlineList) {
-            onlineList.innerHTML = '';
-            onlineUsers.forEach(user => {
-                const userElement = document.createElement('div');
-                userElement.className = 'online-user';
-                userElement.innerHTML = `
-                    <div class="online-user-avatar">
-                        <img src="https://i.pravatar.cc/50?u=${encodeURIComponent(user)}" alt="${user}">
-                        <div class="online-dot"></div>
-                    </div>
-                    <div class="online-user-info">
-                        <div class="online-user-name">${user}</div>
-                    </div>
-                `;
-                onlineList.appendChild(userElement);
-            });
-        }
-        
-        if (onlineCount) {
-            onlineCount.textContent = onlineUsers.length;
-        }
-    }
-
-    // Remove offline user from the lists
-    function removeOfflineUser(username) {
-        console.log('Removing offline user from UI:', username);
-        
-        // Remove from main chat online list
-        removeUserFromSingleList('online-users-list', 'online-count', username);
-        
-        // Remove from private AI online list
-        removeUserFromSingleList('private-online-users-list', 'private-online-count', username);
-        
-        // Update status indicator in messages to offline
-        updateUserStatusIndicator(username, 'offline');
-    }
-
-    function removeUserFromSingleList(listElementId, countElementId, username) {
-        const onlineList = document.getElementById(listElementId);
-        if (onlineList) {
-            const userElements = onlineList.querySelectorAll('.online-user');
-            userElements.forEach(userElement => {
-                const userNameElement = userElement.querySelector('.online-user-name');
-                if (userNameElement && userNameElement.textContent === username) {
-                    userElement.remove();
-                }
-            });
-            // Update online count
-            const onlineCount = document.getElementById(countElementId);
-            if (onlineCount) {
-                const currentCount = parseInt(onlineCount.textContent) || 0;
-                onlineCount.textContent = Math.max(0, currentCount - 1);
-            }
-        }
-    }
-
-    // Update status indicator for a specific user
-    function updateUserStatusIndicator(username, status) {
-        // Find all messages from this user and update their status
-        const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
-        userMessages.forEach(msg => {
-            let statusIndicator = msg.querySelector('.user-status-indicator');
-            if (!statusIndicator) {
-                statusIndicator = createStatusIndicator();
-                const usernameDiv = msg.querySelector('.username');
-                if (usernameDiv) {
-                    usernameDiv.appendChild(statusIndicator);
-                }
-            }
-            statusIndicator.className = `user-status-indicator ${status}`;
-        });
-    }
-
-    // Create a status indicator element
-    function createStatusIndicator() {
-        const indicator = document.createElement('span');
-        indicator.className = 'user-status-indicator';
-        return indicator;
-    }
-
-    // Show typing indicator
-    function showTypingIndicator(username, isTyping) {
-        let indicator = document.getElementById('typing-indicator');
-        if (isTyping) {
-            if (!indicator) {
-                indicator = document.createElement('div');
-                indicator.id = 'typing-indicator';
-                indicator.innerHTML = `${username} is typing...`;
-                document.getElementById('chat-container').appendChild(indicator);
-            }
-        } else if (indicator) {
-            indicator.remove();
-        }
-    }
-
-    // Handle typing events
-    function setupTypingHandlers() {
-        const messageInput = document.getElementById('user-input');
-        if (!messageInput) return;
-        messageInput.addEventListener('input', () => {
-            const username = localStorage.getItem('chat_username');
-            if (!username || !socket) return;
-            if (!isTyping) {
-                isTyping = true;
-                socket.emit('typing-start', { username });
-            }
-            clearTimeout(typingTimer);
-            typingTimer = setTimeout(() => {
-                isTyping = false;
-                socket.emit('typing-stop', { username });
-            }, 1000);
-        });
-    }
-
-    // Improved scroll position detection
-    function checkIfAtBottom(container) {
-        if (!container) return true;
-        const threshold = 50; // pixels
-        const scrollPosition = container.scrollTop + container.clientHeight;
-        const scrollHeight = container.scrollHeight;
-        return Math.abs(scrollHeight - scrollPosition) <= threshold;
-    }
-
-    // IMPROVED Update scroll state function
-    function updateScrollState() {
-        const chatContainer = document.getElementById('chat-container');
-        if (!chatContainer || !scrollToBottomBtn) return;
-        
-        const scrollTop = chatContainer.scrollTop;
-        const scrollHeight = chatContainer.scrollHeight;
-        const clientHeight = chatContainer.clientHeight;
-        
-        // Calculate if we're at the bottom (within 50px threshold)
-        const isAtBottomNow = Math.abs(scrollHeight - scrollTop - clientHeight) <= 50;
-        
-        console.log('Scroll state:', {
-            scrollTop,
-            scrollHeight, 
-            clientHeight,
-            isAtBottomNow,
-            wasAtBottom: isAtBottom
-        });
-        
-        if (!isAtBottomNow) {
-            // User has scrolled up - show the button
-            if (!scrollToBottomBtn.classList.contains('visible')) {
-                scrollToBottomBtn.style.display = 'flex';
-                setTimeout(() => {
-                    scrollToBottomBtn.classList.add('visible');
-                }, 10);
-            }
-            
-            // Update new messages count if we're receiving messages while scrolled up
-            if (isAtBottom && !isAtBottomNow) {
-                newMessagesCount++;
-                if (newMessagesCountEl) {
-                    newMessagesCountEl.textContent = newMessagesCount;
-                }
-            }
-        } else {
-            // User is at bottom - hide the button
-            if (scrollToBottomBtn.classList.contains('visible')) {
-                scrollToBottomBtn.classList.remove('visible');
-                setTimeout(() => {
-                    scrollToBottomBtn.style.display = 'none';
-                }, 300);
-            }
-            newMessagesCount = 0;
-            if (newMessagesCountEl) newMessagesCountEl.textContent = '0';
-        }
-        
-        isAtBottom = isAtBottomNow;
-        lastScrollPosition = scrollTop;
-    }
-
-    // Save scroll position when leaving page
-    function saveScrollPosition() {
-        const chatContainer = document.getElementById('chat-container');
-        if (chatContainer) {
-            sessionStorage.setItem('chatScrollPosition', chatContainer.scrollTop);
-        }
-    }
-
-    // Restore scroll position when returning
-    function restoreScrollPosition() {
-        const chatContainer = document.getElementById('chat-container');
-        if (chatContainer) {
-            const savedPosition = sessionStorage.getItem('chatScrollPosition');
-            if (savedPosition !== null) {
-                chatContainer.scrollTop = savedPosition;
-                lastScrollPosition = parseInt(savedPosition);
-                updateScrollState();
-                shouldRestoreScroll = false;
-            }
-        }
-    }
-
-    // Private AI Go to Top button functions
-    let privateGoTopBtn;
-    let privateContainer;
-    function handlePrivateScroll() {
-        if (!privateContainer || !privateGoTopBtn) return;
-        const scrollTop = privateContainer.scrollTop;
-        // Show button if scrolled more than 200px, else hide
-        if (scrollTop > 200) {
-            privateGoTopBtn.style.display = 'flex';
-            privateGoTopBtn.classList.add('visible');
-        } else {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    }
-
-    function scrollPrivateToTop(e) {
-        if (e) e.preventDefault();
-        if (privateContainer) {
-            privateContainer.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-    }
-
-    // Page visibility and unload handlers
-    function handleVisibilityChange() {
-        const username = localStorage.getItem('chat_username');
-        if (username && socket) {
-            if (document.visibilityState === 'hidden') {
-                // User switched tabs or minimized browser - mark as away
-                socket.emit('user-away', username);
-                saveScrollPosition();
-            } else {
-                // User came back to the tab - mark as online
-                socket.emit('user-online', username);
-            }
-        }
-    }
-
-    function handleBeforeUnload() {
-        const username = localStorage.getItem('chat_username');
-        if (username && socket) {
-            // Send away status instead of offline
-            socket.emit('user-away', username);
-        }
-        saveScrollPosition();
-    }
-
-    function handlePageHide() {
-        const username = localStorage.getItem('chat_username');
-        if (username && socket) {
-            // Send away status instead of offline
-            socket.emit('user-away', username);
-        }
-        saveScrollPosition();
-    }
-
-    // ADDED: Private AI Long Press Functions
-    function handlePrivateMessageTouchStart(e) {
-        isLongPress = false;
-        e.currentTarget.classList.add('no-select');
-        longPressTimer = setTimeout(() => {
-            isLongPress = true;
-            showPrivateMessageContextMenu(e, e.currentTarget);
-        }, 500);
-    }
-
-    function handlePrivateMessageTouchMove(e) {
-        clearTimeout(longPressTimer);
-        e.currentTarget.classList.remove('no-select');
-    }
-
-    function handlePrivateMessageTouchEnd(e) {
-        clearTimeout(longPressTimer);
-        e.currentTarget.classList.remove('no-select');
-    }
-
-    function showPrivateMessageContextMenu(e, message) {
-        const messageText = message.dataset.content || '';
-        document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());
-
-        const contextMenu = document.createElement('div');
-        contextMenu.className = 'message-context-menu active';
-        contextMenu.style.left = `${(e.touches?.[0]?.pageX || e.clientX)}px`;
-        contextMenu.style.top = `${(e.touches?.[0]?.pageY || e.clientY)}px`;
-
-        const copyButton = document.createElement('button');
-        copyButton.textContent = 'Copy';
-        copyButton.onclick = () => {
-            copyToClipboard(messageText, copyButton);
-            contextMenu.remove();
-        };
-
-        const replyButton = document.createElement('button');
-        replyButton.textContent = 'Reply';
-        replyButton.onclick = () => {
-            // For private AI, we can implement reply functionality if needed
-            // For now, just copy and close the menu
-            copyToClipboard(messageText, copyButton);
-            contextMenu.remove();
-        };
-
-        contextMenu.appendChild(copyButton);
-        contextMenu.appendChild(replyButton);
-
-        document.body.appendChild(contextMenu);
-        document.addEventListener('click', () => contextMenu.remove(), {
-            once: true
-        });
-    }
-
-    // FIXED: Image loading function for immediate display
-    function displayImageImmediately(imgUrl, container) {
-        return new Promise((resolve) => {
-            const img = document.createElement('img');
-            img.src = imgUrl;
-            img.alt = "Image";
-            img.loading = "eager"; // Force immediate loading
-            img.style.opacity = "1";
-            img.style.transition = "none";
-            img.style.width = "100%";
-            img.style.borderRadius = "10px";
-            img.style.objectFit = "cover";
-            
-            // Force immediate display
-            img.onload = function() {
-                container.appendChild(img);
-                resolve(img);
-            };
-            
-            // Fallback in case onload doesn't fire
-            setTimeout(() => {
-                if (!img.parentNode) {
-                    container.appendChild(img);
-                }
-                resolve(img);
-            }, 100);
-        });
-    }
-
-    // FIXED: Force image rendering function
-    function forceImageRendering() {
-        document.querySelectorAll('.message img').forEach(img => {
-            // Force reflow and repaint
-            img.style.display = 'none';
-            img.offsetHeight; // Trigger reflow
-            img.style.display = 'block';
-            
-            // Ensure full opacity
-            img.style.opacity = '1';
-            img.style.visibility = 'visible';
-        });
-    }
-
-    function toggleAuth() {
-        isLogin = !isLogin;
-        const authTitle = document.getElementById('auth-title');
-        const authButton = document.querySelector('.auth-box button');
-        const toggleText = document.getElementById('toggle-text');
-        const toggleLink = document.getElementById('toggle-link');
-        elements.errorDisplay.style.display = 'none';
-        elements.successDisplay.style.display = 'none';
-        if (isLogin) {
-            authTitle.textContent = 'Login';
-            authButton.textContent = 'Login';
-            toggleText.textContent = "Don't have an account? ";
-            toggleLink.textContent = 'Sign Up';
-        } else {
-            authTitle.textContent = 'Sign Up';
-            authButton.textContent = 'Sign Up';
-            toggleText.textContent = 'Already have an account? ';
-            toggleLink.textContent = 'Login';
-        }
-    }
-
-    function showSuccess(message) {
-        elements.successDisplay.textContent = message;
-        elements.successDisplay.style.display = 'block';
-        setTimeout(() => {
-            elements.successDisplay.style.display = 'none';
-        }, 3000);
-    }
-
-    function showError(message) {
-        elements.errorDisplay.textContent = message;
-        elements.errorDisplay.style.display = 'block';
-        setTimeout(() => {
-            elements.errorDisplay.style.display = 'none';
-        }, 3000);
-    }
-
-    async function handleAuth() {
-        const username = document.getElementById('auth-username').value.trim();
-        const password = document.getElementById('auth-password').value;
-        const loader = document.getElementById('loader');
-        elements.errorDisplay.style.display = 'none';
-        elements.successDisplay.style.display = 'none';
-        if (!username || !password) {
-            showError('Please enter both username and password');
-            return;
-        }
-        if (username.length < 3 || username.length > 20) {
-            showError('Username must be between 3-20 characters');
-            return;
-        }
-        if (password.length < 4 || password.length > 20) {
-            showError('Password must be between 4-20 characters');
-            return;
-        }
-        loader.style.display = 'flex';
-        try {
-            // Simulate network delay
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            if (isLogin) {
-                // Login logic
-                if (users[username] && users[username] === password) {
-                    showSuccess('Login successful!');
-                    localStorage.setItem('currentUser', username);
-                    localStorage.setItem('chat_username', username);
-                    setTimeout(() => {
-                        loader.style.display = 'none';
-                        document.getElementById('auth-container').style.display = 'none';
-                        document.querySelector('.menu').style.display = 'flex';
-                        document.querySelector('.news-toggle').style.display = 'block';
-                        
-                        // Initialize buttons after successful login
-                        initializeButtons();
-                        showContainer('chat');
-                        updateProfileSection();
-                        initializeChat();
-
-                        // Initialize real-time features after login
-                        initSocket();
-                        setupTypingHandlers();
-                        
-                        // Add page event listeners
-                        document.addEventListener('visibilitychange', handleVisibilityChange);
-                        window.addEventListener('beforeunload', handleBeforeUnload);
-                        window.addEventListener('pagehide', handlePageHide);
-
-                        // Set flag to restore scroll position after messages load
-                        shouldRestoreScroll = true;
-                        
-                        // Enable SQL Editor access if already verified
-                        if (hasVerifiedCode()) {
-                            enableSQLEditorAccess();
-                        }
-                    }, 500);
-                } else {
-                    throw new Error('Invalid username or password');
-                }
-            } else {
-                // Signup logic
-                if (users[username]) {
-                    throw new Error('Username already exists');
-                } else {
-                    users[username] = password;
-                    localStorage.setItem('users', JSON.stringify(users));
-                    showSuccess('Account created successfully! Please login.');
-                    setTimeout(() => {
-                        loader.style.display = 'none';
-                        toggleAuth();
-                    }, 1000);
-                }
-            }
-        } catch (error) {
-            loader.style.display = 'none';
-            showError(error.message);
-        }
-    }
-
-    function initializeChat() {
-        currentUsername = localStorage.getItem('chat_username') || '';
-        if (elements.usernameInput) {
-            elements.usernameInput.value = currentUsername;
-            elements.usernameInput.addEventListener('input', (e) => {
-                currentUsername = e.target.value.trim();
-                localStorage.setItem('chat_username', currentUsername);
-            });
-        }
-        if (elements.messageInput) {
-            elements.messageInput.addEventListener('input', () => {
-                autoResize(elements.messageInput);
-                const hasText = elements.messageInput.value.trim().length > 0;
-                elements.sendButton.disabled = !hasText || isSending;
-                elements.sendButton.classList.toggle('enabled', hasText && !isSending);
-            });
-            elements.messageInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey && !isSending) {
-                    e.preventDefault();
-                    sendMessage();
-                }
-            });
-        }
-        loadMessages();
-    }
-
-    function autoResize(textarea) {
-        if (textarea) {
-            textarea.style.height = 'auto';
-            textarea.style.height = (textarea.scrollHeight > 100 ? 100 : textarea.scrollHeight) + 'px';
-        }
-    }
-
-    function showNotification(username, message) {
-        if (!notificationPermissionGranted || !('Notification' in window)) return;
-        const notification = new Notification(`${username} says:`, {
-            body: message.length > 50 ? message.substring(0, 50) + '...' : message,
-            icon: 'https://i.pravatar.cc/50?u=' + encodeURIComponent(username)
-        });
-        notification.onclick = () => {
-            window.focus();
-        };
-    }
-
-    async function fetchChatResponse(userInput) {
-        try {
-            const response = await fetch('/api/command', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    message: userInput,
-                    source: 'main-chat'
-                }),
-            });
-            const data = await response.json();
-            if (data.reply) {
-                if (Array.isArray(data.reply)) {
-                    data.reply.forEach(reply => displayMessage(reply, 'received', null, 'AI', null, true));
-                } else {
-                    displayMessage(data.reply, 'received', null, 'AI', null, true);
-                }
-            }
-        } catch (error) {
-            console.error("Error fetching AI response:", error);
-        }
-    }
-
-    async function fetchPrivateAIResponse(userInput) {
-        try {
-            const response = await fetch('/api/command', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    message: userInput,
-                    source: 'private-ai'
-                }),
-            });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            if (data.reply) {
-                // Display in private AI container
-                if (Array.isArray(data.reply)) {
-                    data.reply.forEach(reply => displayPrivateMessage(reply, 'received'));
-                } else {
-                    displayPrivateMessage(data.reply, 'received');
-                }
-            } else {
-                throw new Error('No reply from AI');
-            }
-        } catch (error) {
-            console.error("Error fetching Private AI response:", error);
-            displayPrivateMessage("Sorry, I encountered an error processing your message. Please try again.", 'received');
-        }
-    }
-
-    function handleTouchStart(e) {
-        isLongPress = false;
-        e.currentTarget.classList.add('no-select');
-        longPressTimer = setTimeout(() => {
-            isLongPress = true;
-            showMessageContextMenu(e, e.currentTarget);
-        }, 500);
-    }
-
-    function handleTouchMove(e) {
-        clearTimeout(longPressTimer);
-        e.currentTarget.classList.remove('no-select');
-    }
-
-    function handleTouchEnd(e) {
-        clearTimeout(longPressTimer);
-        e.currentTarget.classList.remove('no-select');
-    }
-
-    function clearReply() {
-        replyToText = null;
-        if (elements.replyPreview) {
-            elements.replyPreview.style.display = 'none';
-            elements.replyPreview.textContent = '';
-        }
-    }
-
-    // Track page visibility for notifications
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-            // When page becomes visible, update lastMessageId to prevent duplicate notifications
-            if (elements.chatContainer && elements.chatContainer.lastChild) {
-                lastMessageId = elements.chatContainer.lastChild.dataset.id;
-            }
-        }
-    });
-
-    function showMessageContextMenu(e, message) {
-        const messageText = message.dataset.content || '';
-        const messageId = message.dataset.id;
-        document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());
-
-        const contextMenu = document.createElement('div');
-        contextMenu.className = 'message-context-menu active';
-        contextMenu.style.left = `${(e.touches?.[0]?.pageX || e.clientX)}px`;
-        contextMenu.style.top = `${(e.touches?.[0]?.pageY || e.clientY)}px`;
-
-        const copyButton = document.createElement('button');
-        copyButton.textContent = 'Copy';
-        copyButton.onclick = () => {
-            copyToClipboard(messageText, copyButton);
-            contextMenu.remove();
-        };
-
-        const replyButton = document.createElement('button');
-        replyButton.textContent = 'Reply';
-        replyButton.onclick = () => {
-            replyToText = messageText;
-            elements.messageInput.focus();
-            showReplyPreview();
-            contextMenu.remove();
-        };
-
-        contextMenu.appendChild(copyButton);
-        contextMenu.appendChild(replyButton);
-
-        if (messageId && message.classList.contains('sent')) {
-            const deleteButton = document.createElement('button');
-            deleteButton.textContent = 'Delete';
-            deleteButton.onclick = async () => {
-                try {
-                    const response = await fetch(`/messages/${messageId}`, {
-                        method: 'DELETE'
-                    });
-                    if (!response.ok) throw new Error('Delete failed');
-                    message.remove();
-                } catch (err) {
-                    showError(err.message);
-                }
-                contextMenu.remove();
-            };
-            contextMenu.appendChild(deleteButton);
-        }
-
-        document.body.appendChild(contextMenu);
-        document.addEventListener('click', () => contextMenu.remove(), {
-            once: true
-        });
-    }
-
-    function showReplyPreview() {
-        if (!elements.replyPreview) return;
-        elements.replyPreview.innerHTML = `
-            <div class="reply-preview">
-                Replying to: ${replyToText.substring(0, 80)}
-                <button onclick="clearReply()" style="float:right; font-size:12px;">✕</button>
-            </div>
-        `;
-    }
-
-    function copyToClipboard(text, button) {  
-        const textarea = document.createElement('textarea');  
-        textarea.value = text;  
-        document.body.appendChild(textarea);  
-        textarea.select();  
-        document.execCommand('copy');  
-        document.body.removeChild(textarea);  
-
-        button.innerHTML = '<span style="font-size: 15px;">Copied!</span>';  
-        setTimeout(() => {  
-            button.innerHTML = 'Copy';  
-        }, 2000);  
-    }  
-
-    function toggleKebabMenu(event) {
-        event.stopPropagation();
-        const dropdown = document.querySelector('.kebab-dropdown');
-        if (dropdown) {
-            dropdown.classList.toggle('active');
-        }
-    }
-
-    document.addEventListener('click', function(event) {
-        const dropdown = document.querySelector('.kebab-dropdown');
-        if (dropdown && dropdown.classList.contains('active')) {
-            dropdown.classList.remove('active');
-        }
-    });
-
-    function toggleTheme() {
-        document.body.classList.toggle('dark-theme');
-        const dropdown = document.querySelector('.kebab-dropdown');
-        if (dropdown) {
-            dropdown.classList.remove('active');
-        }
-    }
-
-    function clearChat() {
-        const chatContainer = document.getElementById('chat-container');
-        if (chatContainer) {
-            chatContainer.innerHTML = '';
-        }
-        const dropdown = document.querySelector('.kebab-dropdown');
-        if (dropdown) {
-            dropdown.classList.remove('active');
-        }
-    }
-
-    function exportChat() {
-        const chatContainer = document.getElementById('chat-container');
-        if (!chatContainer) return;
-        
-        const messages = chatContainer.innerText;
-        const blob = new Blob([messages], { type: 'text/plain' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'chat-export.txt';
-        a.click();
-        window.URL.revokeObjectURL(url);
-        const dropdown = document.querySelector('.kebab-dropdown');
-        if (dropdown) {
-            dropdown.classList.remove('active');
-        }
-    }
-
-    function exportChatPDF() {
-        const chatContainer = document.getElementById('chat-container');
-        if (!chatContainer) return;
-        
-        const dropdown = document.querySelector('.kebab-dropdown');
-        if (!dropdown) return;
-
-        const clone = chatContainer.cloneNode(true);
-
-        // Show downloading alert
-        const downloadingAlert = document.createElement('div');
-        downloadingAlert.id = 'downloading-alert';
-        downloadingAlert.textContent = 'Preparing download, please wait...';
-        downloadingAlert.style.position = 'fixed';
-        downloadingAlert.style.top = '20px';
-        downloadingAlert.style.left = '50%';
-        downloadingAlert.style.transform = 'translateX(-50%)';
-        downloadingAlert.style.padding = '10px 20px';
-        downloadingAlert.style.backgroundColor = '#333';
-        downloadingAlert.style.color = '#fff';
-        downloadingAlert.style.fontSize = '16px';
-        downloadingAlert.style.borderRadius = '8px';
-        downloadingAlert.style.zIndex = '9999';
-        document.body.appendChild(downloadingAlert);
-
-        // Find all images and replace src with base64
-        const images = clone.querySelectorAll('img');
-        const promises = [];
-
-        images.forEach(img => {
-            const promise = new Promise((resolve, reject) => {
-                const canvas = document.createElement('canvas');
-                const context = canvas.getContext('2d');
-                const originalImage = new Image();
-                originalImage.crossOrigin = 'anonymous';
-                originalImage.src = img.src;
-
-                originalImage.onload = () => {
-                    try {
-                        // Store original display style to restore later
-                        const originalDisplay = img.style.display;
-                        const originalWidth = img.style.width;
-                        const originalHeight = img.style.height;
-
-                        // Temporarily make image visible and full size for capture
-                        img.style.display = 'block';
-                        img.style.width = 'auto';
-                        img.style.height = 'auto';
-                        img.style.maxWidth = 'none';
-                        img.style.maxHeight = 'none';
-
-                        canvas.width = originalImage.naturalWidth;
-                        canvas.height = originalImage.naturalHeight;
-                        context.drawImage(originalImage, 0, 0);
-
-                        const dataURL = canvas.toDataURL('image/png');
-                        img.src = dataURL;
-
-                        // Restore original styles
-                        img.style.display = originalDisplay;
-                        img.style.width = originalWidth;
-                        img.style.height = originalHeight;
-
-                        resolve();
-                    } catch (error) {
-                        console.error('Error converting image:', error);
-                        resolve();
-                    }
-                };
-
-                originalImage.onerror = () => {
-                    console.error('Error loading image:', img.src);
-                    resolve();
-                };
-            });
-            promises.push(promise);
-        });
-
-        Promise.all(promises).then(() => {
-            const opt = {
-                margin: 10,
-                filename: 'chat-export.pdf',
-                image: { type: 'jpeg', quality: 1 },
-                html2canvas: { 
-                    scale: 2,
-                    useCORS: true,
-                    allowTaint: true,
-                    scrollX: 0,
-                    scrollY: 0,
-                    windowWidth: document.documentElement.scrollWidth,
-                    windowHeight: document.documentElement.scrollHeight
-                },
-                jsPDF: { 
-                    unit: 'mm',
-                    format: 'a4',
-                    orientation: 'portrait',
-                    hotfixes: ['px_scaling'] 
-                },
-                pagebreak: { 
-                    mode: ['avoid-all', 'css', 'legacy'],
-                    before: '.page-break' 
-                }
-            };
-
-            // Temporarily modify image styles for PDF generation
-            const allImages = clone.querySelectorAll('img');
-            allImages.forEach(img => {
-                img.style.maxWidth = '100%';
-                img.style.height = 'auto';
-                img.style.display = 'block';
-            });
-
-            html2pdf().set(opt).from(clone).save().then(() => {
-                downloadingAlert.remove();
-            }).catch((error) => {
-                console.error('Error generating PDF:', error);
-                downloadingAlert.remove();
-            });
-
-            dropdown.classList.remove('active');
-        });
-    }
-
-    function showSettings() {
-        alert('Settings panel coming soon!');
-        const dropdown = document.querySelector('.kebab-dropdown');
-        if (dropdown) {
-            dropdown.classList.remove('active');
-        }
-    }
- 
-    function toggleNews() {
-        const newsContainer = document.getElementById('news-container');
-        if (newsContainer) {
-            // Toggle the display of the news container
-            if (newsContainer.style.display === 'none' || newsContainer.style.display === '') {
-                newsContainer.style.display = 'block';
-                // Make sure it's populated with news items
-                populateNews();
-            } else {
-                newsContainer.style.display = 'none';
-            }
-        }
-    }
-
-    const sampleNews = [
-        {
-            title: "New AI Features Released",
-            description: "We've added exciting new capabilities to our chatbot!",
-            date: "2025-01-15"
+        // BROADCAST BOT RESPONSE TO ALL CLIENTS IMMEDIATELY
+        io.emit('new-message', retryData[0]);
+        return retryData;
+      }
+      throw error;
+    }
+    
+    console.log(`✅ ${commandType} response saved to Supabase. ID:`, data[0]?.id);
+    
+    // BROADCAST BOT RESPONSE TO ALL CLIENTS IMMEDIATELY
+    io.emit('new-message', data[0]);
+    return data;
+  } catch (error) {
+    console.error(`❌ Error saving ${commandType} response to Supabase:`, error);
+    throw error;
+  }
+}
+
+// TEST ENDPOINTS: Check if we can save to Supabase
+app.get('/test-supabase', async (req, res) => {
+  try {
+    console.log('🧪 Testing Supabase connection (GET)...');
+    
+    // Test 1: Check if we can read from Supabase
+    const { data: readData, error: readError } = await supabase
+      .from('chatter')
+      .select('*')
+      .limit(5)
+      .order('created_at', { ascending: false });
+
+    if (readError) {
+      console.error('❌ Read test failed:', readError);
+      return res.status(500).json({ 
+        success: false, 
+        test: 'read',
+        error: readError.message
+      });
+    }
+
+    // Test 2: Try to insert a regular message
+    const testData = {
+      content: 'Test regular message from server',
+      username: 'TestBot',
+      image_url: '',
+      reply_to: ''
+    };
+    
+    const { data: insertData, error: insertError } = await supabase
+      .from('chatter')
+      .insert([testData])
+      .select();
+
+    if (insertError) {
+      console.error('❌ Insert test failed:', insertError);
+      return res.status(500).json({ 
+        success: false, 
+        test: 'insert',
+        error: insertError.message,
+        details: insertError
+      });
+    }
+    
+    console.log('✅ All tests successful!');
+    res.json({ 
+      success: true, 
+      message: 'Supabase connection test successful',
+      tests: {
+        read: {
+          success: true,
+          messageCount: readData?.length || 0
         },
-        {
-            title: "System Update",
-            description: "Performance improvements and bug fixes",
-            date: "2025-03-14"
-        },
-        {
-            title: "Maintenance Notice",
-            description: "Scheduled maintenance on January 20th",
-            date: "2025-03-13"
+        insert: {
+          success: true,
+          insertedId: insertData[0]?.id
         }
+      },
+      recentMessages: readData,
+      insertedMessage: insertData[0]
+    });
+  } catch (error) {
+    console.error('❌ Test error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// DEBUG: Check what's happening with ALL commands
+app.get('/debug-all-commands', async (req, res) => {
+  try {
+    console.log('🔍 Debugging ALL command responses...');
+    
+    // Test different commands
+    const testCommands = [
+      { message: '!help', source: 'main-chat' },
+      { message: '!ping', source: 'main-chat' },
+      { message: '!ai hello world', source: 'main-chat' }
     ];
 
-    function populateNews() {
-        const newsItems = document.getElementById('news-items');
-        if (!newsItems) return;
-        
-        newsItems.innerHTML = '';
+    const results = [];
 
-        sampleNews.forEach(news => {
-            const newsItem = document.createElement('div');
-            newsItem.className = 'news-item';
-            newsItem.innerHTML = `
-                <h3>${news.title}</h3>
-                <p>${news.description}</p>
-                <small>${news.date}</small>
-            `;
-            newsItems.appendChild(newsItem);
+    for (const testCmd of testCommands) {
+      try {
+        console.log(`🧪 Testing command: ${testCmd.message}`);
+        
+        const response = await axios.post('http://localhost:3000/api/command', testCmd, {
+          headers: { 'Content-Type': 'application/json' }
         });
+
+        results.push({
+          command: testCmd.message,
+          success: true,
+          response: response.data.reply || response.data
+        });
+      } catch (error) {
+        results.push({
+          command: testCmd.message,
+          success: false,
+          error: error.message
+        });
+      }
     }
 
-    document.addEventListener('click', function (e) {
-        if (e.target.tagName === 'IMG' && e.target.closest('.message')) {
-            openZoom(e.target.src);
-        }
+    // Check what got saved to database
+    const { data: savedMessages } = await supabase
+      .from('chatter')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    res.json({
+      success: true,
+      commandTests: results,
+      savedMessages: savedMessages,
+      message: 'All command debug test completed'
     });
 
-    function openZoom(src) {
-        document.body.style.overflow = 'hidden';
-        const overlay = document.getElementById('zoom-overlay');
-        const zoomImage = document.getElementById('zoom-image');
-        const downloadBtn = document.getElementById('download-btn');
+  } catch (error) {
+    console.error('❌ All commands debug error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
 
-        if (!overlay || !zoomImage || !downloadBtn) return;
-        
-        zoomImage.src = src;
+// NEW: Test regular message endpoint
+app.post('/test-message', async (req, res) => {
+  try {
+    const { content, username } = req.body;
+    
+    console.log('🧪 Testing regular message:', { content, username });
 
-        // Force download filename
-        downloadBtn.href = src;
-        downloadBtn.setAttribute('download', 'image.jpg');
-
-        overlay.style.display = 'flex';
+    if (!content || !username) {
+      return res.status(400).json({ error: "Content and username required" });
     }
 
-    function closeZoom() {
-        document.body.style.overflow = '';
-        const overlay = document.getElementById('zoom-overlay');
-        if (overlay) overlay.style.display = 'none';
+    const testData = {
+      content: content,
+      username: username,
+      image_url: '',
+      reply_to: ''
+    };
+
+    const { data, error } = await supabase
+      .from('chatter')
+      .insert([testData])
+      .select();
+
+    if (error) {
+      console.error('❌ Test message failed:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: error.message 
+      });
     }
 
-    if (document.getElementById("year")) {
-        document.getElementById("year").textContent = new Date().getFullYear();
+    console.log('✅ Test message saved:', data[0]);
+    
+    // Broadcast via Socket.io
+    io.emit('new-message', data[0]);
+    res.json({ 
+      success: true, 
+      message: 'Test message saved successfully',
+      data: data[0]
+    });
+
+  } catch (error) {
+    console.error('❌ Test message error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Command API handler - FIXED: Only save AI responses for -ai command
+app.post("/api/command", async (req, res) => {
+  try {
+    const { message, source = 'main-chat' } = req.body;
+    console.log('📨 Received command:', { message, source });
+    
+    if (!message) return res.status(400).json({ reply: "❌ Message is required" });
+
+    if (message.trim().toLowerCase() === "prefix") {
+      const reply = `🔹 My command prefix is: \`${PREFIX}\``;
+      
+      // ✅ SAVE ONLY FOR MAIN CHAT: Save prefix command response
+      if (source === 'main-chat') {
+        console.log('💾 ✅ Saving prefix command response to Supabase...');
+        try {
+          await saveBotResponseToSupabase(reply, 'prefix', 'Bot');
+        } catch (saveError) {
+          console.error('❌ Failed to save prefix response:', saveError);
+        }
+      }
+      
+      return res.json({ reply });
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
-        populateNews();
+    const cmd = handleCommand(message);
+    if (!cmd) {
+      console.log('❌ Not a command or wrong prefix');
+      return res.end();
+    }
 
-        const currentUser = localStorage.getItem('currentUser');
-        if (currentUser) {
-            const newsToggle = document.querySelector('.news-toggle');
-            if (newsToggle) newsToggle.style.display = 'block';
+    console.log('🔍 Command detected:', cmd.commandName);
+    console.log('📍 Source:', source);
+
+    // ✅ FIXED: Only process AI command for AI, all other commands go to Bot
+    if (cmd.commandName === "ai") {
+      try {
+        console.log('🤖 Processing AI command:', cmd.text);
+        const response = await axios.get(
+          `https://yau-ai-runing-station.vercel.app/ai?prompt=${encodeURIComponent(cmd.text)}&cb=${Date.now()}`,
+          { 
+            headers: { 
+              Accept: "application/json",
+              "User-Agent": "GoatBot/1.0"
+            },
+            timeout: 15000,
+            validateStatus: () => true
+          }
+        );
+
+        let responseData;
+        let aiResponse;
+
+        if (typeof response.data === 'string') {
+          try {
+            responseData = JSON.parse(response.data);
+          } catch (e) {
+            if (response.data.includes('error') || response.status !== 200) {
+              throw new Error(response.data || `API returned status ${response.status}`);
+            }
+            aiResponse = response.data;
+          }
         } else {
-            const newsToggle = document.querySelector('.news-toggle');
-            if (newsToggle) newsToggle.style.display = 'none';
-            
-            const newsContainer = document.querySelector('.news-container');
-            if (newsContainer) newsContainer.style.display = 'none';
+          responseData = response.data;
         }
+
+        if (!aiResponse) {
+          if (responseData.response) {
+            aiResponse = responseData.response;
+          } else if (responseData.message) {
+            aiResponse = responseData.message;
+          } else if (responseData.data) {
+            aiResponse = responseData.data;
+          } else {
+            aiResponse = JSON.stringify(responseData) || "⚠️ No recognizable response format";
+          }
+        }
+
+        console.log('🤖 AI Response received:', aiResponse.substring(0, 200) + '...');
+
+        // ✅ SAVE AI RESPONSE: Only for AI command in main chat
+        if (source === 'main-chat') {
+          console.log('💾 ✅ Saving AI response to Supabase...');
+          try {
+            await saveBotResponseToSupabase(aiResponse, cmd.text, 'AI');
+          } catch (saveError) {
+            console.error('❌ Failed to save AI response:', saveError);
+          }
+        }
+
+        return res.json({ reply: aiResponse });
+      } catch (aiError) {
+        console.error("❌ AI Processing Error:", aiError);
+        const errorReply = `❌ AI Error: ${aiError.message.replace(/[\n\r]/g, ' ').substring(0, 200)}`;
+        
+        // ✅ SAVE AI ERROR: Only for AI command in main chat
+        if (source === 'main-chat') {
+          console.log('💾 ✅ Saving AI error response to Supabase...');
+          try {
+            await saveBotResponseToSupabase(errorReply, cmd.text, 'AI');
+          } catch (saveError) {
+            console.error('❌ Failed to save AI error response:', saveError);
+          }
+        }
+        
+        return res.status(500).json({ reply: errorReply });
+      }
+    } else {
+      // ✅ FIXED: All other commands (non-AI) are handled by Bot only
+      const command = commands[cmd.commandName];
+      if (!command) {
+        const notFoundReply = "❌ Command not found";
+        
+        // ✅ SAVE BOT RESPONSE: Only for main chat
+        if (source === 'main-chat') {
+          console.log('💾 ✅ Saving "command not found" response to Supabase...');
+          try {
+            await saveBotResponseToSupabase(notFoundReply, cmd.commandName, 'Bot');
+          } catch (saveError) {
+            console.error('❌ Failed to save command not found response:', saveError);
+          }
+        }
+        
+        return res.json({ reply: notFoundReply });
+      }
+      
+      if (typeof command.onStart !== "function") {
+        const noSupportReply = "❌ This command does not support execution";
+        
+        // ✅ SAVE BOT RESPONSE: Only for main chat
+        if (source === 'main-chat') {
+          console.log('💾 ✅ Saving "no support" response to Supabase...');
+          try {
+            await saveBotResponseToSupabase(noSupportReply, cmd.commandName, 'Bot');
+          } catch (saveError) {
+            console.error('❌ Failed to save no support response:', saveError);
+          }
+        }
+        
+        return res.json({ reply: noSupportReply });
+      }
+
+      const replies = [];
+      await command.onStart({
+        api: {
+          sendMessage: (msg) => replies.push(typeof msg === "string" ? msg : JSON.stringify(msg))
+        },
+        event: { body: cmd.text },
+        args: cmd.args,
+        message: {
+          reply: (content) => replies.push(content)
+        }
+      });
+
+      // ✅ SAVE BOT RESPONSE: Only for main chat
+      if (source === 'main-chat' && replies.length > 0) {
+        console.log('💾 ✅ Saving command response to Supabase...');
+        try {
+          // Save each reply as a separate message
+          for (const reply of replies) {
+            if (reply && reply.trim() !== '') {
+              await saveBotResponseToSupabase(reply, cmd.commandName, 'Bot');
+            }
+          }
+        } catch (saveError) {
+          console.error('❌ Failed to save command response:', saveError);
+        }
+      }
+
+      if (!res.headersSent) {
+        res.json({ reply: replies.length === 1 ? replies[0] : replies });
+      }
+    }
+  } catch (error) {
+    console.error("❌ Server Error:", error);
+    const errorReply = `❌ Server Error: ${error.message}`;
+    
+    // ✅ SAVE ERROR RESPONSE: Only for main chat
+    if (source === 'main-chat') {
+      console.log('💾 ✅ Saving server error response to Supabase...');
+      try {
+        await saveBotResponseToSupabase(errorReply, 'unknown', 'Bot');
+      } catch (saveError) {
+        console.error('❌ Failed to save server error response:', saveError);
+      }
+    }
+    
+    res.status(500).json({ reply: errorReply });
+  }
+});
+
+// Add endpoint to get online users
+app.get('/online-users', (req, res) => {
+  const onlineUsersArray = Array.from(onlineUsers.keys());
+  console.log('Current online users:', onlineUsersArray);
+  res.json(onlineUsersArray);
+});
+
+// ===== ENHANCED SOCKET.IO REAL-TIME MESSAGING =====
+
+// Socket.io connection handling - 3 MINUTE ONLINE STATUS
+io.on('connection', (socket) => {
+  console.log('🔌 User connected:', socket.id);
+
+  // Send existing messages to newly connected client
+  socket.on('request-messages', async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chatter')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      
+      if (!error && data) {
+        socket.emit('chat-messages', data.reverse());
+      }
+    } catch (error) {
+      console.error('Error sending messages to client:', error);
+    }
+  });
+
+  socket.on('user-online', (username) => {
+    if (username) {
+      console.log('👤 User online:', username);
+      
+      // Update or add user to online users
+      onlineUsers.set(username, {
+        socketId: socket.id,
+        username: username,
+        lastSeen: Date.now(),
+        isOnline: true
+      });
+      
+      // Get current online users list
+      const onlineUsersArray = Array.from(onlineUsers.keys());
+      console.log('📊 Updated online users:', onlineUsersArray);
+      
+      // Broadcast to all users that this user is online
+      io.emit('user-status-change', { 
+        username, 
+        status: 'online',
+        onlineUsers: onlineUsersArray
+      });
+    }
+  });
+
+  socket.on('user-away', (username) => {
+    if (username && onlineUsers.has(username)) {
+      console.log('⏸️ User away:', username);
+      
+      // Update last seen but keep user in list
+      const userData = onlineUsers.get(username);
+      userData.lastSeen = Date.now();
+      userData.isOnline = false;
+      
+      // Broadcast away status
+      io.emit('user-status-change', { 
+        username, 
+        status: 'away',
+        onlineUsers: Array.from(onlineUsers.keys())
+      });
+    }
+  });
+
+  socket.on('user-offline', (username) => {
+    if (username) {
+      console.log('🔴 User offline (manual):', username);
+      removeUserFromOnlineList(username);
+    }
+  });
+
+  // Handle typing indicators
+  socket.on('typing-start', (data) => {
+    socket.broadcast.emit('user-typing', {
+      username: data.username,
+      isTyping: true
     });
-
-    // UPDATED function to update the profile section with new design
-    function updateProfileSection() {
-        const dropdown = document.getElementById('dropdown');
-        if (!dropdown) return;
-        
-        const currentUsername = localStorage.getItem('currentUser');
-        
-        // Remove existing profile section if it exists
-        const existingProfile = document.querySelector('.profile-section');
-        const existingDivider = document.querySelector('.menu-divider');
-        if (existingProfile) existingProfile.remove();
-        if (existingDivider) existingDivider.remove();
-        
-        // Only add profile section if user is logged in
-        if (currentUsername) {
-            const profileSection = document.createElement('div');
-            profileSection.className = 'profile-panel';
-            profileSection.innerHTML = `
-                <div class="profile-avatar">
-                    <img src="https://i.pravatar.cc/50?u=${encodeURIComponent(currentUsername)}" alt="Profile">
-                </div>
-                <div class="profile-info">
-                    <div class="profile-username">${currentUsername}</div>
-                    <div class="profile-status online">
-                        <span class="status-dot"></span>
-                        <span>Online</span>
-                    </div>
-                </div>
-            `;
-            
-            const divider = document.createElement('div');
-            divider.className = 'menu-divider';
-            
-            // Insert at the beginning of dropdown
-            dropdown.insertBefore(divider, dropdown.firstChild);
-            dropdown.insertBefore(profileSection, dropdown.firstChild);
-        }
-    }
-
-    // Improved click handler for dropdown
-    document.addEventListener('click', function(event) {
-        const dropdown = document.getElementById('dropdown');
-        const hamburger = document.querySelector('.hamburger');
-        const kebabMenu = document.querySelector('.kebab-menu');
-        
-        // Close dropdown if clicking outside of it and not on menu controls
-        if (dropdown && dropdown.style.display === 'block' && 
-            !dropdown.contains(event.target) && 
-            event.target !== hamburger &&
-            !kebabMenu.contains(event.target)) {
-            dropdown.style.display = 'none';
-        }
-        
-        // Close kebab menu if clicking outside
-        const kebabDropdown = document.querySelector('.kebab-dropdown');
-        if (kebabDropdown && kebabDropdown.classList.contains('active') && 
-            !kebabMenu.contains(event.target) && 
-            !kebabDropdown.contains(event.target)) {
-            kebabDropdown.classList.remove('active');
-        }
+  });
+  
+  socket.on('typing-stop', (data) => {
+    socket.broadcast.emit('user-typing', {
+      username: data.username,
+      isTyping: false
     });
+  });
 
-    // IMPROVED logout function with proper cleanup
-    function logout() {
-        const username = localStorage.getItem('chat_username');
-        
-        // Notify server that user is going offline
-        if (username && socket) {
-            socket.emit('user-offline', username);
-            // Disconnect socket
-            socket.disconnect();
-        }
-        
-        // Clear user data
-        localStorage.removeItem('currentUser');
-        localStorage.removeItem('chat_username');
-        
-        // Remove page event listeners
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-        window.removeEventListener('beforeunload', handleBeforeUnload);
-        window.removeEventListener('pagehide', handlePageHide);
-        
-        // Hide all containers and menus
-        document.querySelectorAll('.main-chat-interface').forEach(container => {
-            container.style.display = 'none';
+  // Handle private AI messages
+  socket.on('send-private-message', async (data) => {
+    try {
+      console.log('🤫 Private message received:', data);
+      
+      // Process private AI response
+      const response = await axios.post('http://localhost:3000/api/command', {
+        message: data.content,
+        source: 'private-ai'
+      }, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.data.reply) {
+        // Send private AI response back to the specific user
+        socket.emit('new-private-message', {
+          content: response.data.reply,
+          username: 'Private AI'
         });
-        
-        const menu = document.querySelector('.menu');
-        if (menu) menu.style.display = 'none';
-        
-        const dropdown = document.getElementById('dropdown');
-        if (dropdown) dropdown.style.display = 'none';
-        
-        const kebabDropdown = document.querySelector('.kebab-dropdown');
-        if (kebabDropdown) kebabDropdown.classList.remove('active');
-        
-        // Hide all chat inputs
-        document.querySelectorAll('.chat-input').forEach(input => {
-            input.style.display = 'none';
-        });
-        
-        // Show auth container
-        document.getElementById('auth-container').style.display = 'flex';
-        
-        // Hide news toggle
-        const newsToggle = document.querySelector('.news-toggle');
-        if (newsToggle) newsToggle.style.display = 'none';
-        
-        const newsContainer = document.querySelector('.news-container');
-        if (newsContainer) newsContainer.style.display = 'none';
-        
-        // Hide both buttons on logout
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-        
-        // Reset auth form
-        isLogin = true;
-        const authTitle = document.getElementById('auth-title');
-        if (authTitle) authTitle.textContent = 'Login';
-        
-        const authButton = document.querySelector('.auth-box button');
-        if (authButton) authButton.textContent = 'Login';
-        
-        const toggleText = document.getElementById('toggle-text');
-        if (toggleText) toggleText.textContent = "Don't have an account? ";
-        
-        const toggleLink = document.getElementById('toggle-link');
-        if (toggleLink) toggleLink.textContent = 'Sign Up';
-        
-        // Clear profile section
-        const profileSection = document.querySelector('.profile-panel');
-        const divider = document.querySelector('.menu-divider');
-        if (profileSection) profileSection.remove();
-        if (divider) divider.remove();
+      }
+    } catch (error) {
+      console.error('❌ Private message error:', error);
+      socket.emit('new-private-message', {
+        content: "Error: Could not process your private message",
+        username: 'Private AI'
+      });
     }
+  });
 
-    // Improved toggleDropdown function
-    function toggleDropdown() {
-        const dropdown = document.getElementById('dropdown');
-        if (!dropdown) return;
-        
-        const isVisible = dropdown.style.display === 'block';
-        
-        // Close all other menus first
-        const kebabDropdown = document.querySelector('.kebab-dropdown');
-        if (kebabDropdown) kebabDropdown.classList.remove('active');
-        
-        // Toggle dropdown
-        dropdown.style.display = isVisible ? 'none' : 'block';
-        
-        // Close if clicking the same button while open
-        if (isVisible) {
-            dropdown.style.display = 'none';
-        }
+  // Handle disconnect properly
+  socket.on('disconnect', (reason) => {
+    console.log('🔌 User disconnected:', socket.id, 'Reason:', reason);
+    
+    // Find user by socket ID but DON'T remove them immediately
+    // They stay in the list for 3 minutes due to the timeout
+    let foundUsername = null;
+    for (let [username, data] of onlineUsers.entries()) {
+      if (data.socketId === socket.id) {
+        foundUsername = username;
+        // Update last seen but keep in list
+        data.lastSeen = Date.now();
+        data.isOnline = false;
+        console.log('⏸️ User marked as inactive:', username);
+        break;
+      }
     }
+    
+    // Don't remove from list immediately - let the timeout handle it
+    if (foundUsername) {
+      io.emit('user-status-change', { 
+        username: foundUsername, 
+        status: 'away',
+        onlineUsers: Array.from(onlineUsers.keys())
+      });
+    }
+  });
+  
+  // Helper function to remove user from online list
+  function removeUserFromOnlineList(username) {
+    if (onlineUsers.has(username)) {
+      onlineUsers.delete(username);
+      
+      // Get updated online users list
+      const onlineUsersArray = Array.from(onlineUsers.keys());
+      console.log('🗑️ After removal, online users:', onlineUsersArray);
+      
+      // Broadcast that user went offline
+      io.emit('user-status-change', { 
+        username, 
+        status: 'offline',
+        onlineUsers: onlineUsersArray
+      });
+    }
+  }
+});
 
-    // Zoom functions remain the same
-    function openZoom(src) {
-        document.body.style.overflow = 'hidden';
-        const overlay = document.getElementById('zoom-overlay');
-        const zoomImage = document.getElementById('zoom-image');
-        if (!overlay || !zoomImage) return;
-        
-        zoomImage.src = src;
-        overlay.style.display = 'flex';
+// 3 MINUTE CLEANUP - Remove users after 3 minutes of inactivity
+setInterval(() => {
+  const now = Date.now();
+  const removedUsers = [];
+  
+  for (let [username, data] of onlineUsers.entries()) {
+    // 3 minute timeout (180000 milliseconds)
+    if (now - data.lastSeen > onlineStatusTimeout) {
+      console.log('⏰ Removing inactive user (3 minutes):', username);
+      onlineUsers.delete(username);
+      removedUsers.push(username);
     }
+  }
+  
+  // Notify clients about removed users
+  if (removedUsers.length > 0) {
+    const onlineUsersArray = Array.from(onlineUsers.keys());
+    removedUsers.forEach(username => {
+      io.emit('user-status-change', { 
+        username, 
+        status: 'offline',
+        onlineUsers: onlineUsersArray
+      });
+    });
+    console.log('🧹 Cleaned up inactive users (3min timeout):', removedUsers);
+    console.log('📊 Current online users after cleanup:', onlineUsersArray);
+  }
+}, 30000); // Check every 30 seconds
 
-    function closeZoom() {
-        document.body.style.overflow = '';
-        const overlay = document.getElementById('zoom-overlay');
-        if (overlay) overlay.style.display = 'none';
-    }
+// Start server
+server.listen(port, () => {
+  console.log(`🚀 Server running on port ${port}`);
+  console.log(`🔹 Command prefix: "${PREFIX}"`);
+  console.log(`👥 Online users tracking: ACTIVE (3 minute timeout)`);
+  console.log(`💾 Command responses saving: ENABLED for main chat`);
+  console.log(`🤖 AI responses: ONLY for -ai command`);
+  console.log(`🤖 Bot responses: ONLY for non-ai commands`);
+  console.log(`💬 Real-time messaging: ENABLED via Socket.io`);
+  console.log(`🔌 Socket.io events: new-message, message-deleted, user-status-change`);
+  console.log(`🧪 Test Supabase (GET): http://localhost:${port}/test-supabase`);
+  console.log(`🧪 Test Message (POST): http://localhost:${port}/test-message`);
+  console.log(`🔍 Debug ALL Commands: http://localhost:${port}/debug-all-commands`);
+  if (isRender && renderExternalUrl) {
+    console.log(`🌐 Render External URL: ${renderExternalUrl}`);
+    console.log(`⏱️ UptimeRobot monitoring URL: ${renderExternalUrl}/health`);
+    console.log(`🧪 Test Supabase: ${renderExternalUrl}/test-supabase`);
+    console.log(`🧪 Test Message: ${renderExternalUrl}/test-message`);
+    console.log(`🔍 Debug ALL Commands: ${renderExternalUrl}/debug-all-commands`);
+  }
+});
 
-    // Initialize if user is logged in
-    const currentUser = localStorage.getItem('currentUser');
-    if (currentUser) {
-        showContainer('chat');
-        
-        const chatInput = document.querySelector('.chat-input');
-        if (chatInput) chatInput.style.display = 'flex';
-        
-        updateProfileSection();
-        
-        // Initialize real-time features
-        initSocket();
-        setupTypingHandlers();
-        
-        // Add page event listeners
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        window.addEventListener('pagehide', handlePageHide);
-        
-        // Set flag to restore scroll position after messages load
-        shouldRestoreScroll = true;
-        
-        // Enable SQL Editor access if already verified
-        if (hasVerifiedCode()) {
-            enableSQLEditorAccess();
-        }
-    }
-</script>
-</body>
-</html>
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received. Shutting down gracefully...');
+  process.exit(0);
+});
+
+process.on('unhandledRejection', (err) => {
+  global.utils.log.err("UNHANDLED REJECTION", err);
+});
+
+process.on('uncaughtException', (err) => {
+  global.utils.log.err("UNCAUGHT EXCEPTION", err);
+});
