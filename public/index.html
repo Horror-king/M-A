@@ -1970,224 +1970,6 @@
             elements.usernameInput.value = currentUsername;
         }
 
-        // ===== REAL-TIME MESSAGING FUNCTIONS =====
-        function initSocket() {
-            console.log('🔌 Initializing socket connection...');
-            socket = io();
-            
-            socket.on('connect', () => {
-                console.log('✅ Socket connected');
-                const username = localStorage.getItem('chat_username');
-                if (username) {
-                    socket.emit('user-online', username);
-                    // Request existing messages when connecting
-                    socket.emit('request-messages');
-                }
-            });
-
-            // Listen for new messages in real-time
-            socket.on('new-message', (message) => {
-                console.log('💬 New message received via socket:', message);
-                
-                // Only display if message is from another user or if it's an AI/bot response
-                const isOwnMessage = message.username === currentUsername;
-                const isAIResponse = message.username === 'AI' || message.username === 'Bot';
-                
-                if (!isOwnMessage || isAIResponse) {
-                    // Check if message already exists to prevent duplicates
-                    const existingMessage = document.querySelector(`[data-id="${message.id}"]`);
-                    if (!existingMessage) {
-                        // Display message immediately
-                        displayMessage(
-                            message.content, 
-                            isOwnMessage ? 'sent' : 'received', 
-                            message.reply_to, 
-                            message.username, 
-                            message.id, 
-                            true
-                        );
-                        
-                        // Show notification if page is not focused
-                        if (document.visibilityState !== 'visible' && !isOwnMessage) {
-                            showNotification(message.username, message.content);
-                        }
-                    }
-                }
-            });
-
-            // Listen for message history when first connecting
-            socket.on('chat-messages', (messages) => {
-                console.log('📨 Received message history:', messages.length, 'messages');
-                renderMessages(messages);
-            });
-
-            // Listen for new private AI messages
-            socket.on('new-private-message', (message) => {
-                console.log('🤫 Private message received:', message);
-                displayPrivateMessage(message.content, 'received', null, 'Private AI');
-            });
-
-            // User status updates
-            socket.on('user-status-change', (data) => {
-                console.log('👤 User status change:', data);
-                updateOnlineUsersList(data.onlineUsers);
-                updateUserStatusIndicator(data.username, data.status);
-            });
-
-            socket.on('user-typing', (data) => {
-                showTypingIndicator(data.username, data.isTyping);
-            });
-
-            socket.on('disconnect', (reason) => {
-                console.log('🔌 Socket disconnected:', reason);
-            });
-
-            // Send heartbeat every 2 minutes to stay online
-            const heartbeatInterval = setInterval(() => {
-                const username = localStorage.getItem('chat_username');
-                if (username && socket.connected) {
-                    socket.emit('user-online', username);
-                    console.log('💓 Heartbeat sent - keeping user online');
-                }
-            }, 120000); // 2 minutes
-
-            // Cleanup interval on page unload
-            window.addEventListener('beforeunload', () => {
-                clearInterval(heartbeatInterval);
-            });
-        }
-
-        // Update online users lists
-        function updateOnlineUsersList(onlineUsers) {
-            console.log('Updating online users list:', onlineUsers);
-            
-            // Update main chat online list
-            updateSingleOnlineList('online-users-list', 'online-count', onlineUsers);
-            
-            // Update private AI online list
-            updateSingleOnlineList('private-online-users-list', 'private-online-count', onlineUsers);
-        }
-
-        function updateSingleOnlineList(listElementId, countElementId, onlineUsers) {
-            const onlineList = document.getElementById(listElementId);
-            const onlineCount = document.getElementById(countElementId);
-            
-            if (onlineList) {
-                onlineList.innerHTML = '';
-                onlineUsers.forEach(user => {
-                    const userElement = document.createElement('div');
-                    userElement.className = 'online-user';
-                    userElement.innerHTML = `
-                        <div class="online-user-avatar">
-                            <img src="https://i.pravatar.cc/50?u=${encodeURIComponent(user)}" alt="${user}">
-                            <div class="online-dot"></div>
-                        </div>
-                        <div class="online-user-info">
-                            <div class="online-user-name">${user}</div>
-                        </div>
-                    `;
-                    onlineList.appendChild(userElement);
-                });
-            }
-            
-            if (onlineCount) {
-                onlineCount.textContent = onlineUsers.length;
-            }
-        }
-
-        // Remove offline user from the lists
-        function removeOfflineUser(username) {
-            console.log('Removing offline user from UI:', username);
-            
-            // Remove from main chat online list
-            removeUserFromSingleList('online-users-list', 'online-count', username);
-            
-            // Remove from private AI online list
-            removeUserFromSingleList('private-online-users-list', 'private-online-count', username);
-            
-            // Update status indicator in messages to offline
-            updateUserStatusIndicator(username, 'offline');
-        }
-
-        function removeUserFromSingleList(listElementId, countElementId, username) {
-            const onlineList = document.getElementById(listElementId);
-            if (onlineList) {
-                const userElements = onlineList.querySelectorAll('.online-user');
-                userElements.forEach(userElement => {
-                    const userNameElement = userElement.querySelector('.online-user-name');
-                    if (userNameElement && userNameElement.textContent === username) {
-                        userElement.remove();
-                    }
-                });
-                // Update online count
-                const onlineCount = document.getElementById(countElementId);
-                if (onlineCount) {
-                    const currentCount = parseInt(onlineCount.textContent) || 0;
-                    onlineCount.textContent = Math.max(0, currentCount - 1);
-                }
-            }
-        }
-
-        // Update status indicator for a specific user
-        function updateUserStatusIndicator(username, status) {
-            // Find all messages from this user and update their status
-            const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
-            userMessages.forEach(msg => {
-                let statusIndicator = msg.querySelector('.user-status-indicator');
-                if (!statusIndicator) {
-                    statusIndicator = createStatusIndicator();
-                    const usernameDiv = msg.querySelector('.username');
-                    if (usernameDiv) {
-                        usernameDiv.appendChild(statusIndicator);
-                    }
-                }
-                statusIndicator.className = `user-status-indicator ${status}`;
-            });
-        }
-
-        // Create a status indicator element
-        function createStatusIndicator() {
-            const indicator = document.createElement('span');
-            indicator.className = 'user-status-indicator';
-            return indicator;
-        }
-
-        // Show typing indicator
-        function showTypingIndicator(username, isTyping) {
-            let indicator = document.getElementById('typing-indicator');
-            if (isTyping) {
-                if (!indicator) {
-                    indicator = document.createElement('div');
-                    indicator.id = 'typing-indicator';
-                    indicator.innerHTML = `${username} is typing...`;
-                    document.getElementById('chat-container').appendChild(indicator);
-                }
-            } else if (indicator) {
-                indicator.remove();
-            }
-        }
-
-        // Handle typing events
-        function setupTypingHandlers() {
-            const messageInput = document.getElementById('user-input');
-            if (!messageInput) return;
-            messageInput.addEventListener('input', () => {
-                const username = localStorage.getItem('chat_username');
-                if (!username || !socket) return;
-                if (!isTyping) {
-                    isTyping = true;
-                    socket.emit('typing-start', { username });
-                }
-                clearTimeout(typingTimer);
-                typingTimer = setTimeout(() => {
-                    isTyping = false;
-                    socket.emit('typing-stop', { username });
-                }, 1000);
-            });
-        }
-
-        // ===== END OF REAL-TIME MESSAGING FUNCTIONS =====
-
         // ===== SQL EDITOR FUNCTIONS =====
         function initializeSQLEditor() {
             const sqlTextarea = document.getElementById('sql-textarea');
@@ -2812,6 +2594,185 @@
         function scrollPrivateToBottom() {
             scrollToBottom('private-ai-container');
         }
+
+        // ===== IMPROVED REAL-TIME ACTIVE STATUS FUNCTIONS =====
+        // Initialize socket connection
+        function initSocket() {
+            socket = io();
+            
+            socket.on('connect', () => {
+                console.log('Socket connected');
+                const username = localStorage.getItem('chat_username');
+                if (username) {
+                    socket.emit('user-online', username);
+                }
+            });
+
+            socket.on('user-status-change', (data) => {
+                console.log('User status change:', data);
+                updateOnlineUsersList(data.onlineUsers);
+                updateUserStatusIndicator(data.username, data.status);
+            });
+
+            socket.on('user-typing', (data) => {
+                showTypingIndicator(data.username, data.isTyping);
+            });
+
+            socket.on('disconnect', (reason) => {
+                console.log('Socket disconnected:', reason);
+                // When socket disconnects, user will stay online for 3 minutes
+                const username = localStorage.getItem('chat_username');
+                if (username) {
+                    // User will remain in online list for 3 minutes due to server timeout
+                    console.log('User disconnected but will remain online for 3 minutes');
+                }
+            });
+
+            // Send heartbeat every 2 minutes to stay online
+            const heartbeatInterval = setInterval(() => {
+                const username = localStorage.getItem('chat_username');
+                if (username && socket.connected) {
+                    socket.emit('user-online', username);
+                    console.log('Heartbeat sent - keeping user online');
+                }
+            }, 120000); // 2 minutes
+
+            // Cleanup interval on page unload
+            window.addEventListener('beforeunload', () => {
+                clearInterval(heartbeatInterval);
+            });
+        }
+
+        // Update online users lists
+        function updateOnlineUsersList(onlineUsers) {
+            console.log('Updating online users list:', onlineUsers);
+            
+            // Update main chat online list
+            updateSingleOnlineList('online-users-list', 'online-count', onlineUsers);
+            
+            // Update private AI online list
+            updateSingleOnlineList('private-online-users-list', 'private-online-count', onlineUsers);
+        }
+
+        function updateSingleOnlineList(listElementId, countElementId, onlineUsers) {
+            const onlineList = document.getElementById(listElementId);
+            const onlineCount = document.getElementById(countElementId);
+            
+            if (onlineList) {
+                onlineList.innerHTML = '';
+                onlineUsers.forEach(user => {
+                    const userElement = document.createElement('div');
+                    userElement.className = 'online-user';
+                    userElement.innerHTML = `
+                        <div class="online-user-avatar">
+                            <img src="https://i.pravatar.cc/50?u=${encodeURIComponent(user)}" alt="${user}">
+                            <div class="online-dot"></div>
+                        </div>
+                        <div class="online-user-info">
+                            <div class="online-user-name">${user}</div>
+                        </div>
+                    `;
+                    onlineList.appendChild(userElement);
+                });
+            }
+            
+            if (onlineCount) {
+                onlineCount.textContent = onlineUsers.length;
+            }
+        }
+
+        // Remove offline user from the lists
+        function removeOfflineUser(username) {
+            console.log('Removing offline user from UI:', username);
+            
+            // Remove from main chat online list
+            removeUserFromSingleList('online-users-list', 'online-count', username);
+            
+            // Remove from private AI online list
+            removeUserFromSingleList('private-online-users-list', 'private-online-count', username);
+            
+            // Update status indicator in messages to offline
+            updateUserStatusIndicator(username, 'offline');
+        }
+
+        function removeUserFromSingleList(listElementId, countElementId, username) {
+            const onlineList = document.getElementById(listElementId);
+            if (onlineList) {
+                const userElements = onlineList.querySelectorAll('.online-user');
+                userElements.forEach(userElement => {
+                    const userNameElement = userElement.querySelector('.online-user-name');
+                    if (userNameElement && userNameElement.textContent === username) {
+                        userElement.remove();
+                    }
+                });
+                // Update online count
+                const onlineCount = document.getElementById(countElementId);
+                if (onlineCount) {
+                    const currentCount = parseInt(onlineCount.textContent) || 0;
+                    onlineCount.textContent = Math.max(0, currentCount - 1);
+                }
+            }
+        }
+
+        // Update status indicator for a specific user
+        function updateUserStatusIndicator(username, status) {
+            // Find all messages from this user and update their status
+            const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
+            userMessages.forEach(msg => {
+                let statusIndicator = msg.querySelector('.user-status-indicator');
+                if (!statusIndicator) {
+                    statusIndicator = createStatusIndicator();
+                    const usernameDiv = msg.querySelector('.username');
+                    if (usernameDiv) {
+                        usernameDiv.appendChild(statusIndicator);
+                    }
+                }
+                statusIndicator.className = `user-status-indicator ${status}`;
+            });
+        }
+
+        // Create a status indicator element
+        function createStatusIndicator() {
+            const indicator = document.createElement('span');
+            indicator.className = 'user-status-indicator';
+            return indicator;
+        }
+
+        // Show typing indicator
+        function showTypingIndicator(username, isTyping) {
+            let indicator = document.getElementById('typing-indicator');
+            if (isTyping) {
+                if (!indicator) {
+                    indicator = document.createElement('div');
+                    indicator.id = 'typing-indicator';
+                    indicator.innerHTML = `${username} is typing...`;
+                    document.getElementById('chat-container').appendChild(indicator);
+                }
+            } else if (indicator) {
+                indicator.remove();
+            }
+        }
+
+        // Handle typing events
+        function setupTypingHandlers() {
+            const messageInput = document.getElementById('user-input');
+            if (!messageInput) return;
+            messageInput.addEventListener('input', () => {
+                const username = localStorage.getItem('chat_username');
+                if (!username || !socket) return;
+                if (!isTyping) {
+                    isTyping = true;
+                    socket.emit('typing-start', { username });
+                }
+                clearTimeout(typingTimer);
+                typingTimer = setTimeout(() => {
+                    isTyping = false;
+                    socket.emit('typing-stop', { username });
+                }, 1000);
+            });
+        }
+
+        // ===== END OF REAL-TIME FUNCTIONS =====
 
         // Improved scroll position detection
         function checkIfAtBottom(container) {
@@ -4441,6 +4402,7 @@
             showContainer('chat');
         }
 
+       // --- CUT HERE ---
         // Zoom functions remain the same
         function openZoom(src) {
             document.body.style.overflow = 'hidden';
