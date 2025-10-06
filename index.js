@@ -542,7 +542,7 @@ app.post('/test-message', async (req, res) => {
   }
 });
 
-// Command API handler - FIXED: Clear separation between AI and Bot commands
+// Command API handler - FIXED: Only save AI responses for -ai command
 app.post("/api/command", async (req, res) => {
   try {
     const { message, source = 'main-chat' } = req.body;
@@ -553,7 +553,7 @@ app.post("/api/command", async (req, res) => {
     if (message.trim().toLowerCase() === "prefix") {
       const reply = `🔹 My command prefix is: \`${PREFIX}\``;
       
-      // ✅ Save prefix command response
+      // ✅ SAVE ONLY FOR MAIN CHAT: Save prefix command response
       if (source === 'main-chat') {
         console.log('💾 ✅ Saving prefix command response to Supabase...');
         try {
@@ -575,7 +575,7 @@ app.post("/api/command", async (req, res) => {
     console.log('🔍 Command detected:', cmd.commandName);
     console.log('📍 Source:', source);
 
-    // ===== FIXED: CLEAR SEPARATION - AI COMMANDS =====
+    // ✅ FIXED: Only process AI command for AI, all other commands go to Bot
     if (cmd.commandName === "ai") {
       try {
         console.log('🤖 Processing AI command:', cmd.text);
@@ -621,7 +621,7 @@ app.post("/api/command", async (req, res) => {
 
         console.log('🤖 AI Response received:', aiResponse.substring(0, 200) + '...');
 
-        // ✅ SAVE AI RESPONSE: Only for main chat
+        // ✅ SAVE AI RESPONSE: Only for AI command in main chat
         if (source === 'main-chat') {
           console.log('💾 ✅ Saving AI response to Supabase...');
           try {
@@ -636,7 +636,7 @@ app.post("/api/command", async (req, res) => {
         console.error("❌ AI Processing Error:", aiError);
         const errorReply = `❌ AI Error: ${aiError.message.replace(/[\n\r]/g, ' ').substring(0, 200)}`;
         
-        // ✅ SAVE AI ERROR: Only for main chat
+        // ✅ SAVE AI ERROR: Only for AI command in main chat
         if (source === 'main-chat') {
           console.log('💾 ✅ Saving AI error response to Supabase...');
           try {
@@ -648,77 +648,77 @@ app.post("/api/command", async (req, res) => {
         
         return res.status(500).json({ reply: errorReply });
       }
-    }
-
-    // ===== FIXED: BOT COMMANDS - AI DOES NOT RESPOND TO THESE =====
-    const command = commands[cmd.commandName];
-    if (!command) {
-      const notFoundReply = "❌ Command not found";
-      
-      // ✅ Save "command not found" response for Bot
-      if (source === 'main-chat') {
-        console.log('💾 ✅ Saving "command not found" response to Supabase...');
-        try {
-          await saveBotResponseToSupabase(notFoundReply, cmd.commandName, 'Bot');
-        } catch (saveError) {
-          console.error('❌ Failed to save command not found response:', saveError);
-        }
-      }
-      
-      return res.json({ reply: notFoundReply });
-    }
-    
-    if (typeof command.onStart !== "function") {
-      const noSupportReply = "❌ This command does not support execution";
-      
-      // ✅ Save "no support" response for Bot
-      if (source === 'main-chat') {
-        console.log('💾 ✅ Saving "no support" response to Supabase...');
-        try {
-          await saveBotResponseToSupabase(noSupportReply, cmd.commandName, 'Bot');
-        } catch (saveError) {
-          console.error('❌ Failed to save no support response:', saveError);
-        }
-      }
-      
-      return res.json({ reply: noSupportReply });
-    }
-
-    const replies = [];
-    await command.onStart({
-      api: {
-        sendMessage: (msg) => replies.push(typeof msg === "string" ? msg : JSON.stringify(msg))
-      },
-      event: { body: cmd.text },
-      args: cmd.args,
-      message: {
-        reply: (content) => replies.push(content)
-      }
-    });
-
-    // ✅ SAVE BOT RESPONSES: Only for main chat
-    if (source === 'main-chat' && replies.length > 0) {
-      console.log('💾 ✅ Saving Bot command response to Supabase...');
-      try {
-        // Save each reply as a separate message
-        for (const reply of replies) {
-          if (reply && reply.trim() !== '') {
-            await saveBotResponseToSupabase(reply, cmd.commandName, 'Bot');
+    } else {
+      // ✅ FIXED: All other commands (non-AI) are handled by Bot only
+      const command = commands[cmd.commandName];
+      if (!command) {
+        const notFoundReply = "❌ Command not found";
+        
+        // ✅ SAVE BOT RESPONSE: Only for main chat
+        if (source === 'main-chat') {
+          console.log('💾 ✅ Saving "command not found" response to Supabase...');
+          try {
+            await saveBotResponseToSupabase(notFoundReply, cmd.commandName, 'Bot');
+          } catch (saveError) {
+            console.error('❌ Failed to save command not found response:', saveError);
           }
         }
-      } catch (saveError) {
-        console.error('❌ Failed to save Bot command response:', saveError);
+        
+        return res.json({ reply: notFoundReply });
       }
-    }
+      
+      if (typeof command.onStart !== "function") {
+        const noSupportReply = "❌ This command does not support execution";
+        
+        // ✅ SAVE BOT RESPONSE: Only for main chat
+        if (source === 'main-chat') {
+          console.log('💾 ✅ Saving "no support" response to Supabase...');
+          try {
+            await saveBotResponseToSupabase(noSupportReply, cmd.commandName, 'Bot');
+          } catch (saveError) {
+            console.error('❌ Failed to save no support response:', saveError);
+          }
+        }
+        
+        return res.json({ reply: noSupportReply });
+      }
 
-    if (!res.headersSent) {
-      res.json({ reply: replies.length === 1 ? replies[0] : replies });
+      const replies = [];
+      await command.onStart({
+        api: {
+          sendMessage: (msg) => replies.push(typeof msg === "string" ? msg : JSON.stringify(msg))
+        },
+        event: { body: cmd.text },
+        args: cmd.args,
+        message: {
+          reply: (content) => replies.push(content)
+        }
+      });
+
+      // ✅ SAVE BOT RESPONSE: Only for main chat
+      if (source === 'main-chat' && replies.length > 0) {
+        console.log('💾 ✅ Saving command response to Supabase...');
+        try {
+          // Save each reply as a separate message
+          for (const reply of replies) {
+            if (reply && reply.trim() !== '') {
+              await saveBotResponseToSupabase(reply, cmd.commandName, 'Bot');
+            }
+          }
+        } catch (saveError) {
+          console.error('❌ Failed to save command response:', saveError);
+        }
+      }
+
+      if (!res.headersSent) {
+        res.json({ reply: replies.length === 1 ? replies[0] : replies });
+      }
     }
   } catch (error) {
     console.error("❌ Server Error:", error);
     const errorReply = `❌ Server Error: ${error.message}`;
     
-    // ✅ SAVE ERROR RESPONSES: For Bot
+    // ✅ SAVE ERROR RESPONSE: Only for main chat
     if (source === 'main-chat') {
       console.log('💾 ✅ Saving server error response to Supabase...');
       try {
@@ -937,9 +937,9 @@ server.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
   console.log(`🔹 Command prefix: "${PREFIX}"`);
   console.log(`👥 Online users tracking: ACTIVE (3 minute timeout)`);
-  console.log(`🤖 AI commands: Only responds to -ai command`);
-  console.log(`🤖 Bot commands: Responds to all other commands`);
-  console.log(`🚫 AI does NOT respond to non-AI commands`);
+  console.log(`💾 Command responses saving: ENABLED for main chat`);
+  console.log(`🤖 AI responses: ONLY for -ai command`);
+  console.log(`🤖 Bot responses: ONLY for non-ai commands`);
   console.log(`💬 Real-time messaging: ENABLED via Socket.io`);
   console.log(`🔌 Socket.io events: new-message, message-deleted, user-status-change`);
   console.log(`🧪 Test Supabase (GET): http://localhost:${port}/test-supabase`);
