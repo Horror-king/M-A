@@ -1590,6 +1590,275 @@
             user-select: none;
             touch-action: manipulation;
         }
+
+        /* ===== PROFILE EDITING STYLES ===== */
+        .profile-container {
+            padding: 20px;
+            width: 100vw;
+            height: 100vh;
+            max-width: 100vw;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-radius: 0;
+            box-shadow: none;
+            overflow-y: auto;
+            overflow-x: hidden;
+            display: none;
+            z-index: 1002;
+            box-sizing: border-box;
+        }
+
+        .profile-box {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.1);
+            width: calc(100% - 40px);
+            max-width: 600px;
+            margin: 20px auto;
+            box-sizing: border-box;
+        }
+
+        .profile-header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 1px solid #e4e6eb;
+            padding-bottom: 20px;
+        }
+
+        .profile-header h2 {
+            color: #1c1e21;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .profile-header p {
+            color: #65676b;
+            font-size: 14px;
+        }
+
+        .profile-avatar-section {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .profile-avatar-large {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            overflow: hidden;
+            margin: 0 auto 15px;
+            position: relative;
+            border: 4px solid #f0f2f5;
+        }
+
+        .profile-avatar-large img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .change-avatar-btn {
+            background: #4267B2;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .change-avatar-btn:hover {
+            background: #365899;
+        }
+
+        .profile-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group label {
+            font-weight: 500;
+            color: #1c1e21;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            padding: 12px 15px;
+            border: 1px solid #dddfe2;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+            font-family: inherit;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #4267B2;
+        }
+
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 15px;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        .profile-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            justify-content: flex-end;
+        }
+
+        .save-btn {
+            background: #4267B2;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+
+        .save-btn:hover {
+            background: #365899;
+        }
+
+        .cancel-btn {
+            background: #e4e6eb;
+            color: #1c1e21;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+
+        .cancel-btn:hover {
+            background: #d8dadf;
+        }
+
+        .profile-display-section {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            background: white;
+            color: #1c1e21;
+            border-bottom: 1px solid #e4e6eb;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .profile-display-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            overflow: hidden;
+            margin-right: 10px;
+        }
+
+        .profile-display-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .profile-display-info {
+            flex-grow: 1;
+        }
+
+        .profile-display-username {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 2px;
+            color: #1c1e21;
+        }
+
+        .profile-display-bio {
+            font-size: 13px;
+            color: #65676b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
+        }
+
+        .profile-display-edit {
+            color: #4267B2;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .profile-display-edit:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive Design for Profile */
+        @media (max-width: 768px) {
+            .profile-container {
+                padding: 15px;
+            }
+            
+            .profile-box {
+                padding: 20px 15px;
+                margin: 15px auto;
+                width: calc(100% - 30px);
+                max-width: calc(100% - 30px);
+            }
+            
+            .form-row {
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .profile-container {
+                padding: 10px;
+            }
+            
+            .profile-box {
+                padding: 15px 10px;
+                margin: 10px auto;
+                width: calc(100% - 20px);
+                max-width: calc(100% - 20px);
+                border-radius: 8px;
+            }
+            
+            .profile-avatar-large {
+                width: 100px;
+                height: 100px;
+            }
+            
+            .profile-actions {
+                flex-direction: column;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1631,28 +1900,28 @@
         </div>
     </div>
 
+    <!-- UPDATED DROPDOWN WITH PROFILE DISPLAY -->
     <div class="dropdown" id="dropdown" style="display: none;">
-        <div class="profile-panel">
-            <div class="profile-avatar">
-                <img src="https://i.pravatar.cc/50?u=${encodeURIComponent(currentUsername)}" alt="Profile">
+        <div class="profile-display-section">
+            <div class="profile-display-avatar">
+                <img id="display-avatar" src="https://i.pravatar.cc/50?u=default" alt="Profile">
             </div>
-            <div class="profile-info">
-                <div class="profile-username">${currentUsername}</div>
-                <div class="profile-status online">
-                    <span class="status-dot"></span>
-                    <span>Online</span>
-                </div>
+            <div class="profile-display-info">
+                <div class="profile-display-username" id="display-username">User</div>
+                <div class="profile-display-bio" id="display-bio">No bio yet</div>
+            </div>
+            <div class="profile-display-edit" onclick="showContainer('profile')">
+                Edit
             </div>
         </div>
         <div class="menu-divider"></div>
         <a href="#" onclick="showContainer('chat')">Chat with AI</a>
         <a href="#" onclick="showContainer('private-ai')">Private AI</a>
+        <a href="#" onclick="showContainer('profile')">Edit Profile</a>
         <a href="#" onclick="showContainer('about')">About</a>
         <a href="#" onclick="showContainer('features')">Features</a>
         <a href="#" onclick="showContainer('help')">Help</a>
-        <!-- ADDED: Secret Code menu item -->
         <a href="#" onclick="showContainer('secret-code')">Secret Code</a>
-        <!-- ADDED: SQL Editor menu item -->
         <a href="#" onclick="showContainer('sql-editor-container')">🔍 SQL Editor</a>
         <a href="#" onclick="logout()" style="color: #ff4444;">Logout</a>
     </div>
@@ -1721,6 +1990,80 @@
     <div class="news-container" id="news-container">
         <div class="news-header">Latest News</div>
         <div class="news-items" id="news-items"></div>
+    </div>
+
+    <!-- ADDED: Profile Container -->
+    <div id="profile" class="profile-container">
+        <span class="close-btn" onclick="hideContainer('profile')">&times;</span>
+        <div class="profile-box">
+            <div class="profile-header">
+                <h2>Edit Profile</h2>
+                <p>Update your personal information and preferences</p>
+            </div>
+            
+            <div class="profile-avatar-section">
+                <div class="profile-avatar-large">
+                    <img id="profile-avatar-img" src="https://i.pravatar.cc/150?u=default" alt="Profile Avatar">
+                </div>
+                <button class="change-avatar-btn" onclick="changeAvatar()">Change Profile Picture</button>
+            </div>
+            
+            <form class="profile-form" id="profile-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="profile-firstname">First Name</label>
+                        <input type="text" id="profile-firstname" placeholder="Enter your first name">
+                    </div>
+                    <div class="form-group">
+                        <label for="profile-lastname">Last Name</label>
+                        <input type="text" id="profile-lastname" placeholder="Enter your last name">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="profile-username">Username</label>
+                    <input type="text" id="profile-username" placeholder="Enter your username" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label for="profile-bio">Bio</label>
+                    <textarea id="profile-bio" placeholder="Tell others about yourself"></textarea>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="profile-age">Age</label>
+                        <input type="number" id="profile-age" min="13" max="120" placeholder="Your age">
+                    </div>
+                    <div class="form-group">
+                        <label for="profile-gender">Gender</label>
+                        <select id="profile-gender">
+                            <option value="">Select your gender</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                            <option value="non-binary">Non-binary</option>
+                            <option value="other">Other</option>
+                            <option value="prefer-not-to-say">Prefer not to say</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="profile-location">Location</label>
+                    <input type="text" id="profile-location" placeholder="Where are you from?">
+                </div>
+                
+                <div class="form-group">
+                    <label for="profile-interests">Interests</label>
+                    <input type="text" id="profile-interests" placeholder="Your hobbies and interests">
+                </div>
+                
+                <div class="profile-actions">
+                    <button type="button" class="cancel-btn" onclick="hideContainer('profile')">Cancel</button>
+                    <button type="button" class="save-btn" onclick="saveProfile()">Save Changes</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- ADDED: Secret Code Container -->
@@ -1904,6 +2247,7 @@
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
+
 <script>
     let isLogin = true;
     let users = JSON.parse(localStorage.getItem('users')) || {};
@@ -1970,6 +2314,129 @@
     let currentUsername = localStorage.getItem('chat_username') || '';
     if (currentUsername && elements.usernameInput) {
         elements.usernameInput.value = currentUsername;
+    }
+
+    // ===== PROFILE MANAGEMENT FUNCTIONS =====
+    function loadProfile() {
+        const username = localStorage.getItem('currentUser');
+        if (!username) return;
+        
+        const profileKey = `userProfile_${username}`;
+        const profileData = JSON.parse(localStorage.getItem(profileKey)) || {};
+        
+        // Set default values if profile doesn't exist
+        const defaultProfile = {
+            firstname: '',
+            lastname: '',
+            username: username,
+            bio: '',
+            age: '',
+            gender: '',
+            location: '',
+            interests: '',
+            avatar: `https://i.pravatar.cc/150?u=${username}`
+        };
+        
+        const profile = { ...defaultProfile, ...profileData };
+        
+        // Populate form fields
+        document.getElementById('profile-firstname').value = profile.firstname;
+        document.getElementById('profile-lastname').value = profile.lastname;
+        document.getElementById('profile-username').value = profile.username;
+        document.getElementById('profile-bio').value = profile.bio;
+        document.getElementById('profile-age').value = profile.age;
+        document.getElementById('profile-gender').value = profile.gender;
+        document.getElementById('profile-location').value = profile.location;
+        document.getElementById('profile-interests').value = profile.interests;
+        document.getElementById('profile-avatar-img').src = profile.avatar;
+        
+        // Update display section
+        updateProfileDisplay(profile);
+    }
+    
+    function saveProfile() {
+        const username = localStorage.getItem('currentUser');
+        if (!username) {
+            showError('You must be logged in to save profile');
+            return;
+        }
+        
+        const profileKey = `userProfile_${username}`;
+        const profileData = {
+            firstname: document.getElementById('profile-firstname').value,
+            lastname: document.getElementById('profile-lastname').value,
+            username: document.getElementById('profile-username').value,
+            bio: document.getElementById('profile-bio').value,
+            age: document.getElementById('profile-age').value,
+            gender: document.getElementById('profile-gender').value,
+            location: document.getElementById('profile-location').value,
+            interests: document.getElementById('profile-interests').value,
+            avatar: document.getElementById('profile-avatar-img').src,
+            lastUpdated: new Date().toISOString()
+        };
+        
+        localStorage.setItem(profileKey, JSON.stringify(profileData));
+        
+        // Update display section
+        updateProfileDisplay(profileData);
+        
+        // Show success message
+        showSuccess('Profile updated successfully!');
+        
+        // Close profile editor after a short delay
+        setTimeout(() => {
+            hideContainer('profile');
+        }, 1500);
+    }
+    
+    function updateProfileDisplay(profile) {
+        // Update display section in dropdown
+        const displayUsername = document.getElementById('display-username');
+        const displayBio = document.getElementById('display-bio');
+        const displayAvatar = document.getElementById('display-avatar');
+        
+        if (displayUsername) {
+            if (profile.firstname && profile.lastname) {
+                displayUsername.textContent = `${profile.firstname} ${profile.lastname}`;
+            } else if (profile.firstname) {
+                displayUsername.textContent = profile.firstname;
+            } else if (profile.lastname) {
+                displayUsername.textContent = profile.lastname;
+            } else {
+                displayUsername.textContent = profile.username;
+            }
+        }
+        
+        if (displayBio) {
+            displayBio.textContent = profile.bio || 'No bio yet';
+        }
+        
+        if (displayAvatar) {
+            displayAvatar.src = profile.avatar;
+        }
+        
+        // Update profile picture in messages if needed
+        updateMessageAvatars(profile.avatar);
+    }
+    
+    function changeAvatar() {
+        const avatarUrl = prompt('Enter the URL for your new profile picture:');
+        if (avatarUrl) {
+            // Basic URL validation
+            if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) {
+                document.getElementById('profile-avatar-img').src = avatarUrl;
+            } else {
+                showError('Please enter a valid URL starting with http:// or https://');
+            }
+        }
+    }
+    
+    function updateMessageAvatars(avatarUrl) {
+        // Update all message avatars for the current user
+        const userMessages = document.querySelectorAll('.message.sent .avatar img');
+        userMessages.forEach(img => {
+            img.src = avatarUrl;
+        });
     }
 
     // ===== FIXED: MESSAGE ORDER AND SECTION MANAGEMENT =====
@@ -2367,6 +2834,9 @@
             window.addEventListener('beforeunload', handleBeforeUnload);
             window.addEventListener('pagehide', handlePageHide);
             
+            // Load user profile
+            loadProfile();
+            
             // Enable SQL Editor access if already verified
             if (hasVerifiedCode()) {
                 enableSQLEditorAccess();
@@ -2540,8 +3010,8 @@
             container.style.display = 'none';
         });
         
-        // Hide all info containers
-        document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container').forEach(container => {
+        // Hide all info containers (INCLUDING PROFILE CONTAINER)
+        document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container, .profile-container').forEach(container => {
             container.style.display = 'none';
         });
         
@@ -2559,6 +3029,11 @@
             if (containerId === 'chat' || containerId === 'private-ai') {
                 const chatInput = container.querySelector('.chat-input');
                 if (chatInput) chatInput.style.display = 'flex';
+            }
+            
+            // Load profile data when showing profile container
+            if (containerId === 'profile') {
+                loadProfile();
             }
             
             // Initialize secret code if showing that container
@@ -2682,8 +3157,8 @@
         if (overlay) {
             overlay.addEventListener('click', function() {
                 console.log('🔘 Overlay clicked - closing all sections');
-                // Hide all info containers
-                document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container').forEach(container => {
+                // Hide all info containers (INCLUDING PROFILE)
+                document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container, .profile-container').forEach(container => {
                     container.style.display = 'none';
                 });
                 this.style.display = 'none';
@@ -3757,7 +4232,7 @@
                         // Initialize buttons after successful login
                         initializeButtons();
                         showContainer('chat');
-                        updateProfileSection();
+                        loadProfile();
                         initializeChat();
 
                         // Initialize real-time features after login
@@ -3844,6 +4319,7 @@
         };
     }
 
+// --- CUT HERE ---
     // ✅ FIXED: COMPLETELY REWRITTEN - No more duplicate responses
     async function fetchChatResponse(userInput) {
         if (isProcessingCommand) {
