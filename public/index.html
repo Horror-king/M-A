@@ -1904,8 +1904,6 @@
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
-
-// --- CUT HERE ---
 <script>
     let isLogin = true;
     let users = JSON.parse(localStorage.getItem('users')) || {};
@@ -1952,6 +1950,9 @@
     let socket;
     let isTyping = false;
     let typingTimer;
+
+    // ✅ ADDED: Flag to track if we're processing a command to prevent duplicates
+    let isProcessingCommand = false;
 
     const elements = {
         usernameInput: document.getElementById('auth-username'),
@@ -2063,7 +2064,7 @@
     // ===== FIXED: MESSAGE FUNCTIONS WITH CORRECT ORDER =====
 
     async function sendMessage() {
-        if (isSending) return;
+        if (isSending || isProcessingCommand) return;
         isSending = true;
         
         const content = elements.messageInput.value.trim();
@@ -2140,8 +2141,11 @@
             // Display message immediately for the sender
             displayMessage(content, 'sent', replyToText, username, null, true);
             
-            // Get AI response
-            fetchChatResponse(content);
+            // ✅ FIXED: Only get AI response if it's NOT a command (starts with prefix)
+            const PREFIX = '!'; // Make sure this matches your server prefix
+            if (!content.startsWith(PREFIX)) {
+                fetchChatResponse(content);
+            }
             
             // Clear input
             elements.messageInput.value = '';
@@ -3840,8 +3844,25 @@
         };
     }
 
+    // ✅ FIXED: COMPLETELY REWRITTEN - No more duplicate responses
     async function fetchChatResponse(userInput) {
+        if (isProcessingCommand) {
+            console.log('🛑 Command already being processed, skipping...');
+            return;
+        }
+
+        isProcessingCommand = true;
+        
         try {
+            const PREFIX = '!'; // Make sure this matches your server prefix
+            
+            // Don't process commands that start with prefix - let the server handle them
+            if (userInput.startsWith(PREFIX)) {
+                console.log('🤖 Command detected, letting server handle response...');
+                return;
+            }
+            
+            // Only process non-command messages for AI response
             const response = await fetch('/api/command', {
                 method: 'POST',
                 headers: {
@@ -3852,16 +3873,19 @@
                     source: 'main-chat'
                 }),
             });
-            const data = await response.json();
-            if (data.reply) {
-                if (Array.isArray(data.reply)) {
-                    data.reply.forEach(reply => displayMessage(reply, 'received', null, 'AI', null, true));
-                } else {
-                    displayMessage(data.reply, 'received', null, 'AI', null, true);
-                }
-            }
+            
+            // ✅ FIXED: Don't display the response here - let Socket.io handle it
+            // The server will save the response and broadcast it via Socket.io
+            // We'll display it when we receive the 'new-message' event
+            console.log('🤖 Command sent to server, waiting for Socket.io response...');
+            
         } catch (error) {
             console.error("Error fetching AI response:", error);
+        } finally {
+            // Reset the flag after a short delay
+            setTimeout(() => {
+                isProcessingCommand = false;
+            }, 1000);
         }
     }
 
