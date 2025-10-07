@@ -542,7 +542,7 @@ app.post('/test-message', async (req, res) => {
   }
 });
 
-// Command API handler - COMPLETELY REWRITTEN: Fixed duplicate responses
+// Command API handler - COMPLETELY REWRITTEN: Single response system
 app.post("/api/command", async (req, res) => {
   try {
     const { message, source = 'main-chat' } = req.body;
@@ -576,16 +576,14 @@ app.post("/api/command", async (req, res) => {
     console.log('🔍 Command detected:', cmd.commandName);
     console.log('📍 Source:', source);
 
-    // ✅ FIXED: EXCLUSIVE COMMAND ROUTING - Only AI handles -ai, only Bot handles everything else
+    // ✅ COMPLETELY FIXED: EXCLUSIVE SINGLE RESPONSE SYSTEM
+    let finalReply = null;
+    let responder = null;
+
+    // AI COMMANDS - ONLY AI RESPONDS
     if (cmd.commandName === "ai") {
-      console.log('🤖 Processing EXCLUSIVELY as AI command:', cmd.text);
-      
-      // PREVENT Bot from processing AI commands
-      const command = commands[cmd.commandName];
-      if (command) {
-        console.log('❌ Skipping Bot processing for AI command');
-        // Don't let Bot process AI commands
-      }
+      console.log('🤖 Processing EXCLUSIVELY as AI command');
+      responder = 'AI';
       
       try {
         const response = await axios.get(
@@ -628,102 +626,62 @@ app.post("/api/command", async (req, res) => {
           }
         }
 
-        console.log('🤖 AI Response received:', aiResponse.substring(0, 200) + '...');
+        finalReply = aiResponse;
+        console.log('🤖 AI Response received');
 
-        // ✅ Save AI response ONLY for main chat
-        if (source === 'main-chat') {
-          console.log('💾 Saving AI response to Supabase...');
-          try {
-            await saveBotResponseToSupabase(aiResponse, cmd.text, 'AI');
-          } catch (saveError) {
-            console.error('❌ Failed to save AI response:', saveError);
-          }
-        }
-
-        return res.json({ reply: aiResponse });
       } catch (aiError) {
         console.error("❌ AI Processing Error:", aiError);
-        const errorReply = `❌ AI Error: ${aiError.message.replace(/[\n\r]/g, ' ').substring(0, 200)}`;
-        
-        // Save AI error response
-        if (source === 'main-chat') {
-          console.log('💾 Saving AI error response to Supabase...');
-          try {
-            await saveBotResponseToSupabase(errorReply, cmd.text, 'AI');
-          } catch (saveError) {
-            console.error('❌ Failed to save AI error response:', saveError);
-          }
-        }
-        
-        return res.status(500).json({ reply: errorReply });
+        finalReply = `❌ AI Error: ${aiError.message.replace(/[\n\r]/g, ' ').substring(0, 200)}`;
       }
-    } else {
-      // ✅ FIXED: ALL OTHER COMMANDS are handled EXCLUSIVELY by Bot (NOT AI)
-      console.log('🤖 Processing EXCLUSIVELY as Bot command:', cmd.commandName);
+    } 
+    // BOT COMMANDS - ONLY BOT RESPONDS
+    else {
+      console.log('🤖 Processing EXCLUSIVELY as Bot command');
+      responder = 'Bot';
       
       const command = commands[cmd.commandName];
       if (!command) {
-        const notFoundReply = "❌ Command not found";
-        
-        // Save Bot response for command not found
-        if (source === 'main-chat') {
-          console.log('💾 Saving "command not found" response to Supabase...');
-          try {
-            await saveBotResponseToSupabase(notFoundReply, cmd.commandName, 'Bot');
-          } catch (saveError) {
-            console.error('❌ Failed to save command not found response:', saveError);
+        finalReply = "❌ Command not found";
+      } else if (typeof command.onStart !== "function") {
+        finalReply = "❌ This command does not support execution";
+      } else {
+        const replies = [];
+        await command.onStart({
+          api: {
+            sendMessage: (msg) => replies.push(typeof msg === "string" ? msg : JSON.stringify(msg))
+          },
+          event: { body: cmd.text },
+          args: cmd.args,
+          message: {
+            reply: (content) => replies.push(content)
           }
-        }
-        
-        return res.json({ reply: notFoundReply });
-      }
-      
-      if (typeof command.onStart !== "function") {
-        const noSupportReply = "❌ This command does not support execution";
-        
-        // Save Bot response for no support
-        if (source === 'main-chat') {
-          console.log('💾 Saving "no support" response to Supabase...');
-          try {
-            await saveBotResponseToSupabase(noSupportReply, cmd.commandName, 'Bot');
-          } catch (saveError) {
-            console.error('❌ Failed to save no support response:', saveError);
-          }
-        }
-        
-        return res.json({ reply: noSupportReply });
-      }
+        });
 
-      const replies = [];
-      await command.onStart({
-        api: {
-          sendMessage: (msg) => replies.push(typeof msg === "string" ? msg : JSON.stringify(msg))
-        },
-        event: { body: cmd.text },
-        args: cmd.args,
-        message: {
-          reply: (content) => replies.push(content)
+        if (replies.length > 0) {
+          finalReply = replies.length === 1 ? replies[0] : replies.join('\n');
+        } else {
+          finalReply = "❌ Command executed but no response generated";
         }
-      });
-
-      // ✅ Save Bot response for successful command execution
-      if (source === 'main-chat' && replies.length > 0) {
-        console.log('💾 Saving Bot command response to Supabase...');
-        try {
-          for (const reply of replies) {
-            if (reply && reply.trim() !== '') {
-              await saveBotResponseToSupabase(reply, cmd.commandName, 'Bot');
-            }
-          }
-        } catch (saveError) {
-          console.error('❌ Failed to save command response:', saveError);
-        }
-      }
-
-      if (!res.headersSent) {
-        res.json({ reply: replies.length === 1 ? replies[0] : replies });
       }
     }
+
+    // ✅ SINGLE RESPONSE SAVING - Only save ONE response
+    if (finalReply && source === 'main-chat') {
+      console.log(`💾 Saving ${responder} response to Supabase...`);
+      try {
+        await saveBotResponseToSupabase(finalReply, cmd.commandName, responder);
+      } catch (saveError) {
+        console.error(`❌ Failed to save ${responder} response:`, saveError);
+      }
+    }
+
+    // ✅ SINGLE RESPONSE RETURN - Only return ONE response
+    if (finalReply) {
+      return res.json({ reply: finalReply });
+    } else {
+      return res.json({ reply: "❌ No response generated" });
+    }
+
   } catch (error) {
     console.error("❌ Server Error:", error);
     const errorReply = `❌ Server Error: ${error.message}`;
@@ -947,9 +905,9 @@ server.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
   console.log(`🔹 Command prefix: "${PREFIX}"`);
   console.log(`👥 Online users tracking: ACTIVE (3 minute timeout)`);
-  console.log(`💾 Command responses saving: ENABLED for main chat`);
+  console.log(`💾 SINGLE RESPONSE SYSTEM: ENABLED`);
   console.log(`🤖 EXCLUSIVE ROUTING: -ai → AI only, other commands → Bot only`);
-  console.log(`🚫 DUPLICATE FIX: No more double responses!`);
+  console.log(`🚫 DUPLICATE FIX: GUARANTEED no double responses!`);
   console.log(`💬 Real-time messaging: ENABLED via Socket.io`);
   console.log(`🔌 Socket.io events: new-message, message-deleted, user-status-change`);
   console.log(`🧪 Test Supabase (GET): http://localhost:${port}/test-supabase`);
