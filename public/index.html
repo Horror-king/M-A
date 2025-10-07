@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+l<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
@@ -818,6 +818,7 @@
            background-repeat: no-repeat;
            align-self: flex-start;
            margin-top: 6px; /* Changed from 10px */
+           cursor: pointer; /* ADDED: Make avatar clickable */
         }
 
         .message.sent .avatar {
@@ -842,6 +843,7 @@
             display: flex;
             align-items: center;
             gap: 5px;
+            cursor: pointer; /* ADDED: Make username clickable */
         }
 
         .user-status-indicator {
@@ -1443,6 +1445,7 @@
             border: 1px solid transparent;
             position: relative;
             flex-shrink: 0;
+            cursor: pointer; /* ADDED: Make online user clickable */
         }
 
         .online-user:hover {
@@ -1859,6 +1862,187 @@
                 flex-direction: column;
             }
         }
+
+        /* ===== ADDED: USER PROFILE POPUP STYLES ===== */
+        .user-profile-popup {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .user-profile-card {
+            background: white;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            animation: profilePopup 0.3s ease-out;
+        }
+
+        @keyframes profilePopup {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .user-profile-header {
+            position: relative;
+            height: 120px;
+            background: linear-gradient(135deg, #4267B2, #365899);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding: 20px;
+            color: white;
+        }
+
+        .user-profile-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 4px solid white;
+            position: absolute;
+            bottom: -40px;
+            left: 20px;
+            background: white;
+            overflow: hidden;
+        }
+
+        .user-profile-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .user-profile-name {
+            margin-left: 100px;
+            margin-bottom: 10px;
+        }
+
+        .user-profile-name h2 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .user-profile-status {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .user-profile-body {
+            padding: 60px 20px 20px 20px;
+        }
+
+        .user-profile-info {
+            margin-bottom: 20px;
+        }
+
+        .user-profile-bio {
+            color: #65676b;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .user-profile-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .user-profile-detail {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .user-profile-label {
+            font-size: 12px;
+            color: #65676b;
+            font-weight: 500;
+        }
+
+        .user-profile-value {
+            font-size: 14px;
+            color: #1c1e21;
+        }
+
+        .user-profile-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .user-profile-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .user-profile-btn.primary {
+            background: #4267B2;
+            color: white;
+        }
+
+        .user-profile-btn.primary:hover {
+            background: #365899;
+        }
+
+        .user-profile-btn.secondary {
+            background: #e4e6eb;
+            color: #1c1e21;
+        }
+
+        .user-profile-btn.secondary:hover {
+            background: #d8dadf;
+        }
+
+        .user-profile-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        .user-profile-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
     </style>
 </head>
 <body>
@@ -2063,6 +2247,54 @@
                     <button type="button" class="save-btn" onclick="saveProfile()">Save Changes</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- ADDED: User Profile Popup -->
+    <div id="user-profile-popup" class="user-profile-popup">
+        <div class="user-profile-card">
+            <div class="user-profile-header">
+                <button class="user-profile-close" onclick="hideUserProfile()">&times;</button>
+                <div class="user-profile-avatar">
+                    <img id="popup-avatar" src="https://i.pravatar.cc/150?u=default" alt="User Avatar">
+                </div>
+                <div class="user-profile-name">
+                    <h2 id="popup-username">Username</h2>
+                    <div class="user-profile-status">
+                        <span id="popup-status-dot" class="user-status-indicator online"></span>
+                        <span id="popup-status-text">Online</span>
+                    </div>
+                </div>
+            </div>
+            <div class="user-profile-body">
+                <div class="user-profile-info">
+                    <div class="user-profile-bio" id="popup-bio">
+                        No bio available
+                    </div>
+                    <div class="user-profile-details">
+                        <div class="user-profile-detail">
+                            <span class="user-profile-label">Age</span>
+                            <span class="user-profile-value" id="popup-age">Not specified</span>
+                        </div>
+                        <div class="user-profile-detail">
+                            <span class="user-profile-label">Gender</span>
+                            <span class="user-profile-value" id="popup-gender">Not specified</span>
+                        </div>
+                        <div class="user-profile-detail">
+                            <span class="user-profile-label">Location</span>
+                            <span class="user-profile-value" id="popup-location">Not specified</span>
+                        </div>
+                        <div class="user-profile-detail">
+                            <span class="user-profile-label">Interests</span>
+                            <span class="user-profile-value" id="popup-interests">Not specified</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="user-profile-actions">
+                    <button class="user-profile-btn secondary" onclick="hideUserProfile()">Close</button>
+                    <button class="user-profile-btn primary" id="popup-message-btn" onclick="messageUser()">Message</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -2298,6 +2530,9 @@
     // ✅ ADDED: Flag to track if we're processing a command to prevent duplicates
     let isProcessingCommand = false;
 
+    // ✅ ADDED: Track online users for profile popup
+    let onlineUsers = [];
+
     const elements = {
         usernameInput: document.getElementById('auth-username'),
         messageInput: document.getElementById('user-input'),
@@ -2439,6 +2674,96 @@
         });
     }
 
+    // ===== ADDED: USER PROFILE POPUP FUNCTIONS =====
+    function showUserProfile(username) {
+        const popup = document.getElementById('user-profile-popup');
+        if (!popup) return;
+        
+        // Get user profile data
+        const profileKey = `userProfile_${username}`;
+        const profileData = JSON.parse(localStorage.getItem(profileKey)) || {};
+        
+        // Set default values
+        const defaultProfile = {
+            firstname: '',
+            lastname: '',
+            username: username,
+            bio: '',
+            age: '',
+            gender: '',
+            location: '',
+            interests: '',
+            avatar: `https://i.pravatar.cc/150?u=${username}`
+        };
+        
+        const profile = { ...defaultProfile, ...profileData };
+        
+        // Update popup content
+        document.getElementById('popup-avatar').src = profile.avatar;
+        
+        // Set display name
+        let displayName = username;
+        if (profile.firstname && profile.lastname) {
+            displayName = `${profile.firstname} ${profile.lastname}`;
+        } else if (profile.firstname) {
+            displayName = profile.firstname;
+        } else if (profile.lastname) {
+            displayName = profile.lastname;
+        }
+        document.getElementById('popup-username').textContent = displayName;
+        
+        // Set status (check if user is online)
+        const statusDot = document.getElementById('popup-status-dot');
+        const statusText = document.getElementById('popup-status-text');
+        const isOnline = onlineUsers.includes(username);
+        
+        statusDot.className = `user-status-indicator ${isOnline ? 'online' : 'offline'}`;
+        statusText.textContent = isOnline ? 'Online' : 'Offline';
+        
+        // Set bio
+        document.getElementById('popup-bio').textContent = profile.bio || 'No bio available';
+        
+        // Set details
+        document.getElementById('popup-age').textContent = profile.age || 'Not specified';
+        document.getElementById('popup-gender').textContent = profile.gender ? 
+            profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1) : 'Not specified';
+        document.getElementById('popup-location').textContent = profile.location || 'Not specified';
+        document.getElementById('popup-interests').textContent = profile.interests || 'Not specified';
+        
+        // Update message button
+        const messageBtn = document.getElementById('popup-message-btn');
+        const currentUser = localStorage.getItem('currentUser');
+        if (username === currentUser) {
+            messageBtn.style.display = 'none';
+        } else {
+            messageBtn.style.display = 'block';
+            messageBtn.onclick = () => {
+                hideUserProfile();
+                // Focus on message input and mention the user
+                const messageInput = document.getElementById('user-input');
+                if (messageInput) {
+                    messageInput.value = `@${username} `;
+                    messageInput.focus();
+                }
+            };
+        }
+        
+        // Show popup
+        popup.style.display = 'flex';
+    }
+    
+    function hideUserProfile() {
+        const popup = document.getElementById('user-profile-popup');
+        if (popup) {
+            popup.style.display = 'none';
+        }
+    }
+    
+    function messageUser() {
+        // This function is called from the popup message button
+        // The actual implementation is in showUserProfile function
+    }
+
     // ===== FIXED: MESSAGE ORDER AND SECTION MANAGEMENT =====
 
     // Initialize socket connection for real-time messaging
@@ -2501,7 +2826,8 @@
         // User status updates
         socket.on('user-status-change', (data) => {
             console.log('👤 User status change:', data);
-            updateOnlineUsersList(data.onlineUsers);
+            onlineUsers = data.onlineUsers || [];
+            updateOnlineUsersList(onlineUsers);
             updateUserStatusIndicator(data.username, data.status);
         });
 
@@ -2714,14 +3040,35 @@
         if (sender === 'received') {
             const avatarDiv = document.createElement('div');
             avatarDiv.className = 'avatar';
-            avatarDiv.innerHTML = `<img src="https://i.pravatar.cc/50?u=${encodeURIComponent(username)}" alt="avatar">`;
+            
+            // Get user profile to display correct avatar
+            const profileKey = `userProfile_${username}`;
+            const profileData = JSON.parse(localStorage.getItem(profileKey)) || {};
+            const avatarUrl = profileData.avatar || `https://i.pravatar.cc/50?u=${encodeURIComponent(username)}`;
+            
+            avatarDiv.innerHTML = `<img src="${avatarUrl}" alt="avatar">`;
+            
+            // ADDED: Add click event to show user profile
+            avatarDiv.onclick = (e) => {
+                e.stopPropagation();
+                showUserProfile(username);
+            };
+            
             messageDiv.appendChild(avatarDiv);
 
             const messageBody = document.createElement('div');
             messageBody.className = 'message-body';
+            
             // Username with status indicator
             const usernameDiv = document.createElement('div');
             usernameDiv.className = 'username';
+            
+            // ADDED: Add click event to username to show user profile
+            usernameDiv.onclick = (e) => {
+                e.stopPropagation();
+                showUserProfile(username);
+            };
+            
             const statusIndicator = document.createElement('span');
             statusIndicator.className = 'user-status-indicator online';
             usernameDiv.appendChild(document.createTextNode(username));
@@ -3174,6 +3521,14 @@
                 if (overlay && overlay.style.display === 'block') {
                     hideContainer('chat');
                 }
+            }
+        });
+
+        // ADDED: Close user profile popup when clicking outside
+        document.addEventListener('click', function(e) {
+            const popup = document.getElementById('user-profile-popup');
+            if (popup && popup.style.display === 'flex' && e.target === popup) {
+                hideUserProfile();
             }
         });
     });
@@ -3812,15 +4167,27 @@
             onlineUsers.forEach(user => {
                 const userElement = document.createElement('div');
                 userElement.className = 'online-user';
+                
+                // Get user profile to display correct avatar
+                const profileKey = `userProfile_${user}`;
+                const profileData = JSON.parse(localStorage.getItem(profileKey)) || {};
+                const avatarUrl = profileData.avatar || `https://i.pravatar.cc/50?u=${encodeURIComponent(user)}`;
+                
                 userElement.innerHTML = `
                     <div class="online-user-avatar">
-                        <img src="https://i.pravatar.cc/50?u=${encodeURIComponent(user)}" alt="${user}">
+                        <img src="${avatarUrl}" alt="${user}">
                         <div class="online-dot"></div>
                     </div>
                     <div class="online-user-info">
                         <div class="online-user-name">${user}</div>
                     </div>
                 `;
+                
+                // ADDED: Add click event to show user profile
+                userElement.onclick = () => {
+                    showUserProfile(user);
+                };
+                
                 onlineList.appendChild(userElement);
             });
         }
