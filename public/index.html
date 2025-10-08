@@ -2479,7 +2479,6 @@
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
-
 <script>
     let isLogin = true;
     let users = JSON.parse(localStorage.getItem('users')) || {};
@@ -2517,10 +2516,6 @@
     let newMessagesCount = 0;
     let scrollToBottomBtn;
     let newMessagesCountEl = document.getElementById('newMessagesCount');
-
-    // Scroll position management
-    let lastScrollPosition = 0;
-    let shouldRestoreScroll = false;
 
     // Real-time active status variables
     let socket;
@@ -2931,20 +2926,20 @@
 
             if (!response.ok) throw new Error('Failed to send message');
 
-            // Display message immediately for the sender
+            // FIXED: Display message immediately for the sender with proper scrolling
             displayMessage(content, 'sent', replyToText, username, null, true);
             
-            // ✅ FIXED: Only get AI response if it's NOT a command (starts with prefix)
-            const PREFIX = '!'; // Make sure this matches your server prefix
-            if (!content.startsWith(PREFIX)) {
-                fetchChatResponse(content);
-            }
-            
-            // Clear input
+            // Clear input immediately for better UX
             elements.messageInput.value = '';
             autoResize(elements.messageInput);
             clearReply();
 
+            // FIXED: Only get AI response if it's NOT a command
+            const PREFIX = '!';
+            if (!content.startsWith(PREFIX)) {
+                fetchChatResponse(content);
+            }
+            
         } catch (error) {
             showError(error.message);
         } finally {
@@ -3017,6 +3012,31 @@
                 socket.emit('request-messages');
             }
         }
+    }
+
+    // ===== FIXED: RENDER MESSAGES WITH CORRECT ORDER =====
+    function renderMessages(messages) {
+        if (!elements.chatContainer) return;
+        
+        // FIXED: Clear container but maintain scroll position
+        elements.chatContainer.innerHTML = '';
+        
+        // FIXED: Display messages in correct chronological order (oldest to newest)
+        messages.forEach(msg => {
+            const isOwn = msg.username?.trim().toLowerCase() === currentUsername?.trim().toLowerCase();
+            displayMessage(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id, false);
+        });
+
+        // Update scroll state after rendering messages
+        setTimeout(updateScrollState, 0);
+
+        // FIXED: IMMEDIATELY scroll to bottom after loading ALL messages
+        setTimeout(() => {
+            forceScrollToBottom('chat-container');
+            // Additional attempts to ensure it works
+            setTimeout(() => forceScrollToBottom('chat-container'), 50);
+            setTimeout(() => forceScrollToBottom('chat-container'), 100);
+        }, 10);
     }
 
     // ===== FIXED: DISPLAY MESSAGE WITH CORRECT ORDER =====
@@ -3099,7 +3119,7 @@
                 contentDiv.appendChild(textDiv);
             }
 
-            // FIXED: Use immediate image loading instead of lazy loading
+            // FIXED: Use immediate image loading
             imageMatches.forEach(match => {
                 displayImageImmediately(match[0], contentDiv);
             });
@@ -3142,121 +3162,17 @@
         // Force image rendering after adding message
         setTimeout(forceImageRendering, 50);
 
-        // FORCE SCROLL TO BOTTOM FOR EVERY NEW MESSAGE
+        // FIXED: ALWAYS SCROLL TO BOTTOM FOR NEW MESSAGES
         if (isNew) {
-            setTimeout(() => forceScrollToBottom('chat-container'), 50);
+            setTimeout(() => {
+                forceScrollToBottom('chat-container');
+                // Additional scroll to ensure it works
+                setTimeout(() => forceScrollToBottom('chat-container'), 30);
+            }, 10);
         }
 
         // Update scroll state after adding message
         setTimeout(updateScrollState, 0);
-    }
-
-    // ===== FIXED: INITIALIZATION =====
-    document.addEventListener('DOMContentLoaded', () => {
-        console.log('🚀 Initializing application...');
-        
-        // Initialize buttons first
-        initializeButtons();
-        
-        const savedUser = localStorage.getItem('currentUser');
-        if (savedUser) {
-            console.log('✅ User logged in:', savedUser);
-            localStorage.setItem('chat_username', savedUser);
-            document.getElementById('auth-container').style.display = 'none';
-            document.querySelector('.menu').style.display = 'flex';
-            document.querySelector('.news-toggle').style.display = 'block';
-
-            // FIXED: Show chat container immediately to prevent layout shift
-            showContainer('chat');
-
-            // Set flag to restore scroll position after messages load
-            shouldRestoreScroll = true;
-
-            // Initialize real-time features after login
-            initSocket();
-            setupTypingHandlers();
-            
-            // Add page event listeners
-            document.addEventListener('visibilitychange', handleVisibilityChange);
-            window.addEventListener('beforeunload', handleBeforeUnload);
-            window.addEventListener('pagehide', handlePageHide);
-            
-            // Load user profile
-            loadProfile();
-            
-            // Enable SQL Editor access if already verified
-            if (hasVerifiedCode()) {
-                enableSQLEditorAccess();
-            }
-        } else {
-            console.log('❌ No user logged in');
-            document.getElementById('auth-container').style.display = 'flex';
-            document.querySelector('.menu').style.display = 'none';
-            document.querySelector('.news-toggle').style.display = 'none';
-        }
-
-        if ('Notification' in window) {
-            Notification.requestPermission().then(permission => {
-                notificationPermissionGranted = permission === 'granted';
-                console.log('📢 Notification permission:', permission);
-            });
-        }
-
-        initializeChat();
-
-        // Add scroll event listener for main chat
-        if (elements.chatContainer) {
-            elements.chatContainer.addEventListener('scroll', updateScrollState);
-        }
-
-        // Initialize Private AI input handler
-        if (elements.privateInput) {
-            elements.privateInput.addEventListener('input', () => {
-                autoResize(elements.privateInput);
-                const hasText = elements.privateInput.value.trim().length > 0;
-                elements.privateSendButton.disabled = !hasText;
-                elements.privateSendButton.classList.toggle('enabled', hasText);
-            });
-            elements.privateInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendPrivateMessage();
-                }
-            });
-        }
-
-        console.log('🎯 Application initialization complete');
-    });
-
-    // ===== FIXED: RENDER MESSAGES WITH CORRECT ORDER =====
-    function renderMessages(messages) {
-        if (!elements.chatContainer) return;
-        
-        // FIXED: Clear container but maintain scroll position
-        elements.chatContainer.innerHTML = '';
-        
-        // FIXED: Display messages in correct chronological order (oldest to newest)
-        // NO REVERSING - messages should be in correct order from server
-        messages.forEach(msg => {
-            const isOwn = msg.username?.trim().toLowerCase() === currentUsername?.trim().toLowerCase();
-            displayMessage(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id, false);
-        });
-
-        // Update scroll state after rendering messages
-        setTimeout(updateScrollState, 0);
-
-        // Restore scroll position if needed
-        if (shouldRestoreScroll) {
-            setTimeout(restoreScrollPosition, 100);
-        }
-
-        // FIXED: IMMEDIATELY scroll to bottom after loading messages
-        setTimeout(() => {
-            forceScrollToBottom('chat-container');
-            // Additional scroll attempts to ensure it works
-            setTimeout(() => forceScrollToBottom('chat-container'), 100);
-            setTimeout(() => forceScrollToBottom('chat-container'), 200);
-        }, 10);
     }
 
     // ===== FIXED: DISPLAY PRIVATE MESSAGE FUNCTION =====
@@ -3346,6 +3262,116 @@
         }, 10);
     }
 
+    // ===== FIXED: MORE RELIABLE SCROLL TO BOTTOM FUNCTION =====
+    function forceScrollToBottom(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        // Multiple methods to ensure scrolling works
+        const scrollToBottom = () => {
+            // Method 1: Direct scroll
+            container.scrollTop = container.scrollHeight;
+            
+            // Method 2: Smooth scroll
+            container.scrollTo({
+                top: container.scrollHeight,
+                behavior: 'smooth'
+            });
+            
+            // Method 3: Alternative approach
+            setTimeout(() => {
+                container.scrollTop = container.scrollHeight;
+            }, 10);
+        };
+        
+        // Initial scroll
+        scrollToBottom();
+        
+        // Additional attempts to handle dynamic content loading
+        setTimeout(scrollToBottom, 50);
+        setTimeout(scrollToBottom, 100);
+        setTimeout(scrollToBottom, 200);
+    }
+
+    // ===== FIXED: INITIALIZATION - ENSURE PROPER SCROLL ON LOAD =====
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('🚀 Initializing application...');
+        
+        // Initialize buttons first
+        initializeButtons();
+        
+        const savedUser = localStorage.getItem('currentUser');
+        if (savedUser) {
+            console.log('✅ User logged in:', savedUser);
+            localStorage.setItem('chat_username', savedUser);
+            document.getElementById('auth-container').style.display = 'none';
+            document.querySelector('.menu').style.display = 'flex';
+            document.querySelector('.news-toggle').style.display = 'block';
+
+            // FIXED: Show chat container immediately
+            showContainer('chat');
+
+            // Initialize real-time features after login
+            initSocket();
+            setupTypingHandlers();
+            
+            // Add page event listeners
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+            window.addEventListener('beforeunload', handleBeforeUnload);
+            window.addEventListener('pagehide', handlePageHide);
+            
+            // Load user profile
+            loadProfile();
+            
+            // Enable SQL Editor access if already verified
+            if (hasVerifiedCode()) {
+                enableSQLEditorAccess();
+            }
+            
+            // FIXED: Force scroll to bottom after everything is loaded
+            setTimeout(() => {
+                forceScrollToBottom('chat-container');
+            }, 500);
+        } else {
+            console.log('❌ No user logged in');
+            document.getElementById('auth-container').style.display = 'flex';
+            document.querySelector('.menu').style.display = 'none';
+            document.querySelector('.news-toggle').style.display = 'none';
+        }
+
+        if ('Notification' in window) {
+            Notification.requestPermission().then(permission => {
+                notificationPermissionGranted = permission === 'granted';
+                console.log('📢 Notification permission:', permission);
+            });
+        }
+
+        initializeChat();
+
+        // Add scroll event listener for main chat
+        if (elements.chatContainer) {
+            elements.chatContainer.addEventListener('scroll', updateScrollState);
+        }
+
+        // Initialize Private AI input handler
+        if (elements.privateInput) {
+            elements.privateInput.addEventListener('input', () => {
+                autoResize(elements.privateInput);
+                const hasText = elements.privateInput.value.trim().length > 0;
+                elements.privateSendButton.disabled = !hasText;
+                elements.privateSendButton.classList.toggle('enabled', hasText);
+            });
+            elements.privateInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendPrivateMessage();
+                }
+            });
+        }
+
+        console.log('🎯 Application initialization complete');
+    });
+
     // ===== FIXED: SECTION MANAGEMENT - CLOSE SECTIONS PROPERLY =====
 
     // UPDATED showContainer FUNCTION with proper section closing
@@ -3417,7 +3443,7 @@
             // Re-initialize scroll button for main chat
             setTimeout(() => {
                 initializeButtons();
-                // Force scroll to bottom and update state
+                // FIXED: Force scroll to bottom when switching to chat
                 setTimeout(() => {
                     forceScrollToBottom('chat-container');
                     updateScrollState();
@@ -3427,7 +3453,7 @@
             // Show main chat scroll button, hide private AI button
             if (scrollToBottomBtn) {
                 scrollToBottomBtn.style.display = 'flex';
-                updateScrollState(); // Update visibility based on scroll position
+                updateScrollState();
             }
             if (privateGoTopBtn) {
                 privateGoTopBtn.style.display = 'none';
@@ -3437,7 +3463,7 @@
             // Show private AI button, hide main chat scroll button
             if (privateGoTopBtn) {
                 privateGoTopBtn.style.display = 'flex';
-                handlePrivateScroll(); // Update visibility based on scroll position
+                handlePrivateScroll();
             }
             if (scrollToBottomBtn) {
                 scrollToBottomBtn.style.display = 'none';
@@ -3446,9 +3472,8 @@
             // Attach scroll event for private container
             if (privateContainer) {
                 privateContainer.addEventListener('scroll', handlePrivateScroll);
-                // Initial check for scroll position
                 setTimeout(handlePrivateScroll, 100);
-                // Scroll to bottom when switching to private AI
+                // FIXED: Scroll to bottom when switching to private AI
                 setTimeout(() => forceScrollToBottom('private-ai-container'), 200);
             }
         } else {
@@ -3461,13 +3486,6 @@
                 privateGoTopBtn.style.display = 'none';
                 privateGoTopBtn.classList.remove('visible');
             }
-        }
-        
-        // Set scroll restore flag for chat container
-        if (containerId === 'chat') {
-            shouldRestoreScroll = true;
-            // Scroll to bottom when switching to main chat
-            setTimeout(() => forceScrollToBottom('chat-container'), 200);
         }
 
         // Close dropdown menu when switching containers
@@ -4111,23 +4129,6 @@
         }
     }
 
-    // Force scroll to bottom - more aggressive approach
-    function forceScrollToBottom(containerId) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-        // Multiple attempts to ensure scroll works
-        const attemptScroll = (attempts = 0) => {
-            if (attempts >= 5) return;
-            container.scrollTop = container.scrollHeight;
-            // Check if we actually scrolled to bottom
-            const isAtBottom = Math.abs(container.scrollHeight - container.scrollTop - container.clientHeight) < 10;
-            if (!isAtBottom) {
-                setTimeout(() => attemptScroll(attempts + 1), 50);
-            }
-        };
-        attemptScroll();
-    }
-
     // Scroll to bottom for main chat
     function scrollToBottomMain() {
         scrollToBottom('chat-container');
@@ -4346,29 +4347,6 @@
         }
         
         isAtBottom = isAtBottomNow;
-        lastScrollPosition = scrollTop;
-    }
-
-    // Save scroll position when leaving page
-    function saveScrollPosition() {
-        const chatContainer = document.getElementById('chat-container');
-        if (chatContainer) {
-            sessionStorage.setItem('chatScrollPosition', chatContainer.scrollTop);
-        }
-    }
-
-    // Restore scroll position when returning
-    function restoreScrollPosition() {
-        const chatContainer = document.getElementById('chat-container');
-        if (chatContainer) {
-            const savedPosition = sessionStorage.getItem('chatScrollPosition');
-            if (savedPosition !== null) {
-                chatContainer.scrollTop = savedPosition;
-                lastScrollPosition = parseInt(savedPosition);
-                updateScrollState();
-                shouldRestoreScroll = false;
-            }
-        }
     }
 
     // Private AI Go to Top button functions
@@ -4401,7 +4379,6 @@
             if (document.visibilityState === 'hidden') {
                 // User switched tabs or minimized browser - mark as away
                 socket.emit('user-away', username);
-                saveScrollPosition();
             } else {
                 // User came back to the tab - mark as online
                 socket.emit('user-online', username);
@@ -4415,7 +4392,6 @@
             // Send away status instead of offline
             socket.emit('user-away', username);
         }
-        saveScrollPosition();
     }
 
     function handlePageHide() {
@@ -4424,7 +4400,6 @@
             // Send away status instead of offline
             socket.emit('user-away', username);
         }
-        saveScrollPosition();
     }
 
     // ADDED: Private AI Long Press Functions
@@ -4610,9 +4585,6 @@
                         document.addEventListener('visibilitychange', handleVisibilityChange);
                         window.addEventListener('beforeunload', handleBeforeUnload);
                         window.addEventListener('pagehide', handlePageHide);
-
-                        // Set flag to restore scroll position after messages load
-                        shouldRestoreScroll = true;
                         
                         // Enable SQL Editor access if already verified
                         if (hasVerifiedCode()) {
@@ -4686,7 +4658,6 @@
         };
     }
 
-// --- CUT HERE ---
     // ✅ FIXED: COMPLETELY REWRITTEN - No more duplicate responses
     async function fetchChatResponse(userInput) {
         if (isProcessingCommand) {
@@ -5359,9 +5330,6 @@
         document.addEventListener('visibilitychange', handleVisibilityChange);
         window.addEventListener('beforeunload', handleBeforeUnload);
         window.addEventListener('pagehide', handlePageHide);
-        
-        // Set flag to restore scroll position after messages load
-        shouldRestoreScroll = true;
         
         // Enable SQL Editor access if already verified
         if (hasVerifiedCode()) {
