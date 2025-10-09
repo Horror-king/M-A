@@ -2540,53 +2540,54 @@
     </div>
 
     <!-- MODIFIED: Private Messages Container with updated structure -->
-    <div id="private-messages" class="main-chat-interface container" style="display: none;">
-        <div class="private-messages-header" id="private-messages-header">
-            <h3 id="private-messages-title">Private Messages</h3>
-            <div class="search-container">
-                <input type="text" id="search-users" placeholder="Search users...">
+<div id="private-messages" class="main-chat-interface container" style="display: none;">
+    <div class="private-messages-header" id="private-messages-header">
+        <h3 id="private-messages-title">Private Messages</h3>
+        <div class="search-container">
+            <input type="text" id="search-users" placeholder="Search users...">
+        </div>
+    </div>
+    
+    <div class="private-messages-layout">
+        <!-- Users List Panel - Show initially -->
+        <div class="users-panel" id="users-panel">
+            <div class="users-list" id="users-list">
+                <!-- Users will be dynamically loaded here -->
             </div>
         </div>
         
-        <div class="private-messages-layout">
-            <!-- Users List Panel - Show initially -->
-            <div class="users-panel" id="users-panel">
-                <div class="users-list" id="users-list">
-                    <!-- Users will be dynamically loaded here -->
+        <!-- Chat Container - Hide initially -->
+        <div class="private-chat-container" id="private-chat-container">
+            <div class="private-chat-header" id="private-chat-header">
+                <button class="back-to-users" onclick="showUsersPanel()">← Back</button>
+                <div class="chat-partner-info">
+                    <div class="partner-avatar" id="partner-avatar">
+                        <img src="https://i.pravatar.cc/50?u=default" alt="User">
+                    </div>
+                    <div class="partner-details">
+                        <div class="partner-name" id="partner-name">Select a user to start chatting</div>
+                        <div class="partner-status" id="partner-status"></div>
+                    </div>
                 </div>
             </div>
             
-            <!-- Chat Container - Hide initially -->
-            <div class="private-chat-container" id="private-chat-container">
-                <div class="private-chat-header" id="private-chat-header">
-                    <button class="back-to-users" onclick="showUsersPanel()">← Back</button>
-                    <div class="chat-partner-info">
-                        <div class="partner-avatar" id="partner-avatar">
-                            <img src="https://i.pravatar.cc/50?u=default" alt="User">
-                        </div>
-                        <div class="partner-details">
-                            <div class="partner-name" id="partner-name">Select a user to start chatting</div>
-                            <div class="partner-status" id="partner-status"></div>
-                        </div>
-                    </div>
+            <div class="private-chat-messages" id="private-chat-messages">
+                <!-- Private messages will appear here -->
+                <div class="no-chat-selected">
+                    <p>Select a user from the list to start a private conversation</p>
                 </div>
-                
-                <div class="private-chat-messages" id="private-chat-messages">
-                    <!-- Private messages will appear here -->
-                    <div class="no-chat-selected">
-                        <p>Select a user from the list to start a private conversation</p>
-                    </div>
-                </div>
-                
-                <div class="private-chat-input chat-input" style="display: none;" id="private-chat-input">
-                    <textarea id="private-message-input" placeholder="Type your private message..."></textarea>
-                    <button id="private-send-button" onclick="sendPrivateMessageToUser()" disabled>
-                        <i class="fas fa-paper-plane"></i>
-                    </button>
-                </div>
+            </div>
+            
+            <!-- FIXED: Changed ID to avoid conflict -->
+            <div class="private-chat-input chat-input" style="display: none;" id="private-chat-input">
+                <textarea id="private-message-input" placeholder="Type your private message..."></textarea>
+                <button id="private-messages-send-button" onclick="sendPrivateMessageToUser()" disabled>
+                    <i class="fas fa-paper-plane"></i>
+                </button>
             </div>
         </div>
     </div>
+</div>
   
     <button class="news-toggle" onclick="toggleNews()" title="Toggle News" style="display: none;">
         <i class="fas fa-newspaper"></i>
@@ -2901,8 +2902,8 @@
         </div>
     </div>
 
-    <script>
-    let isLogin = true;
+     <script>
+       let isLogin = true;
 let users = JSON.parse(localStorage.getItem('users')) || {};
 let longPressTimer;
 let isLongPress = false;
@@ -2977,6 +2978,7 @@ if (currentUsername && elements.usernameInput) {
 function initializePrivateMessaging() {
     loadPrivateUsers();
     setupPrivateMessageHandlers();
+    setupPrivateMessageInputHandlers(); // ADDED: Setup input handlers for private messages
     
     // Load private chats from localStorage
     if (localStorage.getItem('privateChats')) {
@@ -3263,8 +3265,8 @@ function sendPrivateMessageToUser() {
     input.value = '';
     autoResize(input);
     
-    // Disable send button temporarily
-    const sendButton = document.getElementById('private-send-button');
+    // Disable send button temporarily - FIXED: Use the correct ID
+    const sendButton = document.getElementById('private-messages-send-button');
     sendButton.disabled = true;
     sendButton.classList.remove('enabled');
     
@@ -3363,10 +3365,32 @@ function formatMessageTime(timestamp) {
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-// Function to setup private message input handlers
+// Function to setup private message input handlers - FIXED: Use correct ID
 function setupPrivateMessageHandlers() {
     const input = document.getElementById('private-message-input');
-    const sendButton = document.getElementById('private-send-button');
+    const sendButton = document.getElementById('private-messages-send-button'); // CHANGED ID
+    
+    if (input && sendButton) {
+        input.addEventListener('input', () => {
+            autoResize(input);
+            const hasText = input.value.trim().length > 0;
+            sendButton.disabled = !hasText;
+            sendButton.classList.toggle('enabled', hasText);
+        });
+        
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendPrivateMessageToUser();
+            }
+        });
+    }
+}
+
+// ADDED: Function to setup private messages input handlers
+function setupPrivateMessageInputHandlers() {
+    const input = document.getElementById('private-message-input');
+    const sendButton = document.getElementById('private-messages-send-button');
     
     if (input && sendButton) {
         input.addEventListener('input', () => {
@@ -6191,6 +6215,6 @@ if (currentUser) {
         enableSQLEditorAccess();
     }
 }
-  </script>  
+ </script>
 </body>
 </html>
