@@ -2903,7 +2903,7 @@
     </div>
 
      <script>
-       let isLogin = true;
+             let isLogin = true;
 let users = JSON.parse(localStorage.getItem('users')) || {};
 let longPressTimer;
 let isLongPress = false;
@@ -2974,11 +2974,10 @@ if (currentUsername && elements.usernameInput) {
     elements.usernameInput.value = currentUsername;
 }
 
-// ===== MODIFIED: PRIVATE MESSAGING FUNCTIONS =====
+// ===== FIXED: PRIVATE MESSAGING FUNCTIONS =====
 function initializePrivateMessaging() {
     loadPrivateUsers();
-    setupPrivateMessageHandlers();
-    setupPrivateMessageInputHandlers(); // ADDED: Setup input handlers for private messages
+    setupPrivateMessageInputHandlers(); // FIXED: Call the correct function
     
     // Load private chats from localStorage
     if (localStorage.getItem('privateChats')) {
@@ -3197,7 +3196,7 @@ function loadPrivateMessages(username) {
     
     // Display messages
     chat.messages.forEach(message => {
-        displayPrivateMessage(
+        displayPrivateUserMessage(
             message.content, 
             message.sender === currentUser ? 'sent' : 'received',
             message.timestamp
@@ -3210,8 +3209,8 @@ function loadPrivateMessages(username) {
     }, 100);
 }
 
-// MODIFIED: Function to display a private message
-function displayPrivateMessage(text, sender, timestamp) {
+// ===== ADDED: Function to display private user messages =====
+function displayPrivateUserMessage(text, sender, timestamp) {
     const messagesContainer = document.getElementById('private-chat-messages');
     if (!messagesContainer) return;
     
@@ -3238,6 +3237,11 @@ function displayPrivateMessage(text, sender, timestamp) {
     if (noChatSelected) {
         noChatSelected.remove();
     }
+    
+    // Scroll to bottom
+    setTimeout(() => {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }, 10);
 }
 
 // Function to send a private message to a user
@@ -3258,17 +3262,19 @@ function sendPrivateMessageToUser() {
     // Save message to private chats
     savePrivateMessage(currentUser, currentPrivateChatUser, content, timestamp);
     
-    // Display message immediately
-    displayPrivateMessage(content, 'sent', timestamp);
+    // Display message immediately - FIXED: Use the correct function
+    displayPrivateUserMessage(content, 'sent', timestamp);
     
     // Clear input
     input.value = '';
     autoResize(input);
     
-    // Disable send button temporarily - FIXED: Use the correct ID
+    // Disable send button temporarily
     const sendButton = document.getElementById('private-messages-send-button');
-    sendButton.disabled = true;
-    sendButton.classList.remove('enabled');
+    if (sendButton) {
+        sendButton.disabled = true;
+        sendButton.classList.remove('enabled');
+    }
     
     // Update user list to show last message
     loadPrivateUsers();
@@ -3292,7 +3298,7 @@ function sendPrivateMessageToUser() {
         const replyTimestamp = Date.now();
         
         savePrivateMessage(currentPrivateChatUser, currentUser, randomReply, replyTimestamp);
-        displayPrivateMessage(randomReply, 'received', replyTimestamp);
+        displayPrivateUserMessage(randomReply, 'received', replyTimestamp); // FIXED: Use correct function
         
         // Update user list
         loadPrivateUsers();
@@ -3365,29 +3371,7 @@ function formatMessageTime(timestamp) {
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-// Function to setup private message input handlers - FIXED: Use correct ID
-function setupPrivateMessageHandlers() {
-    const input = document.getElementById('private-message-input');
-    const sendButton = document.getElementById('private-messages-send-button'); // CHANGED ID
-    
-    if (input && sendButton) {
-        input.addEventListener('input', () => {
-            autoResize(input);
-            const hasText = input.value.trim().length > 0;
-            sendButton.disabled = !hasText;
-            sendButton.classList.toggle('enabled', hasText);
-        });
-        
-        input.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendPrivateMessageToUser();
-            }
-        });
-    }
-}
-
-// ADDED: Function to setup private messages input handlers
+// ===== ADDED: Function to setup private messages input handlers =====
 function setupPrivateMessageInputHandlers() {
     const input = document.getElementById('private-message-input');
     const sendButton = document.getElementById('private-messages-send-button');
@@ -3406,6 +3390,10 @@ function setupPrivateMessageInputHandlers() {
                 sendPrivateMessageToUser();
             }
         });
+        
+        // Initialize button state
+        sendButton.disabled = true;
+        sendButton.classList.remove('enabled');
     }
 }
 
