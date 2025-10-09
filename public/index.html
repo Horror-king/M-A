@@ -2043,6 +2043,341 @@
         .user-profile-close:hover {
             background: rgba(255, 255, 255, 0.3);
         }
+// --- CUT HERE ---
+        .private-messages-header {
+            background: white;
+            padding: 15px;
+            border-bottom: 1px solid #e4e6eb;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .private-messages-header h3 {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+            color: #1c1e21;
+        }
+
+        .search-container {
+            position: relative;
+        }
+
+        .search-container input {
+            width: 100%;
+            padding: 10px 15px;
+            border: 1px solid #e4e6eb;
+            border-radius: 20px;
+            background: #f0f2f5;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .search-container input:focus {
+            background: white;
+            border-color: #4267B2;
+        }
+
+        .private-messages-layout {
+            display: flex;
+            height: calc(100vh - 150px);
+            overflow: hidden;
+        }
+
+        /* Users Panel Styles */
+        .users-panel {
+            width: 35%;
+            border-right: 1px solid #e4e6eb;
+            background: white;
+            overflow-y: auto;
+        }
+
+        .users-list {
+            padding: 0;
+        }
+
+        .user-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            border-bottom: 1px solid #f0f2f5;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .user-item:hover {
+            background-color: #f5f5f5;
+        }
+
+        .user-item.active {
+            background-color: #e6f0ff;
+            border-left: 3px solid #4267B2;
+        }
+
+        .user-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            overflow: hidden;
+            margin-right: 12px;
+            position: relative;
+        }
+
+        .user-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .user-status {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid white;
+        }
+
+        .user-status.online {
+            background: #4CAF50;
+        }
+
+        .user-status.offline {
+            background: #ccc;
+        }
+
+        .user-info {
+            flex: 1;
+        }
+
+        .user-name {
+            font-weight: 600;
+            font-size: 15px;
+            color: #1c1e21;
+            margin-bottom: 3px;
+        }
+
+        .user-last-message {
+            font-size: 13px;
+            color: #65676b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
+        }
+
+        .user-time {
+            font-size: 11px;
+            color: #8a8d91;
+            margin-top: 5px;
+        }
+
+        /* Private Chat Container */
+        .private-chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: white;
+        }
+
+        .private-chat-header {
+            padding: 15px;
+            border-bottom: 1px solid #e4e6eb;
+            background: white;
+        }
+
+        .chat-partner-info {
+            display: flex;
+            align-items: center;
+        }
+
+        .partner-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            overflow: hidden;
+            margin-right: 12px;
+        }
+
+        .partner-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .partner-details {
+            flex: 1;
+        }
+
+        .partner-name {
+            font-weight: 600;
+            font-size: 16px;
+            color: #1c1e21;
+            margin-bottom: 2px;
+        }
+
+        .partner-status {
+            font-size: 13px;
+            color: #65676b;
+        }
+
+        .private-chat-messages {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .no-chat-selected {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            color: #65676b;
+            font-size: 16px;
+            text-align: center;
+        }
+
+        .no-users {
+            text-align: center;
+            padding: 20px;
+            color: #65676b;
+        }
+
+        .no-messages {
+            text-align: center;
+            padding: 20px;
+            color: #65676b;
+        }
+
+        .private-chat-input {
+            display: none;
+            padding: 15px;
+            border-top: 1px solid #e4e6eb;
+            background: white;
+        }
+
+        .private-chat-input textarea {
+            flex: 1;
+            padding: 12px 15px;
+            border-radius: 20px;
+            border: 1px solid #e4e6eb;
+            background: #f0f2f5;
+            font-size: 15px;
+            resize: none;
+            outline: none;
+            max-height: 100px;
+        }
+
+        .private-chat-input textarea:focus {
+            background: white;
+            border-color: #4267B2;
+        }
+
+        .private-chat-input button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0 10px;
+            color: #4267B2;
+            font-size: 18px;
+        }
+
+        .private-chat-input button:disabled {
+            color: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* Message styles for private chat */
+        .private-message {
+            padding: 8px 15px;
+            margin-bottom: 8px;
+            max-width: 70%;
+            word-wrap: break-word;
+            position: relative;
+        }
+
+        .private-message.sent {
+            align-self: flex-end;
+            background: #4267B2;
+            color: white;
+            border-radius: 18px 18px 0 18px;
+        }
+
+        .private-message.received {
+            align-self: flex-start;
+            background: #e4e6eb;
+            color: #1c1e21;
+            border-radius: 18px 18px 18px 0;
+        }
+
+        .message-time {
+            font-size: 11px;
+            margin-top: 5px;
+            opacity: 0.7;
+            text-align: right;
+        }
+
+        /* Responsive Design for Private Messages */
+        @media (max-width: 768px) {
+            .private-messages-layout {
+                flex-direction: column;
+                height: calc(100vh - 130px);
+            }
+            
+            .users-panel {
+                width: 100%;
+                height: 40%;
+                border-right: none;
+                border-bottom: 1px solid #e4e6eb;
+            }
+            
+            .private-chat-container {
+                height: 60%;
+            }
+            
+            .user-item {
+                padding: 10px 12px;
+            }
+            
+            .user-avatar {
+                width: 45px;
+                height: 45px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .private-messages-header {
+                padding: 12px;
+            }
+            
+            .private-chat-header {
+                padding: 12px;
+            }
+            
+            .private-chat-messages {
+                padding: 10px;
+            }
+            
+            .private-chat-input {
+                padding: 12px;
+            }
+            
+            .user-avatar {
+                width: 40px;
+                height: 40px;
+            }
+            
+            .user-name {
+                font-size: 14px;
+            }
+            
+            .user-last-message {
+                font-size: 12px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -2084,7 +2419,7 @@
         </div>
     </div>
 
-    <!-- UPDATED DROPDOWN WITH PROFILE DISPLAY -->
+    <!-- UPDATED DROPDOWN WITH PRIVATE MESSAGES LINK -->
     <div class="dropdown" id="dropdown" style="display: none;">
         <div class="profile-display-section">
             <div class="profile-display-avatar">
@@ -2101,6 +2436,8 @@
         <div class="menu-divider"></div>
         <a href="#" onclick="showContainer('chat')">Chat with AI</a>
         <a href="#" onclick="showContainer('private-ai')">Private AI</a>
+        <!-- ADDED: Private Messages Link -->
+        <a href="#" onclick="showContainer('private-messages')">Private Messages</a>
         <a href="#" onclick="showContainer('profile')">Edit Profile</a>
         <a href="#" onclick="showContainer('about')">About</a>
         <a href="#" onclick="showContainer('features')">Features</a>
@@ -2164,6 +2501,54 @@
         <!-- FIXED: Go to top button specifically for private AI -->
         <div class="go-top-btn" id="private-go-top">
             <i class="fas fa-arrow-up"></i>
+        </div>
+    </div>
+
+    <!-- ADDED: Private Messages Container -->
+    <div id="private-messages" class="main-chat-interface container" style="display: none;">
+        <div class="private-messages-header">
+            <h3>Private Messages</h3>
+            <div class="search-container">
+                <input type="text" id="search-users" placeholder="Search users...">
+            </div>
+        </div>
+        
+        <div class="private-messages-layout">
+            <!-- Users List Panel -->
+            <div class="users-panel">
+                <div class="users-list" id="users-list">
+                    <!-- Users will be dynamically loaded here -->
+                </div>
+            </div>
+            
+            <!-- Chat Container -->
+            <div class="private-chat-container">
+                <div class="private-chat-header" id="private-chat-header">
+                    <div class="chat-partner-info">
+                        <div class="partner-avatar" id="partner-avatar">
+                            <img src="https://i.pravatar.cc/50?u=default" alt="User">
+                        </div>
+                        <div class="partner-details">
+                            <div class="partner-name" id="partner-name">Select a user to start chatting</div>
+                            <div class="partner-status" id="partner-status"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="private-chat-messages" id="private-chat-messages">
+                    <!-- Private messages will appear here -->
+                    <div class="no-chat-selected">
+                        <p>Select a user from the list to start a private conversation</p>
+                    </div>
+                </div>
+                
+                <div class="private-chat-input chat-input" style="display: none;" id="private-chat-input">
+                    <textarea id="private-message-input" placeholder="Type your private message..."></textarea>
+                    <button id="private-send-button" onclick="sendPrivateMessageToUser()" disabled>
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
   
@@ -2479,7 +2864,8 @@
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
-<script>
+
+    <script>
     let isLogin = true;
     let users = JSON.parse(localStorage.getItem('users')) || {};
     let longPressTimer;
@@ -2528,6 +2914,11 @@
     // ✅ ADDED: Track online users for profile popup
     let onlineUsers = [];
 
+    // ✅ ADDED: Private Messaging Variables
+    let privateChats = JSON.parse(localStorage.getItem('privateChats')) || {};
+    let currentPrivateChatUser = null;
+    let privateMessageTypingTimer;
+
     const elements = {
         usernameInput: document.getElementById('auth-username'),
         messageInput: document.getElementById('user-input'),
@@ -2544,6 +2935,361 @@
     let currentUsername = localStorage.getItem('chat_username') || '';
     if (currentUsername && elements.usernameInput) {
         elements.usernameInput.value = currentUsername;
+    }
+
+    // ===== PRIVATE MESSAGING FUNCTIONS =====
+    function initializePrivateMessaging() {
+        loadPrivateUsers();
+        setupPrivateMessageHandlers();
+        
+        // Load private chats from localStorage
+        if (localStorage.getItem('privateChats')) {
+            privateChats = JSON.parse(localStorage.getItem('privateChats'));
+        }
+    }
+
+    // Function to load users for private messaging
+    function loadPrivateUsers() {
+        const usersList = document.getElementById('users-list');
+        if (!usersList) return;
+        
+        // Clear existing list
+        usersList.innerHTML = '';
+        
+        // Get current user
+        const currentUser = localStorage.getItem('currentUser');
+        if (!currentUser) return;
+        
+        // Get all users from localStorage (excluding current user)
+        const users = JSON.parse(localStorage.getItem('users')) || {};
+        const userProfiles = {};
+        
+        // Get user profiles
+        Object.keys(users).forEach(username => {
+            if (username !== currentUser) {
+                const profileKey = `userProfile_${username}`;
+                const profileData = JSON.parse(localStorage.getItem(profileKey)) || {};
+                userProfiles[username] = profileData;
+            }
+        });
+        
+        // Sort users by last message time (most recent first)
+        const sortedUsers = Object.keys(userProfiles).sort((a, b) => {
+            const chatA = getPrivateChat(currentUser, a);
+            const chatB = getPrivateChat(currentUser, b);
+            
+            const lastMsgTimeA = chatA && chatA.messages.length > 0 ? 
+                chatA.messages[chatA.messages.length - 1].timestamp : 0;
+            const lastMsgTimeB = chatB && chatB.messages.length > 0 ? 
+                chatB.messages[chatB.messages.length - 1].timestamp : 0;
+                
+            return lastMsgTimeB - lastMsgTimeA;
+        });
+        
+        // Add users to the list
+        if (sortedUsers.length === 0) {
+            usersList.innerHTML = '<div class="no-users">No users found</div>';
+            return;
+        }
+        
+        sortedUsers.forEach(username => {
+            const profile = userProfiles[username];
+            const chat = getPrivateChat(currentUser, username);
+            const lastMessage = chat && chat.messages.length > 0 ? 
+                chat.messages[chat.messages.length - 1] : null;
+            
+            const userItem = document.createElement('div');
+            userItem.className = 'user-item';
+            userItem.dataset.username = username;
+            userItem.onclick = () => openPrivateChat(username);
+            
+            // Determine online status (for demo, we'll use random status)
+            const isOnline = Math.random() > 0.5;
+            
+            userItem.innerHTML = `
+                <div class="user-avatar">
+                    <img src="${profile.avatar || `https://i.pravatar.cc/50?u=${username}`}" alt="${username}">
+                    <div class="user-status ${isOnline ? 'online' : 'offline'}"></div>
+                </div>
+                <div class="user-info">
+                    <div class="user-name">${profile.firstname && profile.lastname ? 
+                        `${profile.firstname} ${profile.lastname}` : username}</div>
+                    <div class="user-last-message">${lastMessage ? 
+                        (lastMessage.sender === currentUser ? 'You: ' : '') + 
+                        (lastMessage.content.length > 30 ? 
+                         lastMessage.content.substring(0, 30) + '...' : 
+                         lastMessage.content) : 
+                        'No messages yet'}</div>
+                    ${lastMessage ? `<div class="user-time">${formatMessageTime(lastMessage.timestamp)}</div>` : ''}
+                </div>
+            `;
+            
+            usersList.appendChild(userItem);
+        });
+        
+        // Add search functionality
+        const searchInput = document.getElementById('search-users');
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                const userItems = document.querySelectorAll('.user-item');
+                
+                userItems.forEach(item => {
+                    const username = item.dataset.username;
+                    const profile = userProfiles[username];
+                    const displayName = profile.firstname && profile.lastname ? 
+                        `${profile.firstname} ${profile.lastname}`.toLowerCase() : username.toLowerCase();
+                    
+                    if (displayName.includes(searchTerm) || username.toLowerCase().includes(searchTerm)) {
+                        item.style.display = 'flex';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+        }
+    }
+
+    // Function to open a private chat with a user
+    function openPrivateChat(username) {
+        currentPrivateChatUser = username;
+        
+        // Update UI to show active user
+        document.querySelectorAll('.user-item').forEach(item => {
+            item.classList.remove('active');
+            if (item.dataset.username === username) {
+                item.classList.add('active');
+            }
+        });
+        
+        // Get user profile
+        const profileKey = `userProfile_${username}`;
+        const profileData = JSON.parse(localStorage.getItem(profileKey)) || {};
+        
+        // Update chat header
+        document.getElementById('partner-avatar').innerHTML = 
+            `<img src="${profileData.avatar || `https://i.pravatar.cc/50?u=${username}`}" alt="${username}">`;
+        
+        const displayName = profileData.firstname && profile.lastname ? 
+            `${profileData.firstname} ${profileData.lastname}` : username;
+        document.getElementById('partner-name').textContent = displayName;
+        
+        // For demo, set random status
+        const isOnline = Math.random() > 0.5;
+        document.getElementById('partner-status').textContent = isOnline ? 'Online' : 'Offline';
+        document.getElementById('partner-status').style.color = isOnline ? '#4CAF50' : '#65676b';
+        
+        // Show chat input
+        document.getElementById('private-chat-input').style.display = 'flex';
+        
+        // Load messages
+        loadPrivateMessages(username);
+    }
+
+    // Function to load private messages for a user
+    function loadPrivateMessages(username) {
+        const messagesContainer = document.getElementById('private-chat-messages');
+        if (!messagesContainer) return;
+        
+        // Clear container
+        messagesContainer.innerHTML = '';
+        
+        const currentUser = localStorage.getItem('currentUser');
+        const chat = getPrivateChat(currentUser, username);
+        
+        if (!chat || chat.messages.length === 0) {
+            messagesContainer.innerHTML = `
+                <div class="no-messages">
+                    <p>No messages yet. Start a conversation with ${username}!</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Display messages
+        chat.messages.forEach(message => {
+            displayPrivateMessage(
+                message.content, 
+                message.sender === currentUser ? 'sent' : 'received',
+                message.timestamp
+            );
+        });
+        
+        // Scroll to bottom
+        setTimeout(() => {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }, 100);
+    }
+
+    // Function to display a private message
+    function displayPrivateMessage(text, sender, timestamp) {
+        const messagesContainer = document.getElementById('private-chat-messages');
+        if (!messagesContainer) return;
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `private-message ${sender}`;
+        
+        const time = formatMessageTime(timestamp);
+        
+        messageDiv.innerHTML = `
+            <div class="message-content">${text}</div>
+            <div class="message-time">${time}</div>
+        `;
+        
+        messagesContainer.appendChild(messageDiv);
+        
+        // Remove no-messages placeholder if it exists
+        const noMessages = messagesContainer.querySelector('.no-messages');
+        if (noMessages) {
+            noMessages.remove();
+        }
+    }
+
+    // Function to send a private message to a user
+    function sendPrivateMessageToUser() {
+        if (!currentPrivateChatUser) {
+            showError('Please select a user to message');
+            return;
+        }
+        
+        const input = document.getElementById('private-message-input');
+        const content = input.value.trim();
+        
+        if (!content) return;
+        
+        const currentUser = localStorage.getItem('currentUser');
+        const timestamp = Date.now();
+        
+        // Save message to private chats
+        savePrivateMessage(currentUser, currentPrivateChatUser, content, timestamp);
+        
+        // Display message immediately
+        displayPrivateMessage(content, 'sent', timestamp);
+        
+        // Clear input
+        input.value = '';
+        autoResize(input);
+        
+        // Disable send button temporarily
+        const sendButton = document.getElementById('private-send-button');
+        sendButton.disabled = true;
+        sendButton.classList.remove('enabled');
+        
+        // Update user list to show last message
+        loadPrivateUsers();
+        
+        // Scroll to bottom
+        const messagesContainer = document.getElementById('private-chat-messages');
+        if (messagesContainer) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+        
+        // Simulate reply after a delay (for demo purposes)
+        setTimeout(() => {
+            const replies = [
+                "Thanks for your message!",
+                "That's interesting!",
+                "I'll get back to you soon.",
+                "Can we talk about this later?",
+                "I appreciate you reaching out."
+            ];
+            const randomReply = replies[Math.floor(Math.random() * replies.length)];
+            const replyTimestamp = Date.now();
+            
+            savePrivateMessage(currentPrivateChatUser, currentUser, randomReply, replyTimestamp);
+            displayPrivateMessage(randomReply, 'received', replyTimestamp);
+            
+            // Update user list
+            loadPrivateUsers();
+        }, 2000);
+    }
+
+    // Function to save a private message
+    function savePrivateMessage(sender, receiver, content, timestamp) {
+        const chatKey = getPrivateChatKey(sender, receiver);
+        
+        if (!privateChats[chatKey]) {
+            privateChats[chatKey] = {
+                users: [sender, receiver],
+                messages: []
+            };
+        }
+        
+        privateChats[chatKey].messages.push({
+            sender,
+            content,
+            timestamp
+        });
+        
+        // Save to localStorage
+        localStorage.setItem('privateChats', JSON.stringify(privateChats));
+    }
+
+    // Function to get private chat between two users
+    function getPrivateChat(user1, user2) {
+        const chatKey = getPrivateChatKey(user1, user2);
+        return privateChats[chatKey];
+    }
+
+    // Function to generate a consistent chat key for two users
+    function getPrivateChatKey(user1, user2) {
+        const users = [user1, user2].sort();
+        return `private_chat_${users[0]}_${users[1]}`;
+    }
+
+    // Function to format message time
+    function formatMessageTime(timestamp) {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diff = now - date;
+        
+        // If less than a minute ago
+        if (diff < 60000) {
+            return 'Just now';
+        }
+        
+        // If less than an hour ago
+        if (diff < 3600000) {
+            const minutes = Math.floor(diff / 60000);
+            return `${minutes}m ago`;
+        }
+        
+        // If today
+        if (date.toDateString() === now.toDateString()) {
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+        
+        // If yesterday
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        if (date.toDateString() === yesterday.toDateString()) {
+            return 'Yesterday';
+        }
+        
+        // Otherwise, show date
+        return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+
+    // Function to setup private message input handlers
+    function setupPrivateMessageHandlers() {
+        const input = document.getElementById('private-message-input');
+        const sendButton = document.getElementById('private-send-button');
+        
+        if (input && sendButton) {
+            input.addEventListener('input', () => {
+                autoResize(input);
+                const hasText = input.value.trim().length > 0;
+                sendButton.disabled = !hasText;
+                sendButton.classList.toggle('enabled', hasText);
+            });
+            
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendPrivateMessageToUser();
+                }
+            });
+        }
     }
 
     // ===== PROFILE MANAGEMENT FUNCTIONS =====
@@ -3399,7 +4145,7 @@
             container.style.display = 'block';
             
             // Show the appropriate chat input
-            if (containerId === 'chat' || containerId === 'private-ai') {
+            if (containerId === 'chat' || containerId === 'private-ai' || containerId === 'private-messages') {
                 const chatInput = container.querySelector('.chat-input');
                 if (chatInput) chatInput.style.display = 'flex';
             }
@@ -3425,12 +4171,17 @@
                 }
                 initializeSQLEditor();
             }
+            
+            // Initialize private messaging if showing that container
+            if (containerId === 'private-messages') {
+                initializePrivateMessaging();
+            }
         }
         
         // Show overlay for non-chat containers
         const overlay = document.getElementById('overlay');
         if (overlay) {
-            if (containerId === 'chat' || containerId === 'private-ai') {
+            if (containerId === 'chat' || containerId === 'private-ai' || containerId === 'private-messages') {
                 overlay.style.display = 'none';
             } else {
                 overlay.style.display = 'block';
@@ -3475,6 +4226,16 @@
                 setTimeout(handlePrivateScroll, 100);
                 // FIXED: Scroll to bottom when switching to private AI
                 setTimeout(() => forceScrollToBottom('private-ai-container'), 200);
+            }
+        } else if (containerId === 'private-messages') {
+            // Hide both buttons for private messages
+            if (scrollToBottomBtn) {
+                scrollToBottomBtn.style.display = 'none';
+                scrollToBottomBtn.classList.remove('visible');
+            }
+            if (privateGoTopBtn) {
+                privateGoTopBtn.style.display = 'none';
+                privateGoTopBtn.classList.remove('visible');
             }
         } else {
             // For other containers, hide both buttons
@@ -5336,6 +6097,6 @@
             enableSQLEditorAccess();
         }
     }
-</script>
+ </script>     
 </body>
 </html>
