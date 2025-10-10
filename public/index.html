@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2413,31 +2412,6 @@
             .user-last-message {
                 font-size: 12px;
             }
-
-            /* MODIFIED: Private Messages Search Container Visibility */
-.private-messages-header.hidden {
-    display: none;
-}
-
-.search-container.hidden {
-    display: none;
-}
-
-.private-messages-header.compact {
-    padding: 10px 15px;
-    height: auto;
-    min-height: 60px;
-    justify-content: center;
-}
-
-.private-chat-container.full-height {
-    height: 100vh;
-}
-
-/* Ensure proper spacing when search is hidden */
-.private-messages-layout:has(.private-messages-header.hidden) {
-    height: 100vh;
-}
           
             /* Private Messages Badge */
 .menu-badge {
@@ -2988,8 +2962,6 @@
     </div>
 
      <script>
- // --- CUT HERE ---
-     <script>
          let isLogin = true;
 let users = JSON.parse(localStorage.getItem('users')) || {};
 let longPressTimer;
@@ -3161,7 +3133,7 @@ async function loadPrivateUsers() {
     }
 }
 
-// MODIFIED: Open private chat with a user - HIDE SEARCH CONTAINER
+// Open private chat with a user
 async function openPrivateChat(username) {
     currentPrivateChatUser = username;
     
@@ -3172,12 +3144,6 @@ async function openPrivateChat(username) {
             item.classList.add('active');
         }
     });
-    
-    // HIDE SEARCH CONTAINER
-    const privateMessagesHeader = document.getElementById('private-messages-header');
-    if (privateMessagesHeader) {
-        privateMessagesHeader.classList.add('hidden');
-    }
     
     // Get user profile
     const profileKey = `userProfile_${username}`;
@@ -3198,12 +3164,6 @@ async function openPrivateChat(username) {
     
     // Show chat container and hide users panel
     showChatContainer();
-    
-    // Make chat container full height
-    const chatContainer = document.getElementById('private-chat-container');
-    if (chatContainer) {
-        chatContainer.classList.add('full-height');
-    }
     
     // Show chat input
     document.getElementById('private-chat-input').style.display = 'flex';
@@ -3575,7 +3535,7 @@ function setupPrivateMessageTypingHandlers() {
     });
 }
 
-// MODIFIED: Function to show users panel and hide chat - SHOW SEARCH CONTAINER
+// Function to show users panel and hide chat
 function showUsersPanel() {
     const usersPanel = document.getElementById('users-panel');
     const chatContainer = document.getElementById('private-chat-container');
@@ -3583,13 +3543,6 @@ function showUsersPanel() {
     if (usersPanel && chatContainer) {
         usersPanel.classList.remove('hidden');
         chatContainer.classList.remove('active');
-        chatContainer.classList.remove('full-height');
-        
-        // SHOW SEARCH CONTAINER AGAIN
-        const privateMessagesHeader = document.getElementById('private-messages-header');
-        if (privateMessagesHeader) {
-            privateMessagesHeader.classList.remove('hidden');
-        }
         
         // Hide chat input
         const chatInput = document.getElementById('private-chat-input');
