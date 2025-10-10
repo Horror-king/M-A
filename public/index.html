@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2044,7 +2045,6 @@
             background: rgba(255, 255, 255, 0.3);
         }
 // --- CUT HERE ---
-        // --- CUT HERE ---
         /* ... (ALL YOUR EXISTING CSS STYLES REMAIN THE SAME) ... */
 
         /* MODIFIED: Private Messages Layout */
@@ -2092,22 +2092,12 @@
             color: #4267B2;
         }
 
-        /* ADDED: Private messages header visibility control */
+        /* Private Messages Header Styles */
         .private-messages-header {
             background: white;
             padding: 15px;
             border-bottom: 1px solid #e4e6eb;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            transition: all 0.3s ease;
-        }
-
-        .private-messages-header.hidden {
-            display: none !important;
-        }
-
-        /* Ensure proper spacing when header is hidden */
-        .private-messages-layout {
-            height: calc(100vh - 150px);
         }
 
         .private-messages-header h3 {
@@ -2362,65 +2352,6 @@
             text-align: right;
         }
 
-        /* Private Messages Badge */
-        .menu-badge {
-            background: #ff4444;
-            color: white;
-            border-radius: 10px;
-            padding: 2px 6px;
-            font-size: 11px;
-            margin-left: 5px;
-        }
-
-        /* Unread message styles */
-        .user-item.unread {
-            background-color: #f0f8ff;
-            border-left: 3px solid #4267B2;
-        }
-
-        .unread-badge {
-            position: absolute;
-            top: -5px;
-            right: -5px;
-            width: 12px;
-            height: 12px;
-            background: #ff4444;
-            border-radius: 50%;
-            border: 2px solid white;
-        }
-
-        /* Private message typing indicator */
-        .typing-indicator {
-            display: flex;
-            align-items: center;
-            padding: 10px 15px;
-            color: #666;
-            font-style: italic;
-            font-size: 14px;
-        }
-
-        .typing-dots {
-            display: flex;
-            margin-left: 8px;
-        }
-
-        .typing-dot {
-            width: 4px;
-            height: 4px;
-            border-radius: 50%;
-            background-color: #666;
-            margin: 0 1px;
-            animation: typingAnimation 1.4s infinite ease-in-out;
-        }
-
-        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
-        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
-
-        @keyframes typingAnimation {
-            0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
-            40% { transform: scale(1); opacity: 1; }
-        }
-
         /* Responsive Design for Private Messages */
         @media (max-width: 768px) {
             .private-messages-layout {
@@ -2453,13 +2384,6 @@
             }
         }
 
-        /* Desktop: Hide back button */
-        @media (min-width: 769px) {
-            .back-to-users {
-                display: none !important;
-            }
-        }
-
         @media (max-width: 480px) {
             .private-messages-header {
                 padding: 12px;
@@ -2489,6 +2413,65 @@
             .user-last-message {
                 font-size: 12px;
             }
+          
+            /* Private Messages Badge */
+.menu-badge {
+  background: #ff4444;
+  color: white;
+  border-radius: 10px;
+  padding: 2px 6px;
+  font-size: 11px;
+  margin-left: 5px;
+}
+
+/* Unread message styles */
+.user-item.unread {
+  background-color: #f0f8ff;
+  border-left: 3px solid #4267B2;
+}
+
+.unread-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 12px;
+  height: 12px;
+  background: #ff4444;
+  border-radius: 50%;
+  border: 2px solid white;
+}
+
+/* Private message typing indicator */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  padding: 10px 15px;
+  color: #666;
+  font-style: italic;
+  font-size: 14px;
+}
+
+.typing-dots {
+  display: flex;
+  margin-left: 8px;
+}
+
+.typing-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: #666;
+  margin: 0 1px;
+  animation: typingAnimation 1.4s infinite ease-in-out;
+}
+
+.typing-dot:nth-child(1) { animation-delay: -0.32s; }
+.typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes typingAnimation {
+  0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+  40% { transform: scale(1); opacity: 1; }
+}         
         }
     </style>
 </head>
@@ -2633,19 +2616,20 @@
             </div>
         </div>
         
-        <!-- MODIFIED: Private Chat Header with proper back button -->
-<div class="private-chat-header" id="private-chat-header">
-    <button class="back-to-users" onclick="showUsersPanel()">← Back</button>
-    <div class="chat-partner-info">
-        <div class="partner-avatar" id="partner-avatar">
-            <img src="https://i.pravatar.cc/50?u=default" alt="User">
-        </div>
-        <div class="partner-details">
-            <div class="partner-name" id="partner-name">Select a user to start chatting</div>
-            <div class="partner-status" id="partner-status"></div>
-        </div>
-    </div>
-</div>
+        <!-- Chat Container - Hide initially -->
+        <div class="private-chat-container" id="private-chat-container">
+            <div class="private-chat-header" id="private-chat-header">
+                <button class="back-to-users" onclick="showUsersPanel()">← Back</button>
+                <div class="chat-partner-info">
+                    <div class="partner-avatar" id="partner-avatar">
+                        <img src="https://i.pravatar.cc/50?u=default" alt="User">
+                    </div>
+                    <div class="partner-details">
+                        <div class="partner-name" id="partner-name">Select a user to start chatting</div>
+                        <div class="partner-status" id="partner-status"></div>
+                    </div>
+                </div>
+            </div>
             
             <div class="private-chat-messages" id="private-chat-messages">
                 <!-- Private messages will appear here -->
@@ -2979,7 +2963,6 @@
     </div>
 
      <script>
-        // --- CUT HERE ---
          let isLogin = true;
 let users = JSON.parse(localStorage.getItem('users')) || {};
 let longPressTimer;
@@ -3553,16 +3536,14 @@ function setupPrivateMessageTypingHandlers() {
     });
 }
 
-// MODIFIED: Function to show users panel and hide chat - SHOW SEARCH HEADER
+// Function to show users panel and hide chat
 function showUsersPanel() {
     const usersPanel = document.getElementById('users-panel');
     const chatContainer = document.getElementById('private-chat-container');
-    const header = document.getElementById('private-messages-header');
     
-    if (usersPanel && chatContainer && header) {
+    if (usersPanel && chatContainer) {
         usersPanel.classList.remove('hidden');
         chatContainer.classList.remove('active');
-        header.style.display = 'block'; // SHOW HEADER WITH SEARCH INPUT
         
         // Hide chat input
         const chatInput = document.getElementById('private-chat-input');
@@ -3592,16 +3573,14 @@ function showUsersPanel() {
     }
 }
 
-// MODIFIED: Function to show chat container and hide users panel - HIDE SEARCH HEADER
+// Function to show chat container and hide users panel
 function showChatContainer() {
     const usersPanel = document.getElementById('users-panel');
     const chatContainer = document.getElementById('private-chat-container');
-    const header = document.getElementById('private-messages-header');
     
-    if (usersPanel && chatContainer && header) {
+    if (usersPanel && chatContainer) {
         usersPanel.classList.add('hidden');
         chatContainer.classList.add('active');
-        header.style.display = 'none'; // HIDE HEADER WITH SEARCH INPUT
         
         // Show chat input if we have a user selected
         if (currentPrivateChatUser) {
@@ -3611,38 +3590,6 @@ function showChatContainer() {
             }
         }
     }
-}
-
-// ADDED: Back button functionality for private chat header
-function addBackButtonListener() {
-    const backButton = document.querySelector('.back-to-users');
-    if (backButton) {
-        backButton.onclick = showUsersPanel;
-    }
-}
-
-// MODIFIED: Initialize private messaging with back button listener
-function initializePrivateMessaging() {
-    loadPrivateUsers();
-    setupPrivateMessageInputHandlers();
-    addBackButtonListener(); // ADDED: Initialize back button
-    
-    // Listen for real-time private messages
-    if (socket) {
-        socket.on('new-private-message', (message) => {
-            handleNewPrivateMessage(message);
-        });
-        
-        socket.on('private-typing-indicator', (data) => {
-            showPrivateTypingIndicator(data);
-        });
-    }
-    
-    // Initially show only users panel
-    showUsersPanel();
-    
-    // Load unread counts
-    loadUnreadCounts();
 }
 
 // ===== PROFILE MANAGEMENT FUNCTIONS =====
@@ -5125,9 +5072,6 @@ function enableSQLEditorAccess() {
         }
     }
 }
-
-//other javascript code 
-// --- CUT HERE ---
 
 function showLockoutMessage() {
     const lockoutMessage = document.getElementById('lockout-message');
