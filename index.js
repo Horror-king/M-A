@@ -71,6 +71,31 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
+// ===== FIX: ADD MISSING PRIVATE MESSAGES ROUTE =====
+app.get('/private-messages', async (req, res) => {
+  try {
+    const { username } = req.query;
+    
+    if (!username) {
+      return res.status(400).json({ error: "Username query parameter is required" });
+    }
+
+    // Get all private messages for the user
+    const { data: messages, error } = await supabase
+      .from('private_messages')
+      .select('*')
+      .or(`sender_username.eq.${username},receiver_username.eq.${username}`)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    res.json(messages || []);
+  } catch (error) {
+    console.error('Error fetching private messages:', error);
+    res.status(500).json({ error: 'Failed to fetch private messages' });
+  }
+});
+
 // Enhanced Uptime System for Render
 if (config.autoUptime?.enable || isRender) {
   const myUrl = renderExternalUrl || config.autoUptime?.url || `http://localhost:${port}`;
@@ -1139,6 +1164,7 @@ server.listen(port, () => {
   console.log(`🔌 Socket.io events: new-message, message-deleted, user-status-change`);
   console.log(`🤫 PRIVATE MESSAGING: ENABLED via Supabase`);
   console.log(`🔒 Private endpoints: /private-messages/*`);
+  console.log(`📨 NEW: GET /private-messages?username=USERNAME - Get all private messages for user`);
   console.log(`🧪 Test Supabase (GET): http://localhost:${port}/test-supabase`);
   console.log(`🧪 Test Message (POST): http://localhost:${port}/test-message`);
   console.log(`🔍 Debug ALL Commands: http://localhost:${port}/debug-all-commands`);
