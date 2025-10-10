@@ -159,7 +159,162 @@ function handleCommand(input) {
   return { commandName, args, text };
 }
 
-// Chat API Endpoints
+// ===== PRIVATE MESSAGING ENDPOINTS =====
+
+// Get all conversations for a user
+app.get('/private-messages/conversations/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    
+    // Get distinct conversations (people the user has chatted with)
+    const { data: conversations, error } = await supabase
+      .from('private_messages')
+      .select('sender_username, receiver_username, content, created_at, read')
+      .or(`sender_username.eq.${username},receiver_username.eq.${username}`)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Process to get unique conversations with last message
+    const conversationMap = new Map();
+    
+    conversations.forEach(msg => {
+      const otherUser = msg.sender_username === username ? msg.receiver_username : msg.sender_username;
+      
+      if (!conversationMap.has(otherUser) || 
+          new Date(msg.created_at) > new Date(conversationMap.get(otherUser).lastMessageTime)) {
+        conversationMap.set(otherUser, {
+          username: otherUser,
+          lastMessage: msg.content,
+          lastMessageTime: msg.created_at,
+          unread: msg.receiver_username === username && !msg.read,
+          isSender: msg.sender_username === username
+        });
+      }
+    });
+
+    const conversationList = Array.from(conversationMap.values())
+      .sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
+
+    res.json(conversationList);
+  } catch (error) {
+    console.error('Error fetching conversations:', error);
+    res.status(500).json({ error: 'Failed to fetch conversations' });
+  }
+});
+
+// Get messages between two users
+app.get('/private-messages/:user1/:user2', async (req, res) => {
+  try {
+    const { user1, user2 } = req.params;
+    
+    const { data: messages, error } = await supabase
+      .from('private_messages')
+      .select('*')
+      .or(`and(sender_username.eq.${user1},receiver_username.eq.${user2}),and(sender_username.eq.${user2},receiver_username.eq.${user1})`)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    // Mark messages as read when fetched
+    await supabase
+      .from('private_messages')
+      .update({ read: true })
+      .eq('receiver_username', user1)
+      .eq('sender_username', user2)
+      .eq('read', false);
+
+    res.json(messages || []);
+  } catch (error) {
+    console.error('Error fetching private messages:', error);
+    res.status(500).json({ error: 'Failed to fetch private messages' });
+  }
+});
+
+// Send private message
+app.post('/private-messages', async (req, res) => {
+  try {
+    const { sender_username, receiver_username, content, image_url } = req.body;
+
+    console.log('📨 Private message:', { sender_username, receiver_username, content, image_url });
+
+    if (!sender_username || !receiver_username) {
+      return res.status(400).json({ error: "Sender and receiver usernames are required" });
+    }
+
+    if ((!content || content.trim() === '') && !image_url) {
+      return res.status(400).json({ error: "Content or image is required" });
+    }
+
+    const insertData = {
+      sender_username: sender_username.trim(),
+      receiver_username: receiver_username.trim(),
+      content: content ? content.trim() : '',
+      image_url: image_url || '',
+      read: false
+    };
+
+    const { data, error } = await supabase
+      .from('private_messages')
+      .insert([insertData])
+      .select();
+
+    if (error) throw error;
+
+    console.log('✅ Private message saved. ID:', data[0]?.id);
+    
+    // Broadcast via Socket.io to both users
+    io.emit('new-private-message', data[0]);
+    
+    res.status(201).json(data[0]);
+  } catch (error) {
+    console.error('❌ Failed to save private message:', error);
+    res.status(500).json({ error: "Failed to send private message: " + error.message });
+  }
+});
+
+// Get unread message count
+app.get('/private-messages/unread/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    
+    const { count, error } = await supabase
+      .from('private_messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('receiver_username', username)
+      .eq('read', false);
+
+    if (error) throw error;
+
+    res.json({ unreadCount: count || 0 });
+  } catch (error) {
+    console.error('Error fetching unread count:', error);
+    res.status(500).json({ error: 'Failed to fetch unread count' });
+  }
+});
+
+// Mark messages as read
+app.put('/private-messages/read', async (req, res) => {
+  try {
+    const { sender_username, receiver_username } = req.body;
+
+    const { error } = await supabase
+      .from('private_messages')
+      .update({ read: true })
+      .eq('sender_username', sender_username)
+      .eq('receiver_username', receiver_username)
+      .eq('read', false);
+
+    if (error) throw error;
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error marking messages as read:', error);
+    res.status(500).json({ error: 'Failed to mark messages as read' });
+  }
+});
+
+// ===== PUBLIC CHAT ENDPOINTS =====
 
 // GET messages
 app.get('/messages', async (req, res) => {
@@ -824,6 +979,72 @@ io.on('connection', (socket) => {
     }
   });
 
+  // ===== PRIVATE MESSAGING SOCKET EVENTS =====
+
+  // Handle private messaging via Socket.io
+  socket.on('send-private-message-socket', async (data) => {
+    try {
+      console.log('🤫 Private message via socket:', data);
+      
+      const { sender_username, receiver_username, content, image_url } = data;
+
+      const insertData = {
+        sender_username: sender_username.trim(),
+        receiver_username: receiver_username.trim(),
+        content: content ? content.trim() : '',
+        image_url: image_url || '',
+        read: false
+      };
+
+      const { data: messageData, error } = await supabase
+        .from('private_messages')
+        .insert([insertData])
+        .select();
+
+      if (error) throw error;
+
+      // Emit to both sender and receiver
+      io.emit('new-private-message', messageData[0]);
+      
+    } catch (error) {
+      console.error('❌ Private message error:', error);
+      socket.emit('private-message-error', { error: 'Failed to send private message' });
+    }
+  });
+
+  socket.on('join-private-chat', (data) => {
+    const { username, otherUser } = data;
+    const roomName = getPrivateChatRoomName(username, otherUser);
+    socket.join(roomName);
+    console.log(`👥 ${username} joined private chat room: ${roomName}`);
+  });
+
+  socket.on('leave-private-chat', (data) => {
+    const { username, otherUser } = data;
+    const roomName = getPrivateChatRoomName(username, otherUser);
+    socket.leave(roomName);
+    console.log(`👋 ${username} left private chat room: ${roomName}`);
+  });
+
+  // Listen for new private messages and deliver to specific users
+  socket.on('private-message-typing-start', (data) => {
+    const { sender, receiver, isTyping } = data;
+    const roomName = getPrivateChatRoomName(sender, receiver);
+    socket.to(roomName).emit('private-typing-indicator', {
+      username: sender,
+      isTyping: true
+    });
+  });
+
+  socket.on('private-message-typing-stop', (data) => {
+    const { sender, receiver, isTyping } = data;
+    const roomName = getPrivateChatRoomName(sender, receiver);
+    socket.to(roomName).emit('private-typing-indicator', {
+      username: sender,
+      isTyping: false
+    });
+  });
+
   // Handle disconnect properly
   socket.on('disconnect', (reason) => {
     console.log('🔌 User disconnected:', socket.id, 'Reason:', reason);
@@ -871,6 +1092,12 @@ io.on('connection', (socket) => {
   }
 });
 
+// Helper function for private chat room names
+function getPrivateChatRoomName(user1, user2) {
+  const users = [user1, user2].sort();
+  return `private_chat_${users[0]}_${users[1]}`;
+}
+
 // 3 MINUTE CLEANUP - Remove users after 3 minutes of inactivity
 setInterval(() => {
   const now = Date.now();
@@ -910,6 +1137,8 @@ server.listen(port, () => {
   console.log(`🚫 DUPLICATE FIX: GUARANTEED no double responses!`);
   console.log(`💬 Real-time messaging: ENABLED via Socket.io`);
   console.log(`🔌 Socket.io events: new-message, message-deleted, user-status-change`);
+  console.log(`🤫 PRIVATE MESSAGING: ENABLED via Supabase`);
+  console.log(`🔒 Private endpoints: /private-messages/*`);
   console.log(`🧪 Test Supabase (GET): http://localhost:${port}/test-supabase`);
   console.log(`🧪 Test Message (POST): http://localhost:${port}/test-message`);
   console.log(`🔍 Debug ALL Commands: http://localhost:${port}/debug-all-commands`);
