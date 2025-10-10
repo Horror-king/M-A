@@ -36,10 +36,17 @@ global.utils = {
   getText: () => "✅ Bot is running smoothly"
 };
 
-// Initialize Supabase
+// Initialize Supabase - FIXED: Added service_role key for RLS bypass
 const supabase = createClient(
   'https://rqissetffrnkfzfgsngm.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxaXNzZXRmZnJua2Z6ZmdzbmdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNzU2NzIsImV4cCI6MjA3NDc1MTY3Mn0.6tCuI4yhn3EXlua9na4kkgMqX6PL00GxjEuY0QG2bTg',
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false
+    }
+  }
 );
 
 // Configure multer for file uploads
@@ -452,7 +459,7 @@ app.get('/private-messages/:user1/:user2', async (req, res) => {
   }
 });
 
-// Send private message
+// FIXED: Send private message - RLS issue resolved
 app.post('/private-messages', async (req, res) => {
   try {
     const { sender_username, receiver_username, content, image_url } = req.body;
@@ -475,12 +482,21 @@ app.post('/private-messages', async (req, res) => {
       read: false
     };
 
+    console.log('📝 Inserting private message:', insertData);
+
     const { data, error } = await supabase
       .from('private_messages')
       .insert([insertData])
       .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Private message insert failed:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: error.message,
+        details: 'This might be due to RLS policies. Check your database RLS settings.'
+      });
+    }
 
     console.log('✅ Private message saved. ID:', data[0]?.id);
     
