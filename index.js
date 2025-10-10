@@ -71,66 +71,66 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// ===== DEBUGGING ENDPOINTS =====
+// ===== ENHANCED DEBUGGING ENDPOINTS =====
 
-// Debug: Check if private_messages table exists and has data
-app.get('/debug-private-messages', async (req, res) => {
+// GET endpoint to test private messages (for browser testing)
+app.get('/test-private-messages', async (req, res) => {
   try {
-    console.log('🔍 Debugging private_messages table...');
+    console.log('🧪 GET: Testing private messages creation...');
     
-    // Check table structure
-    const { data: tableInfo, error: tableError } = await supabase
-      .from('private_messages')
-      .select('*')
-      .limit(1);
+    // Create a test private message
+    const testData = {
+      sender_username: 'test_user1',
+      receiver_username: 'test_user2',
+      content: 'This is a test private message from GET endpoint!',
+      image_url: '',
+      read: false
+    };
 
-    if (tableError) {
-      console.error('❌ Table error:', tableError);
-      return res.status(500).json({ error: 'Table error: ' + tableError.message });
+    const { data, error } = await supabase
+      .from('private_messages')
+      .insert([testData])
+      .select();
+
+    if (error) {
+      console.error('❌ GET Test private message failed:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: error.message 
+      });
     }
 
-    // Count total messages
-    const { count: totalCount, error: countError } = await supabase
-      .from('private_messages')
-      .select('*', { count: 'exact', head: true });
-
-    if (countError) {
-      console.error('❌ Count error:', countError);
-      return res.status(500).json({ error: 'Count error: ' + countError.message });
-    }
-
-    // Get all messages (limit 10 for preview)
-    const { data: allMessages, error: messagesError } = await supabase
-      .from('private_messages')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(10);
-
-    if (messagesError) {
-      console.error('❌ Messages error:', messagesError);
-      return res.status(500).json({ error: 'Messages error: ' + messagesError.message });
-    }
-
-    res.json({
-      success: true,
-      tableExists: true,
-      totalMessages: totalCount || 0,
-      sampleMessages: allMessages || [],
-      message: 'Private messages table debug information'
+    console.log('✅ GET Test private message saved:', data[0]);
+    
+    // Broadcast via Socket.io
+    io.emit('new-private-message', data[0]);
+    
+    res.json({ 
+      success: true, 
+      message: 'GET Test private message saved successfully',
+      data: data[0],
+      nextSteps: [
+        'Check all messages: GET /private-messages?username=test_user1',
+        'Check conversations: GET /private-messages/conversations/test_user1',
+        'Check between users: GET /private-messages/test_user1/test_user2'
+      ]
     });
 
   } catch (error) {
-    console.error('❌ Debug error:', error);
-    res.status(500).json({ error: 'Debug error: ' + error.message });
+    console.error('❌ GET Test private message error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
   }
 });
 
-// Test: Create a sample private message
-app.post('/test-private-message', async (req, res) => {
+// POST endpoint to test private messages (for API testing)
+app.post('/test-private-messages', async (req, res) => {
   try {
     const { sender_username, receiver_username, content } = req.body;
     
-    console.log('🧪 Creating test private message:', { sender_username, receiver_username, content });
+    console.log('🧪 POST: Creating test private message:', { sender_username, receiver_username, content });
 
     if (!sender_username || !receiver_username || !content) {
       return res.status(400).json({ error: "Sender, receiver, and content are required" });
@@ -150,25 +150,25 @@ app.post('/test-private-message', async (req, res) => {
       .select();
 
     if (error) {
-      console.error('❌ Test private message failed:', error);
+      console.error('❌ POST Test private message failed:', error);
       return res.status(500).json({ 
         success: false, 
         error: error.message 
       });
     }
 
-    console.log('✅ Test private message saved:', data[0]);
+    console.log('✅ POST Test private message saved:', data[0]);
     
     // Broadcast via Socket.io
     io.emit('new-private-message', data[0]);
     res.json({ 
       success: true, 
-      message: 'Test private message saved successfully',
+      message: 'POST Test private message saved successfully',
       data: data[0]
     });
 
   } catch (error) {
-    console.error('❌ Test private message error:', error);
+    console.error('❌ POST Test private message error:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -176,7 +176,80 @@ app.post('/test-private-message', async (req, res) => {
   }
 });
 
-// FIXED: Enhanced private messages endpoint with better error handling
+// Enhanced debug endpoint with more details
+app.get('/debug-private-messages', async (req, res) => {
+  try {
+    console.log('🔍 Debugging private_messages table...');
+    
+    // Check table structure
+    const { data: tableInfo, error: tableError } = await supabase
+      .from('private_messages')
+      .select('*')
+      .limit(1);
+
+    if (tableError) {
+      console.error('❌ Table error:', tableError);
+      return res.status(500).json({ 
+        success: false,
+        error: 'Table error: ' + tableError.message,
+        details: 'The private_messages table might not exist or have RLS issues'
+      });
+    }
+
+    // Count total messages
+    const { count: totalCount, error: countError } = await supabase
+      .from('private_messages')
+      .select('*', { count: 'exact', head: true });
+
+    if (countError) {
+      console.error('❌ Count error:', countError);
+      return res.status(500).json({ 
+        success: false,
+        error: 'Count error: ' + countError.message 
+      });
+    }
+
+    // Get all messages (limit 10 for preview)
+    const { data: allMessages, error: messagesError } = await supabase
+      .from('private_messages')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (messagesError) {
+      console.error('❌ Messages error:', messagesError);
+      return res.status(500).json({ 
+        success: false,
+        error: 'Messages error: ' + messagesError.message 
+      });
+    }
+
+    res.json({
+      success: true,
+      tableExists: true,
+      totalMessages: totalCount || 0,
+      sampleMessages: allMessages || [],
+      message: totalCount === 0 ? 
+        'Table exists but has no messages. Use /test-private-messages to create test data.' : 
+        'Private messages table debug information',
+      testEndpoints: {
+        createTestMessageGET: 'GET /test-private-messages',
+        createTestMessagePOST: 'POST /test-private-messages',
+        getAllMessages: 'GET /private-messages?username=test_user1',
+        getConversations: 'GET /private-messages/conversations/test_user1'
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Debug error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Debug error: ' + error.message 
+    });
+  }
+});
+
+// FIXED: Enhanced private messages endpoint
 app.get('/private-messages', async (req, res) => {
   try {
     const { username } = req.query;
@@ -184,14 +257,17 @@ app.get('/private-messages', async (req, res) => {
     console.log('📨 Fetching private messages for username:', username);
 
     if (!username) {
-      return res.status(400).json({ error: "Username query parameter is required" });
+      return res.status(400).json({ 
+        error: "Username query parameter is required",
+        example: "/private-messages?username=test_user1" 
+      });
     }
 
-    // FIXED: Better query using ilike for case-insensitive matching
+    // Try exact match first, then case-insensitive
     const { data: messages, error } = await supabase
       .from('private_messages')
       .select('*')
-      .or(`sender_username.ilike.%${username}%,receiver_username.ilike.%${username}%`)
+      .or(`sender_username.eq.${username},receiver_username.eq.${username}`)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -201,7 +277,15 @@ app.get('/private-messages', async (req, res) => {
 
     console.log(`✅ Found ${messages?.length || 0} private messages for ${username}`);
     
-    res.json(messages || []);
+    if (messages.length === 0) {
+      return res.json({
+        messages: [],
+        info: 'No private messages found',
+        suggestion: 'Use GET /test-private-messages to create test data'
+      });
+    }
+    
+    res.json(messages);
   } catch (error) {
     console.error('❌ Error fetching private messages:', error);
     res.status(500).json({ error: 'Failed to fetch private messages: ' + error.message });
@@ -1276,9 +1360,9 @@ server.listen(port, () => {
   console.log(`🔌 Socket.io events: new-message, message-deleted, user-status-change`);
   console.log(`🤫 PRIVATE MESSAGING: ENABLED via Supabase`);
   console.log(`🔒 Private endpoints: /private-messages/*`);
-  console.log(`📨 NEW: GET /private-messages?username=USERNAME - Get all private messages for user`);
   console.log(`🔍 NEW: GET /debug-private-messages - Debug private messages table`);
-  console.log(`🧪 NEW: POST /test-private-message - Test private message creation`);
+  console.log(`🧪 NEW: GET /test-private-messages - Test private message creation (GET)`);
+  console.log(`🧪 NEW: POST /test-private-messages - Test private message creation (POST)`);
   console.log(`🧪 Test Supabase (GET): http://localhost:${port}/test-supabase`);
   console.log(`🧪 Test Message (POST): http://localhost:${port}/test-message`);
   console.log(`🔍 Debug ALL Commands: http://localhost:${port}/debug-all-commands`);
@@ -1289,7 +1373,7 @@ server.listen(port, () => {
     console.log(`🧪 Test Message: ${renderExternalUrl}/test-message`);
     console.log(`🔍 Debug ALL Commands: ${renderExternalUrl}/debug-all-commands`);
     console.log(`🔍 Debug Private Messages: ${renderExternalUrl}/debug-private-messages`);
-    console.log(`🧪 Test Private Message: ${renderExternalUrl}/test-private-message`);
+    console.log(`🧪 Test Private Message (GET): ${renderExternalUrl}/test-private-messages`);
   }
 });
 
