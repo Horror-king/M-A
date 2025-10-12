@@ -2488,7 +2488,7 @@
 @keyframes typingAnimation {
     0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
     40% { transform: scale(1); opacity: 1; }
-}
+    }
   </style>
 </head>
 <body>
@@ -2977,8 +2977,8 @@
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
-
-<script>
+  
+   <script>
      let isLogin = true;
 let users = JSON.parse(localStorage.getItem('users')) || {};
 let longPressTimer;
@@ -3032,6 +3032,12 @@ let privateChats = JSON.parse(localStorage.getItem('privateChats')) || {};
 let currentPrivateChatUser = null;
 let privateMessageTypingTimer;
 
+// ✅ ADDED: Track last sent messages to prevent duplicates
+let lastSentMessages = {
+    private: {},
+    main: {}
+};
+
 const elements = {
     usernameInput: document.getElementById('auth-username'),
     messageInput: document.getElementById('user-input'),
@@ -3055,6 +3061,9 @@ if (currentUsername && elements.usernameInput) {
 function initializePrivateMessaging() {
     loadPrivateUsers();
     setupPrivateMessageInputHandlers();
+    
+    // ADDED: Clear old tracking data
+    clearOldMessageTracking();
     
     // Listen for real-time private messages
     if (socket) {
@@ -3293,7 +3302,7 @@ function displayPrivateUserMessage(text, sender, timestamp, username) {
     }, 10);
 }
 
-// Send private message to user
+// MODIFIED: Send private message to user with duplicate prevention
 async function sendPrivateMessageToUser() {
     if (!currentPrivateChatUser) {
         showError('Please select a user to message');
@@ -3306,6 +3315,17 @@ async function sendPrivateMessageToUser() {
     if (!content) return;
     
     const currentUser = localStorage.getItem('currentUser');
+    
+    // ADDED: Check for duplicate message
+    const messageKey = `${currentUser}-${currentPrivateChatUser}-${content}`;
+    if (lastSentMessages.private[messageKey] && 
+        Date.now() - lastSentMessages.private[messageKey] < 3000) { // 3 second cooldown
+        console.log('Duplicate private message prevented');
+        return;
+    }
+    
+    // ADDED: Track this message
+    lastSentMessages.private[messageKey] = Date.now();
     
     try {
         // Send via HTTP or Socket.io
@@ -3353,15 +3373,27 @@ async function sendPrivateMessageToUser() {
     } catch (error) {
         console.error('Error sending private message:', error);
         showError('Failed to send message');
+        
+        // Remove from tracking on error
+        delete lastSentMessages.private[messageKey];
     }
 }
 
-// Handle new private message from Socket.io
+// MODIFIED: Handle new private message with duplicate check
 function handleNewPrivateMessage(message) {
     const currentUser = localStorage.getItem('currentUser');
     
     // Check if this message is relevant to current user
     if (message.sender_username === currentUser || message.receiver_username === currentUser) {
+        
+        // ADDED: Check for duplicate display
+        const messageKey = `display-${message.sender_username}-${message.receiver_username}-${message.content}`;
+        if (lastSentMessages.private[messageKey]) {
+            console.log('Duplicate private message display prevented');
+            return;
+        }
+        
+        lastSentMessages.private[messageKey] = Date.now();
         
         // If we're in the chat with this user, display the message
         if (currentPrivateChatUser && 
@@ -3635,8 +3667,37 @@ function showChatContainer() {
                 chatInput.style.display = 'flex';
             }
         }
+        
+        // ADDED: Adjust padding for private chat messages to prevent hiding
+        const privateChatMessages = document.getElementById('private-chat-messages');
+        if (privateChatMessages) {
+            privateChatMessages.style.paddingBottom = '120px';
+        }
     }
 }
+
+// ===== ADDED: Function to clear old message tracking data =====
+function clearOldMessageTracking() {
+    const now = Date.now();
+    const maxAge = 60000; // 1 minute
+    
+    // Clean private messages tracking
+    Object.keys(lastSentMessages.private).forEach(key => {
+        if (now - lastSentMessages.private[key] > maxAge) {
+            delete lastSentMessages.private[key];
+        }
+    });
+    
+    // Clean main chat messages tracking
+    Object.keys(lastSentMessages.main).forEach(key => {
+        if (now - lastSentMessages.main[key] > maxAge) {
+            delete lastSentMessages.main[key];
+        }
+    });
+}
+
+// Run cleanup every 30 seconds
+setInterval(clearOldMessageTracking, 30000);
 
 // ===== PROFILE MANAGEMENT FUNCTIONS =====
 function loadProfile() {
@@ -3936,6 +3997,7 @@ function initSocket() {
 
 // ===== FIXED: MESSAGE FUNCTIONS WITH CORRECT ORDER =====
 
+// MODIFIED: sendMessage function with duplicate prevention
 async function sendMessage() {
     if (isSending || isProcessingCommand) return;
     isSending = true;
@@ -3948,6 +4010,18 @@ async function sendMessage() {
         isSending = false;
         return showError('Please enter both username and message');
     }
+
+    // ADDED: Check for duplicate message in main chat
+    const messageKey = `main-${username}-${content}`;
+    if (lastSentMessages.main[messageKey] && 
+        Date.now() - lastSentMessages.main[messageKey] < 3000) {
+        console.log('Duplicate message prevented in main chat');
+        isSending = false;
+        return;
+    }
+    
+    // ADDED: Track this message
+    lastSentMessages.main[messageKey] = Date.now();
 
     // Bad word filtering
     const lowerContent = content.toLowerCase();
@@ -4027,6 +4101,9 @@ async function sendMessage() {
         
     } catch (error) {
         showError(error.message);
+        
+        // Remove from tracking on error
+        delete lastSentMessages.main[messageKey];
     } finally {
         setTimeout(() => {
             isSending = false;
