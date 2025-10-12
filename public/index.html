@@ -2404,7 +2404,10 @@
     .private-chat-container.active ~ .private-messages-header .search-container {
         display: none;
     }
-    
+    /* NEW: Hide entire private messages header when chat is active */
+.private-chat-container.active ~ .private-messages-header {
+    display: none !important;
+    }
     /* MOBILE: Adjust header for mobile when chat is active */
     .private-chat-container.active ~ .private-messages-header {
         padding: 5px 15px;
