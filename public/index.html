@@ -2044,7 +2044,7 @@
             background: rgba(255, 255, 255, 0.3);
         }
 
-// --- CUT 
+// --- CUT HERE ---
         /* MODIFIED: Private Messages Layout */
 .private-messages-layout {
     display: flex;
@@ -2079,8 +2079,8 @@
     display: none;
 }
 
-/* NEW: Hide entire private messages header when chat is active */
-.private-chat-container.active ~ .private-messages-header {
+/* FIXED: Hide private messages header when chat container is active */
+#private-messages.private-chat-active .private-messages-header {
     display: none !important;
 }
 
@@ -2389,8 +2389,8 @@
         height: 45px;
     }
     
-    /* MOBILE: Hide entire private messages header when chat is active */
-    .private-chat-container.active ~ .private-messages-header {
+    /* FIXED: Hide private messages header when chat container is active */
+    #private-messages.private-chat-active .private-messages-header {
         display: none !important;
     }
 }
@@ -2425,8 +2425,8 @@
         font-size: 12px;
     }
     
-    /* MOBILE: Hide entire private messages header when chat is active */
-    .private-chat-container.active ~ .private-messages-header {
+    /* FIXED: Hide private messages header when chat container is active */
+    #private-messages.private-chat-active .private-messages-header {
         display: none !important;
     }
 }
@@ -2978,8 +2978,8 @@
         </div>
     </div>
 
-     <script>
-         let isLogin = true;
+<script>
+     let isLogin = true;
 let users = JSON.parse(localStorage.getItem('users')) || {};
 let longPressTimer;
 let isLongPress = false;
@@ -3568,10 +3568,13 @@ function setupPrivateMessageTypingHandlers() {
 function showUsersPanel() {
     const usersPanel = document.getElementById('users-panel');
     const chatContainer = document.getElementById('private-chat-container');
+    const privateMessagesContainer = document.getElementById('private-messages');
     
-    if (usersPanel && chatContainer) {
+    if (usersPanel && chatContainer && privateMessagesContainer) {
         usersPanel.classList.remove('hidden');
         chatContainer.classList.remove('active');
+        // ADD THIS LINE: Remove class to show the header again
+        privateMessagesContainer.classList.remove('private-chat-active');
         
         // SHOW SEARCH CONTAINER AGAIN
         const searchContainer = document.querySelector('.search-container');
@@ -3613,14 +3616,17 @@ function showUsersPanel() {
     }
 }
 
-// Function to show chat container and hide users panel
+// MODIFIED: Function to show chat container and hide users panel
 function showChatContainer() {
     const usersPanel = document.getElementById('users-panel');
     const chatContainer = document.getElementById('private-chat-container');
+    const privateMessagesContainer = document.getElementById('private-messages');
     
-    if (usersPanel && chatContainer) {
+    if (usersPanel && chatContainer && privateMessagesContainer) {
         usersPanel.classList.add('hidden');
         chatContainer.classList.add('active');
+        // ADD THIS LINE: Add class to hide the header
+        privateMessagesContainer.classList.add('private-chat-active');
         
         // Show chat input if we have a user selected
         if (currentPrivateChatUser) {
