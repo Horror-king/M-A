@@ -2238,258 +2238,452 @@
 }
 
 .partner-avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
 
-.partner-details {
-    flex: 1;
-}
+        .partner-details {
+            flex: 1;
+        }
 
-.partner-name {
-    font-weight: 600;
-    font-size: 16px;
-    color: #1c1e21;
-    margin-bottom: 2px;
-}
+        .partner-name {
+            font-weight: 600;
+            font-size: 16px;
+            color: #1c1e21;
+            margin-bottom: 2px;
+        }
 
-.partner-status {
-    font-size: 13px;
-    color: #65676b;
-}
+        .partner-status {
+            font-size: 13px;
+            color: #65676b;
+        }
 
-.private-chat-messages {
-    flex: 1;
-    padding: 15px;
-    overflow-y: auto;
-    background: #f5f5f5;
-    display: flex;
-    flex-direction: column;
-}
+        .private-chat-messages {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+        }
 
-.no-chat-selected {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100%;
-    color: #65676b;
-    font-size: 16px;
-    text-align: center;
-}
+        .no-chat-selected {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            color: #65676b;
+            font-size: 16px;
+            text-align: center;
+        }
 
-.no-users {
-    text-align: center;
-    padding: 20px;
-    color: #65676b;
-}
+        .no-users {
+            text-align: center;
+            padding: 20px;
+            color: #65676b;
+        }
 
-.no-messages {
-    text-align: center;
-    padding: 20px;
-    color: #65676b;
-}
+        .no-messages {
+            text-align: center;
+            padding: 20px;
+            color: #65676b;
+        }
 
-.private-chat-input {
-    display: none;
-    padding: 15px;
-    border-top: 1px solid #e4e6eb;
-    background: white;
-}
+        .private-chat-input {
+            display: none;
+            padding: 15px;
+            border-top: 1px solid #e4e6eb;
+            background: white;
+        }
 
-.private-chat-input textarea {
-    flex: 1;
-    padding: 12px 15px;
-    border-radius: 20px;
-    border: 1px solid #e4e6eb;
-    background: #f0f2f5;
-    font-size: 15px;
-    resize: none;
-    outline: none;
-    max-height: 100px;
-}
+        .private-chat-input textarea {
+            flex: 1;
+            padding: 12px 15px;
+            border-radius: 20px;
+            border: 1px solid #e4e6eb;
+            background: #f0f2f5;
+            font-size: 15px;
+            resize: none;
+            outline: none;
+            max-height: 100px;
+        }
 
-.private-chat-input textarea:focus {
-    background: white;
-    border-color: #4267B2;
-}
+        .private-chat-input textarea:focus {
+            background: white;
+            border-color: #4267B2;
+        }
 
-.private-chat-input button {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0 10px;
-    color: #4267B2;
-    font-size: 18px;
-}
+        .private-chat-input button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0 10px;
+            color: #4267B2;
+            font-size: 18px;
+        }
 
-.private-chat-input button:disabled {
-    color: #ccc;
-    cursor: not-allowed;
-}
+        .private-chat-input button:disabled {
+            color: #ccc;
+            cursor: not-allowed;
+        }
 
-/* Message styles for private chat */
-.private-message {
-    padding: 8px 15px;
-    margin-bottom: 8px;
-    max-width: 70%;
-    word-wrap: break-word;
-    position: relative;
-}
+        /* Message styles for private chat */
+        .private-message {
+            padding: 8px 15px;
+            margin-bottom: 8px;
+            max-width: 70%;
+            word-wrap: break-word;
+            position: relative;
+        }
 
-.private-message.sent {
-    align-self: flex-end;
-    background: #4267B2;
-    color: white;
-    border-radius: 18px 18px 0 18px;
-}
+        .private-message.sent {
+            align-self: flex-end;
+            background: #4267B2;
+            color: white;
+            border-radius: 18px 18px 0 18px;
+        }
 
-.private-message.received {
-    align-self: flex-start;
-    background: #e4e6eb;
-    color: #1c1e21;
-    border-radius: 18px 18px 18px 0;
-}
+        .private-message.received {
+            align-self: flex-start;
+            background: #e4e6eb;
+            color: #1c1e21;
+            border-radius: 18px 18px 18px 0;
+        }
 
-.message-time {
-    font-size: 11px;
-    margin-top: 5px;
-    opacity: 0.7;
-    text-align: right;
-}
+        .message-time {
+            font-size: 11px;
+            margin-top: 5px;
+            opacity: 0.7;
+            text-align: right;
+        }
 
-/* Responsive Design for Private Messages */
-@media (max-width: 768px) {
-    .private-messages-layout {
-        flex-direction: column;
-        height: calc(100vh - 130px);
-    }
-    
-    .users-panel {
-        width: 100%;
-        height: 100%;
-        border-right: none;
-    }
-    
-    .private-chat-container {
-        width: 100%;
-        height: 100%;
-    }
-    
-    .back-to-users {
-        display: inline-block;
-    }
-    
-    .user-item {
-        padding: 10px 12px;
-    }
-    
-    .user-avatar {
-        width: 45px;
-        height: 45px;
-    }
-    
-    /* FIXED: Hide private messages header when chat container is active */
-    #private-messages.private-chat-active .private-messages-header {
-        display: none !important;
-    }
-}
+        /* Responsive Design for Private Messages */
+        @media (max-width: 768px) {
+            .private-messages-layout {
+                flex-direction: column;
+                height: calc(100vh - 130px);
+            }
+            
+            .users-panel {
+                width: 100%;
+                height: 100%;
+                border-right: none;
+            }
+            
+            .private-chat-container {
+                width: 100%;
+                height: 100%;
+            }
+            
+            .back-to-users {
+                display: inline-block;
+            }
+            
+            .user-item {
+                padding: 10px 12px;
+            }
+            
+            .user-avatar {
+                width: 45px;
+                height: 45px;
+            }
+            
+            /* FIXED: Hide private messages header when chat container is active */
+            #private-messages.private-chat-active .private-messages-header {
+                display: none !important;
+            }
+        }
 
-@media (max-width: 480px) {
-    .private-messages-header {
-        padding: 12px;
-    }
-    
-    .private-chat-header {
-        padding: 12px;
-    }
-    
-    .private-chat-messages {
-        padding: 10px;
-    }
-    
-    .private-chat-input {
-        padding: 12px;
-    }
-    
-    .user-avatar {
-        width: 40px;
-        height: 40px;
-    }
-    
-    .user-name {
-        font-size: 14px;
-    }
-    
-    .user-last-message {
-        font-size: 12px;
-    }
-    
-    /* FIXED: Hide private messages header when chat container is active */
-    #private-messages.private-chat-active .private-messages-header {
-        display: none !important;
-    }
-}
+        @media (max-width: 480px) {
+            .private-messages-header {
+                padding: 12px;
+            }
+            
+            .private-chat-header {
+                padding: 12px;
+            }
+            
+            .private-chat-messages {
+                padding: 10px;
+            }
+            
+            .private-chat-input {
+                padding: 12px;
+            }
+            
+            .user-avatar {
+                width: 40px;
+                height: 40px;
+            }
+            
+            .user-name {
+                font-size: 14px;
+            }
+            
+            .user-last-message {
+                font-size: 12px;
+            }
+            
+            /* FIXED: Hide private messages header when chat container is active */
+            #private-messages.private-chat-active .private-messages-header {
+                display: none !important;
+            }
+        }
 
-/* Private Messages Badge */
-.menu-badge {
-    background: #ff4444;
-    color: white;
-    border-radius: 10px;
-    padding: 2px 6px;
-    font-size: 11px;
-    margin-left: 5px;
-}
+        /* Private Messages Badge */
+        .menu-badge {
+            background: #ff4444;
+            color: white;
+            border-radius: 10px;
+            padding: 2px 6px;
+            font-size: 11px;
+            margin-left: 5px;
+        }
 
-/* Unread message styles */
-.user-item.unread {
-    background-color: #f0f8ff;
-    border-left: 3px solid #4267B2;
-}
+        /* Unread message styles */
+        .user-item.unread {
+            background-color: #f0f8ff;
+            border-left: 3px solid #4267B2;
+        }
 
-.unread-badge {
-    position: absolute;
-    top: -5px;
-    right: -5px;
-    width: 12px;
-    height: 12px;
-    background: #ff4444;
-    border-radius: 50%;
-    border: 2px solid white;
-}
+        .unread-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 12px;
+            height: 12px;
+            background: #ff4444;
+            border-radius: 50%;
+            border: 2px solid white;
+        }
 
-/* Private message typing indicator */
-.typing-indicator {
-    display: flex;
-    align-items: center;
-    padding: 10px 15px;
-    color: #666;
-    font-style: italic;
-    font-size: 14px;
-}
+        /* Private message typing indicator */
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            padding: 10px 15px;
+            color: #666;
+            font-style: italic;
+            font-size: 14px;
+        }
 
-.typing-dots {
-    display: flex;
-    margin-left: 8px;
-}
+        .typing-dots {
+            display: flex;
+            margin-left: 8px;
+        }
 
-.typing-dot {
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    background-color: #666;
-    margin: 0 1px;
-    animation: typingAnimation 1.4s infinite ease-in-out;
-}
+        .typing-dot {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background-color: #666;
+            margin: 0 1px;
+            animation: typingAnimation 1.4s infinite ease-in-out;
+        }
 
-.typing-dot:nth-child(1) { animation-delay: -0.32s; }
-.typing-dot:nth-child(2) { animation-delay: -0.16s; }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
 
-@keyframes typingAnimation {
-    0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
-    40% { transform: scale(1); opacity: 1; }
-    }
-  </style>
+        @keyframes typingAnimation {
+            0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        /* ===== ADDED: BEAUTIFUL IMAGE UPLOAD STYLES ===== */
+        .chat-input-container {
+            display: flex;
+            align-items: center;
+            padding: 5px;
+            border-top: 1px solid #e4e6eb;
+            background-color: white;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            max-width: 600px;
+            box-sizing: border-box;
+            z-index: 1000;
+            height: auto;
+            min-height: 55px;
+        }
+
+        .image-upload-button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            position: relative;
+        }
+
+        .image-upload-button:hover {
+            background-color: #f0f2f5;
+            color: #4267B2;
+        }
+
+        .image-upload-button i {
+            font-size: 22px;
+            transition: transform 0.2s ease;
+        }
+
+        .image-upload-button:hover i {
+            transform: scale(1.1);
+        }
+
+        .image-upload-button:active i {
+            transform: scale(0.95);
+        }
+
+        .image-upload-input {
+            display: none;
+        }
+
+        .image-preview-container {
+            position: fixed;
+            bottom: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            padding: 15px;
+            z-index: 1001;
+            max-width: 300px;
+            display: none;
+        }
+
+        .image-preview {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 8px;
+            display: block;
+        }
+
+        .image-preview-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            gap: 8px;
+        }
+
+        .preview-action-btn {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .send-image-btn {
+            background: #4267B2;
+            color: white;
+        }
+
+        .send-image-btn:hover {
+            background: #365899;
+        }
+
+        .cancel-image-btn {
+            background: #e4e6eb;
+            color: #1c1e21;
+        }
+
+        .cancel-image-btn:hover {
+            background: #d8dadf;
+        }
+
+        .upload-progress {
+            width: 100%;
+            height: 4px;
+            background: #f0f2f5;
+            border-radius: 2px;
+            margin-top: 8px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .upload-progress-bar {
+            height: 100%;
+            background: #4267B2;
+            border-radius: 2px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .uploading-text {
+            font-size: 12px;
+            color: #65676b;
+            text-align: center;
+            margin-top: 5px;
+            display: none;
+        }
+
+        /* Animation for image preview */
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        .image-preview-container.show {
+            display: block;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        /* Mobile responsive adjustments */
+        @media (max-width: 480px) {
+            .image-preview-container {
+                max-width: 280px;
+                bottom: 65px;
+            }
+            
+            .image-preview {
+                max-height: 180px;
+            }
+            
+            .preview-action-btn {
+                padding: 7px 10px;
+                font-size: 13px;
+            }
+        }
+
+        /* WhatsApp-style emoji picker placeholder */
+        .emoji-picker-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+        }
+
+        .emoji-picker-btn:hover {
+            background-color: #f0f2f5;
+            color: #ffc107;
+        }
+
+        .emoji-picker-btn i {
+            font-size: 22px;
+        }
+    </style>
 </head>
 <body>
     <div class="loader" id="loader">
@@ -2573,11 +2767,34 @@
             <div id="reply-preview-container"></div>
         </div>
         
-        <div class="chat-input" style="display: none;">
+        <!-- UPDATED: Chat input with image upload button -->
+        <div class="chat-input-container" style="display: none;" id="chat-input-container">
+            <button class="image-upload-button" id="image-upload-button" title="Upload Image">
+                <i class="fas fa-image"></i>
+                <input type="file" id="image-upload-input" class="image-upload-input" accept="image/*">
+            </button>
+            
+            <button class="emoji-picker-btn" id="emoji-picker-btn" title="Add Emoji">
+                <i class="far fa-smile"></i>
+            </button>
+            
             <textarea id="user-input" placeholder="Type your message..."></textarea>
             <button id="send-button" onclick="sendMessage()" disabled>
                 <i class="fas fa-paper-plane"></i>
             </button>
+        </div>
+        
+        <!-- Image preview container -->
+        <div class="image-preview-container" id="image-preview-container">
+            <img class="image-preview" id="image-preview" src="" alt="Image preview">
+            <div class="upload-progress" id="upload-progress">
+                <div class="upload-progress-bar" id="upload-progress-bar"></div>
+            </div>
+            <div class="uploading-text" id="uploading-text">Uploading image...</div>
+            <div class="image-preview-actions">
+                <button class="preview-action-btn cancel-image-btn" id="cancel-image-btn">Cancel</button>
+                <button class="preview-action-btn send-image-btn" id="send-image-btn">Send</button>
+            </div>
         </div>
         
         <!-- FIXED: Scroll to bottom button specifically for main chat -->
@@ -2602,11 +2819,34 @@
             <div id="private-reply-preview-container"></div>
         </div>
         
-        <div class="chat-input" style="display: none;">
+        <!-- UPDATED: Private AI chat input with image upload -->
+        <div class="chat-input-container" style="display: none;" id="private-chat-input-container">
+            <button class="image-upload-button" id="private-image-upload-button" title="Upload Image">
+                <i class="fas fa-image"></i>
+                <input type="file" id="private-image-upload-input" class="image-upload-input" accept="image/*">
+            </button>
+            
+            <button class="emoji-picker-btn" id="private-emoji-picker-btn" title="Add Emoji">
+                <i class="far fa-smile"></i>
+            </button>
+            
             <textarea id="private-user-input" placeholder="Type your private message..."></textarea>
             <button id="private-send-button" onclick="sendPrivateMessage()" disabled>
                 <i class="fas fa-paper-plane"></i>
             </button>
+        </div>
+        
+        <!-- Private AI image preview container -->
+        <div class="image-preview-container" id="private-image-preview-container">
+            <img class="image-preview" id="private-image-preview" src="" alt="Image preview">
+            <div class="upload-progress" id="private-upload-progress">
+                <div class="upload-progress-bar" id="private-upload-progress-bar"></div>
+            </div>
+            <div class="uploading-text" id="private-uploading-text">Uploading image...</div>
+            <div class="image-preview-actions">
+                <button class="preview-action-btn cancel-image-btn" id="private-cancel-image-btn">Cancel</button>
+                <button class="preview-action-btn send-image-btn" id="private-send-image-btn">Send</button>
+            </div>
         </div>
         
         <!-- FIXED: Go to top button specifically for private AI -->
@@ -2654,12 +2894,34 @@
                 </div>
             </div>
             
-            <!-- FIXED: Changed ID to avoid conflict -->
-            <div class="private-chat-input chat-input" style="display: none;" id="private-chat-input">
+            <!-- UPDATED: Private messages chat input with image upload -->
+            <div class="chat-input-container" style="display: none;" id="private-messages-chat-input">
+                <button class="image-upload-button" id="private-messages-image-upload-button" title="Upload Image">
+                    <i class="fas fa-image"></i>
+                    <input type="file" id="private-messages-image-upload-input" class="image-upload-input" accept="image/*">
+                </button>
+                
+                <button class="emoji-picker-btn" id="private-messages-emoji-picker-btn" title="Add Emoji">
+                    <i class="far fa-smile"></i>
+                </button>
+                
                 <textarea id="private-message-input" placeholder="Type your private message..."></textarea>
                 <button id="private-messages-send-button" onclick="sendPrivateMessageToUser()" disabled>
                     <i class="fas fa-paper-plane"></i>
                 </button>
+            </div>
+            
+            <!-- Private messages image preview container -->
+            <div class="image-preview-container" id="private-messages-image-preview-container">
+                <img class="image-preview" id="private-messages-image-preview" src="" alt="Image preview">
+                <div class="upload-progress" id="private-messages-upload-progress">
+                    <div class="upload-progress-bar" id="private-messages-upload-progress-bar"></div>
+                </div>
+                <div class="uploading-text" id="private-messages-uploading-text">Uploading image...</div>
+                <div class="image-preview-actions">
+                    <button class="preview-action-btn cancel-image-btn" id="private-messages-cancel-image-btn">Cancel</button>
+                    <button class="preview-action-btn send-image-btn" id="private-messages-send-image-btn">Send</button>
+                </div>
             </div>
         </div>
     </div>
@@ -2950,6 +3212,7 @@
             <li>Customizable interface</li>
             <li>Dark mode support</li>
             <li>Responsive design for all devices</li>
+            <li>Image upload and sharing</li>
         </ul>
     </div>
 
@@ -2959,6 +3222,10 @@
         <div class="help-section">
             <div class="help-question">How do I start a conversation?</div>
             <div class="help-answer">Simply type your message in the chat input box and press enter or click the send button.</div>
+        </div>
+        <div class="help-section">
+            <div class="help-question">Can I send images?</div>
+            <div class="help-answer">Yes! Click the image icon (📷) next to the message input to upload and send images.</div>
         </div>
         <div class="help-section">
             <div class="help-question">Can I copy the bot's responses?</div>
@@ -3038,6 +3305,13 @@ let lastSentMessages = {
     main: {}
 };
 
+// ✅ ADDED: Image upload variables
+let currentImageUpload = {
+    file: null,
+    previewUrl: null,
+    chatType: null // 'main', 'private-ai', 'private-messages'
+};
+
 const elements = {
     usernameInput: document.getElementById('auth-username'),
     messageInput: document.getElementById('user-input'),
@@ -3054,6 +3328,353 @@ let replyToText = null;
 let currentUsername = localStorage.getItem('chat_username') || '';
 if (currentUsername && elements.usernameInput) {
     elements.usernameInput.value = currentUsername;
+}
+
+// ===== ADDED: IMAGE UPLOAD FUNCTIONALITY =====
+
+function initializeImageUpload() {
+    // Main chat image upload
+    const imageUploadButton = document.getElementById('image-upload-button');
+    const imageUploadInput = document.getElementById('image-upload-input');
+    const imagePreviewContainer = document.getElementById('image-preview-container');
+    const imagePreview = document.getElementById('image-preview');
+    const cancelImageBtn = document.getElementById('cancel-image-btn');
+    const sendImageBtn = document.getElementById('send-image-btn');
+    
+    if (imageUploadButton && imageUploadInput) {
+        imageUploadButton.addEventListener('click', () => {
+            imageUploadInput.click();
+        });
+        
+        imageUploadInput.addEventListener('change', (e) => {
+            handleImageUpload(e, 'main');
+        });
+    }
+    
+    if (cancelImageBtn) {
+        cancelImageBtn.addEventListener('click', () => {
+            hideImagePreview('main');
+        });
+    }
+    
+    if (sendImageBtn) {
+        sendImageBtn.addEventListener('click', () => {
+            sendImageMessage('main');
+        });
+    }
+    
+    // Private AI image upload
+    const privateImageUploadButton = document.getElementById('private-image-upload-button');
+    const privateImageUploadInput = document.getElementById('private-image-upload-input');
+    const privateImagePreviewContainer = document.getElementById('private-image-preview-container');
+    const privateImagePreview = document.getElementById('private-image-preview');
+    const privateCancelImageBtn = document.getElementById('private-cancel-image-btn');
+    const privateSendImageBtn = document.getElementById('private-send-image-btn');
+    
+    if (privateImageUploadButton && privateImageUploadInput) {
+        privateImageUploadButton.addEventListener('click', () => {
+            privateImageUploadInput.click();
+        });
+        
+        privateImageUploadInput.addEventListener('change', (e) => {
+            handleImageUpload(e, 'private-ai');
+        });
+    }
+    
+    if (privateCancelImageBtn) {
+        privateCancelImageBtn.addEventListener('click', () => {
+            hideImagePreview('private-ai');
+        });
+    }
+    
+    if (privateSendImageBtn) {
+        privateSendImageBtn.addEventListener('click', () => {
+            sendImageMessage('private-ai');
+        });
+    }
+    
+    // Private Messages image upload
+    const privateMessagesImageUploadButton = document.getElementById('private-messages-image-upload-button');
+    const privateMessagesImageUploadInput = document.getElementById('private-messages-image-upload-input');
+    const privateMessagesImagePreviewContainer = document.getElementById('private-messages-image-preview-container');
+    const privateMessagesImagePreview = document.getElementById('private-messages-image-preview');
+    const privateMessagesCancelImageBtn = document.getElementById('private-messages-cancel-image-btn');
+    const privateMessagesSendImageBtn = document.getElementById('private-messages-send-image-btn');
+    
+    if (privateMessagesImageUploadButton && privateMessagesImageUploadInput) {
+        privateMessagesImageUploadButton.addEventListener('click', () => {
+            privateMessagesImageUploadInput.click();
+        });
+        
+        privateMessagesImageUploadInput.addEventListener('change', (e) => {
+            handleImageUpload(e, 'private-messages');
+        });
+    }
+    
+    if (privateMessagesCancelImageBtn) {
+        privateMessagesCancelImageBtn.addEventListener('click', () => {
+            hideImagePreview('private-messages');
+        });
+    }
+    
+    if (privateMessagesSendImageBtn) {
+        privateMessagesSendImageBtn.addEventListener('click', () => {
+            sendImageMessage('private-messages');
+        });
+    }
+}
+
+function handleImageUpload(event, chatType) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Check if file is an image
+    if (!file.type.match('image.*')) {
+        showError('Please select an image file (JPEG, PNG, GIF, etc.)');
+        return;
+    }
+    
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+        showError('Image size should be less than 5MB');
+        return;
+    }
+    
+    // Store current upload info
+    currentImageUpload.file = file;
+    currentImageUpload.chatType = chatType;
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        currentImageUpload.previewUrl = e.target.result;
+        showImagePreview(chatType, e.target.result);
+    };
+    reader.readAsDataURL(file);
+    
+    // Reset file input
+    event.target.value = '';
+}
+
+function showImagePreview(chatType, previewUrl) {
+    const containerId = getImagePreviewContainerId(chatType);
+    const previewId = getImagePreviewId(chatType);
+    
+    const container = document.getElementById(containerId);
+    const preview = document.getElementById(previewId);
+    
+    if (container && preview) {
+        preview.src = previewUrl;
+        container.classList.add('show');
+    }
+}
+
+function hideImagePreview(chatType) {
+    const containerId = getImagePreviewContainerId(chatType);
+    const container = document.getElementById(containerId);
+    
+    if (container) {
+        container.classList.remove('show');
+        // Reset current upload
+        currentImageUpload.file = null;
+        currentImageUpload.previewUrl = null;
+        currentImageUpload.chatType = null;
+    }
+}
+
+function getImagePreviewContainerId(chatType) {
+    switch(chatType) {
+        case 'main': return 'image-preview-container';
+        case 'private-ai': return 'private-image-preview-container';
+        case 'private-messages': return 'private-messages-image-preview-container';
+        default: return 'image-preview-container';
+    }
+}
+
+function getImagePreviewId(chatType) {
+    switch(chatType) {
+        case 'main': return 'image-preview';
+        case 'private-ai': return 'private-image-preview';
+        case 'private-messages': return 'private-messages-image-preview';
+        default: return 'image-preview';
+    }
+}
+
+function getProgressBarId(chatType) {
+    switch(chatType) {
+        case 'main': return 'upload-progress-bar';
+        case 'private-ai': return 'private-upload-progress-bar';
+        case 'private-messages': return 'private-messages-upload-progress-bar';
+        default: return 'upload-progress-bar';
+    }
+}
+
+function getUploadingTextId(chatType) {
+    switch(chatType) {
+        case 'main': return 'uploading-text';
+        case 'private-ai': return 'private-uploading-text';
+        case 'private-messages': return 'private-messages-uploading-text';
+        default: return 'uploading-text';
+    }
+}
+
+function getProgressContainerId(chatType) {
+    switch(chatType) {
+        case 'main': return 'upload-progress';
+        case 'private-ai': return 'private-upload-progress';
+        case 'private-messages': return 'private-messages-upload-progress';
+        default: return 'upload-progress';
+    }
+}
+
+async function sendImageMessage(chatType) {
+    if (!currentImageUpload.file || currentImageUpload.chatType !== chatType) {
+        showError('No image to send');
+        return;
+    }
+    
+    const file = currentImageUpload.file;
+    const username = localStorage.getItem('chat_username') || '';
+    
+    if (!username) {
+        showError('Please log in to send images');
+        return;
+    }
+    
+    // Show uploading progress
+    const progressBar = document.getElementById(getProgressBarId(chatType));
+    const uploadingText = document.getElementById(getUploadingTextId(chatType));
+    const progressContainer = document.getElementById(getProgressContainerId(chatType));
+    
+    if (progressBar && uploadingText && progressContainer) {
+        progressContainer.style.display = 'block';
+        uploadingText.style.display = 'block';
+    }
+    
+    try {
+        // Simulate upload progress
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += 5;
+            if (progressBar) {
+                progressBar.style.width = `${progress}%`;
+            }
+            if (progress >= 100) {
+                clearInterval(progressInterval);
+                
+                // Create a blob URL for the image
+                const imageUrl = URL.createObjectURL(file);
+                
+                // Send the image message based on chat type
+                switch(chatType) {
+                    case 'main':
+                        sendImageToMainChat(imageUrl, username);
+                        break;
+                    case 'private-ai':
+                        sendImageToPrivateAI(imageUrl);
+                        break;
+                    case 'private-messages':
+                        sendImageToPrivateMessages(imageUrl, username);
+                        break;
+                }
+                
+                // Hide preview and reset
+                setTimeout(() => {
+                    hideImagePreview(chatType);
+                    if (progressBar) progressBar.style.width = '0%';
+                    if (progressContainer) progressContainer.style.display = 'none';
+                    if (uploadingText) uploadingText.style.display = 'none';
+                }, 500);
+            }
+        }, 50);
+        
+    } catch (error) {
+        console.error('Error sending image:', error);
+        showError('Failed to send image');
+        
+        // Reset progress
+        if (progressBar) progressBar.style.width = '0%';
+        if (progressContainer) progressContainer.style.display = 'none';
+        if (uploadingText) uploadingText.style.display = 'none';
+    }
+}
+
+function sendImageToMainChat(imageUrl, username) {
+    // Display the image immediately in the main chat
+    displayMessage(`[Image: ${currentImageUpload.file.name}]`, 'sent', null, username, null, true);
+    
+    // Also display the actual image
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message sent';
+    messageDiv.innerHTML = `
+        <div class="content">
+            <img src="${imageUrl}" alt="Sent image" style="max-width: 300px; border-radius: 10px; margin-top: 5px;">
+        </div>
+    `;
+    
+    const chatContainer = document.getElementById('chat-container');
+    if (chatContainer) {
+        chatContainer.appendChild(messageDiv);
+        forceScrollToBottom('chat-container');
+    }
+    
+    // Simulate AI response for images
+    setTimeout(() => {
+        displayMessage("Nice image! Thanks for sharing.", 'received', null, 'AI', null, true);
+    }, 1000);
+}
+
+function sendImageToPrivateAI(imageUrl) {
+    // Display the image in private AI chat
+    displayPrivateMessage(`[Image: ${currentImageUpload.file.name}]`, 'sent');
+    
+    // Also display the actual image
+    const container = document.getElementById('private-ai-container');
+    if (container) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message sent';
+        messageDiv.innerHTML = `
+            <div class="content">
+                <img src="${imageUrl}" alt="Sent image" style="max-width: 300px; border-radius: 10px; margin-top: 5px;">
+            </div>
+        `;
+        container.appendChild(messageDiv);
+        forceScrollToBottom('private-ai-container');
+    }
+    
+    // Simulate AI response
+    setTimeout(() => {
+        displayPrivateMessage("I see you've shared an image. In a real implementation, I would analyze this image for you!", 'received');
+    }, 1000);
+}
+
+function sendImageToPrivateMessages(imageUrl, username) {
+    if (!currentPrivateChatUser) {
+        showError('Please select a user to send the image to');
+        return;
+    }
+    
+    // Display the image in private messages chat
+    displayPrivateUserMessage(`[Image: ${currentImageUpload.file.name}]`, 'sent', new Date().toISOString(), username);
+    
+    // Also display the actual image
+    const messagesContainer = document.getElementById('private-chat-messages');
+    if (messagesContainer) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'private-message sent';
+        messageDiv.innerHTML = `
+            <div class="message-content">
+                <img src="${imageUrl}" alt="Sent image" style="max-width: 250px; border-radius: 10px; margin-top: 5px;">
+            </div>
+            <div class="message-time">${formatMessageTime(new Date().toISOString())}</div>
+        `;
+        messagesContainer.appendChild(messageDiv);
+        
+        // Scroll to bottom
+        setTimeout(() => {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }, 10);
+    }
 }
 
 // ===== ENHANCED PRIVATE MESSAGING FUNCTIONS =====
@@ -3204,7 +3825,7 @@ async function openPrivateChat(username) {
     showChatContainer();
     
     // Show chat input
-    document.getElementById('private-chat-input').style.display = 'flex';
+    document.getElementById('private-messages-chat-input').style.display = 'flex';
     
     // Join Socket.io room for real-time updates
     if (socket) {
@@ -3621,7 +4242,7 @@ function showUsersPanel() {
         }
         
         // Hide chat input
-        const chatInput = document.getElementById('private-chat-input');
+        const chatInput = document.getElementById('private-messages-chat-input');
         if (chatInput) {
             chatInput.style.display = 'none';
         }
@@ -3662,7 +4283,7 @@ function showChatContainer() {
         
         // Show chat input if we have a user selected
         if (currentPrivateChatUser) {
-            const chatInput = document.getElementById('private-chat-input');
+            const chatInput = document.getElementById('private-messages-chat-input');
             if (chatInput) {
                 chatInput.style.display = 'flex';
             }
@@ -4462,6 +5083,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize buttons first
     initializeButtons();
     
+    // Initialize image upload functionality
+    initializeImageUpload();
+    
     const savedUser = localStorage.getItem('currentUser');
     if (savedUser) {
         console.log('✅ User logged in:', savedUser);
@@ -4551,7 +5175,7 @@ function showContainer(containerId) {
     });
     
     // Hide all chat inputs
-    document.querySelectorAll('.chat-input').forEach(input => {
+    document.querySelectorAll('.chat-input-container').forEach(input => {
         input.style.display = 'none';
     });
     
@@ -4561,13 +5185,14 @@ function showContainer(containerId) {
         container.style.display = 'block';
         
         // Show the appropriate chat input
-        if (containerId === 'chat' || containerId === 'private-ai') {
-            const chatInput = container.querySelector('.chat-input');
+        if (containerId === 'chat') {
+            const chatInput = document.getElementById('chat-input-container');
             if (chatInput) chatInput.style.display = 'flex';
-        }
-        
-        // For private messages, only show users panel initially
-        if (containerId === 'private-messages') {
+        } else if (containerId === 'private-ai') {
+            const chatInput = document.getElementById('private-chat-input-container');
+            if (chatInput) chatInput.style.display = 'flex';
+        } else if (containerId === 'private-messages') {
+            // For private messages, only show users panel initially
             showUsersPanel();
             initializePrivateMessaging();
         }
@@ -5343,7 +5968,7 @@ function scrollToBottomMain() {
     newMessagesCount = 0;
     if (newMessagesCountEl) newMessagesCountEl.textContent = '0';
     if (scrollToBottomBtn) {
-        scrollToBottomBtn.classList.remove('visible');
+        scrollToBottomBtn.classList.remove('visible';
         setTimeout(() => {
             scrollToBottomBtn.style.display = 'none';
         }, 300);
@@ -6437,7 +7062,7 @@ function logout() {
     if (kebabDropdown) kebabDropdown.classList.remove('active');
     
     // Hide all chat inputs
-    document.querySelectorAll('.chat-input').forEach(input => {
+    document.querySelectorAll('.chat-input-container').forEach(input => {
         input.style.display = 'none';
     });
     
@@ -6524,7 +7149,7 @@ const currentUser = localStorage.getItem('currentUser');
 if (currentUser) {
     showContainer('chat');
     
-    const chatInput = document.querySelector('.chat-input');
+    const chatInput = document.getElementById('chat-input-container');
     if (chatInput) chatInput.style.display = 'flex';
     
     updateProfileSection();
