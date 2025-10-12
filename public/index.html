@@ -3919,12 +3919,6 @@ function initSocket() {
         renderMessages(messages);
     });
 
-    // Listen for new private AI messages
-    socket.on('new-private-message', (message) => {
-        console.log('🤫 Private message received:', message);
-        displayPrivateMessage(message.content, 'received', null, 'Private AI');
-    });
-
     // User status updates
     socket.on('user-status-change', (data) => {
         console.log('👤 User status change:', data);
