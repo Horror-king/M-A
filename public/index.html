@@ -1562,6 +1562,24 @@
                 width: 36px;
                 height: 36px;
             }
+
+            /* Nano AI Upload Button Styles */
+.chat-input button[title="Upload Image for Nano AI Editing"] {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0 10px;
+    color: #666;
+    transition: color 0.3s;
+}
+
+.chat-input button[title="Upload Image for Nano AI Editing"]:hover {
+    color: #4267B2;
+}
+
+.chat-input button[title="Upload Image for Nano AI Editing"] i {
+    font-size: 20px;
+}
             
             /* FIXED: Increased padding for mobile to ensure messages are visible */
             .chat-messages, #private-ai-container {
@@ -2577,9 +2595,7 @@
             <textarea id="user-input" placeholder="Type your message..."></textarea>
             <button id="send-button" onclick="sendMessage()" disabled>
                 <i class="fas fa-paper-plane"></i>
-                <input type="file" id="nano-image-upload" accept="image/*" style="display: none;" onchange="handleNanoImageUpload(event)">
-<button onclick="document.getElementById('nano-image-upload').click()">📷 Upload Image for Nano Edit</button>
-            </button>
+                 </button>
         </div>
         
         <!-- FIXED: Scroll to bottom button specifically for main chat -->
@@ -2605,10 +2621,14 @@
         </div>
         
         <div class="chat-input" style="display: none;">
-            <textarea id="private-user-input" placeholder="Type your private message..."></textarea>
-            <button id="private-send-button" onclick="sendPrivateMessage()" disabled>
-                <i class="fas fa-paper-plane"></i>
-            </button>
+    <textarea id="private-user-input" placeholder="Type your private message..."></textarea>
+    <button id="private-send-button" onclick="sendPrivateMessage()" disabled>
+        <i class="fas fa-paper-plane"></i>
+    </button>
+    <input type="file" id="private-nano-image-upload" accept="image/*" style="display: none;" onchange="handleNanoImageUpload(event, 'private-ai')">
+    <button onclick="document.getElementById('private-nano-image-upload').click()" title="Upload Image for Nano AI Editing">
+        <i class="fas fa-image"></i>
+    </button>
         </div>
         
         <!-- FIXED: Go to top button specifically for private AI -->
