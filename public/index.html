@@ -2044,6 +2044,7 @@
             background: rgba(255, 255, 255, 0.3);
         }
 
+// --- CUT 
         /* MODIFIED: Private Messages Layout */
 .private-messages-layout {
     display: flex;
@@ -2078,21 +2079,9 @@
     display: none;
 }
 
-/* NEW: Hide search container when chat is active */
-.private-chat-container.active ~ .private-messages-header .search-container {
-    display: none;
-}
-
-/* NEW: Adjust header when chat is active to take less space */
+/* NEW: Hide entire private messages header when chat is active */
 .private-chat-container.active ~ .private-messages-header {
-    padding: 8px 15px;
-    min-height: auto;
-}
-
-/* NEW: Keep only the title visible when chat is active */
-.private-chat-container.active ~ .private-messages-header h3 {
-    margin: 0;
-    font-size: 16px;
+    display: none !important;
 }
 
 /* Back button for mobile */
@@ -2400,18 +2389,9 @@
         height: 45px;
     }
     
-    /* MOBILE: Hide search container when chat is active */
-    .private-chat-container.active ~ .private-messages-header .search-container {
-        display: none;
-    }
-    /* NEW: Hide entire private messages header when chat is active */
-.private-chat-container.active ~ .private-messages-header {
-    display: none !important;
-    }
-    /* MOBILE: Adjust header for mobile when chat is active */
+    /* MOBILE: Hide entire private messages header when chat is active */
     .private-chat-container.active ~ .private-messages-header {
-        padding: 5px 15px;
-        min-height: 40px;
+        display: none !important;
     }
 }
 
@@ -2445,14 +2425,9 @@
         font-size: 12px;
     }
     
-    /* MOBILE: Further adjust header for small screens */
+    /* MOBILE: Hide entire private messages header when chat is active */
     .private-chat-container.active ~ .private-messages-header {
-        padding: 4px 12px;
-        min-height: 35px;
-    }
-    
-    .private-chat-container.active ~ .private-messages-header h3 {
-        font-size: 14px;
+        display: none !important;
     }
 }
 
