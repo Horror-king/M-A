@@ -13,7 +13,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
-<style>
+     <style>
     /* COMPLETELY FIXED: Secret Code Container */
     .secret-code-container {
         padding: 20px;
@@ -709,7 +709,7 @@
     /* FIXED: Chat messages container with proper scrolling and padding */
     .chat-messages, #private-ai-container {
         flex: 1;
-        padding: 3px 12px !important; /* REDUCED PADDING */
+        padding: 5px 15px;
         overflow-y: auto;
         height: 100%;
         display: flex;
@@ -722,12 +722,12 @@
         -webkit-overflow-scrolling: touch;
         overscroll-behavior: contain;
         touch-action: auto;
-        gap: 1px !important; /* REDUCED GAP */
+        gap: 2px;
         box-sizing: border-box;
         /* FIXED: Much larger bottom padding to ensure messages are visible above input */
-        padding-bottom: 120px !important; /* REDUCED from 125px */
+        padding-bottom: 125px; /* Increased significantly from 120px */
         /* FIXED: Add margin at the bottom to create space for the input */
-        margin-bottom: 60px !important; /* REDUCED from 65px */
+        margin-bottom: 65px;
     }
      /* FIXED: Ensure the chat container itself has proper spacing */
     .chat-container {
@@ -754,12 +754,12 @@
         padding-bottom: 45px;
     }
             
-    /* FIXED: Improved message styling with reduced padding and transparent background */
+    /* Improved message styling with better avatar alignment */
     .message {
-        padding: 3px 6px !important; /* REDUCED PADDING */
-        border-radius: 16px !important; /* SMALLER RADIUS */
-        margin-bottom: 1px !important; /* REDUCED MARGIN */
-        max-width: 90% !important; /* SLIGHTLY WIDER */
+        padding: 6px 10px;
+        border-radius: 18px;
+        margin-bottom: 2px;
+        max-width: 85%;
         word-wrap: break-word;
         overflow-wrap: break-word;
         word-break: break-word;
@@ -767,7 +767,7 @@
         position: relative;
         display: flex;
         align-items: flex-start;
-        gap: 4px !important; /* REDUCED GAP */
+        gap: 6px;
         touch-action: none;
         -webkit-user-select: none;
         -ms-user-select: none;
@@ -776,26 +776,23 @@
         box-sizing: border-box;
     }
 
-    /* FIXED: Content area with transparent background for bot messages */
     .content {
         user-select: none;
         flex-grow: 1;
-        padding: 6px 10px !important; /* REDUCED PADDING */
-        border-radius: 12px !important; /* SMALLER RADIUS */
+        padding: 8px 12px;
+        border-radius: 14px;
         position: relative;
         overflow: hidden;
-        background-color: transparent !important; /* REMOVED PLAIN BACKGROUND */
-        box-shadow: none !important; /* REMOVED SHADOW */
+        background-color: #f2f3f5;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
         max-width: 100%;
         overflow-wrap: break-word;
         word-break: break-word;
         box-sizing: border-box;
-        border: 1px solid #e0e0e0 !important; /* ADDED BORDER INSTEAD OF BACKGROUND */
     }
 
     .message.sent .content {
-        background-color: #dcf8c6 !important; /* KEEP GREEN BACKGROUND FOR USER */
-        border: none !important; /* NO BORDER FOR USER MESSAGES */
+        background-color: #dcf8c6;
     }
 
     .reply-preview {
@@ -810,24 +807,24 @@
         white-space: pre-wrap;
     }
 
-    /* FIXED: Improved avatar styling */
+    /* Improved avatar styling */
    .message .avatar {
-       width: 24px !important; /* REDUCED from 26px */
-       height: 24px !important; /* REDUCED from 26px */
+       width: 26px; /* Changed from 28px */
+       height: 26px; /* Changed from 28px */
        border-radius: 50%;
        flex-shrink: 0;
        background-size: cover;
        background-position: center;
        background-repeat: no-repeat;
        align-self: flex-start;
-       margin-top: 4px !important; /* REDUCED from 6px */
+       margin-top: 6px; /* Changed from 10px */
        cursor: pointer; /* ADDED: Make avatar clickable */
     }
 
     .message.sent .avatar {
 display: block;
 order: 2;
-margin-top: 4px !important; /* REDUCED from 6px */
+margin-top: 6px; /* Changed from 10px */
 }
     .message .avatar img {
         width: 100%;
@@ -836,16 +833,16 @@ margin-top: 4px !important; /* REDUCED from 6px */
         display: block;
     }
 
-    /* FIXED: Improved username with status indicator */
+    /* Improved username with status indicator */
     .message .username {
-        font-size: 0.65rem !important; /* SLIGHTLY SMALLER */
+        font-size: 0.68rem;
         font-weight: bold;
-        color: #666 !important; /* LIGHTER COLOR */
-        margin-bottom: 1px !important; /* REDUCED MARGIN */
+        color: #777;
+        margin-bottom: 2px;
         line-height: 1;
         display: flex;
         align-items: center;
-        gap: 4px !important; /* REDUCED GAP */
+        gap: 5px;
         cursor: pointer; /* ADDED: Make username clickable */
     }
 
@@ -877,16 +874,16 @@ margin-top: 4px !important; /* REDUCED from 6px */
         min-width: 0; /* Prevent flex overflow */
     }
 
-    /* FIXED: Received messages (left aligned) */
+    /* Received messages (left aligned) */
     .message.received {
 align-self: flex-start;
-margin-left: -6px !important; /* REDUCED from -10px */
+margin-left: -10px; /* Changed from -15px */
 flex-direction: row;
 }
-    /* FIXED: Sent messages (right aligned) - HIDE AVATAR FOR SENT MESSAGES */
+    /* Sent messages (right aligned) - HIDE AVATAR FOR SENT MESSAGES */
     .message.sent {
 align-self: flex-end;
-margin-right: -6px !important; /* REDUCED from -10px */
+margin-right: -10px; /* Changed from -15px */
 flex-direction: row;
 justify-content: flex-end;
 }
@@ -906,8 +903,7 @@ order: 1;
     }
 
     .message.received .content {
-        background-color: transparent !important; /* COMPLETELY TRANSPARENT */
-        border: 1px solid #e0e0e0 !important; /* SUBTLE BORDER */
+        background-color: #f0f0f0;
     }
 
     .message-context-menu {
@@ -1586,7 +1582,7 @@ margin-right: 10px;
         background: #a8a8a8;
     }
 
-    /* FIXED: Mobile responsive adjustments with reduced padding */
+    /* Responsive adjustments for mobile */
     @media (max-width: 480px) {
         .online-users-panel {
             padding: 10px 12px;
@@ -1639,8 +1635,8 @@ margin-right: 10px;
         }
         
         .message .avatar {
-            width: 22px !important; /* FURTHER REDUCED for mobile */
-            height: 22px !important; /* FURTHER REDUCED for mobile */
+            width: 24px;
+            height: 24px;
         }
         
         .profile-panel {
@@ -1652,11 +1648,10 @@ margin-right: 10px;
             height: 36px;
         }
         
-        /* FIXED: Reduced padding for mobile */
+        /* FIXED: Increased padding for mobile to ensure messages are visible */
         .chat-messages, #private-ai-container {
-            padding: 2px 8px !important; /* FURTHER REDUCED for mobile */
-            padding-bottom: 110px !important; /* REDUCED for mobile */
-            margin-bottom: 55px !important; /* REDUCED for mobile */
+            padding-bottom: 125px; /* Even more padding for mobile */
+            margin-bottom: 63px; /* More margin for mobile */
         }
         
         /* FIXED: Adjust container padding for mobile */
@@ -1676,17 +1671,6 @@ margin-right: 10px;
         
         .help-answer {
             margin-left: 10px;
-        }
-        
-        /* FIXED: Additional mobile message adjustments */
-        .message {
-            padding: 2px 4px !important; /* FURTHER REDUCED for mobile */
-            margin-bottom: 1px !important;
-            max-width: 92% !important; /* WIDER on mobile */
-        }
-        
-        .content {
-            padding: 5px 8px !important; /* FURTHER REDUCED for mobile */
         }
     }
 
@@ -2458,30 +2442,27 @@ margin-right: 10px;
         cursor: not-allowed;
     }
 
-    /* FIXED: Message styles for private chat with reduced padding */
+    /* Message styles for private chat */
     .private-message {
-        padding: 6px 12px !important; /* REDUCED PADDING */
-        margin-bottom: 6px !important; /* REDUCED SPACING */
-        max-width: 75% !important; /* SLIGHTLY NARROWER */
+        padding: 8px 15px;
+        margin-bottom: 8px;
+        max-width: 70%;
         word-wrap: break-word;
         position: relative;
-        border: none !important; /* REMOVE BORDERS IF ANY */
-        background: transparent !important; /* ENSURE TRANSPARENCY */
     }
 
     .private-message.sent {
         align-self: flex-end;
-        background: #4267B2 !important; /* KEEP BLUE FOR SENT */
+        background: #4267B2;
         color: white;
-        border-radius: 16px 16px 0 16px !important; /* SMALLER RADIUS */
+        border-radius: 18px 18px 0 18px;
     }
 
     .private-message.received {
         align-self: flex-start;
-        background: transparent !important; /* TRANSPARENT FOR RECEIVED */
+        background: #e4e6eb;
         color: #1c1e21;
-        border-radius: 16px 16px 16px 0 !important; /* SMALLER RADIUS */
-        border: 1px solid #e4e6eb !important; /* SUBTLE BORDER */
+        border-radius: 18px 18px 18px 0;
     }
 
     .message-time {
@@ -2621,21 +2602,6 @@ margin-right: 10px;
     @keyframes typingAnimation {
         0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
         40% { transform: scale(1); opacity: 1; }
-    }
-
-    /* FIXED: Remove any message wrappers that add background */
-    .message-wrapper {
-        background: transparent !important;
-    }
-
-    .chat-bubble {
-        background: transparent !important;
-    }
-
-    /* FIXED: Ensure images don't have backgrounds */
-    .message img {
-        background: transparent !important;
-        border: none !important;
     }
 </style>
 </head>
