@@ -1416,7 +1416,7 @@ margin-right: 10px;
         }
     }
 
-    /* FIXED: INTEGRATED ONLINE USERS PANEL - NOW PART OF CHAT CONTAINER */
+    /* MODIFIED: INTEGRATED ONLINE USERS PANEL - NOW PART OF CHAT CONTAINER WITH TOGGLE */
     .online-users-panel {
         background: white;
         border-radius: 0;
@@ -1427,6 +1427,64 @@ margin-right: 10px;
         border-bottom: 1px solid #e4e6eb;
         flex-shrink: 0; /* Prevent shrinking */
         height: auto; /* Let it take the space it needs */
+        transition: height 0.3s ease;
+    }
+
+    /* ADDED: Online Users Header with Toggle */
+    .online-users-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+
+    .online-users-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0;
+        font-size: 16px;
+        color: #1c1e21;
+    }
+
+    .toggle-online-panel {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 6px;
+        border-radius: 50%;
+        transition: background-color 0.2s;
+        color: #65676b;
+    }
+
+    .toggle-online-panel:hover {
+        background-color: #f0f2f5;
+    }
+
+    .toggle-online-panel i {
+        font-size: 16px;
+        transition: transform 0.2s;
+    }
+
+    .toggle-online-panel.collapsed i {
+        transform: rotate(180deg);
+    }
+
+    .online-count-badge {
+        background: #4CAF50;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 10px;
+        font-size: 11px;
+    }
+
+    .online-users-panel.collapsed {
+        height: 50px; /* Only show header when collapsed */
+        overflow: hidden;
+    }
+
+    .online-users-panel.collapsed .online-users-list {
+        display: none;
     }
 
     .online-users-list {
@@ -1529,6 +1587,26 @@ margin-right: 10px;
         .online-users-panel {
             padding: 10px 12px;
             margin: 0;
+        }
+        
+        .online-users-header {
+            margin-bottom: 8px;
+        }
+        
+        .online-users-title {
+            font-size: 14px;
+        }
+        
+        .toggle-online-panel {
+            padding: 4px;
+        }
+        
+        .toggle-online-panel i {
+            font-size: 14px;
+        }
+        
+        .online-users-panel.collapsed {
+            height: 40px; /* Smaller height on mobile when collapsed */
         }
         
         .online-users-list {
@@ -2594,13 +2672,18 @@ margin-right: 10px;
         <a href="#" onclick="logout()" style="color: #ff4444;">Logout</a>
     </div>
 
-    <!-- FIXED: Moved online users panel INSIDE the main chat interface -->
+    <!-- MODIFIED: Chat container with collapsible online users panel -->
     <div id="chat" class="main-chat-interface container" style="display: none;">
-        <div class="online-users-panel">
-            <h3 style="margin: 0 0 12px 0; font-size: 16px; color: #1c1e21; display: flex; align-items: center; gap: 8px;">
-                Online Users 
-                <span id="online-count" style="background: #4CAF50; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px;">0</span>
-            </h3>
+        <div class="online-users-panel" id="online-users-panel">
+            <div class="online-users-header">
+                <h3 class="online-users-title">
+                    Online Users 
+                    <span id="online-count" class="online-count-badge">0</span>
+                </h3>
+                <button id="toggle-online-panel" class="toggle-online-panel" title="Toggle Online Users Panel">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
             <div id="online-users-list" class="online-users-list"></div>
         </div>
         
@@ -2623,13 +2706,18 @@ margin-right: 10px;
         </div>
     </div>
 
-    <!-- MODIFIED: Added online users panel to private AI container -->
+    <!-- MODIFIED: Private AI container with collapsible online users panel -->
     <div id="private-ai" class="main-chat-interface container" style="display: none;">
-        <div class="online-users-panel">
-            <h3 style="margin: 0 0 12px 0; font-size: 16px; color: #1c1e21; display: flex; align-items: center; gap: 8px;">
-                Online Users 
-                <span id="private-online-count" style="background: #4CAF50; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px;">0</span>
-            </h3>
+        <div class="online-users-panel" id="private-online-users-panel">
+            <div class="online-users-header">
+                <h3 class="online-users-title">
+                    Online Users 
+                    <span id="private-online-count" class="online-count-badge">0</span>
+                </h3>
+                <button id="toggle-private-online-panel" class="toggle-online-panel" title="Toggle Online Users Panel">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
             <div id="private-online-users-list" class="online-users-list"></div>
         </div>
         
@@ -3027,6 +3115,7 @@ margin-right: 10px;
     </div>
   
    <script>
+// --- CUT HERE ---
      let isLogin = true;
 let users = JSON.parse(localStorage.getItem('users')) || {};
 let longPressTimer;
@@ -3086,6 +3175,9 @@ let lastSentMessages = {
     main: {}
 };
 
+// ✅ ADDED: User Panel Visibility State
+let userPanelVisible = true;
+
 const elements = {
     usernameInput: document.getElementById('auth-username'),
     messageInput: document.getElementById('user-input'),
@@ -3102,6 +3194,63 @@ let replyToText = null;
 let currentUsername = localStorage.getItem('chat_username') || '';
 if (currentUsername && elements.usernameInput) {
     elements.usernameInput.value = currentUsername;
+}
+
+// ===== ADDED: USER PANEL VISIBILITY FUNCTIONS =====
+function toggleUserPanel() {
+    userPanelVisible = !userPanelVisible;
+    updateUserPanelVisibility();
+    saveUserPanelPreference();
+}
+
+function updateUserPanelVisibility() {
+    const onlineUsersPanels = document.querySelectorAll('.online-users-panel');
+    const chatContainers = document.querySelectorAll('.chat-container');
+    
+    onlineUsersPanels.forEach(panel => {
+        if (userPanelVisible) {
+            panel.style.display = 'block';
+        } else {
+            panel.style.display = 'none';
+        }
+    });
+    
+    // Adjust chat container height when panel is hidden
+    chatContainers.forEach(container => {
+        if (userPanelVisible) {
+            container.style.height = 'calc(100% - 80px)'; // Default height with panel
+        } else {
+            container.style.height = '100%'; // Full height when panel hidden
+        }
+    });
+    
+    // Update the toggle button in kebab menu
+    updateUserPanelToggleButton();
+}
+
+function saveUserPanelPreference() {
+    localStorage.setItem('userPanelVisible', userPanelVisible.toString());
+}
+
+function loadUserPanelPreference() {
+    const savedPreference = localStorage.getItem('userPanelVisible');
+    if (savedPreference !== null) {
+        userPanelVisible = savedPreference === 'true';
+    } else {
+        userPanelVisible = true; // Default to visible
+    }
+    updateUserPanelVisibility();
+}
+
+function updateUserPanelToggleButton() {
+    const toggleButton = document.querySelector('.kebab-dropdown a[onclick="toggleUserPanel()"]');
+    if (toggleButton) {
+        if (userPanelVisible) {
+            toggleButton.innerHTML = '<i class="fas fa-eye-slash"></i> Hide User Panel';
+        } else {
+            toggleButton.innerHTML = '<i class="fas fa-eye"></i> Show User Panel';
+        }
+    }
 }
 
 // ===== ENHANCED PRIVATE MESSAGING FUNCTIONS =====
@@ -4509,6 +4658,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Initialize buttons first
     initializeButtons();
+    
+    // Load user panel preference
+    loadUserPanelPreference();
     
     const savedUser = localStorage.getItem('currentUser');
     if (savedUser) {
