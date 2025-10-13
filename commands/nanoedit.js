@@ -64,37 +64,34 @@ module.exports = {
       
       console.log("📥 API Response:", JSON.stringify(response.data, null, 2));
 
-      // FIXED: Handle different possible response structures
-      let resultUrl;
-      
-      if (response.data && response.data.imageUrl) {
-        // Case 1: Direct imageUrl in response
-        resultUrl = response.data.imageUrl;
-      } else if (response.data && response.data.data && response.data.data.imageUrl) {
-        // Case 2: Nested imageUrl in data object
-        resultUrl = response.data.data.imageUrl;
-      } else if (response.data && response.data.success && response.data.data) {
-        // Case 3: Image URL might be in data field directly
-        resultUrl = response.data.data;
-      } else if (response.data && typeof response.data === 'string' && response.data.startsWith('http')) {
-        // Case 4: Response is directly the image URL
-        resultUrl = response.data;
-      } else {
-        throw new Error("Invalid API response - no image URL found");
+      // The API response structure is clear: {"success":true,"imageUrl":"..."}
+      if (!response.data || !response.data.success || !response.data.imageUrl) {
+        throw new Error("Invalid API response or missing imageUrl");
       }
 
+      const resultUrl = response.data.imageUrl;
       console.log("🖼️ Result Image URL:", resultUrl);
 
-      // Download the image
+      // Download the image with proper headers to avoid blocking
       const imageResponse = await axios.get(resultUrl, { 
-        responseType: "arraybuffer", 
-        timeout: 60000 
+        responseType: "arraybuffer",
+        timeout: 60000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Referer': 'https://tawsif.is-a.dev/'
+        }
       });
       
+      if (!imageResponse.data || imageResponse.data.length === 0) {
+        throw new Error("Downloaded image data is empty");
+      }
+
       const outputPath = tmpFile("nanoedit");
       await fsp.writeFile(outputPath, imageResponse.data);
 
-      // Verify the file was created
+      // Verify the file was created and has content
       const stats = await fsp.stat(outputPath);
       if (stats.size === 0) {
         throw new Error("Downloaded image file is empty");
@@ -102,7 +99,9 @@ module.exports = {
 
       console.log("✅ Image saved to:", outputPath, "Size:", stats.size, "bytes");
 
-      // Send the image
+      // Send the image - MAKE SURE we're using the correct path
+      console.log("📤 Sending image attachment from:", outputPath);
+      
       await api.sendMessage(
         {
           body: `✅ Image edited successfully!\n🖼️ Prompt: ${promptRaw}`,
@@ -112,12 +111,17 @@ module.exports = {
         event.messageID
       );
 
+      console.log("✅ Image sent successfully!");
+
       // Clean up temporary file after sending
-      setTimeout(() => {
-        fsp.unlink(outputPath).catch(err => {
-          console.error("❌ Error deleting temp file:", err.message);
-        });
-      }, 10000);
+      setTimeout(async () => {
+        try {
+          await fsp.unlink(outputPath);
+          console.log("🧹 Temporary file cleaned up:", outputPath);
+        } catch (cleanupError) {
+          console.error("❌ Error deleting temp file:", cleanupError.message);
+        }
+      }, 5000);
 
     } catch (error) {
       console.error("❌ nanoedit error:", error);
