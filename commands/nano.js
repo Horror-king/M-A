@@ -4,12 +4,10 @@ const fsp = fs.promises;
 const path = require("path");
 const os = require("os");
 
-// --- Configuration ---
 const API_BASE_URL = "https://tawsif.is-a.dev/gemini/nano-banana";
-const COMMAND_NAME = "nano";
 
-// Helper: create a unique temp filepath
-function tmpFile(name = "img") {
+// helper: temporary file path
+function tmpFile(name = "nano") {
   const id = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   return path.join(os.tmpdir(), `${name}_${id}.jpg`);
 }
@@ -17,128 +15,82 @@ function tmpFile(name = "img") {
 module.exports = {
   config: {
     name: "nano",
-    version: "1.1",
+    version: "1.2",
     author: "Hassan",
     countDown: 10,
     role: 0,
-    shortDescription: { en: "Generate or edit images using Nano Banana AI." },
-    longDescription: { 
-      en: "Generate a new image from a text prompt, or reply to an image with a prompt to edit it using the Nano Banana AI API.\n\nUsage:\n!nano <prompt> - Generate an image\nReply to an image with !nano <prompt> - Edit the image" 
+    shortDescription: { en: "Generate or edit images with Nano Banana AI" },
+    longDescription: {
+      en: "Use Nano Banana AI to create or edit images.\n\nUsage:\n!nano <prompt> — Generate an image\n!nano <image-link> | <prompt> — Edit by entering image link manually\nOr reply to an image with !nano <prompt>"
     },
     category: "image",
-    guide: { 
-      en: 
-        `To generate an image: {pn} <prompt>\n` +
-        `Example: {pn} a photorealistic astronaut riding a horse on Mars\n\n` +
-        `To edit an image: Reply to an image with {pn} <prompt>\n` +
-        `Example: Reply to a photo with {pn} turn her shirt blue and add neon lights`
+    guide: {
+      en: `Examples:\n!nano a cat wearing glasses\n!nano https://example.com/photo.jpg | make the sky pink\n(Or reply to an image with !nano add rainbow background)`
     }
   },
 
   onStart: async function ({ api, event, args }) {
     try {
-      const prompt = args.join(" ").trim();
-      
-      if (!prompt) {
+      if (!args.length) {
         return api.sendMessage(
-          `❌ Please provide a prompt to generate or edit an image.\n\n` +
-          `Usage:\n` +
-          `!nano <prompt> - Generate an image\n` +
-          `Reply to an image with !nano <prompt> - Edit the image`,
+          "❌ Usage:\n!nano <prompt>\n!nano <image-link> | <prompt>\nOr reply to an image with !nano <prompt>",
           event.threadID,
           event.messageID
         );
       }
 
       let imageUrl = "";
-      
-      // Check if replying to a message with image attachment
-      if (event.messageReply && event.messageReply.attachments) {
-        const imageAttachment = event.messageReply.attachments.find(
-          attachment => attachment.type === "photo" || attachment.type === "image"
-        );
-        if (imageAttachment) {
-          imageUrl = imageAttachment.url;
-        }
+      let prompt = args.join(" ").trim();
+
+      // case: user entered a link and prompt
+      const match = prompt.match(/(https?:\/\/[^\s]+)\s*\|\s*(.*)/i);
+      if (match) {
+        imageUrl = match[1];
+        prompt = match[2];
       }
 
-      // Construct API URL
+      // case: user replied to image
+      if (!imageUrl && event.messageReply && event.messageReply.attachments) {
+        const img = event.messageReply.attachments.find(a => a.type === "photo" || a.type === "image");
+        if (img) imageUrl = img.url;
+      }
+
       const encodedPrompt = encodeURIComponent(prompt);
       const encodedUrl = encodeURIComponent(imageUrl);
       const apiUrl = `${API_BASE_URL}?prompt=${encodedPrompt}&url=${encodedUrl}`;
 
-      // Send initial message
-      await api.sendMessage(
-        "⏳ Generating image with Nano Banana AI... Please wait...",
-        event.threadID,
-        event.messageID
-      );
+      await api.sendMessage("⏳ Processing your request, please wait...", event.threadID, event.messageID);
 
-      // Make API request
-      const response = await axios.get(apiUrl, {
-        responseType: "json",
-        timeout: 120000
-      });
-
-      if (!response.data || !response.data.success || !response.data.imageUrl) {
-        throw new Error("Invalid API response: missing imageUrl");
-      }
+      const response = await axios.get(apiUrl, { responseType: "json", timeout: 120000 });
+      if (!response.data?.success || !response.data?.imageUrl)
+        throw new Error("API did not return a valid image URL.");
 
       const resultUrl = response.data.imageUrl;
 
-      // Download the generated image
-      const imageResponse = await axios.get(resultUrl, { 
-        responseType: "arraybuffer",
-        timeout: 60000
-      });
+      // download image
+      const imgData = await axios.get(resultUrl, { responseType: "arraybuffer", timeout: 60000 });
+      const outPath = tmpFile("nano");
+      await fsp.writeFile(outPath, imgData.data);
 
-      // Save to temp file
-      const outputPath = tmpFile("nano");
-      await fsp.writeFile(outputPath, imageResponse.data);
-
-      // Send the image
       await api.sendMessage(
         {
-          body: `✅ Image ${imageUrl ? 'edited' : 'generated'} successfully!\n📝 Prompt: ${prompt}`,
-          attachment: fs.createReadStream(outputPath)
+          body: `✅ ${imageUrl ? "Edited" : "Generated"} image successfully!\n📝 Prompt: ${prompt}`,
+          attachment: fs.createReadStream(outPath)
         },
         event.threadID,
         event.messageID
       );
 
-      // Cleanup temp file
-      try {
-        await fsp.unlink(outputPath);
-      } catch (cleanupError) {
-        console.error("Cleanup error:", cleanupError);
-      }
+      // cleanup
+      setTimeout(() => fs.unlink(outPath, () => {}), 20000);
 
-    } catch (error) {
-      console.error("❌ Nano command error:", error);
-      
-      let errorMessage = "❌ Failed to process the image. ";
-      
-      if (error.code === 'ECONNABORTED' || error.message.includes("timeout")) {
-        errorMessage += "The request timed out. Please try again with a simpler prompt.";
-      } else if (error.response) {
-        errorMessage += `API error: ${error.response.status} - ${error.response.statusText}`;
-      } else if (error.message) {
-        errorMessage += error.message.substring(0, 200);
-      } else {
-        errorMessage += "The AI may have blocked the content, or the API is currently unavailable.";
-      }
-
-      await api.sendMessage(
-        errorMessage,
-        event.threadID,
-        event.messageID
-      );
+    } catch (err) {
+      console.error(err);
+      let msg = "❌ Failed to process your image.\n";
+      if (err.code === "ECONNABORTED") msg += "⏱️ Request timed out. Try again later.";
+      else if (err.response) msg += `API Error: ${err.response.status} ${err.response.statusText}`;
+      else msg += err.message.slice(0, 200);
+      api.sendMessage(msg, event.threadID, event.messageID);
     }
-  },
-
-  // Handle chat events for your specific setup
-  onChat: async function ({ api, event, args }) {
-    // This can be used if you need additional chat handling
-    // but the main functionality is in onStart
   }
 };
