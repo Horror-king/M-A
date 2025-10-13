@@ -1562,24 +1562,6 @@
                 width: 36px;
                 height: 36px;
             }
-
-            /* Nano AI Upload Button Styles */
-.chat-input button[title="Upload Image for Nano AI Editing"] {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0 10px;
-    color: #666;
-    transition: color 0.3s;
-}
-
-.chat-input button[title="Upload Image for Nano AI Editing"]:hover {
-    color: #4267B2;
-}
-
-.chat-input button[title="Upload Image for Nano AI Editing"] i {
-    font-size: 20px;
-}
             
             /* FIXED: Increased padding for mobile to ensure messages are visible */
             .chat-messages, #private-ai-container {
@@ -2595,7 +2577,7 @@
             <textarea id="user-input" placeholder="Type your message..."></textarea>
             <button id="send-button" onclick="sendMessage()" disabled>
                 <i class="fas fa-paper-plane"></i>
-                 </button>
+            </button>
         </div>
         
         <!-- FIXED: Scroll to bottom button specifically for main chat -->
@@ -2621,14 +2603,10 @@
         </div>
         
         <div class="chat-input" style="display: none;">
-    <textarea id="private-user-input" placeholder="Type your private message..."></textarea>
-    <button id="private-send-button" onclick="sendPrivateMessage()" disabled>
-        <i class="fas fa-paper-plane"></i>
-    </button>
-    <input type="file" id="private-nano-image-upload" accept="image/*" style="display: none;" onchange="handleNanoImageUpload(event, 'private-ai')">
-    <button onclick="document.getElementById('private-nano-image-upload').click()" title="Upload Image for Nano AI Editing">
-        <i class="fas fa-image"></i>
-    </button>
+            <textarea id="private-user-input" placeholder="Type your private message..."></textarea>
+            <button id="private-send-button" onclick="sendPrivateMessage()" disabled>
+                <i class="fas fa-paper-plane"></i>
+            </button>
         </div>
         
         <!-- FIXED: Go to top button specifically for private AI -->
@@ -3060,10 +3038,6 @@ let lastSentMessages = {
     main: {}
 };
 
-// ✅ ADDED: Nano Image Upload Variables
-let nanoImageUploadData = null;
-let nanoEditPrompt = '';
-
 const elements = {
     usernameInput: document.getElementById('auth-username'),
     messageInput: document.getElementById('user-input'),
@@ -3080,143 +3054,6 @@ let replyToText = null;
 let currentUsername = localStorage.getItem('chat_username') || '';
 if (currentUsername && elements.usernameInput) {
     elements.usernameInput.value = currentUsername;
-}
-
-// ===== ADDED: NANO IMAGE UPLOAD AND EDIT FUNCTIONALITY =====
-
-// Function to handle image upload for nano editing
-function handleNanoImageUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    // Check if file is an image
-    if (!file.type.match('image.*')) {
-        showError('Please select an image file (JPEG, PNG, GIF, etc.)');
-        return;
-    }
-
-    // Check file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-        showError('Image size should be less than 5MB');
-        return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        nanoImageUploadData = {
-            file: file,
-            dataUrl: e.target.result,
-            fileName: file.name
-        };
-
-        // Show prompt for editing instructions
-        showNanoEditPrompt();
-    };
-    reader.readAsDataURL(file);
-}
-
-// Show prompt for nano edit instructions
-function showNanoEditPrompt() {
-    const prompt = prompt('Enter your editing instructions for the image:\n\nExamples:\n- "Turn this into a cartoon"\n- "Add a sunset background"\n- "Make it look like winter"\n- "Change the colors to blue theme"');
-    
-    if (prompt && prompt.trim()) {
-        nanoEditPrompt = prompt.trim();
-        processNanoImageEdit();
-    } else {
-        nanoImageUploadData = null;
-        if (!prompt) {
-            showError('Image editing cancelled');
-        } else {
-            showError('Please enter editing instructions');
-        }
-    }
-}
-
-// Process nano image edit
-async function processNanoImageEdit() {
-    if (!nanoImageUploadData || !nanoEditPrompt) {
-        showError('No image or prompt provided');
-        return;
-    }
-
-    try {
-        // Show loading message
-        displayMessage('⏳ Uploading image and processing with Nano AI...', 'sent', null, currentUsername, null, true);
-        
-        // Convert base64 to blob for upload
-        const response = await fetch(nanoImageUploadData.dataUrl);
-        const blob = await response.blob();
-        
-        // Create form data for upload
-        const formData = new FormData();
-        formData.append('image', blob, nanoImageUploadData.fileName);
-        
-        // Upload image to server
-        const uploadResponse = await fetch('/upload', {
-            method: 'POST',
-            body: formData
-        });
-
-        if (!uploadResponse.ok) {
-            throw new Error('Failed to upload image');
-        }
-
-        const uploadData = await uploadResponse.json();
-        const imageUrl = uploadData.imageUrl;
-
-        // Send nano command with the uploaded image
-        await sendNanoCommand(nanoEditPrompt, imageUrl);
-
-    } catch (error) {
-        console.error('Nano image edit error:', error);
-        showError('Failed to process image: ' + error.message);
-        
-        // Remove the loading message on error
-        const messages = document.querySelectorAll('.message.sent');
-        if (messages.length > 0) {
-            const lastMessage = messages[messages.length - 1];
-            if (lastMessage.textContent.includes('⏳ Uploading image')) {
-                lastMessage.remove();
-            }
-        }
-    } finally {
-        // Reset nano data
-        nanoImageUploadData = null;
-        nanoEditPrompt = '';
-        
-        // Reset file input
-        const fileInput = document.getElementById('nano-image-upload');
-        if (fileInput) {
-            fileInput.value = '';
-        }
-    }
-}
-
-// Send nano command with image URL
-async function sendNanoCommand(prompt, imageUrl) {
-    try {
-        const response = await fetch('/api/command', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: `!nano ${prompt}`,
-                source: 'main-chat',
-                imageUrl: imageUrl
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to send nano command');
-        }
-
-        console.log('Nano command sent successfully');
-
-    } catch (error) {
-        console.error('Error sending nano command:', error);
-        throw error;
-    }
 }
 
 // ===== ENHANCED PRIVATE MESSAGING FUNCTIONS =====
