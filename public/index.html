@@ -2636,6 +2636,7 @@ margin-right: 10px;
             </div>
             <div class="kebab-dropdown">
                 <a href="#" onclick="toggleTheme()">Toggle Theme</a>
+                <a href="#" id="toggle-user-panel-btn"onclick="toggleUserPanel()"><i class="fasfa-eye-slash"></i> Hide User Panel</a>
                 <a href="#" onclick="clearChat()">Clear Chat</a>
                 <a href="#" onclick="exportChat()">Export Chat</a>
                 <a href="#" onclick="exportChatPDF()">Download PDF</a>
@@ -3201,11 +3202,14 @@ function toggleUserPanel() {
     userPanelVisible = !userPanelVisible;
     updateUserPanelVisibility();
     saveUserPanelPreference();
+    
+    // Close the kebab menu after selection
+    const kebabDropdown = document.querySelector('.kebab-dropdown');
+    if (kebabDropdown) kebabDropdown.classList.remove('active');
 }
 
 function updateUserPanelVisibility() {
     const onlineUsersPanels = document.querySelectorAll('.online-users-panel');
-    const chatContainers = document.querySelectorAll('.chat-container');
     
     onlineUsersPanels.forEach(panel => {
         if (userPanelVisible) {
@@ -3215,16 +3219,7 @@ function updateUserPanelVisibility() {
         }
     });
     
-    // Adjust chat container height when panel is hidden
-    chatContainers.forEach(container => {
-        if (userPanelVisible) {
-            container.style.height = 'calc(100% - 80px)'; // Default height with panel
-        } else {
-            container.style.height = '100%'; // Full height when panel hidden
-        }
-    });
-    
-    // Update the toggle button in kebab menu
+    // Update the toggle button text
     updateUserPanelToggleButton();
 }
 
@@ -3243,14 +3238,14 @@ function loadUserPanelPreference() {
 }
 
 function updateUserPanelToggleButton() {
-    const toggleButton = document.querySelector('.kebab-dropdown a[onclick="toggleUserPanel()"]');
-    if (toggleButton) {
+    const toggleButtons = document.querySelectorAll('.kebab-dropdown a[onclick="toggleUserPanel()"]');
+    toggleButtons.forEach(button => {
         if (userPanelVisible) {
-            toggleButton.innerHTML = '<i class="fas fa-eye-slash"></i> Hide User Panel';
+            button.innerHTML = '<i class="fas fa-eye-slash"></i> Hide User Panel';
         } else {
-            toggleButton.innerHTML = '<i class="fas fa-eye"></i> Show User Panel';
+            button.innerHTML = '<i class="fas fa-eye"></i> Show User Panel';
         }
-    }
+    });
 }
 
 // ===== ENHANCED PRIVATE MESSAGING FUNCTIONS =====
