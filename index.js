@@ -8,6 +8,7 @@ const fs = require('fs-extra');
 const config = require('./config.json');
 const http = require('http');
 const { Server } = require('socket.io');
+const bcrypt = require('bcryptjs');
 
 // Initialize apps
 const app = express();
@@ -36,7 +37,7 @@ global.utils = {
   getText: () => "✅ Bot is running smoothly"
 };
 
-// Initialize Supabase - FIXED: Added service_role key for RLS bypass
+// Initialize Supabase
 const supabase = createClient(
   'https://rqissetffrnkfzfgsngm.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxaXNzZXRmZnJua2Z6ZmdzbmdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNzU2NzIsImV4cCI6MjA3NDc1MTY3Mn0.6tCuI4yhn3EXlua9na4kkgMqX6PL00GxjEuY0QG2bTg',
@@ -77,6 +78,358 @@ const renderExternalUrl = process.env.RENDER_EXTERNAL_URL;
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
+
+// ===== USER AUTHENTICATION SYSTEM =====
+
+// Initialize users table if it doesn't exist
+async function initializeUsersTable() {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .limit(1);
+
+    if (error && error.code === '42P01') { // Table doesn't exist
+      console.log('Creating users table...');
+      // In a real scenario, you would create the table via SQL
+      // For now, we'll just log and continue
+    } else if (!error) {
+      console.log('Users table exists');
+    }
+  } catch (error) {
+    console.error('Error checking users table:', error);
+  }
+}
+
+// Call initialization
+initializeUsersTable();
+
+// User registration endpoint
+app.post('/api/register', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    console.log('📝 Registration attempt:', { username });
+
+    if (!username || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Username and password are required" 
+      });
+    }
+
+    if (username.length < 3 || username.length > 20) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Username must be between 3-20 characters" 
+      });
+    }
+
+    if (password.length < 4 || password.length > 20) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Password must be between 4-20 characters" 
+      });
+    }
+
+    // Validate username format
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Username can only contain letters, numbers, and underscores" 
+      });
+    }
+
+    // Check if username already exists (case-insensitive)
+    const { data: existingUsers, error: checkError } = await supabase
+      .from('users')
+      .select('username')
+      .ilike('username', username);
+
+    if (checkError) {
+      console.error('❌ Database error checking username:', checkError);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Database error" 
+      });
+    }
+
+    if (existingUsers && existingUsers.length > 0) {
+      return res.status(409).json({ 
+        success: false, 
+        error: "Username already exists" 
+      });
+    }
+
+    // Hash password
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Create user
+    const { data: newUser, error: createError } = await supabase
+      .from('users')
+      .insert([
+        { 
+          username: username.trim(),
+          password_hash: hashedPassword,
+          created_at: new Date().toISOString(),
+          last_login: new Date().toISOString()
+        }
+      ])
+      .select();
+
+    if (createError) {
+      console.error('❌ Database error creating user:', createError);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Failed to create user" 
+      });
+    }
+
+    console.log('✅ User registered successfully:', username);
+    
+    res.status(201).json({ 
+      success: true, 
+      message: "User registered successfully",
+      username: username
+    });
+
+  } catch (error) {
+    console.error('❌ Registration error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Internal server error" 
+    });
+  }
+});
+
+// User login endpoint
+app.post('/api/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    console.log('🔐 Login attempt:', { username });
+
+    if (!username || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Username and password are required" 
+      });
+    }
+
+    // Find user (case-insensitive search)
+    const { data: users, error: findError } = await supabase
+      .from('users')
+      .select('*')
+      .ilike('username', username)
+      .limit(1);
+
+    if (findError) {
+      console.error('❌ Database error finding user:', findError);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Database error" 
+      });
+    }
+
+    if (!users || users.length === 0) {
+      return res.status(401).json({ 
+        success: false, 
+        error: "Invalid username or password" 
+      });
+    }
+
+    const user = users[0];
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+    
+    if (!isPasswordValid) {
+      return res.status(401).json({ 
+        success: false, 
+        error: "Invalid username or password" 
+      });
+    }
+
+    // Update last login
+    await supabase
+      .from('users')
+      .update({ last_login: new Date().toISOString() })
+      .eq('id', user.id);
+
+    console.log('✅ User logged in successfully:', username);
+
+    res.json({ 
+      success: true, 
+      message: "Login successful",
+      username: user.username,
+      user_id: user.id
+    });
+
+  } catch (error) {
+    console.error('❌ Login error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Internal server error" 
+    });
+  }
+});
+
+// Check username availability
+app.post('/api/check-username', async (req, res) => {
+  try {
+    const { username } = req.body;
+
+    if (!username) {
+      return res.json({ available: true });
+    }
+
+    // Check if username exists (case-insensitive)
+    const { data: existingUsers, error } = await supabase
+      .from('users')
+      .select('username')
+      .ilike('username', username)
+      .limit(1);
+
+    if (error) {
+      console.error('❌ Database error checking username:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Database error" 
+      });
+    }
+
+    const available = !existingUsers || existingUsers.length === 0;
+    
+    res.json({ 
+      available: available,
+      suggestion: available ? null : "Username is already taken"
+    });
+
+  } catch (error) {
+    console.error('❌ Check username error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Internal server error" 
+    });
+  }
+});
+
+// Get user profile
+app.get('/api/user/profile/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+
+    const { data: profiles, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('username', username)
+      .limit(1);
+
+    if (error) {
+      console.error('❌ Database error fetching profile:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Database error" 
+      });
+    }
+
+    if (!profiles || profiles.length === 0) {
+      return res.json({ 
+        exists: false,
+        profile: null 
+      });
+    }
+
+    res.json({ 
+      exists: true,
+      profile: profiles[0]
+    });
+
+  } catch (error) {
+    console.error('❌ Get profile error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Internal server error" 
+    });
+  }
+});
+
+// Update user profile
+app.post('/api/user/profile', async (req, res) => {
+  try {
+    const { username, profileData } = req.body;
+
+    if (!username) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Username is required" 
+      });
+    }
+
+    // Check if profile exists
+    const { data: existingProfiles, error: checkError } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('username', username)
+      .limit(1);
+
+    if (checkError) {
+      console.error('❌ Database error checking profile:', checkError);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Database error" 
+      });
+    }
+
+    let result;
+    if (existingProfiles && existingProfiles.length > 0) {
+      // Update existing profile
+      result = await supabase
+        .from('user_profiles')
+        .update({
+          ...profileData,
+          updated_at: new Date().toISOString()
+        })
+        .eq('username', username)
+        .select();
+    } else {
+      // Create new profile
+      result = await supabase
+        .from('user_profiles')
+        .insert([
+          {
+            username: username,
+            ...profileData,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        ])
+        .select();
+    }
+
+    if (result.error) {
+      console.error('❌ Database error saving profile:', result.error);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Failed to save profile" 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      message: "Profile updated successfully",
+      profile: result.data[0]
+    });
+
+  } catch (error) {
+    console.error('❌ Update profile error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Internal server error" 
+    });
+  }
+});
 
 // ===== ENHANCED DEBUGGING ENDPOINTS =====
 
@@ -1376,9 +1729,15 @@ server.listen(port, () => {
   console.log(`🔌 Socket.io events: new-message, message-deleted, user-status-change`);
   console.log(`🤫 PRIVATE MESSAGING: ENABLED via Supabase`);
   console.log(`🔒 Private endpoints: /private-messages/*`);
+  console.log(`👤 USER AUTHENTICATION: ENABLED (Server-side, no localStorage)`);
+  console.log(`🔐 Password hashing: ENABLED with bcrypt`);
+  console.log(`🌐 Cross-browser compatibility: ENABLED`);
   console.log(`🔍 NEW: GET /debug-private-messages - Debug private messages table`);
   console.log(`🧪 NEW: GET /test-private-messages - Test private message creation (GET)`);
   console.log(`🧪 NEW: POST /test-private-messages - Test private message creation (POST)`);
+  console.log(`🔐 NEW: POST /api/register - User registration`);
+  console.log(`🔐 NEW: POST /api/login - User login`);
+  console.log(`🔐 NEW: POST /api/check-username - Check username availability`);
   console.log(`🧪 Test Supabase (GET): http://localhost:${port}/test-supabase`);
   console.log(`🧪 Test Message (POST): http://localhost:${port}/test-message`);
   console.log(`🔍 Debug ALL Commands: http://localhost:${port}/debug-all-commands`);
