@@ -114,7 +114,9 @@ async function initializeUsersTable() {
 // Call initialization
 initializeUsersTable();
 
-// User registration endpoint
+// ===== AUTHENTICATION ENDPOINTS =====
+
+// User registration endpoint - POST
 app.post('/api/register', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -212,7 +214,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// User login endpoint
+// User login endpoint - POST
 app.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -284,7 +286,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// Check username availability
+// Check username availability - POST
 app.post('/api/check-username', async (req, res) => {
   try {
     const { username } = req.body;
@@ -324,7 +326,59 @@ app.post('/api/check-username', async (req, res) => {
   }
 });
 
-// Get user profile
+// ===== ADD GET ENDPOINTS FOR TESTING =====
+
+// GET endpoint for login (for testing in browser)
+app.get('/api/login', (req, res) => {
+  res.status(405).json({
+    success: false,
+    error: "Method Not Allowed",
+    message: "Use POST method for login",
+    example: {
+      method: "POST",
+      url: "/api/login",
+      body: {
+        username: "your_username",
+        password: "your_password"
+      }
+    }
+  });
+});
+
+// GET endpoint for register (for testing in browser)
+app.get('/api/register', (req, res) => {
+  res.status(405).json({
+    success: false,
+    error: "Method Not Allowed",
+    message: "Use POST method for registration",
+    example: {
+      method: "POST",
+      url: "/api/register",
+      body: {
+        username: "new_username",
+        password: "new_password"
+      }
+    }
+  });
+});
+
+// GET endpoint for check-username (for testing in browser)
+app.get('/api/check-username', (req, res) => {
+  res.status(405).json({
+    success: false,
+    error: "Method Not Allowed",
+    message: "Use POST method for checking username",
+    example: {
+      method: "POST",
+      url: "/api/check-username",
+      body: {
+        username: "username_to_check"
+      }
+    }
+  });
+});
+
+// Get user profile - GET
 app.get('/api/user/profile/:username', async (req, res) => {
   try {
     const { username } = req.params;
@@ -364,7 +418,7 @@ app.get('/api/user/profile/:username', async (req, res) => {
   }
 });
 
-// Update user profile
+// Update user profile - POST
 app.post('/api/user/profile', async (req, res) => {
   try {
     const { username, profileData } = req.body;
@@ -438,6 +492,57 @@ app.post('/api/user/profile', async (req, res) => {
       error: "Internal server error" 
     });
   }
+});
+
+// ===== TEST AUTHENTICATION ENDPOINTS =====
+
+// Test authentication endpoints
+app.get('/api/auth-test', (req, res) => {
+  res.json({
+    message: "Authentication endpoints are working!",
+    endpoints: [
+      {
+        method: "POST",
+        path: "/api/register",
+        description: "Register a new user",
+        body: {
+          username: "string (3-20 characters)",
+          password: "string (4-20 characters)"
+        }
+      },
+      {
+        method: "POST",
+        path: "/api/login",
+        description: "Login user",
+        body: {
+          username: "string",
+          password: "string"
+        }
+      },
+      {
+        method: "POST",
+        path: "/api/check-username",
+        description: "Check username availability",
+        body: {
+          username: "string"
+        }
+      },
+      {
+        method: "GET",
+        path: "/api/user/profile/:username",
+        description: "Get user profile"
+      },
+      {
+        method: "POST",
+        path: "/api/user/profile",
+        description: "Update user profile",
+        body: {
+          username: "string",
+          profileData: "object"
+        }
+      }
+    ]
+  });
 });
 
 // ===== ENHANCED DEBUGGING ENDPOINTS =====
@@ -1744,9 +1849,13 @@ server.listen(port, () => {
   console.log(`🔍 NEW: GET /debug-private-messages - Debug private messages table`);
   console.log(`🧪 NEW: GET /test-private-messages - Test private message creation (GET)`);
   console.log(`🧪 NEW: POST /test-private-messages - Test private message creation (POST)`);
-  console.log(`🔐 NEW: POST /api/register - User registration`);
-  console.log(`🔐 NEW: POST /api/login - User login`);
-  console.log(`🔐 NEW: POST /api/check-username - Check username availability`);
+  console.log(`🔐 AUTHENTICATION ENDPOINTS:`);
+  console.log(`   POST /api/register - User registration`);
+  console.log(`   POST /api/login - User login`);
+  console.log(`   POST /api/check-username - Check username availability`);
+  console.log(`   GET /api/user/profile/:username - Get user profile`);
+  console.log(`   POST /api/user/profile - Update user profile`);
+  console.log(`   GET /api/auth-test - Test all authentication endpoints`);
   console.log(`🧪 Test Supabase (GET): http://localhost:${port}/test-supabase`);
   console.log(`🧪 Test Message (POST): http://localhost:${port}/test-message`);
   console.log(`🔍 Debug ALL Commands: http://localhost:${port}/debug-all-commands`);
@@ -1758,6 +1867,7 @@ server.listen(port, () => {
     console.log(`🔍 Debug ALL Commands: ${renderExternalUrl}/debug-all-commands`);
     console.log(`🔍 Debug Private Messages: ${renderExternalUrl}/debug-private-messages`);
     console.log(`🧪 Test Private Message (GET): ${renderExternalUrl}/test-private-messages`);
+    console.log(`🔐 Test Authentication: ${renderExternalUrl}/api/auth-test`);
   }
 });
 
