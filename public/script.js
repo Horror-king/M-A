@@ -1,6 +1,5 @@
 // --- CUT HERE ---
 let isLogin = true;
-let users = JSON.parse(localStorage.getItem('users')) || {};
 let longPressTimer;
 let isLongPress = false;
 const badWords = ['fuck', 'nigga', 'shit', 'bitch', 'asshole'];
@@ -48,7 +47,6 @@ let isProcessingCommand = false;
 let onlineUsers = [];
 
 // ✅ ADDED: Private Messaging Variables
-let privateChats = JSON.parse(localStorage.getItem('privateChats')) || {};
 let currentPrivateChatUser = null;
 let privateMessageTypingTimer;
 
@@ -60,6 +58,9 @@ let lastSentMessages = {
 
 // ✅ ADDED: User Panel Visibility State
 let userPanelVisible = true;
+
+// ✅ ADDED: Current user session
+let currentUserSession = null;
 
 const elements = {
     usernameInput: document.getElementById('auth-username'),
@@ -74,10 +75,6 @@ const elements = {
 };
 
 let replyToText = null;
-let currentUsername = localStorage.getItem('chat_username') || '';
-if (currentUsername && elements.usernameInput) {
-    elements.usernameInput.value = currentUsername;
-}
 
 // ===== ADDED: USER PANEL VISIBILITY FUNCTIONS =====
 function toggleUserPanel() {
@@ -162,7 +159,7 @@ async function loadPrivateUsers() {
     const usersList = document.getElementById('users-list');
     if (!usersList) return;
     
-    const currentUser = localStorage.getItem('currentUser');
+    const currentUser = currentUserSession?.username;
     if (!currentUser) return;
 
     try {
@@ -183,17 +180,22 @@ async function loadPrivateUsers() {
             return;
         }
         
-        // Get all users from localStorage for profiles
-        const users = JSON.parse(localStorage.getItem('users')) || {};
+        // Get user profiles from server
         const userProfiles = {};
         
-        Object.keys(users).forEach(username => {
-            if (username !== currentUser) {
-                const profileKey = `userProfile_${username}`;
-                const profileData = JSON.parse(localStorage.getItem(profileKey)) || {};
-                userProfiles[username] = profileData;
+        for (const conversation of conversations) {
+            try {
+                const profileResponse = await fetch(`/api/user/profile/${conversation.username}`);
+                if (profileResponse.ok) {
+                    const profileData = await profileResponse.json();
+                    if (profileData.exists) {
+                        userProfiles[conversation.username] = profileData.profile;
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading profile for', conversation.username, error);
             }
-        });
+        }
         
         // Add conversations to the list
         conversations.forEach(conversation => {
@@ -257,9 +259,19 @@ async function openPrivateChat(username) {
         privateMessagesHeader.style.padding = '8px 15px';
     }
     
-    // Get user profile
-    const profileKey = `userProfile_${username}`;
-    const profileData = JSON.parse(localStorage.getItem(profileKey)) || {};
+    // Get user profile from server
+    let profileData = {};
+    try {
+        const profileResponse = await fetch(`/api/user/profile/${username}`);
+        if (profileResponse.ok) {
+            const profileResult = await profileResponse.json();
+            if (profileResult.exists) {
+                profileData = profileResult.profile;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading profile:', error);
+    }
     
     // Update chat header
     document.getElementById('partner-avatar').innerHTML = 
@@ -282,7 +294,7 @@ async function openPrivateChat(username) {
     
     // Join Socket.io room for real-time updates
     if (socket) {
-        const currentUser = localStorage.getItem('currentUser');
+        const currentUser = currentUserSession?.username;
         socket.emit('join-private-chat', { username: currentUser, otherUser: username });
     }
     
@@ -298,7 +310,7 @@ async function loadPrivateMessages(username) {
     const messagesContainer = document.getElementById('private-chat-messages');
     if (!messagesContainer) return;
     
-    const currentUser = localStorage.getItem('currentUser');
+    const currentUser = currentUserSession?.username;
     
     try {
         messagesContainer.innerHTML = '<div class="no-messages">Loading messages...</div>';
@@ -337,7 +349,7 @@ async function loadPrivateMessages(username) {
         
     } catch (error) {
         console.error('Error loading private messages:', error);
-        messagesContainer.innerHTML = '<div class="no-messages">Error loading messages</div>';
+        messagesContainer.innerHTML = '<div class="no-messages'>Error loading messages</div>';
     }
 }
 
@@ -388,7 +400,7 @@ async function sendPrivateMessageToUser() {
     
     if (!content) return;
     
-    const currentUser = localStorage.getItem('currentUser');
+    const currentUser = currentUserSession?.username;
     
     // ADDED: Check for duplicate message
     const messageKey = `${currentUser}-${currentPrivateChatUser}-${content}`;
@@ -400,7 +412,7 @@ async function sendPrivateMessageToUser() {
     
     // ADDED: Track this message
     lastSentMessages.private[messageKey] = Date.now();
-    
+
     try {
         // Send via HTTP or Socket.io
         if (socket) {
@@ -455,7 +467,7 @@ async function sendPrivateMessageToUser() {
 
 // MODIFIED: Handle new private message with duplicate check
 function handleNewPrivateMessage(message) {
-    const currentUser = localStorage.getItem('currentUser');
+    const currentUser = currentUserSession?.username;
     
     // Check if this message is relevant to current user
     if (message.sender_username === currentUser || message.receiver_username === currentUser) {
@@ -510,7 +522,7 @@ function showPrivateMessageNotification(message) {
 
 // Mark messages as read
 async function markMessagesAsRead(senderUsername) {
-    const currentUser = localStorage.getItem('currentUser');
+    const currentUser = currentUserSession?.username;
     
     try {
         await fetch('/private-messages/read', {
@@ -533,7 +545,7 @@ async function markMessagesAsRead(senderUsername) {
 
 // Load unread message counts
 async function loadUnreadCounts() {
-    const currentUser = localStorage.getItem('currentUser');
+    const currentUser = currentUserSession?.username;
     if (!currentUser) return;
     
     try {
@@ -590,12 +602,9 @@ function setupUsersSearch() {
             
             userItems.forEach(item => {
                 const username = item.dataset.username;
-                const profileKey = `userProfile_${username}`;
-                const profileData = JSON.parse(localStorage.getItem(profileKey)) || {};
-                const displayName = profileData.firstname && profileData.lastname ? 
-                    `${profileData.firstname} ${profileData.lastname}`.toLowerCase() : username.toLowerCase();
+                const displayName = username.toLowerCase();
                 
-                if (displayName.includes(searchTerm) || username.toLowerCase().includes(searchTerm)) {
+                if (displayName.includes(searchTerm)) {
                     item.style.display = 'flex';
                 } else {
                     item.style.display = 'none';
@@ -646,7 +655,7 @@ function setupPrivateMessageTypingHandlers() {
     let typingTimer;
     
     input.addEventListener('input', () => {
-        const currentUser = localStorage.getItem('currentUser');
+        const currentUser = currentUserSession?.username;
         if (!currentUser || !currentPrivateChatUser) return;
         
         if (!typing) {
@@ -711,7 +720,7 @@ function showUsersPanel() {
         
         // Leave any private chat room
         if (socket) {
-            const currentUser = localStorage.getItem('currentUser');
+            const currentUser = currentUserSession?.username;
             if (currentUser && currentPrivateChatUser) {
                 socket.emit('leave-private-chat', { 
                     username: currentUser, 
@@ -774,51 +783,61 @@ function clearOldMessageTracking() {
 setInterval(clearOldMessageTracking, 30000);
 
 // ===== PROFILE MANAGEMENT FUNCTIONS =====
-function loadProfile() {
-    const username = localStorage.getItem('currentUser');
+async function loadProfile() {
+    const username = currentUserSession?.username;
     if (!username) return;
     
-    const profileKey = `userProfile_${username}`;
-    const profileData = JSON.parse(localStorage.getItem(profileKey)) || {};
-    
-    // Set default values if profile doesn't exist
-    const defaultProfile = {
-        firstname: '',
-        lastname: '',
-        username: username,
-        bio: '',
-        age: '',
-        gender: '',
-        location: '',
-        interests: '',
-        avatar: `https://i.pravatar.cc/150?u=${username}`
-    };
-    
-    const profile = { ...defaultProfile, ...profileData };
-    
-    // Populate form fields
-    document.getElementById('profile-firstname').value = profile.firstname;
-    document.getElementById('profile-lastname').value = profile.lastname;
-    document.getElementById('profile-username').value = profile.username;
-    document.getElementById('profile-bio').value = profile.bio;
-    document.getElementById('profile-age').value = profile.age;
-    document.getElementById('profile-gender').value = profile.gender;
-    document.getElementById('profile-location').value = profile.location;
-    document.getElementById('profile-interests').value = profile.interests;
-    document.getElementById('profile-avatar-img').src = profile.avatar;
-    
-    // Update display section
-    updateProfileDisplay(profile);
+    try {
+        const response = await fetch(`/api/user/profile/${username}`);
+        if (response.ok) {
+            const data = await response.json();
+            
+            if (data.exists) {
+                const profile = data.profile;
+                
+                // Populate form fields
+                document.getElementById('profile-firstname').value = profile.firstname || '';
+                document.getElementById('profile-lastname').value = profile.lastname || '';
+                document.getElementById('profile-username').value = profile.username || '';
+                document.getElementById('profile-bio').value = profile.bio || '';
+                document.getElementById('profile-age').value = profile.age || '';
+                document.getElementById('profile-gender').value = profile.gender || '';
+                document.getElementById('profile-location').value = profile.location || '';
+                document.getElementById('profile-interests').value = profile.interests || '';
+                document.getElementById('profile-avatar-img').src = profile.avatar || `https://i.pravatar.cc/150?u=${username}`;
+                
+                // Update display section
+                updateProfileDisplay(profile);
+            } else {
+                // Set default values if profile doesn't exist
+                const defaultProfile = {
+                    firstname: '',
+                    lastname: '',
+                    username: username,
+                    bio: '',
+                    age: '',
+                    gender: '',
+                    location: '',
+                    interests: '',
+                    avatar: `https://i.pravatar.cc/150?u=${username}`
+                };
+                
+                updateProfileDisplay(defaultProfile);
+            }
+        }
+    } catch (error) {
+        console.error('Error loading profile:', error);
+        showError('Failed to load profile');
+    }
 }
 
-function saveProfile() {
-    const username = localStorage.getItem('currentUser');
+async function saveProfile() {
+    const username = currentUserSession?.username;
     if (!username) {
         showError('You must be logged in to save profile');
         return;
     }
     
-    const profileKey = `userProfile_${username}`;
     const profileData = {
         firstname: document.getElementById('profile-firstname').value,
         lastname: document.getElementById('profile-lastname').value,
@@ -828,22 +847,41 @@ function saveProfile() {
         gender: document.getElementById('profile-gender').value,
         location: document.getElementById('profile-location').value,
         interests: document.getElementById('profile-interests').value,
-        avatar: document.getElementById('profile-avatar-img').src,
-        lastUpdated: new Date().toISOString()
+        avatar: document.getElementById('profile-avatar-img').src
     };
     
-    localStorage.setItem(profileKey, JSON.stringify(profileData));
-    
-    // Update display section
-    updateProfileDisplay(profileData);
-    
-    // Show success message
-    showSuccess('Profile updated successfully!');
-    
-    // Close profile editor after a short delay
-    setTimeout(() => {
-        hideContainer('profile');
-    }, 1500);
+    try {
+        const response = await fetch('/api/user/profile', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                username: username,
+                profileData: profileData
+            })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            
+            // Update display section
+            updateProfileDisplay(profileData);
+            
+            // Show success message
+            showSuccess('Profile updated successfully!');
+            
+            // Close profile editor after a short delay
+            setTimeout(() => {
+                hideContainer('profile');
+            }, 1500);
+        } else {
+            throw new Error('Failed to save profile');
+        }
+    } catch (error) {
+        console.error('Error saving profile:', error);
+        showError('Failed to save profile');
+    }
 }
 
 function updateProfileDisplay(profile) {
@@ -897,80 +935,90 @@ function updateMessageAvatars(avatarUrl) {
 }
 
 // ===== ADDED: USER PROFILE POPUP FUNCTIONS =====
-function showUserProfile(username) {
+async function showUserProfile(username) {
     const popup = document.getElementById('user-profile-popup');
     if (!popup) return;
     
-    // Get user profile data
-    const profileKey = `userProfile_${username}`;
-    const profileData = JSON.parse(localStorage.getItem(profileKey)) || {};
-    
-    // Set default values
-    const defaultProfile = {
-        firstname: '',
-        lastname: '',
-        username: username,
-        bio: '',
-        age: '',
-        gender: '',
-        location: '',
-        interests: '',
-        avatar: `https://i.pravatar.cc/150?u=${username}`
-    };
-    
-    const profile = { ...defaultProfile, ...profileData };
-    
-    // Update popup content
-    document.getElementById('popup-avatar').src = profile.avatar;
-    
-    // Set display name
-    let displayName = username;
-    if (profile.firstname && profile.lastname) {
-        displayName = `${profile.firstname} ${profile.lastname}`;
-    } else if (profile.firstname) {
-        displayName = profile.firstname;
-    } else if (profile.lastname) {
-        displayName = profile.lastname;
+    try {
+        // Get user profile data from server
+        const response = await fetch(`/api/user/profile/${username}`);
+        if (response.ok) {
+            const data = await response.json();
+            
+            let profile = {};
+            if (data.exists) {
+                profile = data.profile;
+            } else {
+                // Set default values
+                profile = {
+                    firstname: '',
+                    lastname: '',
+                    username: username,
+                    bio: '',
+                    age: '',
+                    gender: '',
+                    location: '',
+                    interests: '',
+                    avatar: `https://i.pravatar.cc/150?u=${username}`
+                };
+            }
+            
+            // Update popup content
+            document.getElementById('popup-avatar').src = profile.avatar;
+            
+            // Set display name
+            let displayName = username;
+            if (profile.firstname && profile.lastname) {
+                displayName = `${profile.firstname} ${profile.lastname}`;
+            } else if (profile.firstname) {
+                displayName = profile.firstname;
+            } else if (profile.lastname) {
+                displayName = profile.lastname;
+            }
+            document.getElementById('popup-username').textContent = displayName;
+            
+            // Set status (check if user is online)
+            const statusDot = document.getElementById('popup-status-dot');
+            const statusText = document.getElementById('popup-status-text');
+            const isOnline = onlineUsers.includes(username);
+            
+            statusDot.className = `user-status-indicator ${isOnline ? 'online' : 'offline'}`;
+            statusText.textContent = isOnline ? 'Online' : 'Offline';
+            
+            // Set bio
+            document.getElementById('popup-bio').textContent = profile.bio || 'No bio available';
+            
+            // Set details
+            document.getElementById('popup-age').textContent = profile.age || 'Not specified';
+            document.getElementById('popup-gender').textContent = profile.gender ? 
+                profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1) : 'Not specified';
+            document.getElementById('popup-location').textContent = profile.location || 'Not specified';
+            document.getElementById('popup-interests').textContent = profile.interests || 'Not specified';
+            
+            // Update message button
+            const messageBtn = document.getElementById('popup-message-btn');
+            const currentUser = currentUserSession?.username;
+            if (username === currentUser) {
+                messageBtn.style.display = 'none';
+            } else {
+                messageBtn.style.display = 'block';
+                messageBtn.onclick = () => {
+                    hideUserProfile();
+                    // Switch to private messages and open chat with this user
+                    showContainer('private-messages');
+                    setTimeout(() => {
+                        openPrivateChat(username);
+                    }, 100);
+                };
+            }
+            
+            // Show popup
+            popup.style.display = 'flex';
+        }
+    } catch (error) {
+        console.error('Error loading user profile:', error);
+        showError('Failed to load user profile');
     }
-    document.getElementById('popup-username').textContent = displayName;
-    
-    // Set status (check if user is online)
-    const statusDot = document.getElementById('popup-status-dot');
-    const statusText = document.getElementById('popup-status-text');
-    const isOnline = onlineUsers.includes(username);
-    
-    statusDot.className = `user-status-indicator ${isOnline ? 'online' : 'offline'}`;
-    statusText.textContent = isOnline ? 'Online' : 'Offline';
-    
-    // Set bio
-    document.getElementById('popup-bio').textContent = profile.bio || 'No bio available';
-    
-    // Set details
-    document.getElementById('popup-age').textContent = profile.age || 'Not specified';
-    document.getElementById('popup-gender').textContent = profile.gender ? 
-        profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1) : 'Not specified';
-    document.getElementById('popup-location').textContent = profile.location || 'Not specified';
-    document.getElementById('popup-interests').textContent = profile.interests || 'Not specified';
-    
-    // Update message button
-    const messageBtn = document.getElementById('popup-message-btn');
-    const currentUser = localStorage.getItem('currentUser');
-    if (username === currentUser) {
-        messageBtn.style.display = 'none';
-    } else {
-        messageBtn.style.display = 'block';
-        messageBtn.onclick = () => {
-            hideUserProfile();
-            // Switch to private messages and open chat with this user
-            showContainer('private-messages');
-            setTimeout(() => {
-                openPrivateChat(username);
-            }, 100);
-        };
-    }
-    
-    // Show popup
-    popup.style.display = 'flex';
 }
 
 function hideUserProfile() {
@@ -994,7 +1042,7 @@ function initSocket() {
     
     socket.on('connect', () => {
         console.log('✅ Socket connected');
-        const username = localStorage.getItem('chat_username');
+        const username = currentUserSession?.username;
         if (username) {
             socket.emit('user-online', username);
             // Request existing messages when connecting
@@ -1007,7 +1055,7 @@ function initSocket() {
         console.log('💬 New message received via socket:', message);
         
         // Only display if message is from another user or if it's an AI/bot response
-        const isOwnMessage = message.username === currentUsername;
+        const isOwnMessage = message.username === currentUserSession?.username;
         const isAIResponse = message.username === 'AI' || message.username === 'Bot';
         
         if (!isOwnMessage || isAIResponse) {
@@ -1056,7 +1104,7 @@ function initSocket() {
 
     // Send heartbeat every 2 minutes to stay online
     const heartbeatInterval = setInterval(() => {
-        const username = localStorage.getItem('chat_username');
+        const username = currentUserSession?.username;
         if (username && socket.connected) {
             socket.emit('user-online', username);
             console.log('💓 Heartbeat sent - keeping user online');
@@ -1077,8 +1125,7 @@ async function sendMessage() {
     isSending = true;
     
     const content = elements.messageInput.value.trim();
-    currentUsername = localStorage.getItem('chat_username') || '';
-    const username = currentUsername;
+    const username = currentUserSession?.username;
     
     if (!content || !username) {
         isSending = false;
@@ -1106,14 +1153,10 @@ async function sendMessage() {
             return showError('Warning: bad word detected! If you repeat, you will be banned.');
         } else {
             bannedUsers[username] = Date.now() + BAN_DURATION;
-            delete users[username];
-            localStorage.setItem('users', JSON.stringify(users));
-            localStorage.removeItem('currentUser');
-            localStorage.removeItem('chat_username');
             showError('You used bad words again. Account deleted and banned.');
             isSending = false;
             setTimeout(() => {
-                location.reload();
+                logout();
             }, 2000);
             return;
         }
@@ -1232,7 +1275,7 @@ async function loadMessages() {
         if (data.length > 0) {
             const latestMessage = data[data.length - 1];
             if (latestMessage.id !== lastMessageId && 
-                latestMessage.username !== currentUsername && 
+                latestMessage.username !== currentUserSession?.username && 
                 document.visibilityState !== 'visible') {
                 showNotification(latestMessage.username, latestMessage.content);
             }
@@ -1259,7 +1302,7 @@ function renderMessages(messages) {
     
     // FIXED: Display messages in correct chronological order (oldest to newest)
     messages.forEach(msg => {
-        const isOwn = msg.username?.trim().toLowerCase() === currentUsername?.trim().toLowerCase();
+        const isOwn = msg.username?.trim().toLowerCase() === currentUserSession?.username?.trim().toLowerCase();
         displayMessage(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id, false);
     });
 
@@ -1298,9 +1341,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
         avatarDiv.className = 'avatar';
         
         // Get user profile to display correct avatar
-        const profileKey = `userProfile_${username}`;
-        const profileData = JSON.parse(localStorage.getItem(profileKey)) || {};
-        const avatarUrl = profileData.avatar || `https://i.pravatar.cc/50?u=${encodeURIComponent(username)}`;
+        const avatarUrl = `https://i.pravatar.cc/50?u=${encodeURIComponent(username)}`;
         
         avatarDiv.innerHTML = `<img src="${avatarUrl}" alt="avatar">`;
         
@@ -1533,16 +1574,17 @@ function forceScrollToBottom(containerId) {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 Initializing application...');
     
+    // Check if user is logged in (using session)
+    checkUserSession();
+    
     // Initialize buttons first
     initializeButtons();
     
     // Load user panel preference
     loadUserPanelPreference();
     
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-        console.log('✅ User logged in:', savedUser);
-        localStorage.setItem('chat_username', savedUser);
+    if (currentUserSession) {
+        console.log('✅ User logged in:', currentUserSession.username);
         document.getElementById('auth-container').style.display = 'none';
         document.querySelector('.menu').style.display = 'flex';
         document.querySelector('.news-toggle').style.display = 'block';
@@ -1610,6 +1652,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     console.log('🎯 Application initialization complete');
 });
+
+// ===== ADDED: USER SESSION MANAGEMENT =====
+function checkUserSession() {
+    // Check if user session exists in sessionStorage (persists only for browser session)
+    const sessionData = sessionStorage.getItem('currentUserSession');
+    if (sessionData) {
+        currentUserSession = JSON.parse(sessionData);
+        return true;
+    }
+    return false;
+}
+
+function saveUserSession(userData) {
+    currentUserSession = userData;
+    sessionStorage.setItem('currentUserSession', JSON.stringify(userData));
+}
+
+function clearUserSession() {
+    currentUserSession = null;
+    sessionStorage.removeItem('currentUserSession');
+}
 
 // ===== FIXED: SECTION MANAGEMENT - CLOSE SECTIONS PROPERLY =====
 
@@ -1835,7 +1898,966 @@ function setupPrivateMessageInputHandlers() {
     }
 }
 
-// ===== REST OF THE FUNCTIONS REMAIN THE SAME =====
+// ===== UPDATED AUTHENTICATION SYSTEM =====
+
+// Real-time username validation
+function setupUsernameValidation() {
+    const usernameInput = document.getElementById('auth-username');
+    if (!usernameInput) return;
+    
+    let validationTimer;
+    
+    usernameInput.addEventListener('input', function() {
+        clearTimeout(validationTimer);
+        const username = this.value.trim();
+        
+        // Clear previous validation states
+        this.classList.remove('username-valid', 'username-invalid');
+        elements.errorDisplay.style.display = 'none';
+        
+        if (username.length < 3) return;
+        
+        validationTimer = setTimeout(async () => {
+            // Validate username format
+            if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+                this.classList.add('username-invalid');
+                return;
+            }
+            
+            // Only check availability during signup
+            if (!isLogin) {
+                try {
+                    const response = await fetch('/api/check-username', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ username: username })
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        
+                        if (data.available) {
+                            this.classList.add('username-valid');
+                        } else {
+                            this.classList.add('username-invalid');
+                            showError('Username already exists');
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error checking username:', error);
+                }
+            }
+        }, 500);
+    });
+}
+
+// MODIFIED: Authentication handler
+async function handleAuth() {
+    const username = document.getElementById('auth-username').value.trim();
+    const password = document.getElementById('auth-password').value;
+    const loader = document.getElementById('loader');
+    
+    elements.errorDisplay.style.display = 'none';
+    elements.successDisplay.style.display = 'none';
+    
+    if (!username || !password) {
+        showError('Please enter both username and password');
+        return;
+    }
+    
+    if (username.length < 3 || username.length > 20) {
+        showError('Username must be between 3-20 characters');
+        return;
+    }
+    
+    if (password.length < 4 || password.length > 20) {
+        showError('Password must be between 4-20 characters');
+        return;
+    }
+    
+    // Validate username format
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+        showError('Username can only contain letters, numbers, and underscores');
+        return;
+    }
+    
+    loader.style.display = 'flex';
+    
+    try {
+        if (isLogin) {
+            // Login
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, password })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showSuccess('Login successful!');
+                
+                // Save user session
+                saveUserSession({
+                    username: data.username,
+                    user_id: data.user_id
+                });
+                
+                setTimeout(() => {
+                    loader.style.display = 'none';
+                    document.getElementById('auth-container').style.display = 'none';
+                    document.querySelector('.menu').style.display = 'flex';
+                    document.querySelector('.news-toggle').style.display = 'block';
+                    
+                    initializeButtons();
+                    showContainer('chat');
+                    loadProfile();
+                    initializeChat();
+
+                    initSocket();
+                    setupTypingHandlers();
+                    
+                    document.addEventListener('visibilitychange', handleVisibilityChange);
+                    window.addEventListener('beforeunload', handleBeforeUnload);
+                    window.addEventListener('pagehide', handlePageHide);
+                    
+                    if (hasVerifiedCode()) {
+                        enableSQLEditorAccess();
+                    }
+                }, 500);
+            } else {
+                throw new Error(data.error || 'Login failed');
+            }
+        } else {
+            // Signup
+            const response = await fetch('/api/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, password })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showSuccess('Account created successfully! Please login.');
+                setTimeout(() => {
+                    loader.style.display = 'none';
+                    toggleAuth();
+                }, 1000);
+            } else {
+                throw new Error(data.error || 'Registration failed');
+            }
+        }
+    } catch (error) {
+        loader.style.display = 'none';
+        showError(error.message);
+    }
+}
+
+function toggleAuth() {
+    isLogin = !isLogin;
+    const authTitle = document.getElementById('auth-title');
+    const authButton = document.querySelector('.auth-box button');
+    const toggleText = document.getElementById('toggle-text');
+    const toggleLink = document.getElementById('toggle-link');
+    elements.errorDisplay.style.display = 'none';
+    elements.successDisplay.style.display = 'none';
+    
+    if (isLogin) {
+        authTitle.textContent = 'Login';
+        authButton.textContent = 'Login';
+        toggleText.textContent = "Don't have an account? ";
+        toggleLink.textContent = 'Sign Up';
+    } else {
+        authTitle.textContent = 'Sign Up';
+        authButton.textContent = 'Sign Up';
+        toggleText.textContent = 'Already have an account? ';
+        toggleLink.textContent = 'Login';
+    }
+    
+    // Reset username validation
+    const usernameInput = document.getElementById('auth-username');
+    if (usernameInput) {
+        usernameInput.classList.remove('username-valid', 'username-invalid');
+    }
+}
+
+function showSuccess(message) {
+    elements.successDisplay.textContent = message;
+    elements.successDisplay.style.display = 'block';
+    setTimeout(() => {
+        elements.successDisplay.style.display = 'none';
+    }, 3000);
+}
+
+function showError(message) {
+    elements.errorDisplay.textContent = message;
+    elements.errorDisplay.style.display = 'block';
+    setTimeout(() => {
+        elements.errorDisplay.style.display = 'none';
+    }, 3000);
+}
+
+function initializeChat() {
+    if (elements.messageInput) {
+        elements.messageInput.addEventListener('input', () => {
+            autoResize(elements.messageInput);
+            const hasText = elements.messageInput.value.trim().length > 0;
+            elements.sendButton.disabled = !hasText || isSending;
+            elements.sendButton.classList.toggle('enabled', hasText && !isSending);
+        });
+        elements.messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !isSending) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    }
+    loadMessages();
+}
+
+function autoResize(textarea) {
+    if (textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = (textarea.scrollHeight > 100 ? 100 : textarea.scrollHeight) + 'px';
+    }
+}
+
+function showNotification(username, message) {
+    if (!notificationPermissionGranted || !('Notification' in window)) return;
+    const notification = new Notification(`${username} says:`, {
+        body: message.length > 50 ? message.substring(0, 50) + '...' : message,
+        icon: 'https://i.pravatar.cc/50?u=' + encodeURIComponent(username)
+    });
+    notification.onclick = () => {
+        window.focus();
+    };
+}
+
+// ✅ FIXED: COMPLETELY REWRITTEN - No more duplicate responses
+async function fetchChatResponse(userInput) {
+    if (isProcessingCommand) {
+        console.log('🛑 Command already being processed, skipping...');
+        return;
+    }
+
+    isProcessingCommand = true;
+    
+    try {
+        const PREFIX = '!'; // Make sure this matches your server prefix
+        
+        // Don't process commands that start with prefix - let the server handle them
+        if (userInput.startsWith(PREFIX)) {
+            console.log('🤖 Command detected, letting server handle response...');
+            return;
+        }
+        
+        // Only process non-command messages for AI response
+        const response = await fetch('/api/command', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: userInput,
+                source: 'main-chat'
+            }),
+        });
+        
+        // ✅ FIXED: Don't display the response here - let Socket.io handle it
+        // The server will save the response and broadcast it via Socket.io
+        // We'll display it when we receive the 'new-message' event
+        console.log('🤖 Command sent to server, waiting for Socket.io response...');
+        
+    } catch (error) {
+        console.error("Error fetching AI response:", error);
+    } finally {
+        // Reset the flag after a short delay
+        setTimeout(() => {
+            isProcessingCommand = false;
+        }, 1000);
+    }
+}
+
+async function fetchPrivateAIResponse(userInput) {
+    try {
+        const response = await fetch('/api/command', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: userInput,
+                source: 'private-ai'
+            }),
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        if (data.reply) {
+            // Display in private AI container
+            if (Array.isArray(data.reply)) {
+                data.reply.forEach(reply => displayPrivateMessage(reply, 'received'));
+            } else {
+                displayPrivateMessage(data.reply, 'received');
+            }
+        } else {
+            throw new Error('No reply from AI');
+        }
+    } catch (error) {
+        console.error("Error fetching Private AI response:", error);
+        displayPrivateMessage("Sorry, I encountered an error processing your message. Please try again.", 'received');
+    }
+}
+
+function handleTouchStart(e) {
+    isLongPress = false;
+    e.currentTarget.classList.add('no-select');
+    longPressTimer = setTimeout(() => {
+        isLongPress = true;
+        showMessageContextMenu(e, e.currentTarget);
+    }, 500);
+}
+
+function handleTouchMove(e) {
+    clearTimeout(longPressTimer);
+    e.currentTarget.classList.remove('no-select');
+}
+
+function handleTouchEnd(e) {
+    clearTimeout(longPressTimer);
+    e.currentTarget.classList.remove('no-select');
+}
+
+function clearReply() {
+    replyToText = null;
+    if (elements.replyPreview) {
+        elements.replyPreview.style.display = 'none';
+        elements.replyPreview.textContent = '';
+    }
+}
+
+// Track page visibility for notifications
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        // When page becomes visible, update lastMessageId to prevent duplicate notifications
+        if (elements.chatContainer && elements.chatContainer.lastChild) {
+            lastMessageId = elements.chatContainer.lastChild.dataset.id;
+        }
+    }
+});
+
+function showMessageContextMenu(e, message) {
+    const messageText = message.dataset.content || '';
+    const messageId = message.dataset.id;
+    document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());
+
+    const contextMenu = document.createElement('div');
+    contextMenu.className = 'message-context-menu active';
+    contextMenu.style.left = `${(e.touches?.[0]?.pageX || e.clientX)}px`;
+    contextMenu.style.top = `${(e.touches?.[0]?.pageY || e.clientY)}px`;
+
+    const copyButton = document.createElement('button');
+    copyButton.textContent = 'Copy';
+    copyButton.onclick = () => {
+        copyToClipboard(messageText, copyButton);
+        contextMenu.remove();
+    };
+
+    const replyButton = document.createElement('button');
+    replyButton.textContent = 'Reply';
+    replyButton.onclick = () => {
+        replyToText = messageText;
+        elements.messageInput.focus();
+        showReplyPreview();
+        contextMenu.remove();
+    };
+
+    contextMenu.appendChild(copyButton);
+    contextMenu.appendChild(replyButton);
+
+    if (messageId && message.classList.contains('sent')) {
+        const deleteButton = document.createElement('button');
+        deleteButton.textContent = 'Delete';
+        deleteButton.onclick = async () => {
+            try {
+                const response = await fetch(`/messages/${messageId}`, {
+                    method: 'DELETE'
+                });
+                if (!response.ok) throw new Error('Delete failed');
+                message.remove();
+            } catch (err) {
+                showError(err.message);
+            }
+            contextMenu.remove();
+        };
+        contextMenu.appendChild(deleteButton);
+    }
+
+    document.body.appendChild(contextMenu);
+    document.addEventListener('click', () => contextMenu.remove(), {
+        once: true
+    });
+}
+
+function showReplyPreview() {
+    if (!elements.replyPreview) return;
+    elements.replyPreview.innerHTML = `
+        <div class="reply-preview">
+            Replying to: ${replyToText.substring(0, 80)}
+            <button onclick="clearReply()" style="float:right; font-size:12px;">✕</button>
+        </div>
+    `;
+}
+
+function copyToClipboard(text, button) {  
+    const textarea = document.createElement('textarea');  
+    textarea.value = text;  
+    document.body.appendChild(textarea);  
+    textarea.select();  
+    document.execCommand('copy');  
+    document.body.removeChild(textarea);  
+
+    button.innerHTML = '<span style="font-size: 15px;">Copied!</span>';  
+    setTimeout(() => {  
+        button.innerHTML = 'Copy';  
+    }, 2000);  
+}  
+
+function toggleKebabMenu(event) {
+    event.stopPropagation();
+    const dropdown = document.querySelector('.kebab-dropdown');
+    if (dropdown) {
+        dropdown.classList.toggle('active');
+    }
+}
+
+document.addEventListener('click', function(event) {
+    const dropdown = document.querySelector('.kebab-dropdown');
+    if (dropdown && dropdown.classList.contains('active')) {
+        dropdown.classList.remove('active');
+    }
+});
+
+function toggleTheme() {
+    document.body.classList.toggle('dark-theme');
+    const dropdown = document.querySelector('.kebab-dropdown');
+    if (dropdown) {
+        dropdown.classList.remove('active');
+    }
+}
+
+function clearChat() {
+    const chatContainer = document.getElementById('chat-container');
+    if (chatContainer) {
+        chatContainer.innerHTML = '';
+    }
+    const dropdown = document.querySelector('.kebab-dropdown');
+    if (dropdown) {
+        dropdown.classList.remove('active');
+    }
+}
+
+function exportChat() {
+    const chatContainer = document.getElementById('chat-container');
+    if (!chatContainer) return;
+    
+    const messages = chatContainer.innerText;
+    const blob = new Blob([messages], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'chat-export.txt';
+    a.click();
+    window.URL.revokeObjectURL(url);
+    const dropdown = document.querySelector('.kebab-dropdown');
+    if (dropdown) {
+        dropdown.classList.remove('active');
+    }
+}
+
+function exportChatPDF() {
+    const chatContainer = document.getElementById('chat-container');
+    if (!chatContainer) return;
+    
+    const dropdown = document.querySelector('.kebab-dropdown');
+    if (!dropdown) return;
+
+    const clone = chatContainer.cloneNode(true);
+
+    // Show downloading alert
+    const downloadingAlert = document.createElement('div');
+    downloadingAlert.id = 'downloading-alert';
+    downloadingAlert.textContent = 'Preparing download, please wait...';
+    downloadingAlert.style.position = 'fixed';
+    downloadingAlert.style.top = '20px';
+    downloadingAlert.style.left = '50%';
+    downloadingAlert.style.transform = 'translateX(-50%)';
+    downloadingAlert.style.padding = '10px 20px';
+    downloadingAlert.style.backgroundColor = '#333';
+    downloadingAlert.style.color = '#fff';
+    downloadingAlert.style.fontSize = '16px';
+    downloadingAlert.style.borderRadius = '8px';
+    downloadingAlert.style.zIndex = '9999';
+    document.body.appendChild(downloadingAlert);
+
+    // Find all images and replace src with base64
+    const images = clone.querySelectorAll('img');
+    const promises = [];
+
+    images.forEach(img => {
+        const promise = new Promise((resolve, reject) => {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            const originalImage = new Image();
+            originalImage.crossOrigin = 'anonymous';
+            originalImage.src = img.src;
+
+            originalImage.onload = () => {
+                try {
+                    // Store original display style to restore later
+                    const originalDisplay = img.style.display;
+                    const originalWidth = img.style.width;
+                    const originalHeight = img.style.height;
+
+                    // Temporarily make image visible and full size for capture
+                    img.style.display = 'block';
+                    img.style.width = 'auto';
+                    img.style.height = 'auto';
+                    img.style.maxWidth = 'none';
+                    img.style.maxHeight = 'none';
+
+                    canvas.width = originalImage.naturalWidth;
+                    canvas.height = originalImage.naturalHeight;
+                    context.drawImage(originalImage, 0, 0);
+
+                    const dataURL = canvas.toDataURL('image/png');
+                    img.src = dataURL;
+
+                    // Restore original styles
+                    img.style.display = originalDisplay;
+                    img.style.width = originalWidth;
+                    img.style.height = originalHeight;
+
+                    resolve();
+                } catch (error) {
+                    console.error('Error converting image:', error);
+                    resolve();
+                }
+            };
+
+            originalImage.onerror = () => {
+                console.error('Error loading image:', img.src);
+                resolve();
+            };
+        });
+        promises.push(promise);
+    });
+
+    Promise.all(promises).then(() => {
+        const opt = {
+            margin: 10,
+            filename: 'chat-export.pdf',
+            image: { type: 'jpeg', quality: 1 },
+            html2canvas: { 
+                scale: 2,
+                useCORS: true,
+                allowTaint: true,
+                scrollX: 0,
+                scrollY: 0,
+                windowWidth: document.documentElement.scrollWidth,
+                windowHeight: document.documentElement.scrollHeight
+            },
+            jsPDF: { 
+                unit: 'mm',
+                format: 'a4',
+                orientation: 'portrait',
+                hotfixes: ['px_scaling'] 
+            },
+            pagebreak: { 
+                mode: ['avoid-all', 'css', 'legacy'],
+                before: '.page-break' 
+            }
+        };
+
+        // Temporarily modify image styles for PDF generation
+        const allImages = clone.querySelectorAll('img');
+        allImages.forEach(img => {
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            img.style.display = 'block';
+        });
+
+        html2pdf().set(opt).from(clone).save().then(() => {
+            downloadingAlert.remove();
+        }).catch((error) => {
+            console.error('Error generating PDF:', error);
+            downloadingAlert.remove();
+        });
+
+        dropdown.classList.remove('active');
+    });
+}
+
+function showSettings() {
+    alert('Settings panel coming soon!');
+    const dropdown = document.querySelector('.kebab-dropdown');
+    if (dropdown) {
+        dropdown.classList.remove('active');
+    }
+}
+
+function toggleNews() {
+    const newsContainer = document.getElementById('news-container');
+    if (newsContainer) {
+        // Toggle the display of the news container
+        if (newsContainer.style.display === 'none' || newsContainer.style.display === '') {
+            newsContainer.style.display = 'block';
+            // Make sure it's populated with news items
+            populateNews();
+        } else {
+            newsContainer.style.display = 'none';
+        }
+    }
+}
+
+const sampleNews = [
+    {
+        title: "New AI Features Released",
+        description: "We've added exciting new capabilities to our chatbot!",
+        date: "2025-01-15"
+    },
+    {
+        title: "System Update",
+        description: "Performance improvements and bug fixes",
+        date: "2025-03-14"
+    },
+    {
+        title: "Maintenance Notice",
+        description: "Scheduled maintenance on January 20th",
+        date: "2025-03-13"
+    }
+];
+
+function populateNews() {
+    const newsItems = document.getElementById('news-items');
+    if (!newsItems) return;
+    
+    newsItems.innerHTML = '';
+
+    sampleNews.forEach(news => {
+        const newsItem = document.createElement('div');
+        newsItem.className = 'news-item';
+        newsItem.innerHTML = `
+            <h3>${news.title}</h3>
+            <p>${news.description}</p>
+            <small>${news.date}</small>
+        `;
+        newsItems.appendChild(newsItem);
+    });
+}
+
+document.addEventListener('click', function (e) {
+    if (e.target.tagName === 'IMG' && e.target.closest('.message')) {
+        openZoom(e.target.src);
+    }
+});
+
+function openZoom(src) {
+    document.body.style.overflow = 'hidden';
+    const overlay = document.getElementById('zoom-overlay');
+    const zoomImage = document.getElementById('zoom-image');
+    const downloadBtn = document.getElementById('download-btn');
+
+    if (!overlay || !zoomImage || !downloadBtn) return;
+    
+    zoomImage.src = src;
+
+    // Force download filename
+    downloadBtn.href = src;
+    downloadBtn.setAttribute('download', 'image.jpg');
+
+    overlay.style.display = 'flex';
+}
+
+function closeZoom() {
+    document.body.style.overflow = '';
+    const overlay = document.getElementById('zoom-overlay');
+    if (overlay) overlay.style.display = 'none';
+}
+
+if (document.getElementById("year")) {
+    document.getElementById("year").textContent = new Date().getFullYear();
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    populateNews();
+
+    const currentUser = currentUserSession?.username;
+    if (currentUser) {
+        const newsToggle = document.querySelector('.news-toggle');
+        if (newsToggle) newsToggle.style.display = 'block';
+    } else {
+        const newsToggle = document.querySelector('.news-toggle');
+        if (newsToggle) newsToggle.style.display = 'none';
+        
+        const newsContainer = document.querySelector('.news-container');
+        if (newsContainer) newsContainer.style.display = 'none';
+    }
+});
+
+// UPDATED function to update the profile section with new design
+function updateProfileSection() {
+    const dropdown = document.getElementById('dropdown');
+    if (!dropdown) return;
+    
+    const currentUsername = currentUserSession?.username;
+    
+    // Remove existing profile section if it exists
+    const existingProfile = document.querySelector('.profile-section');
+    const existingDivider = document.querySelector('.menu-divider');
+    if (existingProfile) existingProfile.remove();
+    if (existingDivider) existingDivider.remove();
+    
+    // Only add profile section if user is logged in
+    if (currentUsername) {
+        const profileSection = document.createElement('div');
+        profileSection.className = 'profile-panel';
+        profileSection.innerHTML = `
+            <div class="profile-avatar">
+                <img src="https://i.pravatar.cc/50?u=${encodeURIComponent(currentUsername)}" alt="Profile">
+            </div>
+            <div class="profile-info">
+                <div class="profile-username">${currentUsername}</div>
+                <div class="profile-status online">
+                    <span class="status-dot"></span>
+                    <span>Online</span>
+                </div>
+            </div>
+        `;
+        
+        const divider = document.createElement('div');
+        divider.className = 'menu-divider';
+        
+        // Insert at the beginning of dropdown
+        dropdown.insertBefore(divider, dropdown.firstChild);
+        dropdown.insertBefore(profileSection, dropdown.firstChild);
+    }
+}
+
+// Improved click handler for dropdown
+document.addEventListener('click', function(event) {
+    const dropdown = document.getElementById('dropdown');
+    const hamburger = document.querySelector('.hamburger');
+    const kebabMenu = document.querySelector('.kebab-menu');
+    
+    // Close dropdown if clicking outside of it and not on menu controls
+    if (dropdown && dropdown.style.display === 'block' && 
+        !dropdown.contains(event.target) && 
+        event.target !== hamburger &&
+        !kebabMenu.contains(event.target)) {
+        dropdown.style.display = 'none';
+    }
+    
+    // Close kebab menu if clicking outside
+    const kebabDropdown = document.querySelector('.kebab-dropdown');
+    if (kebabDropdown && kebabDropdown.classList.contains('active') && 
+        !kebabMenu.contains(event.target) && 
+        !kebabDropdown.contains(event.target)) {
+        kebabDropdown.classList.remove('active');
+    }
+});
+
+// IMPROVED logout function with proper cleanup
+function logout() {
+    const username = currentUserSession?.username;
+    
+    // Notify server that user is going offline
+    if (username && socket) {
+        socket.emit('user-offline', username);
+        // Disconnect socket
+        socket.disconnect();
+    }
+    
+    // Clear user session
+    clearUserSession();
+    
+    // Remove page event listeners
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    window.removeEventListener('beforeunload', handleBeforeUnload);
+    window.removeEventListener('pagehide', handlePageHide);
+    
+    // Hide all containers and menus
+    document.querySelectorAll('.main-chat-interface').forEach(container => {
+        container.style.display = 'none';
+    });
+    
+    const menu = document.querySelector('.menu');
+    if (menu) menu.style.display = 'none';
+    
+    const dropdown = document.getElementById('dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    
+    const kebabDropdown = document.querySelector('.kebab-dropdown');
+    if (kebabDropdown) kebabDropdown.classList.remove('active');
+    
+    // Hide all chat inputs
+    document.querySelectorAll('.chat-input').forEach(input => {
+        input.style.display = 'none';
+    });
+    
+    // Show auth container
+    document.getElementById('auth-container').style.display = 'flex';
+    
+    // Hide news toggle
+    const newsToggle = document.querySelector('.news-toggle');
+    if (newsToggle) newsToggle.style.display = 'none';
+    
+    const newsContainer = document.querySelector('.news-container');
+    if (newsContainer) newsContainer.style.display = 'none';
+    
+    // Hide both buttons on logout
+    if (scrollToBottomBtn) {
+        scrollToBottomBtn.style.display = 'none';
+        scrollToBottomBtn.classList.remove('visible');
+    }
+    if (privateGoTopBtn) {
+        privateGoTopBtn.style.display = 'none';
+        privateGoTopBtn.classList.remove('visible');
+    }
+    
+    // Reset auth form
+    isLogin = true;
+    const authTitle = document.getElementById('auth-title');
+    if (authTitle) authTitle.textContent = 'Login';
+    
+    const authButton = document.querySelector('.auth-box button');
+    if (authButton) authButton.textContent = 'Login';
+    
+    const toggleText = document.getElementById('toggle-text');
+    if (toggleText) toggleText.textContent = "Don't have an account? ";
+    
+    const toggleLink = document.getElementById('toggle-link');
+    if (toggleLink) toggleLink.textContent = 'Sign Up';
+    
+    // Clear profile section
+    const profileSection = document.querySelector('.profile-panel');
+    const divider = document.querySelector('.menu-divider');
+    if (profileSection) profileSection.remove();
+    if (divider) divider.remove();
+    
+    // Clear any validation states
+    const usernameInput = document.getElementById('auth-username');
+    if (usernameInput) {
+        usernameInput.classList.remove('username-valid', 'username-invalid');
+        usernameInput.value = '';
+    }
+    document.getElementById('auth-password').value = '';
+}
+
+// Improved toggleDropdown function
+function toggleDropdown() {
+    const dropdown = document.getElementById('dropdown');
+    if (!dropdown) return;
+    
+    const isVisible = dropdown.style.display === 'block';
+    
+    // Close all other menus first
+    const kebabDropdown = document.querySelector('.kebab-dropdown');
+    if (kebabDropdown) kebabDropdown.classList.remove('active');
+    
+    // Toggle dropdown
+    dropdown.style.display = isVisible ? 'none' : 'block';
+    
+    // Close if clicking the same button while open
+    if (isVisible) {
+        dropdown.style.display = 'none';
+    }
+}
+
+// Zoom functions remain the same
+function openZoom(src) {
+    document.body.style.overflow = 'hidden';
+    const overlay = document.getElementById('zoom-overlay');
+    const zoomImage = document.getElementById('zoom-image');
+    if (!overlay || !zoomImage) return;
+    
+    zoomImage.src = src;
+    overlay.style.display = 'flex';
+}
+
+function closeZoom() {
+    document.body.style.overflow = '';
+    const overlay = document.getElementById('zoom-overlay');
+    if (overlay) overlay.style.display = 'none';
+}
+
+// Initialize if user is logged in
+const currentUser = currentUserSession?.username;
+if (currentUser) {
+    showContainer('chat');
+    
+    const chatInput = document.querySelector('.chat-input');
+    if (chatInput) chatInput.style.display = 'flex';
+    
+    updateProfileSection();
+    
+    // Initialize real-time features
+    initSocket();
+    setupTypingHandlers();
+    
+    // Add page event listeners
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
+    
+    // Enable SQL Editor access if already verified
+    if (hasVerifiedCode()) {
+        enableSQLEditorAccess();
+    }
+}
+
+// Format message time function
+function formatMessageTime(timestamp) {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now - date;
+    
+    // If less than a minute ago
+    if (diff < 60000) {
+        return 'Just now';
+    }
+    
+    // If less than an hour ago
+    if (diff < 3600000) {
+        const minutes = Math.floor(diff / 60000);
+        return `${minutes}m ago`;
+    }
+    
+    // If today
+    if (date.toDateString() === now.toDateString()) {
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    
+    // If yesterday
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) {
+        return 'Yesterday';
+    }
+    
+    // Otherwise, show date
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
 
 // SQL EDITOR FUNCTIONS
 function initializeSQLEditor() {
@@ -2454,9 +3476,7 @@ function updateSingleOnlineList(listElementId, countElementId, onlineUsers) {
             userElement.className = 'online-user';
             
             // Get user profile to display correct avatar
-            const profileKey = `userProfile_${user}`;
-            const profileData = JSON.parse(localStorage.getItem(profileKey)) || {};
-            const avatarUrl = profileData.avatar || `https://i.pravatar.cc/50?u=${encodeURIComponent(user)}`;
+            const avatarUrl = `https://i.pravatar.cc/50?u=${encodeURIComponent(user)}`;
             
             userElement.innerHTML = `
                 <div class="online-user-avatar">
@@ -2559,7 +3579,7 @@ function setupTypingHandlers() {
     const messageInput = document.getElementById('user-input');
     if (!messageInput) return;
     messageInput.addEventListener('input', () => {
-        const username = localStorage.getItem('chat_username');
+        const username = currentUserSession?.username;
         if (!username || !socket) return;
         if (!isTyping) {
             isTyping = true;
@@ -2658,7 +3678,7 @@ function scrollPrivateToTop(e) {
 
 // Page visibility and unload handlers
 function handleVisibilityChange() {
-    const username = localStorage.getItem('chat_username');
+    const username = currentUserSession?.username;
     if (username && socket) {
         if (document.visibilityState === 'hidden') {
             // User switched tabs or minimized browser - mark as away
@@ -2671,7 +3691,7 @@ function handleVisibilityChange() {
 }
 
 function handleBeforeUnload() {
-    const username = localStorage.getItem('chat_username');
+    const username = currentUserSession?.username;
     if (username && socket) {
         // Send away status instead of offline
         socket.emit('user-away', username);
@@ -2679,7 +3699,7 @@ function handleBeforeUnload() {
 }
 
 function handlePageHide() {
-    const username = localStorage.getItem('chat_username');
+    const username = currentUserSession?.username;
     if (username && socket) {
         // Send away status instead of offline
         socket.emit('user-away', username);
@@ -2783,873 +3803,7 @@ function forceImageRendering() {
     });
 }
 
-function toggleAuth() {
-    isLogin = !isLogin;
-    const authTitle = document.getElementById('auth-title');
-    const authButton = document.querySelector('.auth-box button');
-    const toggleText = document.getElementById('toggle-text');
-    const toggleLink = document.getElementById('toggle-link');
-    elements.errorDisplay.style.display = 'none';
-    elements.successDisplay.style.display = 'none';
-    if (isLogin) {
-        authTitle.textContent = 'Login';
-        authButton.textContent = 'Login';
-        toggleText.textContent = "Don't have an account? ";
-        toggleLink.textContent = 'Sign Up';
-    } else {
-        authTitle.textContent = 'Sign Up';
-        authButton.textContent = 'Sign Up';
-        toggleText.textContent = 'Already have an account? ';
-        toggleLink.textContent = 'Login';
-    }
-}
-
-function showSuccess(message) {
-    elements.successDisplay.textContent = message;
-    elements.successDisplay.style.display = 'block';
-    setTimeout(() => {
-        elements.successDisplay.style.display = 'none';
-    }, 3000);
-}
-
-function showError(message) {
-    elements.errorDisplay.textContent = message;
-    elements.errorDisplay.style.display = 'block';
-    setTimeout(() => {
-        elements.errorDisplay.style.display = 'none';
-    }, 3000);
-}
-
-async function handleAuth() {
-    const username = document.getElementById('auth-username').value.trim();
-    const password = document.getElementById('auth-password').value;
-    const loader = document.getElementById('loader');
-    elements.errorDisplay.style.display = 'none';
-    elements.successDisplay.style.display = 'none';
-    if (!username || !password) {
-        showError('Please enter both username and password');
-        return;
-    }
-    if (username.length < 3 || username.length > 20) {
-        showError('Username must be between 3-20 characters');
-        return;
-    }
-    if (password.length < 4 || password.length > 20) {
-        showError('Password must be between 4-20 characters');
-        return;
-    }
-    loader.style.display = 'flex';
-    try {
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        if (isLogin) {
-            // Login logic
-            if (users[username] && users[username] === password) {
-                showSuccess('Login successful!');
-                localStorage.setItem('currentUser', username);
-                localStorage.setItem('chat_username', username);
-                setTimeout(() => {
-                    loader.style.display = 'none';
-                    document.getElementById('auth-container').style.display = 'none';
-                    document.querySelector('.menu').style.display = 'flex';
-                    document.querySelector('.news-toggle').style.display = 'block';
-                    
-                    // Initialize buttons after successful login
-                    initializeButtons();
-                    showContainer('chat');
-                    loadProfile();
-                    initializeChat();
-
-                    // Initialize real-time features after login
-                    initSocket();
-                    setupTypingHandlers();
-                    
-                    // Add page event listeners
-                    document.addEventListener('visibilitychange', handleVisibilityChange);
-                    window.addEventListener('beforeunload', handleBeforeUnload);
-                    window.addEventListener('pagehide', handlePageHide);
-                    
-                    // Enable SQL Editor access if already verified
-                    if (hasVerifiedCode()) {
-                        enableSQLEditorAccess();
-                    }
-                }, 500);
-            } else {
-                throw new Error('Invalid username or password');
-            }
-        } else {
-            // Signup logic
-            if (users[username]) {
-                throw new Error('Username already exists');
-            } else {
-                users[username] = password;
-                localStorage.setItem('users', JSON.stringify(users));
-                showSuccess('Account created successfully! Please login.');
-                setTimeout(() => {
-                    loader.style.display = 'none';
-                    toggleAuth();
-                }, 1000);
-            }
-        }
-    } catch (error) {
-        loader.style.display = 'none';
-        showError(error.message);
-    }
-}
-
-function initializeChat() {
-    currentUsername = localStorage.getItem('chat_username') || '';
-    if (elements.usernameInput) {
-        elements.usernameInput.value = currentUsername;
-        elements.usernameInput.addEventListener('input', (e) => {
-            currentUsername = e.target.value.trim();
-            localStorage.setItem('chat_username', currentUsername);
-        });
-    }
-    if (elements.messageInput) {
-        elements.messageInput.addEventListener('input', () => {
-            autoResize(elements.messageInput);
-            const hasText = elements.messageInput.value.trim().length > 0;
-            elements.sendButton.disabled = !hasText || isSending;
-            elements.sendButton.classList.toggle('enabled', hasText && !isSending);
-        });
-        elements.messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey && !isSending) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-    }
-    loadMessages();
-}
-
-function autoResize(textarea) {
-    if (textarea) {
-        textarea.style.height = 'auto';
-        textarea.style.height = (textarea.scrollHeight > 100 ? 100 : textarea.scrollHeight) + 'px';
-    }
-}
-
-function showNotification(username, message) {
-    if (!notificationPermissionGranted || !('Notification' in window)) return;
-    const notification = new Notification(`${username} says:`, {
-        body: message.length > 50 ? message.substring(0, 50) + '...' : message,
-        icon: 'https://i.pravatar.cc/50?u=' + encodeURIComponent(username)
-    });
-    notification.onclick = () => {
-        window.focus();
-    };
-}
-
-// ✅ FIXED: COMPLETELY REWRITTEN - No more duplicate responses
-async function fetchChatResponse(userInput) {
-    if (isProcessingCommand) {
-        console.log('🛑 Command already being processed, skipping...');
-        return;
-    }
-
-    isProcessingCommand = true;
-    
-    try {
-        const PREFIX = '!'; // Make sure this matches your server prefix
-        
-        // Don't process commands that start with prefix - let the server handle them
-        if (userInput.startsWith(PREFIX)) {
-            console.log('🤖 Command detected, letting server handle response...');
-            return;
-        }
-        
-        // Only process non-command messages for AI response
-        const response = await fetch('/api/command', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: userInput,
-                source: 'main-chat'
-            }),
-        });
-        
-        // ✅ FIXED: Don't display the response here - let Socket.io handle it
-        // The server will save the response and broadcast it via Socket.io
-        // We'll display it when we receive the 'new-message' event
-        console.log('🤖 Command sent to server, waiting for Socket.io response...');
-        
-    } catch (error) {
-        console.error("Error fetching AI response:", error);
-    } finally {
-        // Reset the flag after a short delay
-        setTimeout(() => {
-            isProcessingCommand = false;
-        }, 1000);
-    }
-}
-
-async function fetchPrivateAIResponse(userInput) {
-    try {
-        const response = await fetch('/api/command', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: userInput,
-                source: 'private-ai'
-            }),
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        if (data.reply) {
-            // Display in private AI container
-            if (Array.isArray(data.reply)) {
-                data.reply.forEach(reply => displayPrivateMessage(reply, 'received'));
-            } else {
-                displayPrivateMessage(data.reply, 'received');
-            }
-        } else {
-            throw new Error('No reply from AI');
-        }
-    } catch (error) {
-        console.error("Error fetching Private AI response:", error);
-        displayPrivateMessage("Sorry, I encountered an error processing your message. Please try again.", 'received');
-    }
-}
-
-function handleTouchStart(e) {
-    isLongPress = false;
-    e.currentTarget.classList.add('no-select');
-    longPressTimer = setTimeout(() => {
-        isLongPress = true;
-        showMessageContextMenu(e, e.currentTarget);
-    }, 500);
-}
-
-function handleTouchMove(e) {
-    clearTimeout(longPressTimer);
-    e.currentTarget.classList.remove('no-select');
-}
-
-function handleTouchEnd(e) {
-    clearTimeout(longPressTimer);
-    e.currentTarget.classList.remove('no-select');
-}
-
-function clearReply() {
-    replyToText = null;
-    if (elements.replyPreview) {
-        elements.replyPreview.style.display = 'none';
-        elements.replyPreview.textContent = '';
-    }
-}
-
-// Track page visibility for notifications
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-        // When page becomes visible, update lastMessageId to prevent duplicate notifications
-        if (elements.chatContainer && elements.chatContainer.lastChild) {
-            lastMessageId = elements.chatContainer.lastChild.dataset.id;
-        }
-    }
+// Initialize username validation
+document.addEventListener('DOMContentLoaded', function() {
+    setupUsernameValidation();
 });
-
-function showMessageContextMenu(e, message) {
-    const messageText = message.dataset.content || '';
-    const messageId = message.dataset.id;
-    document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());
-
-    const contextMenu = document.createElement('div');
-    contextMenu.className = 'message-context-menu active';
-    contextMenu.style.left = `${(e.touches?.[0]?.pageX || e.clientX)}px`;
-    contextMenu.style.top = `${(e.touches?.[0]?.pageY || e.clientY)}px`;
-
-    const copyButton = document.createElement('button');
-    copyButton.textContent = 'Copy';
-    copyButton.onclick = () => {
-        copyToClipboard(messageText, copyButton);
-        contextMenu.remove();
-    };
-
-    const replyButton = document.createElement('button');
-    replyButton.textContent = 'Reply';
-    replyButton.onclick = () => {
-        replyToText = messageText;
-        elements.messageInput.focus();
-        showReplyPreview();
-        contextMenu.remove();
-    };
-
-    contextMenu.appendChild(copyButton);
-    contextMenu.appendChild(replyButton);
-
-    if (messageId && message.classList.contains('sent')) {
-        const deleteButton = document.createElement('button');
-        deleteButton.textContent = 'Delete';
-        deleteButton.onclick = async () => {
-            try {
-                const response = await fetch(`/messages/${messageId}`, {
-                    method: 'DELETE'
-                });
-                if (!response.ok) throw new Error('Delete failed');
-                message.remove();
-            } catch (err) {
-                showError(err.message);
-            }
-            contextMenu.remove();
-        };
-        contextMenu.appendChild(deleteButton);
-    }
-
-    document.body.appendChild(contextMenu);
-    document.addEventListener('click', () => contextMenu.remove(), {
-        once: true
-    });
-}
-
-function showReplyPreview() {
-    if (!elements.replyPreview) return;
-    elements.replyPreview.innerHTML = `
-        <div class="reply-preview">
-            Replying to: ${replyToText.substring(0, 80)}
-            <button onclick="clearReply()" style="float:right; font-size:12px;">✕</button>
-        </div>
-    `;
-}
-
-function copyToClipboard(text, button) {  
-    const textarea = document.createElement('textarea');  
-    textarea.value = text;  
-    document.body.appendChild(textarea);  
-    textarea.select();  
-    document.execCommand('copy');  
-    document.body.removeChild(textarea);  
-
-    button.innerHTML = '<span style="font-size: 15px;">Copied!</span>';  
-    setTimeout(() => {  
-        button.innerHTML = 'Copy';  
-    }, 2000);  
-}  
-
-function toggleKebabMenu(event) {
-    event.stopPropagation();
-    const dropdown = document.querySelector('.kebab-dropdown');
-    if (dropdown) {
-        dropdown.classList.toggle('active');
-    }
-}
-
-document.addEventListener('click', function(event) {
-    const dropdown = document.querySelector('.kebab-dropdown');
-    if (dropdown && dropdown.classList.contains('active')) {
-        dropdown.classList.remove('active');
-    }
-});
-
-function toggleTheme() {
-    document.body.classList.toggle('dark-theme');
-    const dropdown = document.querySelector('.kebab-dropdown');
-    if (dropdown) {
-        dropdown.classList.remove('active');
-    }
-}
-
-function clearChat() {
-    const chatContainer = document.getElementById('chat-container');
-    if (chatContainer) {
-        chatContainer.innerHTML = '';
-    }
-    const dropdown = document.querySelector('.kebab-dropdown');
-    if (dropdown) {
-        dropdown.classList.remove('active');
-    }
-}
-
-function exportChat() {
-    const chatContainer = document.getElementById('chat-container');
-    if (!chatContainer) return;
-    
-    const messages = chatContainer.innerText;
-    const blob = new Blob([messages], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'chat-export.txt';
-    a.click();
-    window.URL.revokeObjectURL(url);
-    const dropdown = document.querySelector('.kebab-dropdown');
-    if (dropdown) {
-        dropdown.classList.remove('active');
-    }
-}
-
-function exportChatPDF() {
-    const chatContainer = document.getElementById('chat-container');
-    if (!chatContainer) return;
-    
-    const dropdown = document.querySelector('.kebab-dropdown');
-    if (!dropdown) return;
-
-    const clone = chatContainer.cloneNode(true);
-
-    // Show downloading alert
-    const downloadingAlert = document.createElement('div');
-    downloadingAlert.id = 'downloading-alert';
-    downloadingAlert.textContent = 'Preparing download, please wait...';
-    downloadingAlert.style.position = 'fixed';
-    downloadingAlert.style.top = '20px';
-    downloadingAlert.style.left = '50%';
-    downloadingAlert.style.transform = 'translateX(-50%)';
-    downloadingAlert.style.padding = '10px 20px';
-    downloadingAlert.style.backgroundColor = '#333';
-    downloadingAlert.style.color = '#fff';
-    downloadingAlert.style.fontSize = '16px';
-    downloadingAlert.style.borderRadius = '8px';
-    downloadingAlert.style.zIndex = '9999';
-    document.body.appendChild(downloadingAlert);
-
-    // Find all images and replace src with base64
-    const images = clone.querySelectorAll('img');
-    const promises = [];
-
-    images.forEach(img => {
-        const promise = new Promise((resolve, reject) => {
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            const originalImage = new Image();
-            originalImage.crossOrigin = 'anonymous';
-            originalImage.src = img.src;
-
-            originalImage.onload = () => {
-                try {
-                    // Store original display style to restore later
-                    const originalDisplay = img.style.display;
-                    const originalWidth = img.style.width;
-                    const originalHeight = img.style.height;
-
-                    // Temporarily make image visible and full size for capture
-                    img.style.display = 'block';
-                    img.style.width = 'auto';
-                    img.style.height = 'auto';
-                    img.style.maxWidth = 'none';
-                    img.style.maxHeight = 'none';
-
-                    canvas.width = originalImage.naturalWidth;
-                    canvas.height = originalImage.naturalHeight;
-                    context.drawImage(originalImage, 0, 0);
-
-                    const dataURL = canvas.toDataURL('image/png');
-                    img.src = dataURL;
-
-                    // Restore original styles
-                    img.style.display = originalDisplay;
-                    img.style.width = originalWidth;
-                    img.style.height = originalHeight;
-
-                    resolve();
-                } catch (error) {
-                    console.error('Error converting image:', error);
-                    resolve();
-                }
-            };
-
-            originalImage.onerror = () => {
-                console.error('Error loading image:', img.src);
-                resolve();
-            };
-        });
-        promises.push(promise);
-    });
-
-    Promise.all(promises).then(() => {
-        const opt = {
-            margin: 10,
-            filename: 'chat-export.pdf',
-            image: { type: 'jpeg', quality: 1 },
-            html2canvas: { 
-                scale: 2,
-                useCORS: true,
-                allowTaint: true,
-                scrollX: 0,
-                scrollY: 0,
-                windowWidth: document.documentElement.scrollWidth,
-                windowHeight: document.documentElement.scrollHeight
-            },
-            jsPDF: { 
-                unit: 'mm',
-                format: 'a4',
-                orientation: 'portrait',
-                hotfixes: ['px_scaling'] 
-            },
-            pagebreak: { 
-                mode: ['avoid-all', 'css', 'legacy'],
-                before: '.page-break' 
-            }
-        };
-
-        // Temporarily modify image styles for PDF generation
-        const allImages = clone.querySelectorAll('img');
-        allImages.forEach(img => {
-            img.style.maxWidth = '100%';
-            img.style.height = 'auto';
-            img.style.display = 'block';
-        });
-
-        html2pdf().set(opt).from(clone).save().then(() => {
-            downloadingAlert.remove();
-        }).catch((error) => {
-            console.error('Error generating PDF:', error);
-            downloadingAlert.remove();
-        });
-
-        dropdown.classList.remove('active');
-    });
-}
-
-function showSettings() {
-    alert('Settings panel coming soon!');
-    const dropdown = document.querySelector('.kebab-dropdown');
-    if (dropdown) {
-        dropdown.classList.remove('active');
-    }
-}
-
-function toggleNews() {
-    const newsContainer = document.getElementById('news-container');
-    if (newsContainer) {
-        // Toggle the display of the news container
-        if (newsContainer.style.display === 'none' || newsContainer.style.display === '') {
-            newsContainer.style.display = 'block';
-            // Make sure it's populated with news items
-            populateNews();
-        } else {
-            newsContainer.style.display = 'none';
-        }
-    }
-}
-
-const sampleNews = [
-    {
-        title: "New AI Features Released",
-        description: "We've added exciting new capabilities to our chatbot!",
-        date: "2025-01-15"
-    },
-    {
-        title: "System Update",
-        description: "Performance improvements and bug fixes",
-        date: "2025-03-14"
-    },
-    {
-        title: "Maintenance Notice",
-        description: "Scheduled maintenance on January 20th",
-        date: "2025-03-13"
-    }
-];
-
-function populateNews() {
-    const newsItems = document.getElementById('news-items');
-    if (!newsItems) return;
-    
-    newsItems.innerHTML = '';
-
-    sampleNews.forEach(news => {
-        const newsItem = document.createElement('div');
-        newsItem.className = 'news-item';
-        newsItem.innerHTML = `
-            <h3>${news.title}</h3>
-            <p>${news.description}</p>
-            <small>${news.date}</small>
-        `;
-        newsItems.appendChild(newsItem);
-    });
-}
-
-document.addEventListener('click', function (e) {
-    if (e.target.tagName === 'IMG' && e.target.closest('.message')) {
-        openZoom(e.target.src);
-    }
-});
-
-function openZoom(src) {
-    document.body.style.overflow = 'hidden';
-    const overlay = document.getElementById('zoom-overlay');
-    const zoomImage = document.getElementById('zoom-image');
-    const downloadBtn = document.getElementById('download-btn');
-
-    if (!overlay || !zoomImage || !downloadBtn) return;
-    
-    zoomImage.src = src;
-
-    // Force download filename
-    downloadBtn.href = src;
-    downloadBtn.setAttribute('download', 'image.jpg');
-
-    overlay.style.display = 'flex';
-}
-
-function closeZoom() {
-    document.body.style.overflow = '';
-    const overlay = document.getElementById('zoom-overlay');
-    if (overlay) overlay.style.display = 'none';
-}
-
-if (document.getElementById("year")) {
-    document.getElementById("year").textContent = new Date().getFullYear();
-}
-
-document.addEventListener('DOMContentLoaded', function () {
-    populateNews();
-
-    const currentUser = localStorage.getItem('currentUser');
-    if (currentUser) {
-        const newsToggle = document.querySelector('.news-toggle');
-        if (newsToggle) newsToggle.style.display = 'block';
-    } else {
-        const newsToggle = document.querySelector('.news-toggle');
-        if (newsToggle) newsToggle.style.display = 'none';
-        
-        const newsContainer = document.querySelector('.news-container');
-        if (newsContainer) newsContainer.style.display = 'none';
-    }
-});
-
-// UPDATED function to update the profile section with new design
-function updateProfileSection() {
-    const dropdown = document.getElementById('dropdown');
-    if (!dropdown) return;
-    
-    const currentUsername = localStorage.getItem('currentUser');
-    
-    // Remove existing profile section if it exists
-    const existingProfile = document.querySelector('.profile-section');
-    const existingDivider = document.querySelector('.menu-divider');
-    if (existingProfile) existingProfile.remove();
-    if (existingDivider) existingDivider.remove();
-    
-    // Only add profile section if user is logged in
-    if (currentUsername) {
-        const profileSection = document.createElement('div');
-        profileSection.className = 'profile-panel';
-        profileSection.innerHTML = `
-            <div class="profile-avatar">
-                <img src="https://i.pravatar.cc/50?u=${encodeURIComponent(currentUsername)}" alt="Profile">
-            </div>
-            <div class="profile-info">
-                <div class="profile-username">${currentUsername}</div>
-                <div class="profile-status online">
-                    <span class="status-dot"></span>
-                    <span>Online</span>
-                </div>
-            </div>
-        `;
-        
-        const divider = document.createElement('div');
-        divider.className = 'menu-divider';
-        
-        // Insert at the beginning of dropdown
-        dropdown.insertBefore(divider, dropdown.firstChild);
-        dropdown.insertBefore(profileSection, dropdown.firstChild);
-    }
-}
-
-// Improved click handler for dropdown
-document.addEventListener('click', function(event) {
-    const dropdown = document.getElementById('dropdown');
-    const hamburger = document.querySelector('.hamburger');
-    const kebabMenu = document.querySelector('.kebab-menu');
-    
-    // Close dropdown if clicking outside of it and not on menu controls
-    if (dropdown && dropdown.style.display === 'block' && 
-        !dropdown.contains(event.target) && 
-        event.target !== hamburger &&
-        !kebabMenu.contains(event.target)) {
-        dropdown.style.display = 'none';
-    }
-    
-    // Close kebab menu if clicking outside
-    const kebabDropdown = document.querySelector('.kebab-dropdown');
-    if (kebabDropdown && kebabDropdown.classList.contains('active') && 
-        !kebabMenu.contains(event.target) && 
-        !kebabDropdown.contains(event.target)) {
-        kebabDropdown.classList.remove('active');
-    }
-});
-
-// IMPROVED logout function with proper cleanup
-function logout() {
-    const username = localStorage.getItem('chat_username');
-    
-    // Notify server that user is going offline
-    if (username && socket) {
-        socket.emit('user-offline', username);
-        // Disconnect socket
-        socket.disconnect();
-    }
-    
-    // Clear user data
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('chat_username');
-    
-    // Remove page event listeners
-    document.removeEventListener('visibilitychange', handleVisibilityChange);
-    window.removeEventListener('beforeunload', handleBeforeUnload);
-    window.removeEventListener('pagehide', handlePageHide);
-    
-    // Hide all containers and menus
-    document.querySelectorAll('.main-chat-interface').forEach(container => {
-        container.style.display = 'none';
-    });
-    
-    const menu = document.querySelector('.menu');
-    if (menu) menu.style.display = 'none';
-    
-    const dropdown = document.getElementById('dropdown');
-    if (dropdown) dropdown.style.display = 'none';
-    
-    const kebabDropdown = document.querySelector('.kebab-dropdown');
-    if (kebabDropdown) kebabDropdown.classList.remove('active');
-    
-    // Hide all chat inputs
-    document.querySelectorAll('.chat-input').forEach(input => {
-        input.style.display = 'none';
-    });
-    
-    // Show auth container
-    document.getElementById('auth-container').style.display = 'flex';
-    
-    // Hide news toggle
-    const newsToggle = document.querySelector('.news-toggle');
-    if (newsToggle) newsToggle.style.display = 'none';
-    
-    const newsContainer = document.querySelector('.news-container');
-    if (newsContainer) newsContainer.style.display = 'none';
-    
-    // Hide both buttons on logout
-    if (scrollToBottomBtn) {
-        scrollToBottomBtn.style.display = 'none';
-        scrollToBottomBtn.classList.remove('visible');
-    }
-    if (privateGoTopBtn) {
-        privateGoTopBtn.style.display = 'none';
-        privateGoTopBtn.classList.remove('visible');
-    }
-    
-    // Reset auth form
-    isLogin = true;
-    const authTitle = document.getElementById('auth-title');
-    if (authTitle) authTitle.textContent = 'Login';
-    
-    const authButton = document.querySelector('.auth-box button');
-    if (authButton) authButton.textContent = 'Login';
-    
-    const toggleText = document.getElementById('toggle-text');
-    if (toggleText) toggleText.textContent = "Don't have an account? ";
-    
-    const toggleLink = document.getElementById('toggle-link');
-    if (toggleLink) toggleLink.textContent = 'Sign Up';
-    
-    // Clear profile section
-    const profileSection = document.querySelector('.profile-panel');
-    const divider = document.querySelector('.menu-divider');
-    if (profileSection) profileSection.remove();
-    if (divider) divider.remove();
-}
-
-// Improved toggleDropdown function
-function toggleDropdown() {
-    const dropdown = document.getElementById('dropdown');
-    if (!dropdown) return;
-    
-    const isVisible = dropdown.style.display === 'block';
-    
-    // Close all other menus first
-    const kebabDropdown = document.querySelector('.kebab-dropdown');
-    if (kebabDropdown) kebabDropdown.classList.remove('active');
-    
-    // Toggle dropdown
-    dropdown.style.display = isVisible ? 'none' : 'block';
-    
-    // Close if clicking the same button while open
-    if (isVisible) {
-        dropdown.style.display = 'none';
-    }
-}
-
-// Zoom functions remain the same
-function openZoom(src) {
-    document.body.style.overflow = 'hidden';
-    const overlay = document.getElementById('zoom-overlay');
-    const zoomImage = document.getElementById('zoom-image');
-    if (!overlay || !zoomImage) return;
-    
-    zoomImage.src = src;
-    overlay.style.display = 'flex';
-}
-
-function closeZoom() {
-    document.body.style.overflow = '';
-    const overlay = document.getElementById('zoom-overlay');
-    if (overlay) overlay.style.display = 'none';
-}
-
-// Initialize if user is logged in
-const currentUser = localStorage.getItem('currentUser');
-if (currentUser) {
-    showContainer('chat');
-    
-    const chatInput = document.querySelector('.chat-input');
-    if (chatInput) chatInput.style.display = 'flex';
-    
-    updateProfileSection();
-    
-    // Initialize real-time features
-    initSocket();
-    setupTypingHandlers();
-    
-    // Add page event listeners
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    window.addEventListener('pagehide', handlePageHide);
-    
-    // Enable SQL Editor access if already verified
-    if (hasVerifiedCode()) {
-        enableSQLEditorAccess();
-    }
-}
-
-// Format message time function
-function formatMessageTime(timestamp) {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diff = now - date;
-    
-    // If less than a minute ago
-    if (diff < 60000) {
-        return 'Just now';
-    }
-    
-    // If less than an hour ago
-    if (diff < 3600000) {
-        const minutes = Math.floor(diff / 60000);
-        return `${minutes}m ago`;
-    }
-    
-    // If today
-    if (date.toDateString() === now.toDateString()) {
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-    
-    // If yesterday
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    if (date.toDateString() === yesterday.toDateString()) {
-        return 'Yesterday';
-    }
-    
-    // Otherwise, show date
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-}
