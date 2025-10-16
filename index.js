@@ -8,7 +8,6 @@ const fs = require('fs-extra');
 const config = require('./config.json');
 const http = require('http');
 const { Server } = require('socket.io');
-const bcrypt = require('bcryptjs');
 
 // Initialize apps
 const app = express();
@@ -79,7 +78,18 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// ===== USER AUTHENTICATION SYSTEM =====
+// ===== SIMPLE USER AUTHENTICATION SYSTEM =====
+
+// Simple password hashing function (basic implementation)
+function simpleHash(password) {
+  let hash = 0;
+  for (let i = 0; i < password.length; i++) {
+    const char = password.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return hash.toString();
+}
 
 // Initialize users table if it doesn't exist
 async function initializeUsersTable() {
@@ -161,9 +171,8 @@ app.post('/api/register', async (req, res) => {
       });
     }
 
-    // Hash password
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    // Simple password hashing
+    const hashedPassword = simpleHash(password);
 
     // Create user
     const { data: newUser, error: createError } = await supabase
@@ -241,8 +250,8 @@ app.post('/api/login', async (req, res) => {
 
     const user = users[0];
 
-    // Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+    // Verify password with simple hash
+    const isPasswordValid = simpleHash(password) === user.password_hash;
     
     if (!isPasswordValid) {
       return res.status(401).json({ 
@@ -1730,7 +1739,7 @@ server.listen(port, () => {
   console.log(`🤫 PRIVATE MESSAGING: ENABLED via Supabase`);
   console.log(`🔒 Private endpoints: /private-messages/*`);
   console.log(`👤 USER AUTHENTICATION: ENABLED (Server-side, no localStorage)`);
-  console.log(`🔐 Password hashing: ENABLED with bcrypt`);
+  console.log(`🔐 Password hashing: SIMPLE HASH (basic implementation)`);
   console.log(`🌐 Cross-browser compatibility: ENABLED`);
   console.log(`🔍 NEW: GET /debug-private-messages - Debug private messages table`);
   console.log(`🧪 NEW: GET /test-private-messages - Test private message creation (GET)`);
