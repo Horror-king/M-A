@@ -78,7 +78,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// ===== SIMPLE USER AUTHENTICATION SYSTEM =====
+// ===== ENHANCED USER AUTHENTICATION SYSTEM =====
 
 // Simple password hashing function (basic implementation)
 function simpleHash(password) {
@@ -94,20 +94,44 @@ function simpleHash(password) {
 // Initialize users table if it doesn't exist
 async function initializeUsersTable() {
   try {
+    // First check if table exists by trying to select from it
     const { data, error } = await supabase
       .from('users')
       .select('*')
       .limit(1);
 
     if (error && error.code === '42P01') { // Table doesn't exist
-      console.log('Creating users table...');
-      // In a real scenario, you would create the table via SQL
-      // For now, we'll just log and continue
+      console.log('⚠️ Users table does not exist. Please create it in Supabase.');
+      console.log('📋 SQL to create users table:');
+      console.log(`
+        CREATE TABLE IF NOT EXISTS users (
+          id BIGSERIAL PRIMARY KEY,
+          username VARCHAR(50) UNIQUE NOT NULL,
+          password_hash VARCHAR(255) NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          last_login TIMESTAMPTZ DEFAULT NOW()
+        );
+        
+        CREATE TABLE IF NOT EXISTS user_profiles (
+          id BIGSERIAL PRIMARY KEY,
+          username VARCHAR(50) UNIQUE NOT NULL,
+          firstname VARCHAR(100),
+          lastname VARCHAR(100),
+          bio TEXT,
+          age INTEGER,
+          gender VARCHAR(50),
+          location VARCHAR(100),
+          interests TEXT,
+          avatar TEXT,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+      `);
     } else if (!error) {
-      console.log('Users table exists');
+      console.log('✅ Users table exists');
     }
   } catch (error) {
-    console.error('Error checking users table:', error);
+    console.error('❌ Error checking users table:', error);
   }
 }
 
@@ -202,7 +226,8 @@ app.post('/api/register', async (req, res) => {
     res.status(201).json({ 
       success: true, 
       message: "User registered successfully",
-      username: username
+      username: username,
+      user_id: newUser[0].id
     });
 
   } catch (error) {
