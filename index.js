@@ -351,6 +351,219 @@ app.post('/api/check-username', async (req, res) => {
   }
 });
 
+// ===== ADD AUTH ENDPOINTS TO MATCH CLIENT EXPECTATIONS =====
+
+// Add /api/auth/register endpoint (same as /api/register)
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    console.log('📝 Auth Registration attempt:', { username });
+
+    if (!username || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Username and password are required" 
+      });
+    }
+
+    if (username.length < 3 || username.length > 20) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Username must be between 3-20 characters" 
+      });
+    }
+
+    if (password.length < 4 || password.length > 20) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Password must be between 4-20 characters" 
+      });
+    }
+
+    // Validate username format
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Username can only contain letters, numbers, and underscores" 
+      });
+    }
+
+    // Check if username already exists (case-insensitive)
+    const { data: existingUsers, error: checkError } = await supabase
+      .from('users')
+      .select('username')
+      .ilike('username', username);
+
+    if (checkError) {
+      console.error('❌ Database error checking username:', checkError);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Database error" 
+      });
+    }
+
+    if (existingUsers && existingUsers.length > 0) {
+      return res.status(409).json({ 
+        success: false, 
+        error: "Username already exists" 
+      });
+    }
+
+    // Simple password hashing
+    const hashedPassword = simpleHash(password);
+
+    // Create user
+    const { data: newUser, error: createError } = await supabase
+      .from('users')
+      .insert([
+        { 
+          username: username.trim(),
+          password_hash: hashedPassword,
+          created_at: new Date().toISOString(),
+          last_login: new Date().toISOString()
+        }
+      ])
+      .select();
+
+    if (createError) {
+      console.error('❌ Database error creating user:', createError);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Failed to create user" 
+      });
+    }
+
+    console.log('✅ User registered successfully via auth endpoint:', username);
+    
+    res.status(201).json({ 
+      success: true, 
+      message: "User registered successfully",
+      username: username,
+      user_id: newUser[0].id
+    });
+
+  } catch (error) {
+    console.error('❌ Auth registration error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Internal server error" 
+    });
+  }
+});
+
+// Add /api/auth/login endpoint (same as /api/login)
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    console.log('🔐 Auth Login attempt:', { username });
+
+    if (!username || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Username and password are required" 
+      });
+    }
+
+    // Find user (case-insensitive search)
+    const { data: users, error: findError } = await supabase
+      .from('users')
+      .select('*')
+      .ilike('username', username)
+      .limit(1);
+
+    if (findError) {
+      console.error('❌ Database error finding user:', findError);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Database error" 
+      });
+    }
+
+    if (!users || users.length === 0) {
+      return res.status(401).json({ 
+        success: false, 
+        error: "Invalid username or password" 
+      });
+    }
+
+    const user = users[0];
+
+    // Verify password with simple hash
+    const isPasswordValid = simpleHash(password) === user.password_hash;
+    
+    if (!isPasswordValid) {
+      return res.status(401).json({ 
+        success: false, 
+        error: "Invalid username or password" 
+      });
+    }
+
+    // Update last login
+    await supabase
+      .from('users')
+      .update({ last_login: new Date().toISOString() })
+      .eq('id', user.id);
+
+    console.log('✅ User logged in successfully via auth endpoint:', username);
+
+    res.json({ 
+      success: true, 
+      message: "Login successful",
+      username: user.username,
+      user_id: user.id
+    });
+
+  } catch (error) {
+    console.error('❌ Auth login error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Internal server error" 
+    });
+  }
+});
+
+// Add /api/auth/check-username endpoint (same as /api/check-username)
+app.post('/api/auth/check-username', async (req, res) => {
+  try {
+    const { username } = req.body;
+
+    if (!username) {
+      return res.json({ available: true });
+    }
+
+    // Check if username exists (case-insensitive)
+    const { data: existingUsers, error } = await supabase
+      .from('users')
+      .select('username')
+      .ilike('username', username)
+      .limit(1);
+
+    if (error) {
+      console.error('❌ Database error checking username:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Database error" 
+      });
+    }
+
+    const available = !existingUsers || existingUsers.length === 0;
+    
+    res.json({ 
+      available: available,
+      suggestion: available ? null : "Username is already taken"
+    });
+
+  } catch (error) {
+    console.error('❌ Auth check username error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Internal server error" 
+    });
+  }
+});
+
 // ===== ADD GET ENDPOINTS FOR TESTING =====
 
 // GET endpoint for login (for testing in browser)
@@ -574,6 +787,112 @@ app.post('/api/user/profile', async (req, res) => {
       success: false, 
       error: "Internal server error" 
     });
+  }
+});
+
+// ===== ADD MESSAGES ENDPOINTS TO MATCH CLIENT =====
+
+// GET messages endpoint that client expects
+app.get('/api/messages', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('chatter')
+      .select('id, content, username, created_at, image_url, reply_to')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST messages endpoint that client expects
+app.post('/api/messages', async (req, res) => {
+  try {
+    const { content, username, image_url, reply_to } = req.body;
+
+    console.log('📨 Received message via API:', { content, username, image_url, reply_to });
+
+    // FIXED: Better validation - allow empty content if there's an image
+    if ((!content || content.trim() === '') && !image_url) {
+      return res.status(400).json({ error: "Content or image is required" });
+    }
+
+    if (!username || username.trim() === '') {
+      return res.status(400).json({ error: "Username is required" });
+    }
+
+    // FIXED: Proper data preparation for regular messages
+    const insertData = {
+      content: (content && content.trim() !== '') ? content.trim() : '',
+      username: username.trim(),
+      image_url: image_url || '',
+      reply_to: reply_to || ''
+    };
+
+    console.log('📝 Inserting message to Supabase via API:', insertData);
+
+    const { data, error } = await supabase
+      .from('chatter')
+      .insert([insertData])
+      .select();
+
+    if (error) {
+      console.error('❌ Database insert error:', error);
+      
+      // If there's still an issue, try minimal insert
+      if (error.message.includes('null value') || error.message.includes('primary key')) {
+        console.log('🔄 Retrying with minimal fields...');
+        const minimalData = {
+          content: (content && content.trim() !== '') ? content.trim() : 'Message',
+          username: username.trim()
+        };
+        
+        const { data: retryData, error: retryError } = await supabase
+          .from('chatter')
+          .insert([minimalData])
+          .select();
+          
+        if (retryError) {
+          throw retryError;
+        }
+        console.log('✅ Message saved with minimal fields. ID:', retryData[0]?.id);
+        
+        // BROADCAST NEW MESSAGE TO ALL CLIENTS IMMEDIATELY
+        io.emit('new-message', retryData[0]);
+        return res.status(201).json(retryData[0]);
+      }
+      throw error;
+    }
+    
+    console.log('✅ Message saved successfully via API. ID:', data[0]?.id);
+    
+    // BROADCAST NEW MESSAGE TO ALL CLIENTS IMMEDIATELY
+    io.emit('new-message', data[0]);
+    res.status(201).json(data[0]);
+  } catch (error) {
+    console.error('❌ Failed to save message via API:', error);
+    res.status(500).json({ error: "Failed to save message: " + error.message });
+  }
+});
+
+// DELETE messages endpoint that client expects
+app.delete('/api/messages/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { error } = await supabase
+      .from('chatter')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    
+    // Broadcast deletion via Socket.io
+    io.emit('message-deleted', id);
+    res.status(200).json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete message" });
   }
 });
 
@@ -1052,7 +1371,7 @@ app.put('/private-messages/read', async (req, res) => {
 
 // ===== PUBLIC CHAT ENDPOINTS =====
 
-// GET messages
+// GET messages (legacy endpoint)
 app.get('/messages', async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -1067,12 +1386,12 @@ app.get('/messages', async (req, res) => {
   }
 });
 
-// POST messages - FIXED: Proper handling for regular messages
+// POST messages (legacy endpoint) - FIXED: Proper handling for regular messages
 app.post('/messages', async (req, res) => {
   try {
     const { content, username, image_url, reply_to } = req.body;
 
-    console.log('📨 Received message:', { content, username, image_url, reply_to });
+    console.log('📨 Received message via legacy endpoint:', { content, username, image_url, reply_to });
 
     // FIXED: Better validation - allow empty content if there's an image
     if ((!content || content.trim() === '') && !image_url) {
@@ -1091,7 +1410,7 @@ app.post('/messages', async (req, res) => {
       reply_to: reply_to || ''
     };
 
-    console.log('📝 Inserting message to Supabase:', insertData);
+    console.log('📝 Inserting message to Supabase via legacy endpoint:', insertData);
 
     const { data, error } = await supabase
       .from('chatter')
@@ -1126,13 +1445,13 @@ app.post('/messages', async (req, res) => {
       throw error;
     }
     
-    console.log('✅ Message saved successfully. ID:', data[0]?.id);
+    console.log('✅ Message saved successfully via legacy endpoint. ID:', data[0]?.id);
     
     // BROADCAST NEW MESSAGE TO ALL CLIENTS IMMEDIATELY
     io.emit('new-message', data[0]);
     res.status(201).json(data[0]);
   } catch (error) {
-    console.error('❌ Failed to save message:', error);
+    console.error('❌ Failed to save message via legacy endpoint:', error);
     res.status(500).json({ error: "Failed to save message: " + error.message });
   }
 });
@@ -1173,7 +1492,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
   }
 });
 
-// DELETE messages
+// DELETE messages (legacy endpoint)
 app.delete('/messages/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -1885,9 +2204,16 @@ server.listen(port, () => {
   console.log(`   POST /api/register - User registration`);
   console.log(`   POST /api/login - User login`);
   console.log(`   POST /api/check-username - Check username availability`);
+  console.log(`   POST /api/auth/register - User registration (client-compatible)`);
+  console.log(`   POST /api/auth/login - User login (client-compatible)`);
+  console.log(`   POST /api/auth/check-username - Check username availability (client-compatible)`);
   console.log(`   GET /api/user/profile/:username - Get user profile`);
   console.log(`   POST /api/user/profile - Update user profile`);
   console.log(`   GET /api/auth-test - Test all authentication endpoints`);
+  console.log(`📨 MESSAGES ENDPOINTS:`);
+  console.log(`   GET /api/messages - Get messages (client-compatible)`);
+  console.log(`   POST /api/messages - Send message (client-compatible)`);
+  console.log(`   DELETE /api/messages/:id - Delete message (client-compatible)`);
   console.log(`🧪 Test Supabase (GET): http://localhost:${port}/test-supabase`);
   console.log(`🧪 Test Message (POST): http://localhost:${port}/test-message`);
   console.log(`🔍 Debug ALL Commands: http://localhost:${port}/debug-all-commands`);
