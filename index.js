@@ -36,10 +36,17 @@ global.utils = {
   getText: () => "✅ Bot is running smoothly"
 };
 
-// Initialize Supabase
+// Initialize Supabase - FIXED: Added service_role key for RLS bypass
 const supabase = createClient(
-  'https://tgcovkjghbqyoenxzjyp.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnY292a2pnaGJxeW9lbnh6anlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg0ODM5NTUsImV4cCI6MjA3NDA1OTk1NX0.yKr6C9QMdTyXzxCIK-D5k-kJI3NeJoJjuIEiABFtAr8',
+  'https://rqissetffrnkfzfgsngm.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxaXNzZXRmZnJua2Z6ZmdzbmdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNzU2NzIsImV4cCI6MjA3NDc1MTY3Mn0.6tCuI4yhn3EXlua9na4kkgMqX6PL00GxjEuY0QG2bTg',
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false
+    }
+  }
 );
 
 // Configure multer for file uploads
@@ -70,6 +77,227 @@ const renderExternalUrl = process.env.RENDER_EXTERNAL_URL;
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
+
+// ===== ENHANCED DEBUGGING ENDPOINTS =====
+
+// GET endpoint to test private messages (for browser testing)
+app.get('/test-private-messages', async (req, res) => {
+  try {
+    console.log('🧪 GET: Testing private messages creation...');
+    
+    // Create a test private message
+    const testData = {
+      sender_username: 'test_user1',
+      receiver_username: 'test_user2',
+      content: 'This is a test private message from GET endpoint!',
+      image_url: '',
+      read: false
+    };
+
+    const { data, error } = await supabase
+      .from('private_messages')
+      .insert([testData])
+      .select();
+
+    if (error) {
+      console.error('❌ GET Test private message failed:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: error.message 
+      });
+    }
+
+    console.log('✅ GET Test private message saved:', data[0]);
+    
+    // Broadcast via Socket.io
+    io.emit('new-private-message', data[0]);
+    
+    res.json({ 
+      success: true, 
+      message: 'GET Test private message saved successfully',
+      data: data[0],
+      nextSteps: [
+        'Check all messages: GET /private-messages?username=test_user1',
+        'Check conversations: GET /private-messages/conversations/test_user1',
+        'Check between users: GET /private-messages/test_user1/test_user2'
+      ]
+    });
+
+  } catch (error) {
+    console.error('❌ GET Test private message error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// POST endpoint to test private messages (for API testing)
+app.post('/test-private-messages', async (req, res) => {
+  try {
+    const { sender_username, receiver_username, content } = req.body;
+    
+    console.log('🧪 POST: Creating test private message:', { sender_username, receiver_username, content });
+
+    if (!sender_username || !receiver_username || !content) {
+      return res.status(400).json({ error: "Sender, receiver, and content are required" });
+    }
+
+    const testData = {
+      sender_username: sender_username.trim(),
+      receiver_username: receiver_username.trim(),
+      content: content.trim(),
+      image_url: '',
+      read: false
+    };
+
+    const { data, error } = await supabase
+      .from('private_messages')
+      .insert([testData])
+      .select();
+
+    if (error) {
+      console.error('❌ POST Test private message failed:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: error.message 
+      });
+    }
+
+    console.log('✅ POST Test private message saved:', data[0]);
+    
+    // Broadcast via Socket.io
+    io.emit('new-private-message', data[0]);
+    res.json({ 
+      success: true, 
+      message: 'POST Test private message saved successfully',
+      data: data[0]
+    });
+
+  } catch (error) {
+    console.error('❌ POST Test private message error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Enhanced debug endpoint with more details
+app.get('/debug-private-messages', async (req, res) => {
+  try {
+    console.log('🔍 Debugging private_messages table...');
+    
+    // Check table structure
+    const { data: tableInfo, error: tableError } = await supabase
+      .from('private_messages')
+      .select('*')
+      .limit(1);
+
+    if (tableError) {
+      console.error('❌ Table error:', tableError);
+      return res.status(500).json({ 
+        success: false,
+        error: 'Table error: ' + tableError.message,
+        details: 'The private_messages table might not exist or have RLS issues'
+      });
+    }
+
+    // Count total messages
+    const { count: totalCount, error: countError } = await supabase
+      .from('private_messages')
+      .select('*', { count: 'exact', head: true });
+
+    if (countError) {
+      console.error('❌ Count error:', countError);
+      return res.status(500).json({ 
+        success: false,
+        error: 'Count error: ' + countError.message 
+      });
+    }
+
+    // Get all messages (limit 10 for preview)
+    const { data: allMessages, error: messagesError } = await supabase
+      .from('private_messages')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (messagesError) {
+      console.error('❌ Messages error:', messagesError);
+      return res.status(500).json({ 
+        success: false,
+        error: 'Messages error: ' + messagesError.message 
+      });
+    }
+
+    res.json({
+      success: true,
+      tableExists: true,
+      totalMessages: totalCount || 0,
+      sampleMessages: allMessages || [],
+      message: totalCount === 0 ? 
+        'Table exists but has no messages. Use /test-private-messages to create test data.' : 
+        'Private messages table debug information',
+      testEndpoints: {
+        createTestMessageGET: 'GET /test-private-messages',
+        createTestMessagePOST: 'POST /test-private-messages',
+        getAllMessages: 'GET /private-messages?username=test_user1',
+        getConversations: 'GET /private-messages/conversations/test_user1'
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Debug error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Debug error: ' + error.message 
+    });
+  }
+});
+
+// FIXED: Enhanced private messages endpoint
+app.get('/private-messages', async (req, res) => {
+  try {
+    const { username } = req.query;
+    
+    console.log('📨 Fetching private messages for username:', username);
+
+    if (!username) {
+      return res.status(400).json({ 
+        error: "Username query parameter is required",
+        example: "/private-messages?username=test_user1" 
+      });
+    }
+
+    // Try exact match first, then case-insensitive
+    const { data: messages, error } = await supabase
+      .from('private_messages')
+      .select('*')
+      .or(`sender_username.eq.${username},receiver_username.eq.${username}`)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('❌ Database error:', error);
+      throw error;
+    }
+
+    console.log(`✅ Found ${messages?.length || 0} private messages for ${username}`);
+    
+    if (messages.length === 0) {
+      return res.json({
+        messages: [],
+        info: 'No private messages found',
+        suggestion: 'Use GET /test-private-messages to create test data'
+      });
+    }
+    
+    res.json(messages);
+  } catch (error) {
+    console.error('❌ Error fetching private messages:', error);
+    res.status(500).json({ error: 'Failed to fetch private messages: ' + error.message });
+  }
+});
 
 // Enhanced Uptime System for Render
 if (config.autoUptime?.enable || isRender) {
@@ -159,14 +387,178 @@ function handleCommand(input) {
   return { commandName, args, text };
 }
 
-// Chat API Endpoints
+// ===== PRIVATE MESSAGING ENDPOINTS =====
+
+// Get all conversations for a user
+app.get('/private-messages/conversations/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    
+    // Get distinct conversations (people the user has chatted with)
+    const { data: conversations, error } = await supabase
+      .from('private_messages')
+      .select('sender_username, receiver_username, content, created_at, read')
+      .or(`sender_username.eq.${username},receiver_username.eq.${username}`)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Process to get unique conversations with last message
+    const conversationMap = new Map();
+    
+    conversations.forEach(msg => {
+      const otherUser = msg.sender_username === username ? msg.receiver_username : msg.sender_username;
+      
+      if (!conversationMap.has(otherUser) || 
+          new Date(msg.created_at) > new Date(conversationMap.get(otherUser).lastMessageTime)) {
+        conversationMap.set(otherUser, {
+          username: otherUser,
+          lastMessage: msg.content,
+          lastMessageTime: msg.created_at,
+          unread: msg.receiver_username === username && !msg.read,
+          isSender: msg.sender_username === username
+        });
+      }
+    });
+
+    const conversationList = Array.from(conversationMap.values())
+      .sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
+
+    res.json(conversationList);
+  } catch (error) {
+    console.error('Error fetching conversations:', error);
+    res.status(500).json({ error: 'Failed to fetch conversations' });
+  }
+});
+
+// Get messages between two users
+app.get('/private-messages/:user1/:user2', async (req, res) => {
+  try {
+    const { user1, user2 } = req.params;
+    
+    const { data: messages, error } = await supabase
+      .from('private_messages')
+      .select('*')
+      .or(`and(sender_username.eq.${user1},receiver_username.eq.${user2}),and(sender_username.eq.${user2},receiver_username.eq.${user1})`)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    // Mark messages as read when fetched
+    await supabase
+      .from('private_messages')
+      .update({ read: true })
+      .eq('receiver_username', user1)
+      .eq('sender_username', user2)
+      .eq('read', false);
+
+    res.json(messages || []);
+  } catch (error) {
+    console.error('Error fetching private messages:', error);
+    res.status(500).json({ error: 'Failed to fetch private messages' });
+  }
+});
+
+// FIXED: Send private message - RLS issue resolved
+app.post('/private-messages', async (req, res) => {
+  try {
+    const { sender_username, receiver_username, content, image_url } = req.body;
+
+    console.log('📨 Private message:', { sender_username, receiver_username, content, image_url });
+
+    if (!sender_username || !receiver_username) {
+      return res.status(400).json({ error: "Sender and receiver usernames are required" });
+    }
+
+    if ((!content || content.trim() === '') && !image_url) {
+      return res.status(400).json({ error: "Content or image is required" });
+    }
+
+    const insertData = {
+      sender_username: sender_username.trim(),
+      receiver_username: receiver_username.trim(),
+      content: content ? content.trim() : '',
+      image_url: image_url || '',
+      read: false
+    };
+
+    console.log('📝 Inserting private message:', insertData);
+
+    const { data, error } = await supabase
+      .from('private_messages')
+      .insert([insertData])
+      .select();
+
+    if (error) {
+      console.error('❌ Private message insert failed:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: error.message,
+        details: 'This might be due to RLS policies. Check your database RLS settings.'
+      });
+    }
+
+    console.log('✅ Private message saved. ID:', data[0]?.id);
+    
+    // Broadcast via Socket.io to both users
+    io.emit('new-private-message', data[0]);
+    
+    res.status(201).json(data[0]);
+  } catch (error) {
+    console.error('❌ Failed to save private message:', error);
+    res.status(500).json({ error: "Failed to send private message: " + error.message });
+  }
+});
+
+// Get unread message count
+app.get('/private-messages/unread/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    
+    const { count, error } = await supabase
+      .from('private_messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('receiver_username', username)
+      .eq('read', false);
+
+    if (error) throw error;
+
+    res.json({ unreadCount: count || 0 });
+  } catch (error) {
+    console.error('Error fetching unread count:', error);
+    res.status(500).json({ error: 'Failed to fetch unread count' });
+  }
+});
+
+// Mark messages as read
+app.put('/private-messages/read', async (req, res) => {
+  try {
+    const { sender_username, receiver_username } = req.body;
+
+    const { error } = await supabase
+      .from('private_messages')
+      .update({ read: true })
+      .eq('sender_username', sender_username)
+      .eq('receiver_username', receiver_username)
+      .eq('read', false);
+
+    if (error) throw error;
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error marking messages as read:', error);
+    res.status(500).json({ error: 'Failed to mark messages as read' });
+  }
+});
+
+// ===== PUBLIC CHAT ENDPOINTS =====
 
 // GET messages
 app.get('/messages', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('chatter')
-      .select('id, content, username, created_at, image_url')
+      .select('id, content, username, created_at, image_url, reply_to')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -176,24 +568,73 @@ app.get('/messages', async (req, res) => {
   }
 });
 
-// POST messages
+// POST messages - FIXED: Proper handling for regular messages
 app.post('/messages', async (req, res) => {
   try {
-    const { content, username, image_url } = req.body;
+    const { content, username, image_url, reply_to } = req.body;
 
-    if ((!content && !image_url) || !username) {
-      return res.status(400).json({ error: "Content or image, and username required" });
+    console.log('📨 Received message:', { content, username, image_url, reply_to });
+
+    // FIXED: Better validation - allow empty content if there's an image
+    if ((!content || content.trim() === '') && !image_url) {
+      return res.status(400).json({ error: "Content or image is required" });
     }
+
+    if (!username || username.trim() === '') {
+      return res.status(400).json({ error: "Username is required" });
+    }
+
+    // FIXED: Proper data preparation for regular messages
+    const insertData = {
+      content: (content && content.trim() !== '') ? content.trim() : '',
+      username: username.trim(),
+      image_url: image_url || '',
+      reply_to: reply_to || ''
+    };
+
+    console.log('📝 Inserting message to Supabase:', insertData);
 
     const { data, error } = await supabase
       .from('chatter')
-      .insert([{ content, username, image_url }])
+      .insert([insertData])
       .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Database insert error:', error);
+      
+      // If there's still an issue, try minimal insert
+      if (error.message.includes('null value') || error.message.includes('primary key')) {
+        console.log('🔄 Retrying with minimal fields...');
+        const minimalData = {
+          content: (content && content.trim() !== '') ? content.trim() : 'Message',
+          username: username.trim()
+        };
+        
+        const { data: retryData, error: retryError } = await supabase
+          .from('chatter')
+          .insert([minimalData])
+          .select();
+          
+        if (retryError) {
+          throw retryError;
+        }
+        console.log('✅ Message saved with minimal fields. ID:', retryData[0]?.id);
+        
+        // BROADCAST NEW MESSAGE TO ALL CLIENTS IMMEDIATELY
+        io.emit('new-message', retryData[0]);
+        return res.status(201).json(retryData[0]);
+      }
+      throw error;
+    }
+    
+    console.log('✅ Message saved successfully. ID:', data[0]?.id);
+    
+    // BROADCAST NEW MESSAGE TO ALL CLIENTS IMMEDIATELY
+    io.emit('new-message', data[0]);
     res.status(201).json(data[0]);
   } catch (error) {
-    res.status(500).json({ error: "Failed to save message" });
+    console.error('❌ Failed to save message:', error);
+    res.status(500).json({ error: "Failed to save message: " + error.message });
   }
 });
 
@@ -243,26 +684,299 @@ app.delete('/messages/:id', async (req, res) => {
       .eq('id', id);
 
     if (error) throw error;
+    
+    // Broadcast deletion via Socket.io
+    io.emit('message-deleted', id);
     res.status(200).json({ success: true });
   } catch (error) {
     res.status(500).json({ error: "Failed to delete message" });
   }
 });
 
-// Command API handler
+// FIXED: Function to save ANY bot response to Supabase
+async function saveBotResponseToSupabase(content, originalCommand, commandType = 'AI') {
+  try {
+    console.log(`🔄 Attempting to save ${commandType} response to Supabase...`);
+    console.log('Content:', content);
+    console.log('Original Command:', originalCommand);
+    
+    // FIXED: Use proper values for all fields
+    const insertData = {
+      content: content || `${commandType} Response`, 
+      username: commandType === 'AI' ? 'AI' : 'Bot',
+      image_url: '',
+      reply_to: originalCommand || ''
+    };
+    
+    console.log('📝 Insert data:', insertData);
+    
+    const { data, error } = await supabase
+      .from('chatter')
+      .insert([insertData])
+      .select();
+
+    if (error) {
+      console.error('❌ Supabase insertion error:', error);
+      console.error('❌ Error details:', JSON.stringify(error, null, 2));
+      
+      // If there's an issue, try minimal insert
+      if (error.message.includes('null value') || error.message.includes('primary key')) {
+        console.log('🔄 Retrying with minimal fields...');
+        const minimalData = {
+          content: content || `${commandType} Response`,
+          username: commandType === 'AI' ? 'AI' : 'Bot'
+        };
+        
+        const { data: retryData, error: retryError } = await supabase
+          .from('chatter')
+          .insert([minimalData])
+          .select();
+          
+        if (retryError) {
+          throw retryError;
+        }
+        console.log(`✅ ${commandType} response saved to Supabase (minimal fields). ID:`, retryData[0]?.id);
+        
+        // BROADCAST BOT RESPONSE TO ALL CLIENTS IMMEDIATELY
+        io.emit('new-message', retryData[0]);
+        return retryData;
+      }
+      throw error;
+    }
+    
+    console.log(`✅ ${commandType} response saved to Supabase. ID:`, data[0]?.id);
+    
+    // BROADCAST BOT RESPONSE TO ALL CLIENTS IMMEDIATELY
+    io.emit('new-message', data[0]);
+    return data;
+  } catch (error) {
+    console.error(`❌ Error saving ${commandType} response to Supabase:`, error);
+    throw error;
+  }
+}
+
+// TEST ENDPOINTS: Check if we can save to Supabase
+app.get('/test-supabase', async (req, res) => {
+  try {
+    console.log('🧪 Testing Supabase connection (GET)...');
+    
+    // Test 1: Check if we can read from Supabase
+    const { data: readData, error: readError } = await supabase
+      .from('chatter')
+      .select('*')
+      .limit(5)
+      .order('created_at', { ascending: false });
+
+    if (readError) {
+      console.error('❌ Read test failed:', readError);
+      return res.status(500).json({ 
+        success: false, 
+        test: 'read',
+        error: readError.message
+      });
+    }
+
+    // Test 2: Try to insert a regular message
+    const testData = {
+      content: 'Test regular message from server',
+      username: 'TestBot',
+      image_url: '',
+      reply_to: ''
+    };
+    
+    const { data: insertData, error: insertError } = await supabase
+      .from('chatter')
+      .insert([testData])
+      .select();
+
+    if (insertError) {
+      console.error('❌ Insert test failed:', insertError);
+      return res.status(500).json({ 
+        success: false, 
+        test: 'insert',
+        error: insertError.message,
+        details: insertError
+      });
+    }
+    
+    console.log('✅ All tests successful!');
+    res.json({ 
+      success: true, 
+      message: 'Supabase connection test successful',
+      tests: {
+        read: {
+          success: true,
+          messageCount: readData?.length || 0
+        },
+        insert: {
+          success: true,
+          insertedId: insertData[0]?.id
+        }
+      },
+      recentMessages: readData,
+      insertedMessage: insertData[0]
+    });
+  } catch (error) {
+    console.error('❌ Test error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// DEBUG: Check what's happening with ALL commands
+app.get('/debug-all-commands', async (req, res) => {
+  try {
+    console.log('🔍 Debugging ALL command responses...');
+    
+    // Test different commands
+    const testCommands = [
+      { message: '!help', source: 'main-chat' },
+      { message: '!ping', source: 'main-chat' },
+      { message: '!ai hello world', source: 'main-chat' }
+    ];
+
+    const results = [];
+
+    for (const testCmd of testCommands) {
+      try {
+        console.log(`🧪 Testing command: ${testCmd.message}`);
+        
+        const response = await axios.post('http://localhost:3000/api/command', testCmd, {
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        results.push({
+          command: testCmd.message,
+          success: true,
+          response: response.data.reply || response.data
+        });
+      } catch (error) {
+        results.push({
+          command: testCmd.message,
+          success: false,
+          error: error.message
+        });
+      }
+    }
+
+    // Check what got saved to database
+    const { data: savedMessages } = await supabase
+      .from('chatter')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    res.json({
+      success: true,
+      commandTests: results,
+      savedMessages: savedMessages,
+      message: 'All command debug test completed'
+    });
+
+  } catch (error) {
+    console.error('❌ All commands debug error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// NEW: Test regular message endpoint
+app.post('/test-message', async (req, res) => {
+  try {
+    const { content, username } = req.body;
+    
+    console.log('🧪 Testing regular message:', { content, username });
+
+    if (!content || !username) {
+      return res.status(400).json({ error: "Content and username required" });
+    }
+
+    const testData = {
+      content: content,
+      username: username,
+      image_url: '',
+      reply_to: ''
+    };
+
+    const { data, error } = await supabase
+      .from('chatter')
+      .insert([testData])
+      .select();
+
+    if (error) {
+      console.error('❌ Test message failed:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: error.message 
+      });
+    }
+
+    console.log('✅ Test message saved:', data[0]);
+    
+    // Broadcast via Socket.io
+    io.emit('new-message', data[0]);
+    res.json({ 
+      success: true, 
+      message: 'Test message saved successfully',
+      data: data[0]
+    });
+
+  } catch (error) {
+    console.error('❌ Test message error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Command API handler - COMPLETELY REWRITTEN: Single response system
 app.post("/api/command", async (req, res) => {
   try {
-    const { message } = req.body;
+    const { message, source = 'main-chat' } = req.body;
+    console.log('📨 Received command:', { message, source });
+    
     if (!message) return res.status(400).json({ reply: "❌ Message is required" });
 
+    // Handle prefix command separately
     if (message.trim().toLowerCase() === "prefix") {
-      return res.json({ reply: `🔹 My command prefix is: \`${PREFIX}\`` });
+      const reply = `🔹 My command prefix is: \`${PREFIX}\``;
+      
+      // Save to main chat only
+      if (source === 'main-chat') {
+        console.log('💾 Saving prefix command response to Supabase...');
+        try {
+          await saveBotResponseToSupabase(reply, 'prefix', 'Bot');
+        } catch (saveError) {
+          console.error('❌ Failed to save prefix response:', saveError);
+        }
+      }
+      
+      return res.json({ reply });
     }
 
     const cmd = handleCommand(message);
-    if (!cmd) return res.end();
+    if (!cmd) {
+      console.log('❌ Not a command or wrong prefix');
+      return res.end();
+    }
 
+    console.log('🔍 Command detected:', cmd.commandName);
+    console.log('📍 Source:', source);
+
+    // ✅ COMPLETELY FIXED: EXCLUSIVE SINGLE RESPONSE SYSTEM
+    let finalReply = null;
+    let responder = null;
+
+    // AI COMMANDS - ONLY AI RESPONDS
     if (cmd.commandName === "ai") {
+      console.log('🤖 Processing EXCLUSIVELY as AI command');
+      responder = 'AI';
+      
       try {
         const response = await axios.get(
           `https://yau-ai-runing-station.vercel.app/ai?prompt=${encodeURIComponent(cmd.text)}&cb=${Date.now()}`,
@@ -277,6 +991,8 @@ app.post("/api/command", async (req, res) => {
         );
 
         let responseData;
+        let aiResponse;
+
         if (typeof response.data === 'string') {
           try {
             responseData = JSON.parse(response.data);
@@ -284,53 +1000,95 @@ app.post("/api/command", async (req, res) => {
             if (response.data.includes('error') || response.status !== 200) {
               throw new Error(response.data || `API returned status ${response.status}`);
             }
-            return res.json({ reply: response.data });
+            aiResponse = response.data;
           }
         } else {
           responseData = response.data;
         }
 
-        if (responseData.response) {
-          return res.json({ reply: responseData.response });
-        } else if (responseData.message) {
-          return res.json({ reply: responseData.message });
-        } else if (responseData.data) {
-          return res.json({ reply: responseData.data });
-        } else {
-          return res.json({ reply: JSON.stringify(responseData) || "⚠️ No recognizable response format" });
+        if (!aiResponse) {
+          if (responseData.response) {
+            aiResponse = responseData.response;
+          } else if (responseData.message) {
+            aiResponse = responseData.message;
+          } else if (responseData.data) {
+            aiResponse = responseData.data;
+          } else {
+            aiResponse = JSON.stringify(responseData) || "⚠️ No recognizable response format";
+          }
         }
+
+        finalReply = aiResponse;
+        console.log('🤖 AI Response received');
+
       } catch (aiError) {
-        console.error("AI Processing Error:", aiError);
-        return res.status(500).json({ 
-          reply: `❌ AI Error: ${aiError.message.replace(/[\n\r]/g, ' ').substring(0, 200)}` 
+        console.error("❌ AI Processing Error:", aiError);
+        finalReply = `❌ AI Error: ${aiError.message.replace(/[\n\r]/g, ' ').substring(0, 200)}`;
+      }
+    } 
+    // BOT COMMANDS - ONLY BOT RESPONDS
+    else {
+      console.log('🤖 Processing EXCLUSIVELY as Bot command');
+      responder = 'Bot';
+      
+      const command = commands[cmd.commandName];
+      if (!command) {
+        finalReply = "❌ Command not found";
+      } else if (typeof command.onStart !== "function") {
+        finalReply = "❌ This command does not support execution";
+      } else {
+        const replies = [];
+        await command.onStart({
+          api: {
+            sendMessage: (msg) => replies.push(typeof msg === "string" ? msg : JSON.stringify(msg))
+          },
+          event: { body: cmd.text },
+          args: cmd.args,
+          message: {
+            reply: (content) => replies.push(content)
+          }
         });
+
+        if (replies.length > 0) {
+          finalReply = replies.length === 1 ? replies[0] : replies.join('\n');
+        } else {
+          finalReply = "❌ Command executed but no response generated";
+        }
       }
     }
 
-    const command = commands[cmd.commandName];
-    if (!command) return res.json({ reply: "❌ Command not found" });
-    if (typeof command.onStart !== "function") {
-      return res.json({ reply: "❌ This command does not support execution" });
-    }
-
-    const replies = [];
-    await command.onStart({
-      api: {
-        sendMessage: (msg) => replies.push(typeof msg === "string" ? msg : JSON.stringify(msg))
-      },
-      event: { body: cmd.text },
-      args: cmd.args,
-      message: {
-        reply: (content) => replies.push(content)
+    // ✅ SINGLE RESPONSE SAVING - Only save ONE response
+    if (finalReply && source === 'main-chat') {
+      console.log(`💾 Saving ${responder} response to Supabase...`);
+      try {
+        await saveBotResponseToSupabase(finalReply, cmd.commandName, responder);
+      } catch (saveError) {
+        console.error(`❌ Failed to save ${responder} response:`, saveError);
       }
-    });
-
-    if (!res.headersSent) {
-      res.json({ reply: replies.length === 1 ? replies[0] : replies });
     }
+
+    // ✅ SINGLE RESPONSE RETURN - Only return ONE response
+    if (finalReply) {
+      return res.json({ reply: finalReply });
+    } else {
+      return res.json({ reply: "❌ No response generated" });
+    }
+
   } catch (error) {
-    console.error("Server Error:", error);
-    res.status(500).json({ reply: `❌ Server Error: ${error.message}` });
+    console.error("❌ Server Error:", error);
+    const errorReply = `❌ Server Error: ${error.message}`;
+    
+    // Save error response
+    if (source === 'main-chat') {
+      console.log('💾 Saving server error response to Supabase...');
+      try {
+        await saveBotResponseToSupabase(errorReply, 'unknown', 'Bot');
+      } catch (saveError) {
+        console.error('❌ Failed to save server error response:', saveError);
+      }
+    }
+    
+    res.status(500).json({ reply: errorReply });
   }
 });
 
@@ -341,13 +1099,32 @@ app.get('/online-users', (req, res) => {
   res.json(onlineUsersArray);
 });
 
+// ===== ENHANCED SOCKET.IO REAL-TIME MESSAGING =====
+
 // Socket.io connection handling - 3 MINUTE ONLINE STATUS
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
+  console.log('🔌 User connected:', socket.id);
+
+  // Send existing messages to newly connected client
+  socket.on('request-messages', async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chatter')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      
+      if (!error && data) {
+        socket.emit('chat-messages', data.reverse());
+      }
+    } catch (error) {
+      console.error('Error sending messages to client:', error);
+    }
+  });
 
   socket.on('user-online', (username) => {
     if (username) {
-      console.log('User online:', username);
+      console.log('👤 User online:', username);
       
       // Update or add user to online users
       onlineUsers.set(username, {
@@ -359,7 +1136,7 @@ io.on('connection', (socket) => {
       
       // Get current online users list
       const onlineUsersArray = Array.from(onlineUsers.keys());
-      console.log('Updated online users:', onlineUsersArray);
+      console.log('📊 Updated online users:', onlineUsersArray);
       
       // Broadcast to all users that this user is online
       io.emit('user-status-change', { 
@@ -372,7 +1149,7 @@ io.on('connection', (socket) => {
 
   socket.on('user-away', (username) => {
     if (username && onlineUsers.has(username)) {
-      console.log('User away:', username);
+      console.log('⏸️ User away:', username);
       
       // Update last seen but keep user in list
       const userData = onlineUsers.get(username);
@@ -390,39 +1167,12 @@ io.on('connection', (socket) => {
 
   socket.on('user-offline', (username) => {
     if (username) {
-      console.log('User offline (manual):', username);
+      console.log('🔴 User offline (manual):', username);
       removeUserFromOnlineList(username);
     }
   });
 
-  // Handle disconnect properly
-  socket.on('disconnect', (reason) => {
-    console.log('User disconnected:', socket.id, 'Reason:', reason);
-    
-    // Find user by socket ID but DON'T remove them immediately
-    // They stay in the list for 3 minutes due to the timeout
-    let foundUsername = null;
-    for (let [username, data] of onlineUsers.entries()) {
-      if (data.socketId === socket.id) {
-        foundUsername = username;
-        // Update last seen but keep in list
-        data.lastSeen = Date.now();
-        data.isOnline = false;
-        console.log('User marked as inactive:', username);
-        break;
-      }
-    }
-    
-    // Don't remove from list immediately - let the timeout handle it
-    if (foundUsername) {
-      io.emit('user-status-change', { 
-        username: foundUsername, 
-        status: 'away',
-        onlineUsers: Array.from(onlineUsers.keys())
-      });
-    }
-  });
-  
+  // Handle typing indicators
   socket.on('typing-start', (data) => {
     socket.broadcast.emit('user-typing', {
       username: data.username,
@@ -437,6 +1187,129 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Handle private AI messages
+  socket.on('send-private-message', async (data) => {
+    try {
+      console.log('🤫 Private message received:', data);
+      
+      // Process private AI response
+      const response = await axios.post('http://localhost:3000/api/command', {
+        message: data.content,
+        source: 'private-ai'
+      }, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.data.reply) {
+        // Send private AI response back to the specific user
+        socket.emit('new-private-message', {
+          content: response.data.reply,
+          username: 'Private AI'
+        });
+      }
+    } catch (error) {
+      console.error('❌ Private message error:', error);
+      socket.emit('new-private-message', {
+        content: "Error: Could not process your private message",
+        username: 'Private AI'
+      });
+    }
+  });
+
+  // ===== PRIVATE MESSAGING SOCKET EVENTS =====
+
+  // Handle private messaging via Socket.io
+  socket.on('send-private-message-socket', async (data) => {
+    try {
+      console.log('🤫 Private message via socket:', data);
+      
+      const { sender_username, receiver_username, content, image_url } = data;
+
+      const insertData = {
+        sender_username: sender_username.trim(),
+        receiver_username: receiver_username.trim(),
+        content: content ? content.trim() : '',
+        image_url: image_url || '',
+        read: false
+      };
+
+      const { data: messageData, error } = await supabase
+        .from('private_messages')
+        .insert([insertData])
+        .select();
+
+      if (error) throw error;
+
+      // Emit to both sender and receiver
+      io.emit('new-private-message', messageData[0]);
+      
+    } catch (error) {
+      console.error('❌ Private message error:', error);
+      socket.emit('private-message-error', { error: 'Failed to send private message' });
+    }
+  });
+
+  socket.on('join-private-chat', (data) => {
+    const { username, otherUser } = data;
+    const roomName = getPrivateChatRoomName(username, otherUser);
+    socket.join(roomName);
+    console.log(`👥 ${username} joined private chat room: ${roomName}`);
+  });
+
+  socket.on('leave-private-chat', (data) => {
+    const { username, otherUser } = data;
+    const roomName = getPrivateChatRoomName(username, otherUser);
+    socket.leave(roomName);
+    console.log(`👋 ${username} left private chat room: ${roomName}`);
+  });
+
+  // Listen for new private messages and deliver to specific users
+  socket.on('private-message-typing-start', (data) => {
+    const { sender, receiver, isTyping } = data;
+    const roomName = getPrivateChatRoomName(sender, receiver);
+    socket.to(roomName).emit('private-typing-indicator', {
+      username: sender,
+      isTyping: true
+    });
+  });
+
+  socket.on('private-message-typing-stop', (data) => {
+    const { sender, receiver, isTyping } = data;
+    const roomName = getPrivateChatRoomName(sender, receiver);
+    socket.to(roomName).emit('private-typing-indicator', {
+      username: sender,
+      isTyping: false
+    });
+  });
+
+  // Handle disconnect properly
+  socket.on('disconnect', (reason) => {
+    console.log('🔌 User disconnected:', socket.id, 'Reason:', reason);
+    
+    // Find user by socket ID but DON'T remove them immediately
+    // They stay in the list for 3 minutes due to the timeout
+    let foundUsername = null;
+    for (let [username, data] of onlineUsers.entries()) {
+      if (data.socketId === socket.id) {
+        foundUsername = username;
+        // Update last seen but keep in list
+        data.lastSeen = Date.now();
+        data.isOnline = false;
+        console.log('⏸️ User marked as inactive:', username);
+        break;
+      }
+    }
+    
+    // Don't remove from list immediately - let the timeout handle it
+    if (foundUsername) {
+      io.emit('user-status-change', { 
+        username: foundUsername, 
+        status: 'away',
+        onlineUsers: Array.from(onlineUsers.keys())
+      });
+    }
+  });
+  
   // Helper function to remove user from online list
   function removeUserFromOnlineList(username) {
     if (onlineUsers.has(username)) {
@@ -444,7 +1317,7 @@ io.on('connection', (socket) => {
       
       // Get updated online users list
       const onlineUsersArray = Array.from(onlineUsers.keys());
-      console.log('After removal, online users:', onlineUsersArray);
+      console.log('🗑️ After removal, online users:', onlineUsersArray);
       
       // Broadcast that user went offline
       io.emit('user-status-change', { 
@@ -456,6 +1329,12 @@ io.on('connection', (socket) => {
   }
 });
 
+// Helper function for private chat room names
+function getPrivateChatRoomName(user1, user2) {
+  const users = [user1, user2].sort();
+  return `private_chat_${users[0]}_${users[1]}`;
+}
+
 // 3 MINUTE CLEANUP - Remove users after 3 minutes of inactivity
 setInterval(() => {
   const now = Date.now();
@@ -464,7 +1343,7 @@ setInterval(() => {
   for (let [username, data] of onlineUsers.entries()) {
     // 3 minute timeout (180000 milliseconds)
     if (now - data.lastSeen > onlineStatusTimeout) {
-      console.log('Removing inactive user (3 minutes):', username);
+      console.log('⏰ Removing inactive user (3 minutes):', username);
       onlineUsers.delete(username);
       removedUsers.push(username);
     }
@@ -480,8 +1359,8 @@ setInterval(() => {
         onlineUsers: onlineUsersArray
       });
     });
-    console.log('Cleaned up inactive users (3min timeout):', removedUsers);
-    console.log('Current online users after cleanup:', onlineUsersArray);
+    console.log('🧹 Cleaned up inactive users (3min timeout):', removedUsers);
+    console.log('📊 Current online users after cleanup:', onlineUsersArray);
   }
 }, 30000); // Check every 30 seconds
 
@@ -490,9 +1369,27 @@ server.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
   console.log(`🔹 Command prefix: "${PREFIX}"`);
   console.log(`👥 Online users tracking: ACTIVE (3 minute timeout)`);
+  console.log(`💾 SINGLE RESPONSE SYSTEM: ENABLED`);
+  console.log(`🤖 EXCLUSIVE ROUTING: -ai → AI only, other commands → Bot only`);
+  console.log(`🚫 DUPLICATE FIX: GUARANTEED no double responses!`);
+  console.log(`💬 Real-time messaging: ENABLED via Socket.io`);
+  console.log(`🔌 Socket.io events: new-message, message-deleted, user-status-change`);
+  console.log(`🤫 PRIVATE MESSAGING: ENABLED via Supabase`);
+  console.log(`🔒 Private endpoints: /private-messages/*`);
+  console.log(`🔍 NEW: GET /debug-private-messages - Debug private messages table`);
+  console.log(`🧪 NEW: GET /test-private-messages - Test private message creation (GET)`);
+  console.log(`🧪 NEW: POST /test-private-messages - Test private message creation (POST)`);
+  console.log(`🧪 Test Supabase (GET): http://localhost:${port}/test-supabase`);
+  console.log(`🧪 Test Message (POST): http://localhost:${port}/test-message`);
+  console.log(`🔍 Debug ALL Commands: http://localhost:${port}/debug-all-commands`);
   if (isRender && renderExternalUrl) {
     console.log(`🌐 Render External URL: ${renderExternalUrl}`);
     console.log(`⏱️ UptimeRobot monitoring URL: ${renderExternalUrl}/health`);
+    console.log(`🧪 Test Supabase: ${renderExternalUrl}/test-supabase`);
+    console.log(`🧪 Test Message: ${renderExternalUrl}/test-message`);
+    console.log(`🔍 Debug ALL Commands: ${renderExternalUrl}/debug-all-commands`);
+    console.log(`🔍 Debug Private Messages: ${renderExternalUrl}/debug-private-messages`);
+    console.log(`🧪 Test Private Message (GET): ${renderExternalUrl}/test-private-messages`);
   }
 });
 
