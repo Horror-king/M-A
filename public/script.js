@@ -1,3 +1,180 @@
+// ===== FIXED AUTHENTICATION FUNCTIONS =====
+
+// MODIFIED: Authentication handler with proper error handling
+async function handleAuth() {
+    const username = document.getElementById('auth-username').value.trim();
+    const password = document.getElementById('auth-password').value;
+    const loader = document.getElementById('loader');
+    
+    elements.errorDisplay.style.display = 'none';
+    elements.successDisplay.style.display = 'none';
+    
+    if (!username || !password) {
+        showError('Please enter both username and password');
+        return;
+    }
+    
+    if (username.length < 3 || username.length > 20) {
+        showError('Username must be between 3-20 characters');
+        return;
+    }
+    
+    if (password.length < 4 || password.length > 20) {
+        showError('Password must be between 4-20 characters');
+        return;
+    }
+    
+    // Validate username format
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+        showError('Username can only contain letters, numbers, and underscores');
+        return;
+    }
+    
+    loader.style.display = 'flex';
+    
+    try {
+        const endpoint = isLogin ? '/api/login' : '/api/register';
+        console.log(`🔄 Attempting ${isLogin ? 'login' : 'registration'} for:`, username);
+        
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username, password })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || `${isLogin ? 'Login' : 'Registration'} failed`);
+        }
+        
+        if (data.success) {
+            if (isLogin) {
+                showSuccess('Login successful!');
+                
+                // Save user session
+                saveUserSession({
+                    username: data.username,
+                    user_id: data.user_id
+                });
+                
+                setTimeout(() => {
+                    loader.style.display = 'none';
+                    document.getElementById('auth-container').style.display = 'none';
+                    document.querySelector('.menu').style.display = 'flex';
+                    document.querySelector('.news-toggle').style.display = 'block';
+
+                    initializeButtons();
+                    showContainer('chat');
+                    loadProfile();
+                    initializeChat();
+
+                    initSocket();
+                    setupTypingHandlers();
+                    
+                    document.addEventListener('visibilitychange', handleVisibilityChange);
+                    window.addEventListener('beforeunload', handleBeforeUnload);
+                    window.addEventListener('pagehide', handlePageHide);
+                    
+                    if (hasVerifiedCode()) {
+                        enableSQLEditorAccess();
+                    }
+                }, 500);
+            } else {
+                showSuccess('Account created successfully! Please login.');
+                setTimeout(() => {
+                    loader.style.display = 'none';
+                    toggleAuth(); // Switch to login form
+                }, 1000);
+            }
+        } else {
+            throw new Error(data.error || 'Authentication failed');
+        }
+    } catch (error) {
+        loader.style.display = 'none';
+        console.error('❌ Authentication error:', error);
+        showError(error.message);
+    }
+}
+
+// ADDED: Check username availability in real-time
+function setupUsernameValidation() {
+    const usernameInput = document.getElementById('auth-username');
+    if (!usernameInput) return;
+    
+    let validationTimer;
+    
+    usernameInput.addEventListener('input', function() {
+        clearTimeout(validationTimer);
+        const username = this.value.trim();
+        
+        // Clear previous validation states
+        this.classList.remove('username-valid', 'username-invalid');
+        elements.errorDisplay.style.display = 'none';
+        
+        if (username.length < 3) return;
+        
+        validationTimer = setTimeout(async () => {
+            // Validate username format
+            if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+                this.classList.add('username-invalid');
+                showError('Username can only contain letters, numbers, and underscores');
+                return;
+            }
+            
+            // Only check availability during signup
+            if (!isLogin) {
+                try {
+                    const response = await fetch('/api/check-username', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ username: username })
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        
+                        if (data.available) {
+                            this.classList.add('username-valid');
+                            elements.errorDisplay.style.display = 'none';
+                        } else {
+                            this.classList.add('username-invalid');
+                            showError('Username already exists');
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error checking username:', error);
+                }
+            }
+        }, 500);
+    });
+}
+
+// ADDED: Enhanced user session management
+function checkUserSession() {
+    // Check if user session exists in sessionStorage (persists only for browser session)
+    const sessionData = sessionStorage.getItem('currentUserSession');
+    if (sessionData) {
+        currentUserSession = JSON.parse(sessionData);
+        return true;
+    }
+    return false;
+}
+
+function saveUserSession(userData) {
+    currentUserSession = userData;
+    sessionStorage.setItem('currentUserSession', JSON.stringify(userData));
+}
+
+function clearUserSession() {
+    currentUserSession = null;
+    sessionStorage.removeItem('currentUserSession');
+}
+
 // --- CUT HERE ---
 let isLogin = true;
 let longPressTimer;
@@ -1653,27 +1830,6 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('🎯 Application initialization complete');
 });
 
-// ===== ADDED: USER SESSION MANAGEMENT =====
-function checkUserSession() {
-    // Check if user session exists in sessionStorage (persists only for browser session)
-    const sessionData = sessionStorage.getItem('currentUserSession');
-    if (sessionData) {
-        currentUserSession = JSON.parse(sessionData);
-        return true;
-    }
-    return false;
-}
-
-function saveUserSession(userData) {
-    currentUserSession = userData;
-    sessionStorage.setItem('currentUserSession', JSON.stringify(userData));
-}
-
-function clearUserSession() {
-    currentUserSession = null;
-    sessionStorage.removeItem('currentUserSession');
-}
-
 // ===== FIXED: SECTION MANAGEMENT - CLOSE SECTIONS PROPERLY =====
 
 // MODIFIED: showContainer function to handle private messages initialization
@@ -1895,168 +2051,6 @@ function setupPrivateMessageInputHandlers() {
         // Initialize button state
         sendButton.disabled = true;
         sendButton.classList.remove('enabled');
-    }
-}
-
-// ===== UPDATED AUTHENTICATION SYSTEM =====
-
-// Real-time username validation
-function setupUsernameValidation() {
-    const usernameInput = document.getElementById('auth-username');
-    if (!usernameInput) return;
-    
-    let validationTimer;
-    
-    usernameInput.addEventListener('input', function() {
-        clearTimeout(validationTimer);
-        const username = this.value.trim();
-        
-        // Clear previous validation states
-        this.classList.remove('username-valid', 'username-invalid');
-        elements.errorDisplay.style.display = 'none';
-        
-        if (username.length < 3) return;
-        
-        validationTimer = setTimeout(async () => {
-            // Validate username format
-            if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-                this.classList.add('username-invalid');
-                return;
-            }
-            
-            // Only check availability during signup
-            if (!isLogin) {
-                try {
-                    const response = await fetch('/api/check-username', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ username: username })
-                    });
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        
-                        if (data.available) {
-                            this.classList.add('username-valid');
-                        } else {
-                            this.classList.add('username-invalid');
-                            showError('Username already exists');
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error checking username:', error);
-                }
-            }
-        }, 500);
-    });
-}
-
-// MODIFIED: Authentication handler
-async function handleAuth() {
-    const username = document.getElementById('auth-username').value.trim();
-    const password = document.getElementById('auth-password').value;
-    const loader = document.getElementById('loader');
-    
-    elements.errorDisplay.style.display = 'none';
-    elements.successDisplay.style.display = 'none';
-    
-    if (!username || !password) {
-        showError('Please enter both username and password');
-        return;
-    }
-    
-    if (username.length < 3 || username.length > 20) {
-        showError('Username must be between 3-20 characters');
-        return;
-    }
-    
-    if (password.length < 4 || password.length > 20) {
-        showError('Password must be between 4-20 characters');
-        return;
-    }
-    
-    // Validate username format
-    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-        showError('Username can only contain letters, numbers, and underscores');
-        return;
-    }
-    
-    loader.style.display = 'flex';
-    
-    try {
-        if (isLogin) {
-            // Login
-            const response = await fetch('/api/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ username, password })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                showSuccess('Login successful!');
-                
-                // Save user session
-                saveUserSession({
-                    username: data.username,
-                    user_id: data.user_id
-                });
-                
-                setTimeout(() => {
-                    loader.style.display = 'none';
-                    document.getElementById('auth-container').style.display = 'none';
-                    document.querySelector('.menu').style.display = 'flex';
-                    document.querySelector('.news-toggle').style.display = 'block';
-                    
-                    initializeButtons();
-                    showContainer('chat');
-                    loadProfile();
-                    initializeChat();
-
-                    initSocket();
-                    setupTypingHandlers();
-                    
-                    document.addEventListener('visibilitychange', handleVisibilityChange);
-                    window.addEventListener('beforeunload', handleBeforeUnload);
-                    window.addEventListener('pagehide', handlePageHide);
-                    
-                    if (hasVerifiedCode()) {
-                        enableSQLEditorAccess();
-                    }
-                }, 500);
-            } else {
-                throw new Error(data.error || 'Login failed');
-            }
-        } else {
-            // Signup
-            const response = await fetch('/api/register', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ username, password })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                showSuccess('Account created successfully! Please login.');
-                setTimeout(() => {
-                    loader.style.display = 'none';
-                    toggleAuth();
-                }, 1000);
-            } else {
-                throw new Error(data.error || 'Registration failed');
-            }
-        }
-    } catch (error) {
-        loader.style.display = 'none';
-        showError(error.message);
     }
 }
 
