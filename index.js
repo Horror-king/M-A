@@ -378,6 +378,64 @@ app.get('/api/check-username', (req, res) => {
   });
 });
 
+// ===== ADD MISSING AUTH TEST ENDPOINT =====
+
+// Test authentication endpoints - GET
+app.get('/api/auth-test', (req, res) => {
+  res.json({
+    message: "✅ Authentication endpoints are working!",
+    timestamp: new Date().toISOString(),
+    endpoints: [
+      {
+        method: "POST",
+        path: "/api/register",
+        description: "Register a new user",
+        body: {
+          username: "string (3-20 characters)",
+          password: "string (4-20 characters)"
+        }
+      },
+      {
+        method: "POST",
+        path: "/api/login",
+        description: "Login user",
+        body: {
+          username: "string",
+          password: "string"
+        }
+      },
+      {
+        method: "POST",
+        path: "/api/check-username",
+        description: "Check username availability",
+        body: {
+          username: "string"
+        }
+      },
+      {
+        method: "GET",
+        path: "/api/user/profile/:username",
+        description: "Get user profile"
+      },
+      {
+        method: "POST",
+        path: "/api/user/profile",
+        description: "Update user profile",
+        body: {
+          username: "string",
+          profileData: "object"
+        }
+      }
+    ],
+    testInstructions: [
+      "1. Use POST /api/check-username to check availability",
+      "2. Use POST /api/register to create account",
+      "3. Use POST /api/login to authenticate",
+      "4. Use GET/POST /api/user/profile to manage profile"
+    ]
+  });
+});
+
 // Get user profile - GET
 app.get('/api/user/profile/:username', async (req, res) => {
   try {
@@ -492,57 +550,6 @@ app.post('/api/user/profile', async (req, res) => {
       error: "Internal server error" 
     });
   }
-});
-
-// ===== TEST AUTHENTICATION ENDPOINTS =====
-
-// Test authentication endpoints
-app.get('/api/auth-test', (req, res) => {
-  res.json({
-    message: "Authentication endpoints are working!",
-    endpoints: [
-      {
-        method: "POST",
-        path: "/api/register",
-        description: "Register a new user",
-        body: {
-          username: "string (3-20 characters)",
-          password: "string (4-20 characters)"
-        }
-      },
-      {
-        method: "POST",
-        path: "/api/login",
-        description: "Login user",
-        body: {
-          username: "string",
-          password: "string"
-        }
-      },
-      {
-        method: "POST",
-        path: "/api/check-username",
-        description: "Check username availability",
-        body: {
-          username: "string"
-        }
-      },
-      {
-        method: "GET",
-        path: "/api/user/profile/:username",
-        description: "Get user profile"
-      },
-      {
-        method: "POST",
-        path: "/api/user/profile",
-        description: "Update user profile",
-        body: {
-          username: "string",
-          profileData: "object"
-        }
-      }
-    ]
-  });
 });
 
 // ===== ENHANCED DEBUGGING ENDPOINTS =====
