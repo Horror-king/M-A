@@ -790,6 +790,124 @@ app.post('/api/user/profile', async (req, res) => {
   }
 });
 
+// ===== ADD MISSING AI ENDPOINTS =====
+
+// Private AI endpoint - FIXED: This was missing
+app.post('/api/ai/private', async (req, res) => {
+  try {
+    const { message } = req.body;
+    console.log('🤫 Private AI request:', { message });
+
+    if (!message) {
+      return res.status(400).json({ error: "Message is required" });
+    }
+
+    // Use the same AI service as the main chat
+    const response = await axios.get(
+      `https://yau-ai-runing-station.vercel.app/ai?prompt=${encodeURIComponent(message)}&cb=${Date.now()}`,
+      { 
+        headers: { 
+          Accept: "application/json",
+          "User-Agent": "GoatBot/1.0"
+        },
+        timeout: 15000,
+        validateStatus: () => true
+      }
+    );
+
+    let responseData;
+    let aiResponse;
+
+    if (typeof response.data === 'string') {
+      try {
+        responseData = JSON.parse(response.data);
+      } catch (e) {
+        if (response.data.includes('error') || response.status !== 200) {
+          throw new Error(response.data || `API returned status ${response.status}`);
+        }
+        aiResponse = response.data;
+      }
+    } else {
+      responseData = response.data;
+    }
+
+    if (!aiResponse) {
+      if (responseData.response) {
+        aiResponse = responseData.response;
+      } else if (responseData.message) {
+        aiResponse = responseData.message;
+      } else if (responseData.data) {
+        aiResponse = responseData.data;
+      } else {
+        aiResponse = JSON.stringify(responseData) || "⚠️ No recognizable response format";
+      }
+    }
+
+    res.json({ reply: aiResponse });
+  } catch (error) {
+    console.error("❌ Private AI Error:", error);
+    res.status(500).json({ error: `Private AI Error: ${error.message}` });
+  }
+});
+
+// Main AI chat endpoint - FIXED: This was missing
+app.post('/api/ai/chat', async (req, res) => {
+  try {
+    const { message } = req.body;
+    console.log('🤖 Main AI request:', { message });
+
+    if (!message) {
+      return res.status(400).json({ error: "Message is required" });
+    }
+
+    // Use the same AI service
+    const response = await axios.get(
+      `https://yau-ai-runing-station.vercel.app/ai?prompt=${encodeURIComponent(message)}&cb=${Date.now()}`,
+      { 
+        headers: { 
+          Accept: "application/json",
+          "User-Agent": "GoatBot/1.0"
+        },
+        timeout: 15000,
+        validateStatus: () => true
+      }
+    );
+
+    let responseData;
+    let aiResponse;
+
+    if (typeof response.data === 'string') {
+      try {
+        responseData = JSON.parse(response.data);
+      } catch (e) {
+        if (response.data.includes('error') || response.status !== 200) {
+          throw new Error(response.data || `API returned status ${response.status}`);
+        }
+        aiResponse = response.data;
+      }
+    } else {
+      responseData = response.data;
+    }
+
+    if (!aiResponse) {
+      if (responseData.response) {
+        aiResponse = responseData.response;
+      } else if (responseData.message) {
+        aiResponse = responseData.message;
+      } else if (responseData.data) {
+        aiResponse = responseData.data;
+      } else {
+        aiResponse = JSON.stringify(responseData) || "⚠️ No recognizable response format";
+      }
+    }
+
+    res.json({ reply: aiResponse });
+  } catch (error) {
+    console.error("❌ Main AI Error:", error);
+    res.status(500).json({ error: `Main AI Error: ${error.message}` });
+  }
+});
+
 // ===== ADD MESSAGES ENDPOINTS TO MATCH CLIENT =====
 
 // GET messages endpoint that client expects
@@ -893,6 +1011,186 @@ app.delete('/api/messages/:id', async (req, res) => {
     res.status(200).json({ success: true });
   } catch (error) {
     res.status(500).json({ error: "Failed to delete message" });
+  }
+});
+
+// ===== ADD PRIVATE MESSAGES ENDPOINTS THAT CLIENT EXPECTS =====
+
+// Get conversations for the current user - FIXED: This endpoint was missing
+app.get('/api/private/conversations', async (req, res) => {
+  try {
+    const { username } = req.query;
+    
+    if (!username) {
+      return res.status(400).json({ error: "Username query parameter is required" });
+    }
+
+    // Get distinct conversations (people the user has chatted with)
+    const { data: conversations, error } = await supabase
+      .from('private_messages')
+      .select('sender_username, receiver_username, content, created_at, read')
+      .or(`sender_username.eq.${username},receiver_username.eq.${username}`)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Process to get unique conversations with last message
+    const conversationMap = new Map();
+    
+    conversations.forEach(msg => {
+      const otherUser = msg.sender_username === username ? msg.receiver_username : msg.sender_username;
+      
+      if (!conversationMap.has(otherUser) || 
+          new Date(msg.created_at) > new Date(conversationMap.get(otherUser).lastMessageTime)) {
+        conversationMap.set(otherUser, {
+          username: otherUser,
+          lastMessage: msg.content,
+          lastMessageTime: msg.created_at,
+          unread: msg.receiver_username === username && !msg.read,
+          isSender: msg.sender_username === username
+        });
+      }
+    });
+
+    const conversationList = Array.from(conversationMap.values())
+      .sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
+
+    res.json(conversationList);
+  } catch (error) {
+    console.error('Error fetching conversations:', error);
+    res.status(500).json({ error: 'Failed to fetch conversations' });
+  }
+});
+
+// Get messages between two users - FIXED: This endpoint was missing
+app.get('/api/private/messages/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    const { otherUser } = req.query;
+    
+    if (!username || !otherUser) {
+      return res.status(400).json({ error: "Username and otherUser parameters are required" });
+    }
+    
+    const { data: messages, error } = await supabase
+      .from('private_messages')
+      .select('*')
+      .or(`and(sender_username.eq.${username},receiver_username.eq.${otherUser}),and(sender_username.eq.${otherUser},receiver_username.eq.${username})`)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    // Mark messages as read when fetched
+    await supabase
+      .from('private_messages')
+      .update({ read: true })
+      .eq('receiver_username', username)
+      .eq('sender_username', otherUser)
+      .eq('read', false);
+
+    res.json(messages || []);
+  } catch (error) {
+    console.error('Error fetching private messages:', error);
+    res.status(500).json({ error: 'Failed to fetch private messages' });
+  }
+});
+
+// Send private message - FIXED: This endpoint was missing
+app.post('/api/private/messages', async (req, res) => {
+  try {
+    const { sender_username, receiver_username, content, image_url } = req.body;
+
+    console.log('📨 Private message via API:', { sender_username, receiver_username, content, image_url });
+
+    if (!sender_username || !receiver_username) {
+      return res.status(400).json({ error: "Sender and receiver usernames are required" });
+    }
+
+    if ((!content || content.trim() === '') && !image_url) {
+      return res.status(400).json({ error: "Content or image is required" });
+    }
+
+    const insertData = {
+      sender_username: sender_username.trim(),
+      receiver_username: receiver_username.trim(),
+      content: content ? content.trim() : '',
+      image_url: image_url || '',
+      read: false
+    };
+
+    console.log('📝 Inserting private message via API:', insertData);
+
+    const { data, error } = await supabase
+      .from('private_messages')
+      .insert([insertData])
+      .select();
+
+    if (error) {
+      console.error('❌ Private message insert failed:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: error.message
+      });
+    }
+
+    console.log('✅ Private message saved via API. ID:', data[0]?.id);
+    
+    // Broadcast via Socket.io to both users
+    io.emit('new-private-message', data[0]);
+    
+    res.status(201).json(data[0]);
+  } catch (error) {
+    console.error('❌ Failed to save private message via API:', error);
+    res.status(500).json({ error: "Failed to send private message: " + error.message });
+  }
+});
+
+// Get unread message count - FIXED: This endpoint was missing
+app.get('/api/private/unread', async (req, res) => {
+  try {
+    const { username } = req.query;
+    
+    if (!username) {
+      return res.status(400).json({ error: "Username query parameter is required" });
+    }
+
+    const { count, error } = await supabase
+      .from('private_messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('receiver_username', username)
+      .eq('read', false);
+
+    if (error) throw error;
+
+    res.json({ unreadCount: count || 0 });
+  } catch (error) {
+    console.error('Error fetching unread count:', error);
+    res.status(500).json({ error: 'Failed to fetch unread count' });
+  }
+});
+
+// Mark messages as read - FIXED: This endpoint was missing
+app.put('/api/private/messages/read', async (req, res) => {
+  try {
+    const { sender_username, receiver_username } = req.body;
+
+    if (!sender_username || !receiver_username) {
+      return res.status(400).json({ error: "Sender and receiver usernames are required" });
+    }
+
+    const { error } = await supabase
+      .from('private_messages')
+      .update({ read: true })
+      .eq('sender_username', sender_username)
+      .eq('receiver_username', receiver_username)
+      .eq('read', false);
+
+    if (error) throw error;
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error marking messages as read:', error);
+    res.status(500).json({ error: 'Failed to mark messages as read' });
   }
 });
 
@@ -2005,15 +2303,14 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Handle private AI messages
+  // Handle private AI messages - FIXED: This was causing issues
   socket.on('send-private-message', async (data) => {
     try {
-      console.log('🤫 Private message received:', data);
+      console.log('🤫 Private AI message received via socket:', data);
       
-      // Process private AI response
-      const response = await axios.post('http://localhost:3000/api/command', {
-        message: data.content,
-        source: 'private-ai'
+      // Process private AI response using the new endpoint
+      const response = await axios.post('http://localhost:3000/api/ai/private', {
+        message: data.content
       }, {
         headers: { 'Content-Type': 'application/json' }
       });
@@ -2022,14 +2319,20 @@ io.on('connection', (socket) => {
         // Send private AI response back to the specific user
         socket.emit('new-private-message', {
           content: response.data.reply,
-          username: 'Private AI'
+          username: 'Private AI',
+          sender_username: 'Private AI',
+          receiver_username: data.username,
+          created_at: new Date().toISOString()
         });
       }
     } catch (error) {
-      console.error('❌ Private message error:', error);
+      console.error('❌ Private AI message error:', error);
       socket.emit('new-private-message', {
         content: "Error: Could not process your private message",
-        username: 'Private AI'
+        username: 'Private AI',
+        sender_username: 'Private AI', 
+        receiver_username: data.username,
+        created_at: new Date().toISOString()
       });
     }
   });
@@ -2194,9 +2497,19 @@ server.listen(port, () => {
   console.log(`🔌 Socket.io events: new-message, message-deleted, user-status-change`);
   console.log(`🤫 PRIVATE MESSAGING: ENABLED via Supabase`);
   console.log(`🔒 Private endpoints: /private-messages/*`);
-  console.log(`👤 USER AUTHENTICATION: ENABLED (Server-side, no localStorage)`);
+  console.log(`🔐 USER AUTHENTICATION: ENABLED (Server-side, no localStorage)`);
   console.log(`🔐 Password hashing: SIMPLE HASH (basic implementation)`);
   console.log(`🌐 Cross-browser compatibility: ENABLED`);
+  
+  // NEW: Added missing endpoints
+  console.log(`🤖 NEW: POST /api/ai/private - Private AI endpoint`);
+  console.log(`🤖 NEW: POST /api/ai/chat - Main AI chat endpoint`);
+  console.log(`💬 NEW: GET /api/private/conversations - Get conversations`);
+  console.log(`💬 NEW: GET /api/private/messages/:username - Get private messages`);
+  console.log(`💬 NEW: POST /api/private/messages - Send private message`);
+  console.log(`💬 NEW: PUT /api/private/messages/read - Mark as read`);
+  console.log(`💬 NEW: GET /api/private/unread - Get unread count`);
+  
   console.log(`🔍 NEW: GET /debug-private-messages - Debug private messages table`);
   console.log(`🧪 NEW: GET /test-private-messages - Test private message creation (GET)`);
   console.log(`🧪 NEW: POST /test-private-messages - Test private message creation (POST)`);
