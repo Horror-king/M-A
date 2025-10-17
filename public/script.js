@@ -1,4 +1,108 @@
-// ===== FIXED AUTHENTICATION FUNCTIONS =====
+let isLogin = true;
+let longPressTimer;
+let isLongPress = false;
+const badWords = ['fuck', 'nigga', 'shit', 'bitch', 'asshole'];
+const spamTracker = {};
+const SPAM_LIMIT = 5;
+const SPAM_WINDOW = 10000;
+const BAN_DURATION = 60000;
+const bannedUsers = {};
+const warnedUsers = {};
+
+// SECRET CODE VERIFICATION VARIABLES
+const SECRET_CODE = "456i";
+let failedAttempts = 0;
+const MAX_ATTEMPTS = 3;
+let isLockedOut = false;
+let lockoutTimeout = null;
+
+// SQL Editor Variables
+let sqlEditor = null;
+let sqlResults = [];
+let savedQueries = JSON.parse(localStorage.getItem('savedQueries')) || [];
+
+// Notification variables
+let lastMessageId = null;
+let notificationPermissionGranted = false;
+
+// Flag to prevent duplicate sends
+let isSending = false;
+
+// Scroll state variables
+let isAtBottom = true;
+let newMessagesCount = 0;
+let scrollToBottomBtn;
+let newMessagesCountEl = document.getElementById('newMessagesCount');
+
+// Real-time active status variables
+let socket;
+let isTyping = false;
+let typingTimer;
+
+// ✅ ADDED: Flag to track if we're processing a command to prevent duplicates
+let isProcessingCommand = false;
+
+// ✅ ADDED: Track online users for profile popup
+let onlineUsers = [];
+
+// ✅ ADDED: Private Messaging Variables
+let currentPrivateChatUser = null;
+let privateMessageTypingTimer;
+
+// ✅ ADDED: Track last sent messages to prevent duplicates
+let lastSentMessages = {
+    private: {},
+    main: {}
+};
+
+// ✅ ADDED: User Panel Visibility State
+let userPanelVisible = true;
+
+// ✅ ADDED: Current user session
+let currentUserSession = null;
+
+const elements = {
+    usernameInput: document.getElementById('auth-username'),
+    messageInput: document.getElementById('user-input'),
+    sendButton: document.getElementById('send-button'),
+    chatContainer: document.getElementById('chat-container'),
+    replyPreview: document.getElementById('reply-preview-container'),
+    errorDisplay: document.getElementById('error-message'),
+    successDisplay: document.getElementById('success-message'),
+    privateInput: document.getElementById('private-user-input'),
+    privateSendButton: document.getElementById('private-send-button')
+};
+
+let replyToText = null;
+
+// ===== AUTHENTICATION FUNCTIONS =====
+function toggleAuth() {
+    isLogin = !isLogin;
+    const authTitle = document.getElementById('auth-title');
+    const authButton = document.querySelector('.auth-box button');
+    const toggleText = document.getElementById('toggle-text');
+    const toggleLink = document.getElementById('toggle-link');
+    elements.errorDisplay.style.display = 'none';
+    elements.successDisplay.style.display = 'none';
+    
+    if (isLogin) {
+        authTitle.textContent = 'Login';
+        authButton.textContent = 'Login';
+        toggleText.textContent = "Don't have an account? ";
+        toggleLink.textContent = 'Sign Up';
+    } else {
+        authTitle.textContent = 'Sign Up';
+        authButton.textContent = 'Sign Up';
+        toggleText.textContent = 'Already have an account? ';
+        toggleLink.textContent = 'Login';
+    }
+    
+    // Reset username validation
+    const usernameInput = document.getElementById('auth-username');
+    if (usernameInput) {
+        usernameInput.classList.remove('username-valid', 'username-invalid');
+    }
+}
 
 // MODIFIED: Authentication handler with proper error handling
 async function handleAuth() {
@@ -175,83 +279,25 @@ function clearUserSession() {
     sessionStorage.removeItem('currentUserSession');
 }
 
-// --- CUT HERE ---
-let isLogin = true;
-let longPressTimer;
-let isLongPress = false;
-const badWords = ['fuck', 'nigga', 'shit', 'bitch', 'asshole'];
-const spamTracker = {};
-const SPAM_LIMIT = 5;
-const SPAM_WINDOW = 10000;
-const BAN_DURATION = 60000;
-const bannedUsers = {};
-const warnedUsers = {};
-
-// SECRET CODE VERIFICATION VARIABLES
-const SECRET_CODE = "456i";
-let failedAttempts = 0;
-const MAX_ATTEMPTS = 3;
-let isLockedOut = false;
-let lockoutTimeout = null;
-
-// SQL Editor Variables
-let sqlEditor = null;
-let sqlResults = [];
-let savedQueries = JSON.parse(localStorage.getItem('savedQueries')) || [];
-
-// Notification variables
-let lastMessageId = null;
-let notificationPermissionGranted = false;
-
-// Flag to prevent duplicate sends
-let isSending = false;
-
-// Scroll state variables
-let isAtBottom = true;
-let newMessagesCount = 0;
-let scrollToBottomBtn;
-let newMessagesCountEl = document.getElementById('newMessagesCount');
-
-// Real-time active status variables
-let socket;
-let isTyping = false;
-let typingTimer;
-
-// ✅ ADDED: Flag to track if we're processing a command to prevent duplicates
-let isProcessingCommand = false;
-
-// ✅ ADDED: Track online users for profile popup
-let onlineUsers = [];
-
-// ✅ ADDED: Private Messaging Variables
-let currentPrivateChatUser = null;
-let privateMessageTypingTimer;
-
-// ✅ ADDED: Track last sent messages to prevent duplicates
-let lastSentMessages = {
-    private: {},
-    main: {}
-};
-
-// ✅ ADDED: User Panel Visibility State
-let userPanelVisible = true;
-
-// ✅ ADDED: Current user session
-let currentUserSession = null;
-
-const elements = {
-    usernameInput: document.getElementById('auth-username'),
-    messageInput: document.getElementById('user-input'),
-    sendButton: document.getElementById('send-button'),
-    chatContainer: document.getElementById('chat-container'),
-    replyPreview: document.getElementById('reply-preview-container'),
-    errorDisplay: document.getElementById('error-message'),
-    successDisplay: document.getElementById('success-message'),
-    privateInput: document.getElementById('private-user-input'),
-    privateSendButton: document.getElementById('private-send-button')
-};
-
-let replyToText = null;
+// Initialize authentication when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    setupUsernameValidation();
+    
+    // Check if user is already logged in
+    if (checkUserSession()) {
+        console.log('✅ User logged in:', currentUserSession.username);
+        document.getElementById('auth-container').style.display = 'none';
+        document.querySelector('.menu').style.display = 'flex';
+        document.querySelector('.news-toggle').style.display = 'block';
+        showContainer('chat');
+        loadProfile();
+        initializeChat();
+        initSocket();
+    } else {
+        console.log('❌ No user logged in');
+        document.getElementById('auth-container').style.display = 'flex';
+    }
+});
 
 // ===== ADDED: USER PANEL VISIBILITY FUNCTIONS =====
 function toggleUserPanel() {
@@ -2054,34 +2100,6 @@ function setupPrivateMessageInputHandlers() {
     }
 }
 
-function toggleAuth() {
-    isLogin = !isLogin;
-    const authTitle = document.getElementById('auth-title');
-    const authButton = document.querySelector('.auth-box button');
-    const toggleText = document.getElementById('toggle-text');
-    const toggleLink = document.getElementById('toggle-link');
-    elements.errorDisplay.style.display = 'none';
-    elements.successDisplay.style.display = 'none';
-    
-    if (isLogin) {
-        authTitle.textContent = 'Login';
-        authButton.textContent = 'Login';
-        toggleText.textContent = "Don't have an account? ";
-        toggleLink.textContent = 'Sign Up';
-    } else {
-        authTitle.textContent = 'Sign Up';
-        authButton.textContent = 'Sign Up';
-        toggleText.textContent = 'Already have an account? ';
-        toggleLink.textContent = 'Login';
-    }
-    
-    // Reset username validation
-    const usernameInput = document.getElementById('auth-username');
-    if (usernameInput) {
-        usernameInput.classList.remove('username-valid', 'username-invalid');
-    }
-}
-
 function showSuccess(message) {
     elements.successDisplay.textContent = message;
     elements.successDisplay.style.display = 'block';
@@ -3796,8 +3814,3 @@ function forceImageRendering() {
         img.style.visibility = 'visible';
     });
 }
-
-// Initialize username validation
-document.addEventListener('DOMContentLoaded', function() {
-    setupUsernameValidation();
-});
