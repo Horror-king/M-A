@@ -1415,7 +1415,19 @@ function logout() {
     console.log('✅ User logged out successfully');
 }
 
-// ===== AI RESPONSE FUNCTIONS =====
+// --- CUT HERE ---
+function showNotification(username, message) {
+    if (!notificationPermissionGranted || !('Notification' in window)) return;
+    const notification = new Notification(`${username} says:`, {
+        body: message.length > 50 ? message.substring(0, 50) + '...' : message,
+        icon: 'https://i.pravatar.cc/50?u=' + encodeURIComponent(username)
+    });
+    notification.onclick = () => {
+        window.focus();
+    };
+}
+
+// ✅ FIXED: COMPLETELY REWRITTEN - No more duplicate responses
 async function fetchChatResponse(userInput) {
     if (isProcessingCommand) {
         console.log('🛑 Command already being processed, skipping...');
@@ -1434,12 +1446,10 @@ async function fetchChatResponse(userInput) {
         }
         
         // Only process non-command messages for AI response
-        const token = localStorage.getItem('auth_token');
-        const response = await fetch('/api/ai/chat', {
+        const response = await fetch('/api/command', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': token ? `Bearer ${token}` : ''
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 message: userInput,
@@ -1464,12 +1474,10 @@ async function fetchChatResponse(userInput) {
 
 async function fetchPrivateAIResponse(userInput) {
     try {
-        const token = localStorage.getItem('auth_token');
-        const response = await fetch('/api/ai/private', {
+        const response = await fetch('/api/command', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': token ? `Bearer ${token}` : ''
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 message: userInput,
