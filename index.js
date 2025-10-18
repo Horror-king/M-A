@@ -36,7 +36,7 @@ global.utils = {
   getText: () => "✅ Bot is running smoothly"
 };
 
-// Initialize Supabase - FIXED: Added service_role key for RLS bypass
+// Initialize Supabase
 const supabase = createClient(
   'https://rqissetffrnkfzfgsngm.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxaXNzZXRmZnJua2Z6ZmdzbmdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNzU2NzIsImV4cCI6MjA3NDc1MTY3Mn0.6tCuI4yhn3EXlua9na4kkgMqX6PL00GxjEuY0QG2bTg',
@@ -77,6 +77,1228 @@ const renderExternalUrl = process.env.RENDER_EXTERNAL_URL;
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
+
+// ===== ENHANCED USER AUTHENTICATION SYSTEM =====
+
+// Simple password hashing function (basic implementation)
+function simpleHash(password) {
+  let hash = 0;
+  for (let i = 0; i < password.length; i++) {
+    const char = password.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return hash.toString();
+}
+
+// Initialize users table if it doesn't exist
+async function initializeUsersTable() {
+  try {
+    // First check if table exists by trying to select from it
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .limit(1);
+
+    if (error && error.code === '42P01') { // Table doesn't exist
+      console.log('⚠️ Users table does not exist. Please create it in Supabase.');
+      console.log('📋 SQL to create users table:');
+      console.log(`
+        CREATE TABLE IF NOT EXISTS users (
+          id BIGSERIAL PRIMARY KEY,
+          username VARCHAR(50) UNIQUE NOT NULL,
+          password_hash VARCHAR(255) NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          last_login TIMESTAMPTZ DEFAULT NOW()
+        );
+        
+        CREATE TABLE IF NOT EXISTS user_profiles (
+          id BIGSERIAL PRIMARY KEY,
+          username VARCHAR(50) UNIQUE NOT NULL,
+          firstname VARCHAR(100),
+          lastname VARCHAR(100),
+          bio TEXT,
+          age INTEGER,
+          gender VARCHAR(50),
+          location VARCHAR(100),
+          interests TEXT,
+          avatar TEXT,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+      `);
+    } else if (!error) {
+      console.log('✅ Users table exists');
+    }
+  } catch (error) {
+    console.error('❌ Error checking users table:', error);
+  }
+}
+
+// Call initialization
+initializeUsersTable();
+
+// ===== AUTHENTICATION ENDPOINTS =====
+
+// User registration endpoint - POST
+app.post('/api/register', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    console.log('📝 Registration attempt:', { username });
+
+    if (!username || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Username and password are required" 
+      });
+    }
+
+    if (username.length < 3 || username.length > 20) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Username must be between 3-20 characters" 
+      });
+    }
+
+    if (password.length < 4 || password.length > 20) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Password must be between 4-20 characters" 
+      });
+    }
+
+    // Validate username format
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Username can only contain letters, numbers, and underscores" 
+      });
+    }
+
+    // Check if username already exists (case-insensitive)
+    const { data: existingUsers, error: checkError } = await supabase
+      .from('users')
+      .select('username')
+      .ilike('username', username);
+
+    if (checkError) {
+      console.error('❌ Database error checking username:', checkError);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Database error" 
+      });
+    }
+
+    if (existingUsers && existingUsers.length > 0) {
+      return res.status(409).json({ 
+        success: false, 
+        error: "Username already exists" 
+      });
+    }
+
+    // Simple password hashing
+    const hashedPassword = simpleHash(password);
+
+    // Create user
+    const { data: newUser, error: createError } = await supabase
+      .from('users')
+      .insert([
+        { 
+          username: username.trim(),
+          password_hash: hashedPassword,
+          created_at: new Date().toISOString(),
+          last_login: new Date().toISOString()
+        }
+      ])
+      .select();
+
+    if (createError) {
+      console.error('❌ Database error creating user:', createError);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Failed to create user" 
+      });
+    }
+
+    console.log('✅ User registered successfully:', username);
+    
+    // Generate a simple token for persistent login
+    const userToken = generateUserToken(username);
+    
+    res.status(201).json({ 
+      success: true, 
+      message: "User registered successfully",
+      username: username,
+      user_id: newUser[0].id,
+      token: userToken
+    });
+
+  } catch (error) {
+    console.error('❌ Registration error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Internal server error" 
+    });
+  }
+});
+
+// User login endpoint - POST
+app.post('/api/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    console.log('🔐 Login attempt:', { username });
+
+    if (!username || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Username and password are required" 
+      });
+    }
+
+    // Find user (case-insensitive search)
+    const { data: users, error: findError } = await supabase
+      .from('users')
+      .select('*')
+      .ilike('username', username)
+      .limit(1);
+
+    if (findError) {
+      console.error('❌ Database error finding user:', findError);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Database error" 
+      });
+    }
+
+    if (!users || users.length === 0) {
+      return res.status(401).json({ 
+        success: false, 
+        error: "Invalid username or password" 
+      });
+    }
+
+    const user = users[0];
+
+    // Verify password with simple hash
+    const isPasswordValid = simpleHash(password) === user.password_hash;
+    
+    if (!isPasswordValid) {
+      return res.status(401).json({ 
+        success: false, 
+        error: "Invalid username or password" 
+      });
+    }
+
+    // Update last login
+    await supabase
+      .from('users')
+      .update({ last_login: new Date().toISOString() })
+      .eq('id', user.id);
+
+    console.log('✅ User logged in successfully:', username);
+
+    // Generate a token for persistent login
+    const userToken = generateUserToken(username);
+
+    res.json({ 
+      success: true, 
+      message: "Login successful",
+      username: user.username,
+      user_id: user.id,
+      token: userToken
+    });
+
+  } catch (error) {
+    console.error('❌ Login error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Internal server error" 
+    });
+  }
+});
+
+// Simple token generation function
+function generateUserToken(username) {
+  const timestamp = Date.now();
+  return Buffer.from(`${username}:${timestamp}`).toString('base64');
+}
+
+// Token verification middleware
+function verifyToken(req, res, next) {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  
+  if (!token) {
+    return res.status(401).json({ 
+      success: false, 
+      error: "Authentication token required" 
+    });
+  }
+
+  try {
+    // Simple token verification - in production, use JWT or similar
+    const decoded = Buffer.from(token, 'base64').toString('ascii');
+    const [username, timestamp] = decoded.split(':');
+    
+    // Check if token is not too old (30 days)
+    const tokenAge = Date.now() - parseInt(timestamp);
+    const maxTokenAge = 30 * 24 * 60 * 60 * 1000; // 30 days
+    
+    if (tokenAge > maxTokenAge) {
+      return res.status(401).json({ 
+        success: false, 
+        error: "Token expired" 
+      });
+    }
+    
+    req.user = { username };
+    next();
+  } catch (error) {
+    return res.status(401).json({ 
+      success: false, 
+      error: "Invalid token" 
+    });
+  }
+}
+
+// Check username availability - POST
+app.post('/api/check-username', async (req, res) => {
+  try {
+    const { username } = req.body;
+
+    if (!username) {
+      return res.json({ available: true });
+    }
+
+    // Check if username exists (case-insensitive)
+    const { data: existingUsers, error } = await supabase
+      .from('users')
+      .select('username')
+      .ilike('username', username)
+      .limit(1);
+
+    if (error) {
+      console.error('❌ Database error checking username:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Database error" 
+      });
+    }
+
+    const available = !existingUsers || existingUsers.length === 0;
+    
+    res.json({ 
+      available: available,
+      suggestion: available ? null : "Username is already taken"
+    });
+
+  } catch (error) {
+    console.error('❌ Check username error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Internal server error" 
+    });
+  }
+});
+
+// ===== ADD AUTH ENDPOINTS TO MATCH CLIENT EXPECTATIONS =====
+
+// Add /api/auth/register endpoint (same as /api/register)
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    console.log('📝 Auth Registration attempt:', { username });
+
+    if (!username || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Username and password are required" 
+      });
+    }
+
+    if (username.length < 3 || username.length > 20) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Username must be between 3-20 characters" 
+      });
+    }
+
+    if (password.length < 4 || password.length > 20) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Password must be between 4-20 characters" 
+      });
+    }
+
+    // Validate username format
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Username can only contain letters, numbers, and underscores" 
+      });
+    }
+
+    // Check if username already exists (case-insensitive)
+    const { data: existingUsers, error: checkError } = await supabase
+      .from('users')
+      .select('username')
+      .ilike('username', username);
+
+    if (checkError) {
+      console.error('❌ Database error checking username:', checkError);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Database error" 
+      });
+    }
+
+    if (existingUsers && existingUsers.length > 0) {
+      return res.status(409).json({ 
+        success: false, 
+        error: "Username already exists" 
+      });
+    }
+
+    // Simple password hashing
+    const hashedPassword = simpleHash(password);
+
+    // Create user
+    const { data: newUser, error: createError } = await supabase
+      .from('users')
+      .insert([
+        { 
+          username: username.trim(),
+          password_hash: hashedPassword,
+          created_at: new Date().toISOString(),
+          last_login: new Date().toISOString()
+        }
+      ])
+      .select();
+
+    if (createError) {
+      console.error('❌ Database error creating user:', createError);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Failed to create user" 
+      });
+    }
+
+    console.log('✅ User registered successfully via auth endpoint:', username);
+    
+    // Generate token for persistent login
+    const userToken = generateUserToken(username);
+    
+    res.status(201).json({ 
+      success: true, 
+      message: "User registered successfully",
+      username: username,
+      user_id: newUser[0].id,
+      token: userToken
+    });
+
+  } catch (error) {
+    console.error('❌ Auth registration error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Internal server error" 
+    });
+  }
+});
+
+// Add /api/auth/login endpoint (same as /api/login)
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    console.log('🔐 Auth Login attempt:', { username });
+
+    if (!username || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Username and password are required" 
+      });
+    }
+
+    // Find user (case-insensitive search)
+    const { data: users, error: findError } = await supabase
+      .from('users')
+      .select('*')
+      .ilike('username', username)
+      .limit(1);
+
+    if (findError) {
+      console.error('❌ Database error finding user:', findError);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Database error" 
+      });
+    }
+
+    if (!users || users.length === 0) {
+      return res.status(401).json({ 
+        success: false, 
+        error: "Invalid username or password" 
+      });
+    }
+
+    const user = users[0];
+
+    // Verify password with simple hash
+    const isPasswordValid = simpleHash(password) === user.password_hash;
+    
+    if (!isPasswordValid) {
+      return res.status(401).json({ 
+        success: false, 
+        error: "Invalid username or password" 
+      });
+    }
+
+    // Update last login
+    await supabase
+      .from('users')
+      .update({ last_login: new Date().toISOString() })
+      .eq('id', user.id);
+
+    console.log('✅ User logged in successfully via auth endpoint:', username);
+
+    // Generate token for persistent login
+    const userToken = generateUserToken(username);
+
+    res.json({ 
+      success: true, 
+      message: "Login successful",
+      username: user.username,
+      user_id: user.id,
+      token: userToken
+    });
+
+  } catch (error) {
+    console.error('❌ Auth login error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Internal server error" 
+    });
+  }
+});
+
+// Add /api/auth/check-username endpoint (same as /api/check-username)
+app.post('/api/auth/check-username', async (req, res) => {
+  try {
+    const { username } = req.body;
+
+    if (!username) {
+      return res.json({ available: true });
+    }
+
+    // Check if username exists (case-insensitive)
+    const { data: existingUsers, error } = await supabase
+      .from('users')
+      .select('username')
+      .ilike('username', username)
+      .limit(1);
+
+    if (error) {
+      console.error('❌ Database error checking username:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Database error" 
+      });
+    }
+
+    const available = !existingUsers || existingUsers.length === 0;
+    
+    res.json({ 
+      available: available,
+      suggestion: available ? null : "Username is already taken"
+    });
+
+  } catch (error) {
+    console.error('❌ Auth check username error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Internal server error" 
+    });
+  }
+});
+
+// Add auto-login endpoint
+app.post('/api/auth/auto-login', verifyToken, async (req, res) => {
+  try {
+    const username = req.user.username;
+
+    console.log('🔄 Auto-login attempt for:', username);
+
+    // Find user
+    const { data: users, error } = await supabase
+      .from('users')
+      .select('*')
+      .ilike('username', username)
+      .limit(1);
+
+    if (error || !users || users.length === 0) {
+      return res.status(401).json({ 
+        success: false, 
+        error: "User not found" 
+      });
+    }
+
+    const user = users[0];
+
+    // Update last login
+    await supabase
+      .from('users')
+      .update({ last_login: new Date().toISOString() })
+      .eq('id', user.id);
+
+    console.log('✅ Auto-login successful for:', username);
+
+    res.json({ 
+      success: true, 
+      message: "Auto-login successful",
+      username: user.username,
+      user_id: user.id
+    });
+
+  } catch (error) {
+    console.error('❌ Auto-login error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Internal server error" 
+    });
+  }
+});
+
+// ===== ADD GET ENDPOINTS FOR TESTING =====
+
+// GET endpoint for login (for testing in browser)
+app.get('/api/login', (req, res) => {
+  res.status(405).json({
+    success: false,
+    error: "Method Not Allowed",
+    message: "Use POST method for login",
+    example: {
+      method: "POST",
+      url: "/api/login",
+      body: {
+        username: "your_username",
+        password: "your_password"
+      }
+    }
+  });
+});
+
+// GET endpoint for register (for testing in browser)
+app.get('/api/register', (req, res) => {
+  res.status(405).json({
+    success: false,
+    error: "Method Not Allowed",
+    message: "Use POST method for registration",
+    example: {
+      method: "POST",
+      url: "/api/register",
+      body: {
+        username: "new_username",
+        password: "new_password"
+      }
+    }
+  });
+});
+
+// GET endpoint for check-username (for testing in browser)
+app.get('/api/check-username', (req, res) => {
+  res.status(405).json({
+    success: false,
+    error: "Method Not Allowed",
+    message: "Use POST method for checking username",
+    example: {
+      method: "POST",
+      url: "/api/check-username",
+      body: {
+        username: "username_to_check"
+      }
+    }
+  });
+});
+
+// ===== ADD MISSING AUTH TEST ENDPOINT =====
+
+// Test authentication endpoints - GET
+app.get('/api/auth-test', (req, res) => {
+  res.json({
+    message: "✅ Authentication endpoints are working!",
+    timestamp: new Date().toISOString(),
+    endpoints: [
+      {
+        method: "POST",
+        path: "/api/register",
+        description: "Register a new user",
+        body: {
+          username: "string (3-20 characters)",
+          password: "string (4-20 characters)"
+        }
+      },
+      {
+        method: "POST",
+        path: "/api/login",
+        description: "Login user",
+        body: {
+          username: "string",
+          password: "string"
+        }
+      },
+      {
+        method: "POST",
+        path: "/api/check-username",
+        description: "Check username availability",
+        body: {
+          username: "string"
+        }
+      },
+      {
+        method: "GET",
+        path: "/api/user/profile/:username",
+        description: "Get user profile"
+      },
+      {
+        method: "POST",
+        path: "/api/user/profile",
+        description: "Update user profile",
+        body: {
+          username: "string",
+          profileData: "object"
+        }
+      }
+    ],
+    testInstructions: [
+      "1. Use POST /api/check-username to check availability",
+      "2. Use POST /api/register to create account",
+      "3. Use POST /api/login to authenticate",
+      "4. Use GET/POST /api/user/profile to manage profile"
+    ]
+  });
+});
+
+// Get user profile - GET
+app.get('/api/user/profile/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+
+    const { data: profiles, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('username', username)
+      .limit(1);
+
+    if (error) {
+      console.error('❌ Database error fetching profile:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Database error" 
+      });
+    }
+
+    if (!profiles || profiles.length === 0) {
+      return res.json({ 
+        exists: false,
+        profile: null 
+      });
+    }
+
+    res.json({ 
+      exists: true,
+      profile: profiles[0]
+    });
+
+  } catch (error) {
+    console.error('❌ Get profile error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Internal server error" 
+    });
+  }
+});
+
+// Update user profile - POST
+app.post('/api/user/profile', async (req, res) => {
+  try {
+    const { username, profileData } = req.body;
+
+    if (!username) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Username is required" 
+      });
+    }
+
+    // Check if profile exists
+    const { data: existingProfiles, error: checkError } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('username', username)
+      .limit(1);
+
+    if (checkError) {
+      console.error('❌ Database error checking profile:', checkError);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Database error" 
+      });
+    }
+
+    let result;
+    if (existingProfiles && existingProfiles.length > 0) {
+      // Update existing profile
+      result = await supabase
+        .from('user_profiles')
+        .update({
+          ...profileData,
+          updated_at: new Date().toISOString()
+        })
+        .eq('username', username)
+        .select();
+    } else {
+      // Create new profile
+      result = await supabase
+        .from('user_profiles')
+        .insert([
+          {
+            username: username,
+            ...profileData,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        ])
+        .select();
+    }
+
+    if (result.error) {
+      console.error('❌ Database error saving profile:', result.error);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Failed to save profile" 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      message: "Profile updated successfully",
+      profile: result.data[0]
+    });
+
+  } catch (error) {
+    console.error('❌ Update profile error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Internal server error" 
+    });
+  }
+});
+
+// ===== ADD MISSING AI ENDPOINTS =====
+
+// Private AI endpoint - FIXED: This was missing
+app.post('/api/ai/private', async (req, res) => {
+  try {
+    const { message } = req.body;
+    console.log('🤫 Private AI request:', { message });
+
+    if (!message) {
+      return res.status(400).json({ error: "Message is required" });
+    }
+
+    // Use the same AI service as the main chat
+    const response = await axios.get(
+      `https://yau-ai-runing-station.vercel.app/ai?prompt=${encodeURIComponent(message)}&cb=${Date.now()}`,
+      { 
+        headers: { 
+          Accept: "application/json",
+          "User-Agent": "GoatBot/1.0"
+        },
+        timeout: 15000,
+        validateStatus: () => true
+      }
+    );
+
+    let responseData;
+    let aiResponse;
+
+    if (typeof response.data === 'string') {
+      try {
+        responseData = JSON.parse(response.data);
+      } catch (e) {
+        if (response.data.includes('error') || response.status !== 200) {
+          throw new Error(response.data || `API returned status ${response.status}`);
+        }
+        aiResponse = response.data;
+      }
+    } else {
+      responseData = response.data;
+    }
+
+    if (!aiResponse) {
+      if (responseData.response) {
+        aiResponse = responseData.response;
+      } else if (responseData.message) {
+        aiResponse = responseData.message;
+      } else if (responseData.data) {
+        aiResponse = responseData.data;
+      } else {
+        aiResponse = JSON.stringify(responseData) || "⚠️ No recognizable response format";
+      }
+    }
+
+    res.json({ reply: aiResponse });
+  } catch (error) {
+    console.error("❌ Private AI Error:", error);
+    res.status(500).json({ error: `Private AI Error: ${error.message}` });
+  }
+});
+
+// Main AI chat endpoint - FIXED: This was missing
+app.post('/api/ai/chat', async (req, res) => {
+  try {
+    const { message } = req.body;
+    console.log('🤖 Main AI request:', { message });
+
+    if (!message) {
+      return res.status(400).json({ error: "Message is required" });
+    }
+
+    // Use the same AI service
+    const response = await axios.get(
+      `https://yau-ai-runing-station.vercel.app/ai?prompt=${encodeURIComponent(message)}&cb=${Date.now()}`,
+      { 
+        headers: { 
+          Accept: "application/json",
+          "User-Agent": "GoatBot/1.0"
+        },
+        timeout: 15000,
+        validateStatus: () => true
+      }
+    );
+
+    let responseData;
+    let aiResponse;
+
+    if (typeof response.data === 'string') {
+      try {
+        responseData = JSON.parse(response.data);
+      } catch (e) {
+        if (response.data.includes('error') || response.status !== 200) {
+          throw new Error(response.data || `API returned status ${response.status}`);
+        }
+        aiResponse = response.data;
+      }
+    } else {
+      responseData = response.data;
+    }
+
+    if (!aiResponse) {
+      if (responseData.response) {
+        aiResponse = responseData.response;
+      } else if (responseData.message) {
+        aiResponse = responseData.message;
+      } else if (responseData.data) {
+        aiResponse = responseData.data;
+      } else {
+        aiResponse = JSON.stringify(responseData) || "⚠️ No recognizable response format";
+      }
+    }
+
+    res.json({ reply: aiResponse });
+  } catch (error) {
+    console.error("❌ Main AI Error:", error);
+    res.status(500).json({ error: `Main AI Error: ${error.message}` });
+  }
+});
+
+// ===== ADD MESSAGES ENDPOINTS TO MATCH CLIENT =====
+
+// GET messages endpoint that client expects
+app.get('/api/messages', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('chatter')
+      .select('id, content, username, created_at, image_url, reply_to')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST messages endpoint that client expects
+app.post('/api/messages', async (req, res) => {
+  try {
+    const { content, username, image_url, reply_to } = req.body;
+
+    console.log('📨 Received message via API:', { content, username, image_url, reply_to });
+
+    // FIXED: Better validation - allow empty content if there's an image
+    if ((!content || content.trim() === '') && !image_url) {
+      return res.status(400).json({ error: "Content or image is required" });
+    }
+
+    if (!username || username.trim() === '') {
+      return res.status(400).json({ error: "Username is required" });
+    }
+
+    // FIXED: Proper data preparation for regular messages
+    const insertData = {
+      content: (content && content.trim() !== '') ? content.trim() : '',
+      username: username.trim(),
+      image_url: image_url || '',
+      reply_to: reply_to || ''
+    };
+
+    console.log('📝 Inserting message to Supabase via API:', insertData);
+
+    const { data, error } = await supabase
+      .from('chatter')
+      .insert([insertData])
+      .select();
+
+    if (error) {
+      console.error('❌ Database insert error:', error);
+      
+      // If there's still an issue, try minimal insert
+      if (error.message.includes('null value') || error.message.includes('primary key')) {
+        console.log('🔄 Retrying with minimal fields...');
+        const minimalData = {
+          content: (content && content.trim() !== '') ? content.trim() : 'Message',
+          username: username.trim()
+        };
+        
+        const { data: retryData, error: retryError } = await supabase
+          .from('chatter')
+          .insert([minimalData])
+          .select();
+          
+        if (retryError) {
+          throw retryError;
+        }
+        console.log('✅ Message saved with minimal fields. ID:', retryData[0]?.id);
+        
+        // BROADCAST NEW MESSAGE TO ALL CLIENTS IMMEDIATELY
+        io.emit('new-message', retryData[0]);
+        return res.status(201).json(retryData[0]);
+      }
+      throw error;
+    }
+    
+    console.log('✅ Message saved successfully via API. ID:', data[0]?.id);
+    
+    // BROADCAST NEW MESSAGE TO ALL CLIENTS IMMEDIATELY
+    io.emit('new-message', data[0]);
+    res.status(201).json(data[0]);
+  } catch (error) {
+    console.error('❌ Failed to save message via API:', error);
+    res.status(500).json({ error: "Failed to save message: " + error.message });
+  }
+});
+
+// DELETE messages endpoint that client expects
+app.delete('/api/messages/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { error } = await supabase
+      .from('chatter')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    
+    // Broadcast deletion via Socket.io
+    io.emit('message-deleted', id);
+    res.status(200).json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete message" });
+  }
+});
+
+// ===== ADD PRIVATE MESSAGES ENDPOINTS THAT CLIENT EXPECTS =====
+
+// Get conversations for the current user - FIXED: This endpoint was missing
+app.get('/api/private/conversations', async (req, res) => {
+  try {
+    const { username } = req.query;
+    
+    if (!username) {
+      return res.status(400).json({ error: "Username query parameter is required" });
+    }
+
+    // Get distinct conversations (people the user has chatted with)
+    const { data: conversations, error } = await supabase
+      .from('private_messages')
+      .select('sender_username, receiver_username, content, created_at, read')
+      .or(`sender_username.eq.${username},receiver_username.eq.${username}`)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Process to get unique conversations with last message
+    const conversationMap = new Map();
+    
+    conversations.forEach(msg => {
+      const otherUser = msg.sender_username === username ? msg.receiver_username : msg.sender_username;
+      
+      if (!conversationMap.has(otherUser) || 
+          new Date(msg.created_at) > new Date(conversationMap.get(otherUser).lastMessageTime)) {
+        conversationMap.set(otherUser, {
+          username: otherUser,
+          lastMessage: msg.content,
+          lastMessageTime: msg.created_at,
+          unread: msg.receiver_username === username && !msg.read,
+          isSender: msg.sender_username === username
+        });
+      }
+    });
+
+    const conversationList = Array.from(conversationMap.values())
+      .sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
+
+    res.json(conversationList);
+  } catch (error) {
+    console.error('Error fetching conversations:', error);
+    res.status(500).json({ error: 'Failed to fetch conversations' });
+  }
+});
+
+// Get messages between two users - FIXED: This endpoint was missing
+app.get('/api/private/messages/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    const { otherUser } = req.query;
+    
+    if (!username || !otherUser) {
+      return res.status(400).json({ error: "Username and otherUser parameters are required" });
+    }
+    
+    const { data: messages, error } = await supabase
+      .from('private_messages')
+      .select('*')
+      .or(`and(sender_username.eq.${username},receiver_username.eq.${otherUser}),and(sender_username.eq.${otherUser},receiver_username.eq.${username})`)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    // Mark messages as read when fetched
+    await supabase
+      .from('private_messages')
+      .update({ read: true })
+      .eq('receiver_username', username)
+      .eq('sender_username', otherUser)
+      .eq('read', false);
+
+    res.json(messages || []);
+  } catch (error) {
+    console.error('Error fetching private messages:', error);
+    res.status(500).json({ error: 'Failed to fetch private messages' });
+  }
+});
+
+// Send private message - FIXED: This endpoint was missing
+app.post('/api/private/messages', async (req, res) => {
+  try {
+    const { sender_username, receiver_username, content, image_url } = req.body;
+
+    console.log('📨 Private message via API:', { sender_username, receiver_username, content, image_url });
+
+    if (!sender_username || !receiver_username) {
+      return res.status(400).json({ error: "Sender and receiver usernames are required" });
+    }
+
+    if ((!content || content.trim() === '') && !image_url) {
+      return res.status(400).json({ error: "Content or image is required" });
+    }
+
+    const insertData = {
+      sender_username: sender_username.trim(),
+      receiver_username: receiver_username.trim(),
+      content: content ? content.trim() : '',
+      image_url: image_url || '',
+      read: false
+    };
+
+    console.log('📝 Inserting private message via API:', insertData);
+
+    const { data, error } = await supabase
+      .from('private_messages')
+      .insert([insertData])
+      .select();
+
+    if (error) {
+      console.error('❌ Private message insert failed:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: error.message
+      });
+    }
+
+    console.log('✅ Private message saved via API. ID:', data[0]?.id);
+    
+    // Broadcast via Socket.io to both users
+    io.emit('new-private-message', data[0]);
+    
+    res.status(201).json(data[0]);
+  } catch (error) {
+    console.error('❌ Failed to save private message via API:', error);
+    res.status(500).json({ error: "Failed to send private message: " + error.message });
+  }
+});
+
+// Get unread message count - FIXED: This endpoint was missing
+app.get('/api/private/unread', async (req, res) => {
+  try {
+    const { username } = req.query;
+    
+    if (!username) {
+      return res.status(400).json({ error: "Username query parameter is required" });
+    }
+
+    const { count, error } = await supabase
+      .from('private_messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('receiver_username', username)
+      .eq('read', false);
+
+    if (error) throw error;
+
+    res.json({ unreadCount: count || 0 });
+  } catch (error) {
+    console.error('Error fetching unread count:', error);
+    res.status(500).json({ error: 'Failed to fetch unread count' });
+  }
+});
+
+// Mark messages as read - FIXED: This endpoint was missing
+app.put('/api/private/messages/read', async (req, res) => {
+  try {
+    const { sender_username, receiver_username } = req.body;
+
+    if (!sender_username || !receiver_username) {
+      return res.status(400).json({ error: "Sender and receiver usernames are required" });
+    }
+
+    const { error } = await supabase
+      .from('private_messages')
+      .update({ read: true })
+      .eq('sender_username', sender_username)
+      .eq('receiver_username', receiver_username)
+      .eq('read', false);
+
+    if (error) throw error;
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error marking messages as read:', error);
+    res.status(500).json({ error: 'Failed to mark messages as read' });
+  }
+});
 
 // ===== ENHANCED DEBUGGING ENDPOINTS =====
 
@@ -553,7 +1775,7 @@ app.put('/private-messages/read', async (req, res) => {
 
 // ===== PUBLIC CHAT ENDPOINTS =====
 
-// GET messages
+// GET messages (legacy endpoint)
 app.get('/messages', async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -568,12 +1790,12 @@ app.get('/messages', async (req, res) => {
   }
 });
 
-// POST messages - FIXED: Proper handling for regular messages
+// POST messages (legacy endpoint) - FIXED: Proper handling for regular messages
 app.post('/messages', async (req, res) => {
   try {
     const { content, username, image_url, reply_to } = req.body;
 
-    console.log('📨 Received message:', { content, username, image_url, reply_to });
+    console.log('📨 Received message via legacy endpoint:', { content, username, image_url, reply_to });
 
     // FIXED: Better validation - allow empty content if there's an image
     if ((!content || content.trim() === '') && !image_url) {
@@ -592,7 +1814,7 @@ app.post('/messages', async (req, res) => {
       reply_to: reply_to || ''
     };
 
-    console.log('📝 Inserting message to Supabase:', insertData);
+    console.log('📝 Inserting message to Supabase via legacy endpoint:', insertData);
 
     const { data, error } = await supabase
       .from('chatter')
@@ -627,13 +1849,13 @@ app.post('/messages', async (req, res) => {
       throw error;
     }
     
-    console.log('✅ Message saved successfully. ID:', data[0]?.id);
+    console.log('✅ Message saved successfully via legacy endpoint. ID:', data[0]?.id);
     
     // BROADCAST NEW MESSAGE TO ALL CLIENTS IMMEDIATELY
     io.emit('new-message', data[0]);
     res.status(201).json(data[0]);
   } catch (error) {
-    console.error('❌ Failed to save message:', error);
+    console.error('❌ Failed to save message via legacy endpoint:', error);
     res.status(500).json({ error: "Failed to save message: " + error.message });
   }
 });
@@ -674,7 +1896,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
   }
 });
 
-// DELETE messages
+// DELETE messages (legacy endpoint)
 app.delete('/messages/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -1187,15 +2409,14 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Handle private AI messages
+  // Handle private AI messages - FIXED: This was causing issues
   socket.on('send-private-message', async (data) => {
     try {
-      console.log('🤫 Private message received:', data);
+      console.log('🤫 Private AI message received via socket:', data);
       
-      // Process private AI response
-      const response = await axios.post('http://localhost:3000/api/command', {
-        message: data.content,
-        source: 'private-ai'
+      // Process private AI response using the new endpoint
+      const response = await axios.post('http://localhost:3000/api/ai/private', {
+        message: data.content
       }, {
         headers: { 'Content-Type': 'application/json' }
       });
@@ -1204,14 +2425,20 @@ io.on('connection', (socket) => {
         // Send private AI response back to the specific user
         socket.emit('new-private-message', {
           content: response.data.reply,
-          username: 'Private AI'
+          username: 'Private AI',
+          sender_username: 'Private AI',
+          receiver_username: data.username,
+          created_at: new Date().toISOString()
         });
       }
     } catch (error) {
-      console.error('❌ Private message error:', error);
+      console.error('❌ Private AI message error:', error);
       socket.emit('new-private-message', {
         content: "Error: Could not process your private message",
-        username: 'Private AI'
+        username: 'Private AI',
+        sender_username: 'Private AI', 
+        receiver_username: data.username,
+        created_at: new Date().toISOString()
       });
     }
   });
@@ -1376,9 +2603,37 @@ server.listen(port, () => {
   console.log(`🔌 Socket.io events: new-message, message-deleted, user-status-change`);
   console.log(`🤫 PRIVATE MESSAGING: ENABLED via Supabase`);
   console.log(`🔒 Private endpoints: /private-messages/*`);
+  console.log(`🔐 USER AUTHENTICATION: ENABLED (Server-side, no localStorage)`);
+  console.log(`🔐 Password hashing: SIMPLE HASH (basic implementation)`);
+  console.log(`🌐 Cross-browser compatibility: ENABLED`);
+  
+  // NEW: Added missing endpoints
+  console.log(`🤖 NEW: POST /api/ai/private - Private AI endpoint`);
+  console.log(`🤖 NEW: POST /api/ai/chat - Main AI chat endpoint`);
+  console.log(`💬 NEW: GET /api/private/conversations - Get conversations`);
+  console.log(`💬 NEW: GET /api/private/messages/:username - Get private messages`);
+  console.log(`💬 NEW: POST /api/private/messages - Send private message`);
+  console.log(`💬 NEW: PUT /api/private/messages/read - Mark as read`);
+  console.log(`💬 NEW: GET /api/private/unread - Get unread count`);
+  
   console.log(`🔍 NEW: GET /debug-private-messages - Debug private messages table`);
   console.log(`🧪 NEW: GET /test-private-messages - Test private message creation (GET)`);
   console.log(`🧪 NEW: POST /test-private-messages - Test private message creation (POST)`);
+  console.log(`🔐 AUTHENTICATION ENDPOINTS:`);
+  console.log(`   POST /api/register - User registration`);
+  console.log(`   POST /api/login - User login`);
+  console.log(`   POST /api/check-username - Check username availability`);
+  console.log(`   POST /api/auth/register - User registration (client-compatible)`);
+  console.log(`   POST /api/auth/login - User login (client-compatible)`);
+  console.log(`   POST /api/auth/check-username - Check username availability (client-compatible)`);
+  console.log(`   POST /api/auth/auto-login - Auto-login with token`);
+  console.log(`   GET /api/user/profile/:username - Get user profile`);
+  console.log(`   POST /api/user/profile - Update user profile`);
+  console.log(`   GET /api/auth-test - Test all authentication endpoints`);
+  console.log(`📨 MESSAGES ENDPOINTS:`);
+  console.log(`   GET /api/messages - Get messages (client-compatible)`);
+  console.log(`   POST /api/messages - Send message (client-compatible)`);
+  console.log(`   DELETE /api/messages/:id - Delete message (client-compatible)`);
   console.log(`🧪 Test Supabase (GET): http://localhost:${port}/test-supabase`);
   console.log(`🧪 Test Message (POST): http://localhost:${port}/test-message`);
   console.log(`🔍 Debug ALL Commands: http://localhost:${port}/debug-all-commands`);
@@ -1390,6 +2645,7 @@ server.listen(port, () => {
     console.log(`🔍 Debug ALL Commands: ${renderExternalUrl}/debug-all-commands`);
     console.log(`🔍 Debug Private Messages: ${renderExternalUrl}/debug-private-messages`);
     console.log(`🧪 Test Private Message (GET): ${renderExternalUrl}/test-private-messages`);
+    console.log(`🔐 Test Authentication: ${renderExternalUrl}/api/auth-test`);
   }
 });
 
