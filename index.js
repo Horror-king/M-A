@@ -506,7 +506,7 @@ app.post('/api/auth/auto-login', verifyToken, async (req, res) => {
   }
 });
 
-// ===== FIXED PRIVATE MESSAGES ENDPOINTS =====
+// ===== COMPLETELY FIXED PRIVATE MESSAGES ENDPOINTS =====
 
 // Get conversations for the current user - FIXED
 app.get('/api/private/conversations', async (req, res) => {
@@ -602,12 +602,44 @@ app.get('/api/private/messages/:username', async (req, res) => {
   }
 });
 
-// Send private message - FIXED: Proper field names
+// ===== COMPLETELY FIXED PRIVATE MESSAGE SENDING - HANDLES ALL FIELD FORMATS =====
 app.post('/api/private/messages', async (req, res) => {
   try {
-    const { sender_username, receiver_username, content, image_url } = req.body;
+    console.log('📨 Received private message request:', JSON.stringify(req.body, null, 2));
 
-    console.log('📨 Private message via API:', { sender_username, receiver_username, content, image_url });
+    // Handle both field naming conventions
+    let sender_username, receiver_username, content, image_url;
+
+    // Check for new format (sender_username, receiver_username)
+    if (req.body.sender_username && req.body.receiver_username) {
+      sender_username = req.body.sender_username;
+      receiver_username = req.body.receiver_username;
+      content = req.body.content;
+      image_url = req.body.image_url;
+    }
+    // Check for old format (username fields)
+    else if (req.body.senderUsername || req.body.receiverUsername) {
+      sender_username = req.body.senderUsername;
+      receiver_username = req.body.receiverUsername;
+      content = req.body.content;
+      image_url = req.body.image_url;
+    }
+    // Check for simple format (username, toUser)
+    else if (req.body.username && req.body.toUser) {
+      sender_username = req.body.username;
+      receiver_username = req.body.toUser;
+      content = req.body.content;
+      image_url = req.body.image_url;
+    }
+    else {
+      return res.status(400).json({ 
+        success: false,
+        error: "Invalid field names. Expected: sender_username, receiver_username OR senderUsername, receiverUsername OR username, toUser",
+        received_fields: Object.keys(req.body)
+      });
+    }
+
+    console.log('🔄 Processed fields:', { sender_username, receiver_username, content, image_url });
 
     if (!sender_username || !receiver_username) {
       return res.status(400).json({ 
@@ -623,7 +655,7 @@ app.post('/api/private/messages', async (req, res) => {
       });
     }
 
-    // Prepare insert data with correct field names
+    // Prepare insert data with correct field names for database
     const insertData = {
       sender_username: sender_username.trim(),
       receiver_username: receiver_username.trim(),
@@ -644,7 +676,8 @@ app.post('/api/private/messages', async (req, res) => {
       console.error('❌ Private message insert failed:', error);
       return res.status(500).json({ 
         success: false,
-        error: error.message 
+        error: error.message,
+        details: "Database insertion failed"
       });
     }
 
@@ -653,13 +686,122 @@ app.post('/api/private/messages', async (req, res) => {
     // Broadcast via Socket.io to both users
     io.emit('new-private-message', data[0]);
     
-    res.status(201).json(data[0]);
+    res.status(201).json({
+      success: true,
+      message: "Private message sent successfully",
+      data: data[0]
+    });
 
   } catch (error) {
     console.error('❌ Failed to save private message:', error);
     res.status(500).json({ 
       success: false,
       error: "Failed to send private message: " + error.message 
+    });
+  }
+});
+
+// ===== AUTO-MAPPING ENDPOINT FOR MAXIMUM COMPATIBILITY =====
+app.post('/api/private/messages/auto', async (req, res) => {
+  try {
+    console.log('🔄 Auto-mapping private message fields:', req.body);
+    
+    // Field mapping dictionary
+    const fieldMappings = {
+      // Standard format
+      'sender_username': 'sender_username',
+      'receiver_username': 'receiver_username',
+      'content': 'content',
+      'image_url': 'image_url',
+      
+      // Common alternative formats
+      'senderUsername': 'sender_username',
+      'receiverUsername': 'receiver_username', 
+      'sender': 'sender_username',
+      'receiver': 'receiver_username',
+      'to': 'receiver_username',
+      'toUser': 'receiver_username',
+      'username': 'sender_username',
+      'message': 'content',
+      'text': 'content',
+      'image': 'image_url',
+      'imageUrl': 'image_url'
+    };
+
+    // Map fields
+    const mappedData = {};
+    let foundFields = [];
+    
+    Object.keys(req.body).forEach(inputField => {
+      const dbField = fieldMappings[inputField];
+      if (dbField) {
+        mappedData[dbField] = req.body[inputField];
+        foundFields.push({ input: inputField, mapped_to: dbField });
+      } else {
+        console.log(`⚠️ Unmapped field: ${inputField}`);
+      }
+    });
+
+    console.log('🔄 Field mapping result:', foundFields);
+    console.log('📝 Mapped data for database:', mappedData);
+
+    // Validate required fields
+    if (!mappedData.sender_username || !mappedData.receiver_username) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing sender or receiver information",
+        field_mapping: foundFields,
+        mapped_data: mappedData,
+        required_fields: ['sender_username', 'receiver_username'],
+        received_fields: Object.keys(req.body)
+      });
+    }
+
+    if ((!mappedData.content || mappedData.content.trim() === '') && !mappedData.image_url) {
+      return res.status(400).json({
+        success: false,
+        error: "Content or image is required",
+        field_mapping: foundFields,
+        mapped_data: mappedData
+      });
+    }
+
+    // Add metadata
+    mappedData.read = false;
+    mappedData.created_at = new Date().toISOString();
+
+    // Insert into database
+    const { data, error } = await supabase
+      .from('private_messages')
+      .insert([mappedData])
+      .select();
+
+    if (error) {
+      console.error('❌ Database insert error:', error);
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+        field_mapping: foundFields
+      });
+    }
+
+    console.log('✅ Auto-mapped private message saved. ID:', data[0]?.id);
+    
+    // Broadcast via Socket.io
+    io.emit('new-private-message', data[0]);
+    
+    res.status(201).json({
+      success: true,
+      message: "Private message sent successfully (auto-mapped)",
+      field_mapping: foundFields,
+      data: data[0]
+    });
+
+  } catch (error) {
+    console.error('❌ Auto-mapping error:', error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to send private message: " + error.message
     });
   }
 });
@@ -1036,19 +1178,35 @@ app.delete('/api/messages/:id', async (req, res) => {
 
 // ===== DEBUGGING AND TESTING ENDPOINTS =====
 
-// Test private messages creation
+// Enhanced test endpoint
 app.get('/test-private-messages', async (req, res) => {
   try {
-    console.log('🧪 GET: Testing private messages creation...');
+    console.log('🧪 Testing private messages system...');
     
-    // Create a test private message
+    // Test 1: Check if table exists and is accessible
+    const { data: tableCheck, error: tableError } = await supabase
+      .from('private_messages')
+      .select('*')
+      .limit(1);
+
+    if (tableError) {
+      console.error('❌ Table access error:', tableError);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Cannot access private_messages table: ' + tableError.message 
+      });
+    }
+
+    // Test 2: Create a test message using the CORRECT field names
     const testData = {
       sender_username: 'test_user1',
-      receiver_username: 'test_user2',
-      content: 'This is a test private message from GET endpoint!',
+      receiver_username: 'test_user2', 
+      content: 'This is a test private message with CORRECT field names!',
       image_url: '',
       read: false
     };
+
+    console.log('📝 Testing with correct field names:', testData);
 
     const { data, error } = await supabase
       .from('private_messages')
@@ -1056,26 +1214,86 @@ app.get('/test-private-messages', async (req, res) => {
       .select();
 
     if (error) {
-      console.error('❌ GET Test private message failed:', error);
+      console.error('❌ Test message failed:', error);
       return res.status(500).json({ 
         success: false, 
-        error: error.message 
+        error: error.message,
+        solution: "The table structure might not match expected fields. Check if private_messages table has: sender_username, receiver_username, content, image_url, read, created_at"
       });
     }
 
-    console.log('✅ GET Test private message saved:', data[0]);
+    console.log('✅ Test private message saved successfully:', data[0]);
     
     // Broadcast via Socket.io
     io.emit('new-private-message', data[0]);
     
+    // Test 3: Verify we can retrieve the message
+    const { data: verifyData, error: verifyError } = await supabase
+      .from('private_messages')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (verifyError) {
+      console.error('❌ Verification error:', verifyError);
+    }
+
     res.json({ 
       success: true, 
-      message: 'GET Test private message saved successfully',
-      data: data[0]
+      message: 'Private messages system is working correctly!',
+      test_message: data[0],
+      recent_messages: verifyData || [],
+      next_steps: [
+        '1. Use POST /api/debug-private-message to see what your frontend is sending',
+        '2. Check the field names in the diagnostic output',
+        '3. Ensure your frontend uses: sender_username, receiver_username',
+        '4. Test sending: POST /api/private/messages with correct fields'
+      ]
     });
 
   } catch (error) {
-    console.error('❌ GET Test private message error:', error);
+    console.error('❌ Test private message error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Diagnostic endpoint to see exactly what frontend sends
+app.post('/api/debug-private-message', async (req, res) => {
+  try {
+    console.log('🔍 DIAGNOSTIC - Raw request body:', JSON.stringify(req.body, null, 2));
+    console.log('🔍 DIAGNOSTIC - Request headers:', req.headers);
+    
+    res.json({
+      success: true,
+      diagnostic: {
+        received_at: new Date().toISOString(),
+        raw_body: req.body,
+        body_fields: Object.keys(req.body),
+        body_values: req.body,
+        content_type: req.headers['content-type'],
+        expected_formats: [
+          {
+            format: "Preferred",
+            fields: ["sender_username", "receiver_username", "content", "image_url"]
+          },
+          {
+            format: "Alternative 1", 
+            fields: ["senderUsername", "receiverUsername", "content", "image_url"]
+          },
+          {
+            format: "Alternative 2",
+            fields: ["username", "toUser", "content", "image_url"]
+          }
+        ]
+      },
+      instructions: "Check the 'body_fields' above to see what field names your frontend is actually sending"
+    });
+    
+  } catch (error) {
+    console.error('❌ Diagnostic error:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -1342,10 +1560,13 @@ setInterval(() => {
 // Start server
 server.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
-  console.log(`🔹 Private messages: ✅ FIXED - Using correct field names`);
-  console.log(`🔹 Field names: sender_username, receiver_username (NOT username)`);
+  console.log(`🔹 Private messages: ✅ COMPLETELY FIXED`);
+  console.log(`🔹 Field mapping: Supports multiple field name formats`);
+  console.log(`🔹 Primary endpoint: POST /api/private/messages`);
+  console.log(`🔹 Auto-mapping endpoint: POST /api/private/messages/auto`);
   console.log(`🔹 Test private messages: GET /test-private-messages`);
   console.log(`🔹 Debug private messages: GET /debug-private-messages`);
+  console.log(`🔹 Diagnostic endpoint: POST /api/debug-private-message`);
   console.log(`🔹 Health check: GET /health`);
   console.log(`💬 Real-time messaging: ENABLED via Socket.io`);
   console.log(`👥 Online users tracking: ACTIVE (3 minute timeout)`);
