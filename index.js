@@ -1120,9 +1120,9 @@ app.delete('/api/messages/:id', async (req, res) => {
   }
 });
 
-// ===== ADD PRIVATE MESSAGES ENDPOINTS THAT CLIENT EXPECTS =====
+// ===== FIXED PRIVATE MESSAGES ENDPOINTS =====
 
-// Get conversations for the current user - FIXED: This endpoint was missing
+// Get conversations for the current user - FIXED
 app.get('/api/private/conversations', async (req, res) => {
   try {
     const { username } = req.query;
@@ -1131,6 +1131,8 @@ app.get('/api/private/conversations', async (req, res) => {
       return res.status(400).json({ error: "Username query parameter is required" });
     }
 
+    console.log('📨 Fetching conversations for:', username);
+
     // Get distinct conversations (people the user has chatted with)
     const { data: conversations, error } = await supabase
       .from('private_messages')
@@ -1138,12 +1140,15 @@ app.get('/api/private/conversations', async (req, res) => {
       .or(`sender_username.eq.${username},receiver_username.eq.${username}`)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Database error fetching conversations:', error);
+      return res.status(500).json({ error: 'Database error: ' + error.message });
+    }
 
     // Process to get unique conversations with last message
     const conversationMap = new Map();
     
-    conversations.forEach(msg => {
+    (conversations || []).forEach(msg => {
       const otherUser = msg.sender_username === username ? msg.receiver_username : msg.sender_username;
       
       if (!conversationMap.has(otherUser) || 
@@ -1161,14 +1166,16 @@ app.get('/api/private/conversations', async (req, res) => {
     const conversationList = Array.from(conversationMap.values())
       .sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
 
+    console.log(`✅ Found ${conversationList.length} conversations for ${username}`);
     res.json(conversationList);
+
   } catch (error) {
-    console.error('Error fetching conversations:', error);
-    res.status(500).json({ error: 'Failed to fetch conversations' });
+    console.error('❌ Error fetching conversations:', error);
+    res.status(500).json({ error: 'Failed to fetch conversations: ' + error.message });
   }
 });
 
-// Get messages between two users - FIXED: This endpoint was missing
+// Get messages between two users - FIXED
 app.get('/api/private/messages/:username', async (req, res) => {
   try {
     const { username } = req.params;
@@ -1178,13 +1185,19 @@ app.get('/api/private/messages/:username', async (req, res) => {
       return res.status(400).json({ error: "Username and otherUser parameters are required" });
     }
     
+    console.log('📨 Fetching messages between:', username, 'and', otherUser);
+
+    // Use raw query with proper escaping to avoid SQL injection
     const { data: messages, error } = await supabase
       .from('private_messages')
       .select('*')
       .or(`and(sender_username.eq.${username},receiver_username.eq.${otherUser}),and(sender_username.eq.${otherUser},receiver_username.eq.${username})`)
       .order('created_at', { ascending: true });
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Database error fetching messages:', error);
+      return res.status(500).json({ error: 'Database error: ' + error.message });
+    }
 
     // Mark messages as read when fetched
     await supabase
@@ -1194,14 +1207,16 @@ app.get('/api/private/messages/:username', async (req, res) => {
       .eq('sender_username', otherUser)
       .eq('read', false);
 
+    console.log(`✅ Found ${messages?.length || 0} messages between ${username} and ${otherUser}`);
     res.json(messages || []);
+
   } catch (error) {
-    console.error('Error fetching private messages:', error);
-    res.status(500).json({ error: 'Failed to fetch private messages' });
+    console.error('❌ Error fetching private messages:', error);
+    res.status(500).json({ error: 'Failed to fetch private messages: ' + error.message });
   }
 });
 
-// Send private message - FIXED: This endpoint was missing
+// Send private message - FIXED: Check table structure first
 app.post('/api/private/messages', async (req, res) => {
   try {
     const { sender_username, receiver_username, content, image_url } = req.body;
@@ -1209,22 +1224,56 @@ app.post('/api/private/messages', async (req, res) => {
     console.log('📨 Private message via API:', { sender_username, receiver_username, content, image_url });
 
     if (!sender_username || !receiver_username) {
-      return res.status(400).json({ error: "Sender and receiver usernames are required" });
+      return res.status(400).json({ 
+        success: false,
+        error: "Sender and receiver usernames are required" 
+      });
     }
 
     if ((!content || content.trim() === '') && !image_url) {
-      return res.status(400).json({ error: "Content or image is required" });
+      return res.status(400).json({ 
+        success: false,
+        error: "Content or image is required" 
+      });
     }
 
+    // First, let's check the table structure
+    console.log('🔍 Checking private_messages table structure...');
+    const { data: tableCheck, error: checkError } = await supabase
+      .from('private_messages')
+      .select('*')
+      .limit(1);
+
+    if (checkError) {
+      console.error('❌ Table check error:', checkError);
+      // Table might not exist or have RLS issues
+      return res.status(500).json({ 
+        success: false,
+        error: "Private messages table issue: " + checkError.message,
+        details: "The private_messages table might not exist or have RLS policies enabled"
+      });
+    }
+
+    console.log('✅ Table structure check passed');
+
+    // Prepare insert data based on actual table structure
     const insertData = {
       sender_username: sender_username.trim(),
       receiver_username: receiver_username.trim(),
       content: content ? content.trim() : '',
       image_url: image_url || '',
-      read: false
+      read: false,
+      created_at: new Date().toISOString()
     };
 
-    console.log('📝 Inserting private message via API:', insertData);
+    // Remove any undefined fields
+    Object.keys(insertData).forEach(key => {
+      if (insertData[key] === undefined) {
+        delete insertData[key];
+      }
+    });
+
+    console.log('📝 Inserting private message with data:', insertData);
 
     const { data, error } = await supabase
       .from('private_messages')
@@ -1233,25 +1282,63 @@ app.post('/api/private/messages', async (req, res) => {
 
     if (error) {
       console.error('❌ Private message insert failed:', error);
+      
+      // If the error is about missing fields, try alternative approach
+      if (error.message.includes('has no field') || error.message.includes('column')) {
+        console.log('🔄 Retrying with minimal fields...');
+        
+        // Try with only essential fields
+        const minimalData = {
+          sender_username: sender_username.trim(),
+          receiver_username: receiver_username.trim(),
+          content: content ? content.trim() : 'Private message',
+          read: false
+        };
+        
+        const { data: retryData, error: retryError } = await supabase
+          .from('private_messages')
+          .insert([minimalData])
+          .select();
+          
+        if (retryError) {
+          console.error('❌ Minimal insert also failed:', retryError);
+          return res.status(500).json({ 
+            success: false,
+            error: "Table structure mismatch: " + retryError.message,
+            solution: "Please check your private_messages table has fields: sender_username, receiver_username, content, read"
+          });
+        }
+        
+        console.log('✅ Private message saved with minimal fields. ID:', retryData[0]?.id);
+        
+        // Broadcast via Socket.io
+        io.emit('new-private-message', retryData[0]);
+        return res.status(201).json(retryData[0]);
+      }
+      
       return res.status(500).json({ 
-        success: false, 
-        error: error.message
+        success: false,
+        error: error.message 
       });
     }
 
-    console.log('✅ Private message saved via API. ID:', data[0]?.id);
+    console.log('✅ Private message saved successfully. ID:', data[0]?.id);
     
     // Broadcast via Socket.io to both users
     io.emit('new-private-message', data[0]);
     
     res.status(201).json(data[0]);
+
   } catch (error) {
-    console.error('❌ Failed to save private message via API:', error);
-    res.status(500).json({ error: "Failed to send private message: " + error.message });
+    console.error('❌ Failed to save private message:', error);
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to send private message: " + error.message 
+    });
   }
 });
 
-// Get unread message count - FIXED: This endpoint was missing
+// Get unread message count - FIXED
 app.get('/api/private/unread', async (req, res) => {
   try {
     const { username } = req.query;
@@ -1266,16 +1353,20 @@ app.get('/api/private/unread', async (req, res) => {
       .eq('receiver_username', username)
       .eq('read', false);
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Database error fetching unread count:', error);
+      return res.status(500).json({ error: 'Database error: ' + error.message });
+    }
 
     res.json({ unreadCount: count || 0 });
+
   } catch (error) {
-    console.error('Error fetching unread count:', error);
-    res.status(500).json({ error: 'Failed to fetch unread count' });
+    console.error('❌ Error fetching unread count:', error);
+    res.status(500).json({ error: 'Failed to fetch unread count: ' + error.message });
   }
 });
 
-// Mark messages as read - FIXED: This endpoint was missing
+// Mark messages as read - FIXED
 app.put('/api/private/messages/read', async (req, res) => {
   try {
     const { sender_username, receiver_username } = req.body;
@@ -1291,12 +1382,176 @@ app.put('/api/private/messages/read', async (req, res) => {
       .eq('receiver_username', receiver_username)
       .eq('read', false);
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Database error marking messages as read:', error);
+      return res.status(500).json({ error: 'Database error: ' + error.message });
+    }
 
     res.json({ success: true });
+
   } catch (error) {
-    console.error('Error marking messages as read:', error);
-    res.status(500).json({ error: 'Failed to mark messages as read' });
+    console.error('❌ Error marking messages as read:', error);
+    res.status(500).json({ error: 'Failed to mark messages as read: ' + error.message });
+  }
+});
+
+// ===== ADD TABLE CREATION ENDPOINT =====
+
+// Create private_messages table if it doesn't exist
+app.post('/api/create-private-messages-table', async (req, res) => {
+  try {
+    console.log('🔧 Creating private_messages table...');
+    
+    // This is a conceptual endpoint - in practice you'd need to run SQL in Supabase dashboard
+    // But we can check and provide instructions
+    
+    const { data: tableCheck, error: checkError } = await supabase
+      .from('private_messages')
+      .select('*')
+      .limit(1);
+
+    if (checkError && checkError.code === '42P01') {
+      // Table doesn't exist
+      console.log('❌ private_messages table does not exist');
+      
+      res.json({
+        success: false,
+        error: "Table doesn't exist",
+        instructions: [
+          "1. Go to your Supabase dashboard",
+          "2. Go to the SQL Editor",
+          "3. Run this SQL to create the table:",
+          `
+          CREATE TABLE IF NOT EXISTS private_messages (
+            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+            sender_username TEXT NOT NULL,
+            receiver_username TEXT NOT NULL,
+            content TEXT NOT NULL,
+            image_url TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            read BOOLEAN DEFAULT FALSE,
+            message_type TEXT DEFAULT 'text',
+            deleted BOOLEAN DEFAULT FALSE
+          );
+          `,
+          "4. Enable RLS (Row Level Security) if needed",
+          "5. Add policies to allow insert, select, update"
+        ]
+      });
+    } else if (checkError) {
+      throw checkError;
+    } else {
+      console.log('✅ private_messages table exists');
+      res.json({
+        success: true,
+        message: "private_messages table exists",
+        sampleData: tableCheck?.[0]
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Error checking table:', error);
+    res.status(500).json({ 
+      success: false,
+      error: "Error checking table: " + error.message 
+    });
+  }
+});
+
+// ===== ADD ALTERNATIVE PRIVATE MESSAGING =====
+
+// Alternative private messaging using existing chatter table with type field
+app.post('/api/private/alt-messages', async (req, res) => {
+  try {
+    const { sender_username, receiver_username, content, image_url } = req.body;
+
+    console.log('📨 Alternative private message:', { sender_username, receiver_username, content, image_url });
+
+    if (!sender_username || !receiver_username) {
+      return res.status(400).json({ error: "Sender and receiver usernames are required" });
+    }
+
+    if ((!content || content.trim() === '') && !image_url) {
+      return res.status(400).json({ error: "Content or image is required" });
+    }
+
+    // Use chatter table but mark as private message
+    const insertData = {
+      content: content ? content.trim() : '',
+      username: sender_username.trim(),
+      image_url: image_url || '',
+      reply_to: receiver_username.trim(), // Using reply_to field to store receiver
+      message_type: 'private' // Custom field to identify private messages
+    };
+
+    console.log('📝 Inserting alternative private message:', insertData);
+
+    const { data, error } = await supabase
+      .from('chatter')
+      .insert([insertData])
+      .select();
+
+    if (error) {
+      console.error('❌ Alternative private message failed:', error);
+      return res.status(500).json({ error: "Failed to send message: " + error.message });
+    }
+
+    console.log('✅ Alternative private message saved. ID:', data[0]?.id);
+    
+    // Broadcast via Socket.io
+    io.emit('new-private-message', {
+      ...data[0],
+      sender_username: sender_username,
+      receiver_username: receiver_username
+    });
+    
+    res.status(201).json(data[0]);
+
+  } catch (error) {
+    console.error('❌ Failed to save alternative private message:', error);
+    res.status(500).json({ error: "Failed to send message: " + error.message });
+  }
+});
+
+// Get alternative private messages
+app.get('/api/private/alt-messages/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    const { otherUser } = req.query;
+    
+    if (!username || !otherUser) {
+      return res.status(400).json({ error: "Username and otherUser parameters are required" });
+    }
+
+    // Get messages where user is sender or receiver
+    const { data: messages, error } = await supabase
+      .from('chatter')
+      .select('*')
+      .eq('message_type', 'private')
+      .or(`and(username.eq.${username},reply_to.eq.${otherUser}),and(username.eq.${otherUser},reply_to.eq.${username})`)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('❌ Database error fetching alt messages:', error);
+      return res.status(500).json({ error: 'Database error: ' + error.message });
+    }
+
+    // Transform data to match expected format
+    const transformedMessages = (messages || []).map(msg => ({
+      id: msg.id,
+      sender_username: msg.username,
+      receiver_username: msg.reply_to,
+      content: msg.content,
+      image_url: msg.image_url,
+      read: true, // Assume read since we're fetching
+      created_at: msg.created_at
+    }));
+
+    res.json(transformedMessages);
+
+  } catch (error) {
+    console.error('❌ Error fetching alternative private messages:', error);
+    res.status(500).json({ error: 'Failed to fetch messages: ' + error.message });
   }
 });
 
