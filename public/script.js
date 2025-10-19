@@ -41,6 +41,10 @@ let socket;
 let isTyping = false;
 let typingTimer;
 
+// ✅ ADDED: Typing indicator variables
+let typingUsers = {};
+let typingTimeout;
+
 // ✅ ADDED: Flag to track if we're processing a command to prevent duplicates
 let isProcessingCommand = false;
 
@@ -76,6 +80,134 @@ const elements = {
 };
 
 let replyToText = null;
+
+// ===== TYPING INDICATOR FUNCTIONS =====
+function showTypingIndicator(username) {
+    if (!username || username === currentUserSession?.username) return;
+    
+    typingUsers[username] = Date.now();
+    updateTypingIndicator();
+}
+
+function hideTypingIndicator(username) {
+    if (typingUsers[username]) {
+        delete typingUsers[username];
+        updateTypingIndicator();
+    }
+}
+
+function updateTypingIndicator() {
+    const typingIndicator = document.getElementById('typing-indicator');
+    if (!typingIndicator) return;
+    
+    const currentUsers = Object.keys(typingUsers);
+    
+    // Clean up old entries (more than 5 seconds)
+    const now = Date.now();
+    Object.keys(typingUsers).forEach(username => {
+        if (now - typingUsers[username] > 5000) {
+            delete typingUsers[username];
+        }
+    });
+    
+    if (currentUsers.length === 0) {
+        typingIndicator.style.display = 'none';
+        typingIndicator.innerHTML = '';
+        return;
+    }
+    
+    let message = '';
+    if (currentUsers.length === 1) {
+        message = `${currentUsers[0]} is typing...`;
+    } else if (currentUsers.length === 2) {
+        message = `${currentUsers[0]} and ${currentUsers[1]} are typing...`;
+    } else {
+        message = `${currentUsers[0]} and ${currentUsers.length - 1} others are typing...`;
+    }
+    
+    typingIndicator.innerHTML = `
+        <div class="typing-indicator-message">
+            <div class="typing-dots">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+            <span class="typing-text">${message}</span>
+        </div>
+    `;
+    typingIndicator.style.display = 'block';
+}
+
+function sendTypingStart() {
+    const username = currentUserSession?.username;
+    if (username && socket) {
+        socket.emit('typing-start', { username });
+    }
+}
+
+function sendTypingStop() {
+    const username = currentUserSession?.username;
+    if (username && socket) {
+        socket.emit('typing-stop', { username });
+    }
+}
+
+function setupTypingDetection() {
+    const messageInput = document.getElementById('user-input');
+    if (!messageInput) return;
+    
+    let isTyping = false;
+    let typingTimer;
+    
+    messageInput.addEventListener('input', () => {
+        if (!isTyping) {
+            isTyping = true;
+            sendTypingStart();
+        }
+        
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(() => {
+            isTyping = false;
+            sendTypingStop();
+        }, 1000);
+    });
+    
+    messageInput.addEventListener('blur', () => {
+        if (isTyping) {
+            isTyping = false;
+            sendTypingStop();
+        }
+    });
+    
+    // Also stop typing when message is sent
+    const originalSendMessage = sendMessage;
+    window.sendMessage = function() {
+        if (isTyping) {
+            isTyping = false;
+            sendTypingStop();
+        }
+        originalSendMessage();
+    };
+}
+
+function setupTypingSocketEvents() {
+    if (!socket) return;
+    
+    // Listen for typing start events
+    socket.on('user-typing-start', (data) => {
+        showTypingIndicator(data.username);
+    });
+    
+    // Listen for typing stop events
+    socket.on('user-typing-stop', (data) => {
+        hideTypingIndicator(data.username);
+    });
+    
+    // Clean up typing indicators when user goes offline
+    socket.on('user-offline', (username) => {
+        hideTypingIndicator(username);
+    });
+}
 
 // ===== AUTHENTICATION FUNCTIONS =====
 async function handleAuth() {
@@ -145,6 +277,8 @@ async function handleAuth() {
 
                     initSocket();
                     setupTypingHandlers();
+                    setupTypingDetection();
+                    setupTypingSocketEvents();
                     
                     document.addEventListener('visibilitychange', handleVisibilityChange);
                     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -304,6 +438,8 @@ async function attemptAutoLogin() {
 
             initSocket();
             setupTypingHandlers();
+            setupTypingDetection();
+            setupTypingSocketEvents();
             
             document.addEventListener('visibilitychange', handleVisibilityChange);
             window.addEventListener('beforeunload', handleBeforeUnload);
@@ -2656,8 +2792,15 @@ function initSocket() {
         updateUserStatusIndicator(data.username, data.status);
     });
 
-    socket.on('user-typing', (data) => {
-        showTypingIndicator(data.username, data.isTyping);
+    // ADDED: Typing events
+    socket.on('user-typing-start', (data) => {
+        console.log('⌨️ User started typing:', data.username);
+        showTypingIndicator(data.username);
+    });
+
+    socket.on('user-typing-stop', (data) => {
+        console.log('💤 User stopped typing:', data.username);
+        hideTypingIndicator(data.username);
     });
 
     socket.on('disconnect', (reason) => {
@@ -2800,6 +2943,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         initializeChat();
+        
+        // ADDED: Setup typing detection
+        setupTypingDetection();
+        setupTypingSocketEvents();
 
         // Add scroll event listener for main chat
         if (elements.chatContainer) {
@@ -2993,21 +3140,6 @@ function createStatusIndicator() {
     const indicator = document.createElement('span');
     indicator.className = 'user-status-indicator';
     return indicator;
-}
-
-// Show typing indicator
-function showTypingIndicator(username, isTyping) {
-    let indicator = document.getElementById('typing-indicator');
-    if (isTyping) {
-        if (!indicator) {
-            indicator = document.createElement('div');
-            indicator.id = 'typing-indicator';
-            indicator.innerHTML = `${username} is typing...`;
-            document.getElementById('chat-container').appendChild(indicator);
-        }
-    } else if (indicator) {
-        indicator.remove();
-    }
 }
 
 // Handle typing events
@@ -3924,6 +4056,8 @@ if (currentUser) {
     // Initialize real-time features
     initSocket();
     setupTypingHandlers();
+    setupTypingDetection();
+    setupTypingSocketEvents();
     
     // Add page event listeners
     document.addEventListener('visibilitychange', handleVisibilityChange);
