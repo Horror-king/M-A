@@ -84,39 +84,43 @@
     </div>
 
     <!-- MODIFIED: Chat container with collapsible online users panel -->
-    <div id="chat" class="main-chat-interface container" style="display: none;">
-        <div class="online-users-panel" id="online-users-panel">
-            <div class="online-users-header">
-                <h3 class="online-users-title">
-                    Online Users 
-                    <span id="online-count" class="online-count-badge">0</span>
-                </h3>
-                <button id="toggle-online-panel" class="toggle-online-panel" title="Toggle Online Users Panel">
-                    <i class="fas fa-chevron-down"></i>
-                </button>
-            </div>
-            <div id="online-users-list" class="online-users-list"></div>
-        </div>
-        
-        <div class="chat-container">
-            <div class="chat-messages" id="chat-container"></div>
-            <div id="reply-preview-container"></div>
-        </div>
-        
-        <div class="chat-input" style="display: none;">
-            <textarea id="user-input" placeholder="Type your message..."></textarea>
-            <button id="send-button" onclick="sendMessage()" disabled>
-                <i class="fas fa-paper-plane"></i>
+<div id="chat" class="main-chat-interface container" style="display: none;">
+    <div class="online-users-panel" id="online-users-panel">
+        <div class="online-users-header">
+            <h3 class="online-users-title">
+                Online Users 
+                <span id="online-count" class="online-count-badge">0</span>
+            </h3>
+            <button id="toggle-online-panel" class="toggle-online-panel" title="Toggle Online Users Panel">
+                <i class="fas fa-chevron-down"></i>
             </button>
         </div>
-        
-        <!-- FIXED: Scroll to bottom button specifically for main chat -->
-        <div class="scroll-to-bottom-btn" id="scrollToBottomBtn">
-            <i class="fas fa-chevron-down"></i>
-            <div class="new-messages-notification" id="newMessagesCount">0</div>
-        </div>
+        <div id="online-users-list" class="online-users-list"></div>
     </div>
-
+    
+    <div class="chat-container">
+        <div class="chat-messages" id="chat-container"></div>
+        
+        <!-- ADDED: Typing Indicator -->
+        <div id="typing-indicator"></div>
+        
+        <div id="reply-preview-container"></div>
+    </div>
+    
+    <div class="chat-input" style="display: none;">
+        <textarea id="user-input" placeholder="Type your message..."></textarea>
+        <button id="send-button" onclick="sendMessage()" disabled>
+            <i class="fas fa-paper-plane"></i>
+        </button>
+    </div>
+    
+    <!-- FIXED: Scroll to bottom button specifically for main chat -->
+    <div class="scroll-to-bottom-btn" id="scrollToBottomBtn">
+        <i class="fas fa-chevron-down"></i>
+        <div class="new-messages-notification" id="newMessagesCount">0</div>
+    </div>
+</div>
+    
     <!-- MODIFIED: Private AI container with collapsible online users panel -->
     <div id="private-ai" class="main-chat-interface container" style="display: none;">
         <div class="online-users-panel" id="private-online-users-panel">
