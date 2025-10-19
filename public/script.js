@@ -3842,6 +3842,56 @@ function populateNews() {
     });
 }
 
+// --- CUT HERE ---
+document.addEventListener('click', function (e) {
+    if (e.target.tagName === 'IMG' && e.target.closest('.message')) {
+        openZoom(e.target.src);
+    }
+});
+
+function openZoom(src) {
+    document.body.style.overflow = 'hidden';
+    const overlay = document.getElementById('zoom-overlay');
+    const zoomImage = document.getElementById('zoom-image');
+    const downloadBtn = document.getElementById('download-btn');
+
+    if (!overlay || !zoomImage || !downloadBtn) return;
+    
+    zoomImage.src = src;
+
+    // Force download filename
+    downloadBtn.href = src;
+    downloadBtn.setAttribute('download', 'image.jpg');
+
+    overlay.style.display = 'flex';
+}
+
+function closeZoom() {
+    document.body.style.overflow = '';
+    const overlay = document.getElementById('zoom-overlay');
+    if (overlay) overlay.style.display = 'none';
+}
+
+if (document.getElementById("year")) {
+    document.getElementById("year").textContent = new Date().getFullYear();
+}
+// --- CUT HERE ---
+// Zoom functions remain the same
+function openZoom(src) {
+    document.body.style.overflow = 'hidden';
+    const overlay = document.getElementById('zoom-overlay');
+    const zoomImage = document.getElementById('zoom-image');
+    if (!overlay || !zoomImage) return;
+    
+    zoomImage.src = src;
+    overlay.style.display = 'flex';
+}
+
+function closeZoom() {
+    document.body.style.overflow = '';
+    const overlay = document.getElementById('zoom-overlay');
+    if (overlay) overlay.style.display = 'none';
+}
 // Initialize if user is logged in
 const currentUser = currentUserSession?.username;
 if (currentUser) {
@@ -3867,7 +3917,35 @@ if (currentUser) {
     }
 }
 
-// Set current year in footer
-if (document.getElementById("year")) {
-    document.getElementById("year").textContent = new Date().getFullYear();
+// Format message time function
+function formatMessageTime(timestamp) {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now - date;
+    
+    // If less than a minute ago
+    if (diff < 60000) {
+        return 'Just now';
+    }
+    
+    // If less than an hour ago
+    if (diff < 3600000) {
+        const minutes = Math.floor(diff / 60000);
+        return `${minutes}m ago`;
+    }
+    
+    // If today
+    if (date.toDateString() === now.toDateString()) {
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    
+    // If yesterday
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) {
+        return 'Yesterday';
+    }
+    
+    // Otherwise, show date
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
