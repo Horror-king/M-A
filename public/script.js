@@ -1842,29 +1842,39 @@ async function openPrivateChat(username) {
 }
 
 // Load private messages from API
+// Load private messages from API - UPDATED with better error handling
 async function loadPrivateMessages(username) {
     const messagesContainer = document.getElementById('private-chat-messages');
     if (!messagesContainer) return;
     
     const currentUser = currentUserSession?.username;
+    if (!currentUser) {
+        console.error('No current user found');
+        return;
+    }
     
     try {
         messagesContainer.innerHTML = '<div class="no-messages">Loading messages...</div>';
         
         const token = localStorage.getItem('auth_token');
-        const response = await fetch(`/api/private/messages/${username}`, {
+        const response = await fetch(`/api/private/messages/${currentUser}?otherUser=${encodeURIComponent(username)}`, {
             headers: {
-                'Authorization': token ? `Bearer ${token}` : ''
+                'Authorization': token ? `Bearer ${token}` : '',
+                'Content-Type': 'application/json'
             }
         });
-        if (!response.ok) throw new Error('Failed to load messages');
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(errorData.error || `Failed to load messages: ${response.status}`);
+        }
         
         const messages = await response.json();
         
         // Clear container
         messagesContainer.innerHTML = '';
         
-        if (messages.length === 0) {
+        if (!messages || messages.length === 0) {
             messagesContainer.innerHTML = `
                 <div class="no-messages">
                     <p>No messages yet. Start a conversation with ${username}!</p>
@@ -1890,7 +1900,7 @@ async function loadPrivateMessages(username) {
         
     } catch (error) {
         console.error('Error loading private messages:', error);
-        messagesContainer.innerHTML = '<div class="no-messages">Error loading messages</div>';
+        messagesContainer.innerHTML = `<div class="no-messages">Error loading messages: ${error.message}</div>`;
     }
 }
 
