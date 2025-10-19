@@ -1717,28 +1717,37 @@ async function loadPrivateUsers() {
     if (!usersList) return;
     
     const currentUser = currentUserSession?.username;
-    if (!currentUser) return;
+    if (!currentUser) {
+        console.error('No current user found');
+        usersList.innerHTML = '<div class="no-users">Please log in to view conversations</div>';
+        return;
+    }
 
     try {
         // Show loading
         usersList.innerHTML = '<div class="no-users">Loading conversations...</div>';
         
-        // Get conversations from server - USING UPDATED ENDPOINT
+        // Get conversations from server - FIXED: Add username parameter
         const token = localStorage.getItem('auth_token');
-        const response = await fetch(`/api/private/conversations`, {
+        const response = await fetch(`/api/private/conversations?username=${encodeURIComponent(currentUser)}`, {
             headers: {
-                'Authorization': token ? `Bearer ${token}` : ''
+                'Authorization': token ? `Bearer ${token}` : '',
+                'Content-Type': 'application/json'
             }
         });
-        if (!response.ok) throw new Error('Failed to load conversations');
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(errorData.error || `Failed to load conversations: ${response.status}`);
+        }
         
         const conversations = await response.json();
         
         // Clear existing list
         usersList.innerHTML = '';
         
-        if (conversations.length === 0) {
-            usersList.innerHTML = '<div class="no-users">No conversations yet</div>';
+        if (!conversations || conversations.length === 0) {
+            usersList.innerHTML = '<div class="no-users">No conversations yet. Start a new conversation!</div>';
             return;
         }
         
@@ -1761,7 +1770,7 @@ async function loadPrivateUsers() {
                 </div>
                 <div class="user-info">
                     <div class="user-name">${conversation.displayName || conversation.username}</div>
-                    <div class="user-last-message">${conversation.isSender ? 'You: ' : ''}${conversation.lastMessage}</div>
+                    <div class="user-last-message">${conversation.isSender ? 'You: ' : ''}${conversation.lastMessage || 'No messages'}</div>
                     <div class="user-time">${formatMessageTime(conversation.lastMessageTime)}</div>
                 </div>
             `;
@@ -1774,7 +1783,7 @@ async function loadPrivateUsers() {
         
     } catch (error) {
         console.error('Error loading conversations:', error);
-        usersList.innerHTML = '<div class="no-users">Error loading conversations</div>';
+        usersList.innerHTML = `<div class="no-users">Error loading conversations: ${error.message}</div>`;
     }
 }
 
