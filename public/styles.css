@@ -690,7 +690,7 @@ html, body {
     box-shadow: none;
 }
 
-/* FIXED: Chat messages container with proper scrolling and padding */
+/* FIXED: Dynamic padding based on online panel state */
 .chat-messages, #private-ai-container {
     flex: 1;
     padding: 5px 15px;
@@ -708,12 +708,18 @@ html, body {
     touch-action: auto;
     gap: 2px;
     box-sizing: border-box;
-    /* FIXED: Much larger bottom padding to ensure messages are visible above input */
-    padding-bottom: 125px; /* Increased significantly from 120px */
-    /* FIXED: Add margin at the bottom to create space for the input */
-    margin-bottom: 65px;
+    
+    /* CRITICAL FIX: Dynamic padding - less when panel is open, more when closed */
+    padding-bottom: 120px; /* Default when panel is open */
+}
+
+/* When online users panel is CLOSED, add more padding */
+.online-users-panel.collapsed ~ .chat-container .chat-messages,
+.online-users-panel.collapsed ~ .chat-container #private-ai-container {
+    padding-bottom: 150px !important; /* More padding when panel is closed */
 }
  /* FIXED: Ensure the chat container itself has proper spacing */
+/* FIXED: Chat container with proper spacing */
 .chat-container {
     flex: 1;
     display: flex;
@@ -722,8 +728,6 @@ html, body {
     background-color: white;
     overflow: hidden;
     position: relative;
-    /* FIXED: Add padding at the bottom of the container */
-    padding-bottom: 65px;
 }
 
 #private-ai {
