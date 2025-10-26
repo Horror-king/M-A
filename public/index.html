@@ -37,9 +37,9 @@
             padding-bottom: 120px; /* Default when panel is open */
         }
 
-        /* When online users panel is CLOSED, add more padding */
-        .online-users-panel.collapsed ~ .chat-container .chat-messages,
-        .online-users-panel.collapsed ~ .chat-container #private-ai-container {
+        /* FIXED: When online users panel is CLOSED, add more padding */
+        #chat .online-users-panel.collapsed + .chat-container .chat-messages,
+        #private-ai .online-users-panel.collapsed + .chat-container #private-ai-container {
             padding-bottom: 150px !important; /* More padding when panel is closed */
         }
 
@@ -101,8 +101,9 @@
                 padding-bottom: 130px; /* Default for mobile when panel open */
             }
             
-            .online-users-panel.collapsed ~ .chat-container .chat-messages,
-            .online-users-panel.collapsed ~ .chat-container #private-ai-container {
+            /* FIXED: Mobile adjustments for collapsed panel */
+            #chat .online-users-panel.collapsed + .chat-container .chat-messages,
+            #private-ai .online-users-panel.collapsed + .chat-container #private-ai-container {
                 padding-bottom: 160px !important; /* More for mobile when panel closed */
             }
         }
@@ -3291,25 +3292,53 @@
                 
                 // Force reflow and scroll adjustment
                 setTimeout(() => {
-                    forceScrollToBottom('chat-container');
+                    // Update padding based on panel state
+                    updateChatPadding();
+                    
+                    // Scroll to bottom
+                    if (panelId === 'online-users-panel') {
+                        forceScrollToBottom('chat-container');
+                    } else if (panelId === 'private-online-users-panel') {
+                        forceScrollToBottom('private-ai-container');
+                    }
+                    
                     updateScrollState();
                 }, 100);
             }
         }
 
-        // FIXED: Initialize online panel toggle buttons
+        // FIXED: Function to update chat padding based on panel state
+        function updateChatPadding() {
+            const mainPanel = document.getElementById('online-users-panel');
+            const privatePanel = document.getElementById('private-online-users-panel');
+            
+            // Force CSS recalculation
+            document.body.clientHeight;
+        }
+
+        // FIXED: Initialize online panel toggle buttons with proper event listeners
         function initializeOnlinePanels() {
             // Main chat panel
             const mainToggleBtn = document.getElementById('toggle-online-panel');
             if (mainToggleBtn) {
-                mainToggleBtn.addEventListener('click', () => toggleOnlinePanel('online-users-panel'));
+                mainToggleBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleOnlinePanel('online-users-panel');
+                });
             }
             
             // Private AI panel
             const privateToggleBtn = document.getElementById('toggle-private-online-panel');
             if (privateToggleBtn) {
-                privateToggleBtn.addEventListener('click', () => toggleOnlinePanel('private-online-users-panel'));
+                privateToggleBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleOnlinePanel('private-online-users-panel');
+                });
             }
+            
+            console.log('✅ Online panels initialized');
         }
 
         // FIXED: Enhanced scroll to bottom that works with dynamic padding
@@ -3317,17 +3346,30 @@
             const container = document.getElementById(containerId);
             if (!container) return;
             
+            // Multiple methods to ensure scrolling works
             const scrollToBottom = () => {
+                // Method 1: Direct scroll
                 container.scrollTop = container.scrollHeight;
+                
+                // Method 2: Smooth scroll
                 container.scrollTo({
                     top: container.scrollHeight,
                     behavior: 'smooth'
                 });
+                
+                // Method 3: Alternative approach
+                setTimeout(() => {
+                    container.scrollTop = container.scrollHeight;
+                }, 10);
             };
             
+            // Initial scroll
             scrollToBottom();
+            
+            // Additional attempts to handle dynamic content loading
             setTimeout(scrollToBottom, 50);
             setTimeout(scrollToBottom, 100);
+            setTimeout(scrollToBottom, 200);
         }
 
         // Call this in your DOMContentLoaded or initialization function
@@ -4348,36 +4390,6 @@
         }
 
         // ===== SCROLL FUNCTIONS =====
-        function forceScrollToBottom(containerId) {
-            const container = document.getElementById(containerId);
-            if (!container) return;
-            
-            // Multiple methods to ensure scrolling works
-            const scrollToBottom = () => {
-                // Method 1: Direct scroll
-                container.scrollTop = container.scrollHeight;
-                
-                // Method 2: Smooth scroll
-                container.scrollTo({
-                    top: container.scrollHeight,
-                    behavior: 'smooth'
-                });
-                
-                // Method 3: Alternative approach
-                setTimeout(() => {
-                    container.scrollTop = container.scrollHeight;
-                }, 10);
-            };
-            
-            // Initial scroll
-            scrollToBottom();
-            
-            // Additional attempts to handle dynamic content loading
-            setTimeout(scrollToBottom, 50);
-            setTimeout(scrollToBottom, 100);
-            setTimeout(scrollToBottom, 200);
-        }
-
         function scrollToBottomMain() {
             forceScrollToBottom('chat-container');
             isAtBottom = true;
@@ -6219,295 +6231,7 @@
             }, 10);
         }
 
-        // ===== FIXED: MORE RELIABLE SCROLL TO BOTTOM FUNCTION =====
-        function forceScrollToBottom(containerId) {
-            const container = document.getElementById(containerId);
-            if (!container) return;
-            
-            // Multiple methods to ensure scrolling works
-            const scrollToBottom = () => {
-                // Method 1: Direct scroll
-                container.scrollTop = container.scrollHeight;
-                
-                // Method 2: Smooth scroll
-                container.scrollTo({
-                    top: container.scrollHeight,
-                    behavior: 'smooth'
-                });
-                
-                // Method 3: Alternative approach
-                setTimeout(() => {
-                    container.scrollTop = container.scrollHeight;
-                }, 10);
-            };
-            
-            // Initial scroll
-            scrollToBottom();
-            
-            // Additional attempts to handle dynamic content loading
-            setTimeout(scrollToBottom, 50);
-            setTimeout(scrollToBottom, 100);
-            setTimeout(scrollToBottom, 200);
-        }
-
-        // ===== ENHANCED INITIALIZATION - WITH AUTO-LOGIN =====
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('🚀 Initializing application...');
-            
-            // First, try auto-login
-            attemptAutoLogin().then(success => {
-                if (!success) {
-                    // If auto-login fails, show auth container
-                    console.log('❌ No valid session found, showing login form');
-                    document.getElementById('auth-container').style.display = 'flex';
-                    document.querySelector('.menu').style.display = 'none';
-                    document.querySelector('.news-toggle').style.display = 'none';
-                } else {
-                    console.log('✅ User auto-logged in successfully');
-                }
-                
-                // Initialize buttons
-                initializeButtons();
-                
-                // Load user panel preference
-                loadUserPanelPreference();
-                
-                if ('Notification' in window) {
-                    Notification.requestPermission().then(permission => {
-                        notificationPermissionGranted = permission === 'granted';
-                        console.log('📢 Notification permission:', permission);
-                    });
-                }
-
-                initializeChat();
-                
-                // ADDED: Setup typing detection
-                setupTypingDetection();
-                setupTypingSocketEvents();
-
-                // Add scroll event listener for main chat
-                if (elements.chatContainer) {
-                    elements.chatContainer.addEventListener('scroll', updateScrollState);
-                }
-
-                // Initialize Private AI input handler
-                if (elements.privateInput) {
-                    elements.privateInput.addEventListener('input', () => {
-                        autoResize(elements.privateInput);
-                        const hasText = elements.privateInput.value.trim().length > 0;
-                        elements.privateSendButton.disabled = !hasText;
-                        elements.privateSendButton.classList.toggle('enabled', hasText);
-                    });
-                    elements.privateInput.addEventListener('keypress', (e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            sendPrivateMessage();
-                        }
-                    });
-                }
-
-                console.log('🎯 Application initialization complete');
-            });
-        });
-
-        // ===== FIXED: OVERLAY CLICK HANDLER =====
-        document.addEventListener('DOMContentLoaded', function() {
-            const overlay = document.getElementById('overlay');
-            if (overlay) {
-                overlay.addEventListener('click', function() {
-                    console.log('🔘 Overlay clicked - closing all sections');
-                    // Hide all info containers (INCLUDING PROFILE)
-                    document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container, .profile-container').forEach(container => {
-                        container.style.display = 'none';
-                    });
-                    this.style.display = 'none';
-                    // Show main chat
-                    showContainer('chat');
-                });
-            }
-
-            // Close sections when clicking escape key
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape') {
-                    const overlay = document.getElementById('overlay');
-                    if (overlay && overlay.style.display === 'block') {
-                        hideContainer('chat');
-                    }
-                }
-            });
-
-            // ADDED: Close user profile popup when clicking outside
-            document.addEventListener('click', function(e) {
-                const popup = document.getElementById('user-profile-popup');
-                if (popup && popup.style.display === 'flex' && e.target === popup) {
-                    hideUserProfile();
-                }
-            });
-        });
-
-        // ===== ADDED: Function to setup private messages input handlers =====
-        function setupPrivateMessageInputHandlers() {
-            const input = document.getElementById('private-message-input');
-            const sendButton = document.getElementById('private-messages-send-button');
-            
-            if (input && sendButton) {
-                input.addEventListener('input', () => {
-                    autoResize(input);
-                    const hasText = input.value.trim().length > 0;
-                    sendButton.disabled = !hasText;
-                    sendButton.classList.toggle('enabled', hasText);
-                    
-                    // Setup typing indicators for private messages
-                    setupPrivateMessageTypingHandlers();
-                });
-                
-                input.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        sendPrivateMessageToUser();
-                    }
-                });
-                
-                // Initialize button state
-                sendButton.disabled = true;
-                sendButton.classList.remove('enabled');
-            }
-        }
-
-        // Update online users lists
-        function updateOnlineUsersList(onlineUsers) {
-            console.log('Updating online users list:', onlineUsers);
-            
-            // Update main chat online list
-            updateSingleOnlineList('online-users-list', 'online-count', onlineUsers);
-            
-            // Update private AI online list
-            updateSingleOnlineList('private-online-users-list', 'private-online-count', onlineUsers);
-        }
-
-        function updateSingleOnlineList(listElementId, countElementId, onlineUsers) {
-            const onlineList = document.getElementById(listElementId);
-            const onlineCount = document.getElementById(countElementId);
-            
-            if (onlineList) {
-                onlineList.innerHTML = '';
-                onlineUsers.forEach(user => {
-                    const userElement = document.createElement('div');
-                    userElement.className = 'online-user';
-                    
-                    // Get user profile to display correct avatar
-                    const avatarUrl = `https://i.pravatar.cc/50?u=${encodeURIComponent(user)}`;
-                    
-                    userElement.innerHTML = `
-                        <div class="online-user-avatar">
-                            <img src="${avatarUrl}" alt="${user}">
-                            <div class="online-dot"></div>
-                        </div>
-                        <div class="online-user-info">
-                            <div class="online-user-name">${user}</div>
-                        </div>
-                    `;
-                    
-                    // ADDED: Add click event to show user profile
-                    userElement.onclick = () => {
-                        showUserProfile(user);
-                    };
-                    
-                    onlineList.appendChild(userElement);
-                });
-            }
-            
-            if (onlineCount) {
-                onlineCount.textContent = onlineUsers.length;
-            }
-        }
-
-        // Remove offline user from the lists
-        function removeOfflineUser(username) {
-            console.log('Removing offline user from UI:', username);
-            
-            // Remove from main chat online list
-            removeUserFromSingleList('online-users-list', 'online-count', username);
-            
-            // Remove from private AI online list
-            removeUserFromSingleList('private-online-users-list', 'private-online-count', username);
-            
-            // Update status indicator in messages to offline
-            updateUserStatusIndicator(username, 'offline');
-        }
-
-        function removeUserFromSingleList(listElementId, countElementId, username) {
-            const onlineList = document.getElementById(listElementId);
-            if (onlineList) {
-                const userElements = onlineList.querySelectorAll('.online-user');
-                userElements.forEach(userElement => {
-                    const userNameElement = userElement.querySelector('.online-user-name');
-                    if (userNameElement && userNameElement.textContent === username) {
-                        userElement.remove();
-                    }
-                });
-                // Update online count
-                const onlineCount = document.getElementById(countElementId);
-                if (onlineCount) {
-                    const currentCount = parseInt(onlineCount.textContent) || 0;
-                    onlineCount.textContent = Math.max(0, currentCount - 1);
-                }
-            }
-        }
-
-        // Update status indicator for a specific user
-        function updateUserStatusIndicator(username, status) {
-            // Find all messages from this user and update their status
-            const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
-            userMessages.forEach(msg => {
-                let statusIndicator = msg.querySelector('.user-status-indicator');
-                if (!statusIndicator) {
-                    statusIndicator = createStatusIndicator();
-                    const usernameDiv = msg.querySelector('.username');
-                    if (usernameDiv) {
-                        usernameDiv.appendChild(statusIndicator);
-                    }
-                }
-                statusIndicator.className = `user-status-indicator ${status}`;
-            });
-        }
-
-        // Create a status indicator element
-        function createStatusIndicator() {
-            const indicator = document.createElement('span');
-            indicator.className = 'user-status-indicator';
-            return indicator;
-        }
-
-        // Handle typing events
-        function setupTypingHandlers() {
-            const messageInput = document.getElementById('user-input');
-            if (!messageInput) return;
-            messageInput.addEventListener('input', () => {
-                const username = currentUserSession?.username;
-                if (!username || !socket) return;
-                if (!isTyping) {
-                    isTyping = true;
-                    socket.emit('typing-start', { username });
-                }
-                clearTimeout(typingTimer);
-                typingTimer = setTimeout(() => {
-                    isTyping = false;
-                    socket.emit('typing-stop', { username });
-                }, 1000);
-            });
-        }
-
-        // Improved scroll position detection
-        function checkIfAtBottom(container) {
-            if (!container) return true;
-            const threshold = 50; // pixels
-            const scrollPosition = container.scrollTop + container.clientHeight;
-            const scrollHeight = container.scrollHeight;
-            return Math.abs(scrollHeight - scrollPosition) <= threshold;
-        }
-
-        // IMPROVED Update scroll state function
+        // ===== IMPROVED Update scroll state function =====
         function updateScrollState() {
             const chatContainer = document.getElementById('chat-container');
             if (!chatContainer || !scrollToBottomBtn) return;
@@ -7438,6 +7162,266 @@
             
             // Otherwise, show date
             return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        }
+
+        // ENHANCED INITIALIZATION - WITH AUTO-LOGIN
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 Initializing application...');
+            
+            // First, try auto-login
+            attemptAutoLogin().then(success => {
+                if (!success) {
+                    // If auto-login fails, show auth container
+                    console.log('❌ No valid session found, showing login form');
+                    document.getElementById('auth-container').style.display = 'flex';
+                    document.querySelector('.menu').style.display = 'none';
+                    document.querySelector('.news-toggle').style.display = 'none';
+                } else {
+                    console.log('✅ User auto-logged in successfully');
+                }
+                
+                // Initialize buttons
+                initializeButtons();
+                
+                // Initialize online panels
+                initializeOnlinePanels();
+                
+                // Load user panel preference
+                loadUserPanelPreference();
+                
+                if ('Notification' in window) {
+                    Notification.requestPermission().then(permission => {
+                        notificationPermissionGranted = permission === 'granted';
+                        console.log('📢 Notification permission:', permission);
+                    });
+                }
+
+                initializeChat();
+                
+                // ADDED: Setup typing detection
+                setupTypingDetection();
+                setupTypingSocketEvents();
+
+                // Add scroll event listener for main chat
+                if (elements.chatContainer) {
+                    elements.chatContainer.addEventListener('scroll', updateScrollState);
+                }
+
+                // Initialize Private AI input handler
+                if (elements.privateInput) {
+                    elements.privateInput.addEventListener('input', () => {
+                        autoResize(elements.privateInput);
+                        const hasText = elements.privateInput.value.trim().length > 0;
+                        elements.privateSendButton.disabled = !hasText;
+                        elements.privateSendButton.classList.toggle('enabled', hasText);
+                    });
+                    elements.privateInput.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            sendPrivateMessage();
+                        }
+                    });
+                }
+
+                console.log('🎯 Application initialization complete');
+            });
+        });
+
+        // ===== FIXED: OVERLAY CLICK HANDLER =====
+        document.addEventListener('DOMContentLoaded', function() {
+            const overlay = document.getElementById('overlay');
+            if (overlay) {
+                overlay.addEventListener('click', function() {
+                    console.log('🔘 Overlay clicked - closing all sections');
+                    // Hide all info containers (INCLUDING PROFILE)
+                    document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container, .profile-container').forEach(container => {
+                        container.style.display = 'none';
+                    });
+                    this.style.display = 'none';
+                    // Show main chat
+                    showContainer('chat');
+                });
+            }
+
+            // Close sections when clicking escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    const overlay = document.getElementById('overlay');
+                    if (overlay && overlay.style.display === 'block') {
+                        hideContainer('chat');
+                    }
+                }
+            });
+
+            // ADDED: Close user profile popup when clicking outside
+            document.addEventListener('click', function(e) {
+                const popup = document.getElementById('user-profile-popup');
+                if (popup && popup.style.display === 'flex' && e.target === popup) {
+                    hideUserProfile();
+                }
+            });
+        });
+
+        // ===== ADDED: Function to setup private messages input handlers =====
+        function setupPrivateMessageInputHandlers() {
+            const input = document.getElementById('private-message-input');
+            const sendButton = document.getElementById('private-messages-send-button');
+            
+            if (input && sendButton) {
+                input.addEventListener('input', () => {
+                    autoResize(input);
+                    const hasText = input.value.trim().length > 0;
+                    sendButton.disabled = !hasText;
+                    sendButton.classList.toggle('enabled', hasText);
+                    
+                    // Setup typing indicators for private messages
+                    setupPrivateMessageTypingHandlers();
+                });
+                
+                input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendPrivateMessageToUser();
+                    }
+                });
+                
+                // Initialize button state
+                sendButton.disabled = true;
+                sendButton.classList.remove('enabled');
+            }
+        }
+
+        // Update online users lists
+        function updateOnlineUsersList(onlineUsers) {
+            console.log('Updating online users list:', onlineUsers);
+            
+            // Update main chat online list
+            updateSingleOnlineList('online-users-list', 'online-count', onlineUsers);
+            
+            // Update private AI online list
+            updateSingleOnlineList('private-online-users-list', 'private-online-count', onlineUsers);
+        }
+
+        function updateSingleOnlineList(listElementId, countElementId, onlineUsers) {
+            const onlineList = document.getElementById(listElementId);
+            const onlineCount = document.getElementById(countElementId);
+            
+            if (onlineList) {
+                onlineList.innerHTML = '';
+                onlineUsers.forEach(user => {
+                    const userElement = document.createElement('div');
+                    userElement.className = 'online-user';
+                    
+                    // Get user profile to display correct avatar
+                    const avatarUrl = `https://i.pravatar.cc/50?u=${encodeURIComponent(user)}`;
+                    
+                    userElement.innerHTML = `
+                        <div class="online-user-avatar">
+                            <img src="${avatarUrl}" alt="${user}">
+                            <div class="online-dot"></div>
+                        </div>
+                        <div class="online-user-info">
+                            <div class="online-user-name">${user}</div>
+                        </div>
+                    `;
+                    
+                    // ADDED: Add click event to show user profile
+                    userElement.onclick = () => {
+                        showUserProfile(user);
+                    };
+                    
+                    onlineList.appendChild(userElement);
+                });
+            }
+            
+            if (onlineCount) {
+                onlineCount.textContent = onlineUsers.length;
+            }
+        }
+
+        // Remove offline user from the lists
+        function removeOfflineUser(username) {
+            console.log('Removing offline user from UI:', username);
+            
+            // Remove from main chat online list
+            removeUserFromSingleList('online-users-list', 'online-count', username);
+            
+            // Remove from private AI online list
+            removeUserFromSingleList('private-online-users-list', 'private-online-count', username);
+            
+            // Update status indicator in messages to offline
+            updateUserStatusIndicator(username, 'offline');
+        }
+
+        function removeUserFromSingleList(listElementId, countElementId, username) {
+            const onlineList = document.getElementById(listElementId);
+            if (onlineList) {
+                const userElements = onlineList.querySelectorAll('.online-user');
+                userElements.forEach(userElement => {
+                    const userNameElement = userElement.querySelector('.online-user-name');
+                    if (userNameElement && userNameElement.textContent === username) {
+                        userElement.remove();
+                    }
+                });
+                // Update online count
+                const onlineCount = document.getElementById(countElementId);
+                if (onlineCount) {
+                    const currentCount = parseInt(onlineCount.textContent) || 0;
+                    onlineCount.textContent = Math.max(0, currentCount - 1);
+                }
+            }
+        }
+
+        // Update status indicator for a specific user
+        function updateUserStatusIndicator(username, status) {
+            // Find all messages from this user and update their status
+            const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
+            userMessages.forEach(msg => {
+                let statusIndicator = msg.querySelector('.user-status-indicator');
+                if (!statusIndicator) {
+                    statusIndicator = createStatusIndicator();
+                    const usernameDiv = msg.querySelector('.username');
+                    if (usernameDiv) {
+                        usernameDiv.appendChild(statusIndicator);
+                    }
+                }
+                statusIndicator.className = `user-status-indicator ${status}`;
+            });
+        }
+
+        // Create a status indicator element
+        function createStatusIndicator() {
+            const indicator = document.createElement('span');
+            indicator.className = 'user-status-indicator';
+            return indicator;
+        }
+
+        // Handle typing events
+        function setupTypingHandlers() {
+            const messageInput = document.getElementById('user-input');
+            if (!messageInput) return;
+            messageInput.addEventListener('input', () => {
+                const username = currentUserSession?.username;
+                if (!username || !socket) return;
+                if (!isTyping) {
+                    isTyping = true;
+                    socket.emit('typing-start', { username });
+                }
+                clearTimeout(typingTimer);
+                typingTimer = setTimeout(() => {
+                    isTyping = false;
+                    socket.emit('typing-stop', { username });
+                }, 1000);
+            });
+        }
+
+        // Improved scroll position detection
+        function checkIfAtBottom(container) {
+            if (!container) return true;
+            const threshold = 50; // pixels
+            const scrollPosition = container.scrollTop + container.clientHeight;
+            const scrollHeight = container.scrollHeight;
+            return Math.abs(scrollHeight - scrollPosition) <= threshold;
         }
     </script>
 </body>
