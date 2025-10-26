@@ -1,5 +1,4 @@
 // --- CUT HERE ---
-// --- CUT HERE ---
 let isLogin = true;
 let longPressTimer;
 let isLongPress = false;
@@ -66,6 +65,9 @@ let userPanelVisible = true;
 
 // ✅ ADDED: Current user session
 let currentUserSession = null;
+
+// ✅ ADDED: Online panel state
+let onlinePanelExpanded = true;
 
 const elements = {
     usernameInput: document.getElementById('auth-username'),
@@ -515,6 +517,9 @@ function showContainer(containerId) {
         if (containerId === 'chat' || containerId === 'private-ai') {
             const chatInput = container.querySelector('.chat-input');
             if (chatInput) chatInput.style.display = 'flex';
+            
+            // FIXED: Adjust chat container padding based on online panel state
+            setTimeout(adjustChatContainerPadding, 100);
         }
         
         // For private messages, only show users panel initially
@@ -642,6 +647,53 @@ function hideContainer(containerId) {
     
     // Show chat container and input after closing any section
     showContainer('chat');
+}
+
+// ===== FIXED: ADJUST CHAT CONTAINER PADDING =====
+function adjustChatContainerPadding() {
+    const chatContainers = [
+        document.getElementById('chat-container'),
+        document.getElementById('private-ai-container')
+    ];
+    
+    chatContainers.forEach(container => {
+        if (!container) return;
+        
+        // Get the online panel state
+        const mainChat = document.getElementById('chat');
+        const privateAI = document.getElementById('private-ai');
+        
+        let onlinePanel;
+        if (mainChat && mainChat.style.display !== 'none') {
+            onlinePanel = document.getElementById('online-users-panel');
+        } else if (privateAI && privateAI.style.display !== 'none') {
+            onlinePanel = document.getElementById('private-online-users-panel');
+        }
+        
+        if (onlinePanel) {
+            const isExpanded = !onlinePanel.classList.contains('collapsed');
+            const panelHeight = isExpanded ? onlinePanel.offsetHeight : 0;
+            
+            // Set dynamic padding based on online panel state
+            const basePadding = 80; // Base padding for input area
+            const extraPadding = isExpanded ? 60 : 0; // Extra padding when online panel is visible
+            
+            container.style.paddingBottom = (basePadding + extraPadding) + 'px';
+            
+            console.log('📏 Adjusted chat container padding:', {
+                container: container.id,
+                isExpanded: isExpanded,
+                panelHeight: panelHeight,
+                paddingBottom: container.style.paddingBottom
+            });
+        }
+    });
+    
+    // Force scroll to bottom after adjusting padding
+    setTimeout(() => {
+        forceScrollToBottom('chat-container');
+        forceScrollToBottom('private-ai-container');
+    }, 50);
 }
 
 // ===== MESSAGE FUNCTIONS =====
@@ -1746,6 +1798,9 @@ function initializeButtons() {
         privateGoTopBtn.addEventListener('click', scrollPrivateToTop);
     }
 
+    // FIXED: Initialize online panel toggle buttons
+    setupOnlinePanelToggle();
+
     // Force initial state update
     setTimeout(updateScrollState, 100);
 }
@@ -1766,6 +1821,44 @@ function initializeChat() {
         });
     }
     loadMessages();
+}
+
+// ===== FIXED: ONLINE PANEL TOGGLE FUNCTION =====
+function setupOnlinePanelToggle() {
+    const toggleButtons = [
+        { buttonId: 'toggle-online-panel', panelId: 'online-users-panel' },
+        { buttonId: 'toggle-private-online-panel', panelId: 'private-online-users-panel' }
+    ];
+
+    toggleButtons.forEach(({ buttonId, panelId }) => {
+        const button = document.getElementById(buttonId);
+        const panel = document.getElementById(panelId);
+
+        if (button && panel) {
+            button.addEventListener('click', () => {
+                panel.classList.toggle('collapsed');
+                
+                // Update icon
+                const icon = button.querySelector('i');
+                if (panel.classList.contains('collapsed')) {
+                    icon.classList.remove('fa-chevron-down');
+                    icon.classList.add('fa-chevron-up');
+                } else {
+                    icon.classList.remove('fa-chevron-up');
+                    icon.classList.add('fa-chevron-down');
+                }
+
+                // Adjust chat container padding
+                adjustChatContainerPadding();
+                
+                // Force scroll to bottom after adjusting padding
+                setTimeout(() => {
+                    forceScrollToBottom('chat-container');
+                    forceScrollToBottom('private-ai-container');
+                }, 100);
+            });
+        }
+    });
 }
 
 // ===== PRIVATE MESSAGING FUNCTIONS =====
@@ -3759,6 +3852,7 @@ function showLockoutMessage() {
     }
 }
 
+// --- CUT HERE ---
 function hideLockoutMessage() {
     const lockoutMessage = document.getElementById('lockout-message');
     if (lockoutMessage) lockoutMessage.style.display = 'none';
