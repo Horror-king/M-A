@@ -1,5 +1,3 @@
-// --- CUT HERE ---
-// --- CUT HERE ---
 let isLogin = true;
 let longPressTimer;
 let isLongPress = false;
@@ -267,6 +265,8 @@ async function handleAuth() {
                 setTimeout(() => {
                     loader.style.display = 'none';
                     document.getElementById('auth-container').style.display = 'none';
+                    
+                    // Show main interface elements after login
                     document.querySelector('.menu').style.display = 'flex';
                     document.querySelector('.news-toggle').style.display = 'block';
                     
@@ -1500,15 +1500,14 @@ function logout() {
         input.style.display = 'none';
     });
     
-    // Show auth container
-    document.getElementById('auth-container').style.display = 'flex';
-    
-    // Hide news toggle
+    // Hide news container and toggle
+    const newsContainer = document.querySelector('.news-container');
+    if (newsContainer) newsContainer.style.display = 'none';
     const newsToggle = document.querySelector('.news-toggle');
     if (newsToggle) newsToggle.style.display = 'none';
     
-    const newsContainer = document.querySelector('.news-container');
-    if (newsContainer) newsContainer.style.display = 'none';
+    // Show auth container
+    document.getElementById('auth-container').style.display = 'flex';
     
     // Hide both buttons on logout
     if (scrollToBottomBtn) {
@@ -1548,10 +1547,16 @@ function logout() {
     }
     document.getElementById('auth-password').value = '';
     
+    // Hide SQL Editor menu item
+    const sqlEditorMenuItem = document.getElementById('sql-editor-menu-item');
+    if (sqlEditorMenuItem) {
+        sqlEditorMenuItem.style.display = 'none';
+    }
+    
     console.log('✅ User logged out successfully');
 }
 
-// --- CUT HERE ---
+// ===== NOTIFICATION FUNCTIONS =====
 function showNotification(username, message) {
     if (!notificationPermissionGranted || !('Notification' in window)) return;
     const notification = new Notification(`${username} says:`, {
@@ -1978,7 +1983,6 @@ async function openPrivateChat(username) {
 }
 
 // Load private messages from API
-// Load private messages from API - UPDATED with better error handling
 async function loadPrivateMessages(username) {
     const messagesContainer = document.getElementById('private-chat-messages');
     if (!messagesContainer) return;
@@ -2882,161 +2886,6 @@ function renderMessages(messages) {
     }, 10);
 }
 
-// ===== FIXED: MORE RELIABLE SCROLL TO BOTTOM FUNCTION =====
-function forceScrollToBottom(containerId) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-    
-    // Multiple methods to ensure scrolling works
-    const scrollToBottom = () => {
-        // Method 1: Direct scroll
-        container.scrollTop = container.scrollHeight;
-        
-        // Method 2: Smooth scroll
-        container.scrollTo({
-            top: container.scrollHeight,
-            behavior: 'smooth'
-        });
-        
-        // Method 3: Alternative approach
-        setTimeout(() => {
-            container.scrollTop = container.scrollHeight;
-        }, 10);
-    };
-    
-    // Initial scroll
-    scrollToBottom();
-    
-    // Additional attempts to handle dynamic content loading
-    setTimeout(scrollToBottom, 50);
-    setTimeout(scrollToBottom, 100);
-    setTimeout(scrollToBottom, 200);
-}
-
-// ===== ENHANCED INITIALIZATION - WITH AUTO-LOGIN =====
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Initializing application...');
-    
-    // First, try auto-login
-    attemptAutoLogin().then(success => {
-        if (!success) {
-            // If auto-login fails, show auth container
-            console.log('❌ No valid session found, showing login form');
-            document.getElementById('auth-container').style.display = 'flex';
-            document.querySelector('.menu').style.display = 'none';
-            document.querySelector('.news-toggle').style.display = 'none';
-        } else {
-            console.log('✅ User auto-logged in successfully');
-        }
-        
-        // Initialize buttons
-        initializeButtons();
-        
-        // Load user panel preference
-        loadUserPanelPreference();
-        
-        if ('Notification' in window) {
-            Notification.requestPermission().then(permission => {
-                notificationPermissionGranted = permission === 'granted';
-                console.log('📢 Notification permission:', permission);
-            });
-        }
-
-        initializeChat();
-        
-        // ADDED: Setup typing detection
-        setupTypingDetection();
-        setupTypingSocketEvents();
-
-        // Add scroll event listener for main chat
-        if (elements.chatContainer) {
-            elements.chatContainer.addEventListener('scroll', updateScrollState);
-        }
-
-        // Initialize Private AI input handler
-        if (elements.privateInput) {
-            elements.privateInput.addEventListener('input', () => {
-                autoResize(elements.privateInput);
-                const hasText = elements.privateInput.value.trim().length > 0;
-                elements.privateSendButton.disabled = !hasText;
-                elements.privateSendButton.classList.toggle('enabled', hasText);
-            });
-            elements.privateInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendPrivateMessage();
-                }
-            });
-        }
-
-        console.log('🎯 Application initialization complete');
-    });
-});
-
-// ===== FIXED: OVERLAY CLICK HANDLER =====
-document.addEventListener('DOMContentLoaded', function() {
-    const overlay = document.getElementById('overlay');
-    if (overlay) {
-        overlay.addEventListener('click', function() {
-            console.log('🔘 Overlay clicked - closing all sections');
-            // Hide all info containers (INCLUDING PROFILE)
-            document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container, .profile-container').forEach(container => {
-                container.style.display = 'none';
-            });
-            this.style.display = 'none';
-            // Show main chat
-            showContainer('chat');
-        });
-    }
-
-    // Close sections when clicking escape key
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            const overlay = document.getElementById('overlay');
-            if (overlay && overlay.style.display === 'block') {
-                hideContainer('chat');
-            }
-        }
-    });
-
-    // ADDED: Close user profile popup when clicking outside
-    document.addEventListener('click', function(e) {
-        const popup = document.getElementById('user-profile-popup');
-        if (popup && popup.style.display === 'flex' && e.target === popup) {
-            hideUserProfile();
-        }
-    });
-});
-
-// ===== ADDED: Function to setup private messages input handlers =====
-function setupPrivateMessageInputHandlers() {
-    const input = document.getElementById('private-message-input');
-    const sendButton = document.getElementById('private-messages-send-button');
-    
-    if (input && sendButton) {
-        input.addEventListener('input', () => {
-            autoResize(input);
-            const hasText = input.value.trim().length > 0;
-            sendButton.disabled = !hasText;
-            sendButton.classList.toggle('enabled', hasText);
-            
-            // Setup typing indicators for private messages
-            setupPrivateMessageTypingHandlers();
-        });
-        
-        input.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendPrivateMessageToUser();
-            }
-        });
-        
-        // Initialize button state
-        sendButton.disabled = true;
-        sendButton.classList.remove('enabled');
-    }
-}
-
 // Update online users lists
 function updateOnlineUsersList(onlineUsers) {
     console.log('Updating online users list:', onlineUsers);
@@ -3168,57 +3017,6 @@ function checkIfAtBottom(container) {
     const scrollPosition = container.scrollTop + container.clientHeight;
     const scrollHeight = container.scrollHeight;
     return Math.abs(scrollHeight - scrollPosition) <= threshold;
-}
-
-// IMPROVED Update scroll state function
-function updateScrollState() {
-    const chatContainer = document.getElementById('chat-container');
-    if (!chatContainer || !scrollToBottomBtn) return;
-    
-    const scrollTop = chatContainer.scrollTop;
-    const scrollHeight = chatContainer.scrollHeight;
-    const clientHeight = chatContainer.clientHeight;
-    
-    // Calculate if we're at the bottom (within 50px threshold)
-    const isAtBottomNow = Math.abs(scrollHeight - scrollTop - clientHeight) <= 50;
-    
-    console.log('Scroll state:', {
-        scrollTop,
-        scrollHeight, 
-        clientHeight,
-        isAtBottomNow,
-        wasAtBottom: isAtBottom
-    });
-    
-    if (!isAtBottomNow) {
-        // User has scrolled up - show the button
-        if (!scrollToBottomBtn.classList.contains('visible')) {
-            scrollToBottomBtn.style.display = 'flex';
-            setTimeout(() => {
-                scrollToBottomBtn.classList.add('visible');
-            }, 10);
-        }
-        
-        // Update new messages count if we're receiving messages while scrolled up
-        if (isAtBottom && !isAtBottomNow) {
-            newMessagesCount++;
-            if (newMessagesCountEl) {
-                newMessagesCountEl.textContent = newMessagesCount;
-            }
-        }
-    } else {
-        // User is at bottom - hide the button
-        if (scrollToBottomBtn.classList.contains('visible')) {
-            scrollToBottomBtn.classList.remove('visible');
-            setTimeout(() => {
-                scrollToBottomBtn.style.display = 'none';
-            }, 300);
-        }
-        newMessagesCount = 0;
-        if (newMessagesCountEl) newMessagesCountEl.textContent = '0';
-    }
-    
-    isAtBottom = isAtBottomNow;
 }
 
 // Private AI Go to Top button functions
@@ -3716,24 +3514,9 @@ function verifySecretCode() {
 
 function enableSQLEditorAccess() {
     // Add SQL Editor to menu if not already there
-    const dropdown = document.getElementById('dropdown');
-    if (dropdown) {
-        // Check if SQL Editor menu item already exists
-        const existingSqlItem = dropdown.querySelector('a[onclick="showContainer(\'sql-editor-container\')"]');
-        if (!existingSqlItem) {
-            const sqlMenuItem = document.createElement('a');
-            sqlMenuItem.href = '#';
-            sqlMenuItem.onclick = function() { showContainer('sql-editor-container'); return false; };
-            sqlMenuItem.innerHTML = '🔍 SQL Editor';
-            
-            // Insert after Secret Code menu item
-            const secretCodeItem = dropdown.querySelector('a[onclick="showContainer(\'secret-code\')"]');
-            if (secretCodeItem) {
-                secretCodeItem.parentNode.insertBefore(sqlMenuItem, secretCodeItem.nextSibling);
-            } else {
-                dropdown.appendChild(sqlMenuItem);
-            }
-        }
+    const sqlEditorMenuItem = document.getElementById('sql-editor-menu-item');
+    if (sqlEditorMenuItem) {
+        sqlEditorMenuItem.style.display = 'block';
     }
 }
 
@@ -3993,56 +3776,135 @@ function populateNews() {
     });
 }
 
-// --- CUT HERE ---
-document.addEventListener('click', function (e) {
-    if (e.target.tagName === 'IMG' && e.target.closest('.message')) {
-        openZoom(e.target.src);
+// ===== ENHANCED INITIALIZATION - WITH AUTO-LOGIN =====
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Initializing application...');
+    
+    // Initialize current year
+    if (document.getElementById("year")) {
+        document.getElementById("year").textContent = new Date().getFullYear();
     }
+    
+    // First, try auto-login
+    attemptAutoLogin().then(success => {
+        if (!success) {
+            // If auto-login fails, show auth container
+            console.log('❌ No valid session found, showing login form');
+            document.getElementById('auth-container').style.display = 'flex';
+            document.querySelector('.menu').style.display = 'none';
+            document.querySelector('.news-toggle').style.display = 'none';
+        } else {
+            console.log('✅ User auto-logged in successfully');
+        }
+        
+        // Initialize buttons
+        initializeButtons();
+        
+        // Load user panel preference
+        loadUserPanelPreference();
+        
+        if ('Notification' in window) {
+            Notification.requestPermission().then(permission => {
+                notificationPermissionGranted = permission === 'granted';
+                console.log('📢 Notification permission:', permission);
+            });
+        }
+
+        initializeChat();
+        
+        // ADDED: Setup typing detection
+        setupTypingDetection();
+        setupTypingSocketEvents();
+
+        // Add scroll event listener for main chat
+        if (elements.chatContainer) {
+            elements.chatContainer.addEventListener('scroll', updateScrollState);
+        }
+
+        // Initialize Private AI input handler
+        if (elements.privateInput) {
+            elements.privateInput.addEventListener('input', () => {
+                autoResize(elements.privateInput);
+                const hasText = elements.privateInput.value.trim().length > 0;
+                elements.privateSendButton.disabled = !hasText;
+                elements.privateSendButton.classList.toggle('enabled', hasText);
+            });
+            elements.privateInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendPrivateMessage();
+                }
+            });
+        }
+
+        console.log('🎯 Application initialization complete');
+    });
 });
 
-function openZoom(src) {
-    document.body.style.overflow = 'hidden';
-    const overlay = document.getElementById('zoom-overlay');
-    const zoomImage = document.getElementById('zoom-image');
-    const downloadBtn = document.getElementById('download-btn');
+// ===== FIXED: OVERLAY CLICK HANDLER =====
+document.addEventListener('DOMContentLoaded', function() {
+    const overlay = document.getElementById('overlay');
+    if (overlay) {
+        overlay.addEventListener('click', function() {
+            console.log('🔘 Overlay clicked - closing all sections');
+            // Hide all info containers (INCLUDING PROFILE)
+            document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container, .profile-container').forEach(container => {
+                container.style.display = 'none';
+            });
+            this.style.display = 'none';
+            // Show main chat
+            showContainer('chat');
+        });
+    }
 
-    if (!overlay || !zoomImage || !downloadBtn) return;
+    // Close sections when clicking escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            const overlay = document.getElementById('overlay');
+            if (overlay && overlay.style.display === 'block') {
+                hideContainer('chat');
+            }
+        }
+    });
+
+    // ADDED: Close user profile popup when clicking outside
+    document.addEventListener('click', function(e) {
+        const popup = document.getElementById('user-profile-popup');
+        if (popup && popup.style.display === 'flex' && e.target === popup) {
+            hideUserProfile();
+        }
+    });
+});
+
+// ===== ADDED: Function to setup private messages input handlers =====
+function setupPrivateMessageInputHandlers() {
+    const input = document.getElementById('private-message-input');
+    const sendButton = document.getElementById('private-messages-send-button');
     
-    zoomImage.src = src;
-
-    // Force download filename
-    downloadBtn.href = src;
-    downloadBtn.setAttribute('download', 'image.jpg');
-
-    overlay.style.display = 'flex';
+    if (input && sendButton) {
+        input.addEventListener('input', () => {
+            autoResize(input);
+            const hasText = input.value.trim().length > 0;
+            sendButton.disabled = !hasText;
+            sendButton.classList.toggle('enabled', hasText);
+            
+            // Setup typing indicators for private messages
+            setupPrivateMessageTypingHandlers();
+        });
+        
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendPrivateMessageToUser();
+            }
+        });
+        
+        // Initialize button state
+        sendButton.disabled = true;
+        sendButton.classList.remove('enabled');
+    }
 }
 
-function closeZoom() {
-    document.body.style.overflow = '';
-    const overlay = document.getElementById('zoom-overlay');
-    if (overlay) overlay.style.display = 'none';
-}
-
-if (document.getElementById("year")) {
-    document.getElementById("year").textContent = new Date().getFullYear();
-}
-// --- CUT HERE ---
-// Zoom functions remain the same
-function openZoom(src) {
-    document.body.style.overflow = 'hidden';
-    const overlay = document.getElementById('zoom-overlay');
-    const zoomImage = document.getElementById('zoom-image');
-    if (!overlay || !zoomImage) return;
-    
-    zoomImage.src = src;
-    overlay.style.display = 'flex';
-}
-
-function closeZoom() {
-    document.body.style.overflow = '';
-    const overlay = document.getElementById('zoom-overlay');
-    if (overlay) overlay.style.display = 'none';
-}
 // Initialize if user is logged in
 const currentUser = currentUserSession?.username;
 if (currentUser) {
@@ -4070,35 +3932,9 @@ if (currentUser) {
     }
 }
 
-// Format message time function
-function formatMessageTime(timestamp) {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diff = now - date;
-    
-    // If less than a minute ago
-    if (diff < 60000) {
-        return 'Just now';
+// Add click handler for images to open zoom
+document.addEventListener('click', function (e) {
+    if (e.target.tagName === 'IMG' && e.target.closest('.message')) {
+        openZoom(e.target.src);
     }
-    
-    // If less than an hour ago
-    if (diff < 3600000) {
-        const minutes = Math.floor(diff / 60000);
-        return `${minutes}m ago`;
-    }
-    
-    // If today
-    if (date.toDateString() === now.toDateString()) {
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-    
-    // If yesterday
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    if (date.toDateString() === yesterday.toDateString()) {
-        return 'Yesterday';
-    }
-    
-    // Otherwise, show date
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-}
+});
