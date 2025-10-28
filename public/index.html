@@ -35,7 +35,8 @@
         </div>
     </div>
 
-    <div class="menu">
+    <!-- All these elements are hidden until login -->
+    <div class="menu" style="display: none;">
         <div class="hamburger" onclick="toggleDropdown()">☰</div>
         <div class="title">MessageMate&#9662;</div>
         <div class="kebab-menu" onclick="toggleKebabMenu(event)">
@@ -46,7 +47,7 @@
             </div>
             <div class="kebab-dropdown">
                 <a href="#" onclick="toggleTheme()">Toggle Theme</a>
-                <a href="#" id="toggle-user-panel-btn"onclick="toggleUserPanel()"><i class="fasfa-eye-slash"></i> Hide User Panel</a>
+                <a href="#" id="toggle-user-panel-btn" onclick="toggleUserPanel()"><i class="fas fa-eye-slash"></i> Hide User Panel</a>
                 <a href="#" onclick="clearChat()">Clear Chat</a>
                 <a href="#" onclick="exportChat()">Export Chat</a>
                 <a href="#" onclick="exportChatPDF()">Download PDF</a>
@@ -79,47 +80,47 @@
         <a href="#" onclick="showContainer('features')">Features</a>
         <a href="#" onclick="showContainer('help')">Help</a>
         <a href="#" onclick="showContainer('secret-code')">Secret Code</a>
-        <a href="#" onclick="showContainer('sql-editor-container')">🔍 SQL Editor</a>
+        <a href="#" onclick="showContainer('sql-editor-container')" style="display: none;" id="sql-editor-menu-item">🔍 SQL Editor</a>
         <a href="#" onclick="logout()" style="color: #ff4444;">Logout</a>
     </div>
 
     <!-- MODIFIED: Chat container with collapsible online users panel -->
-<div id="chat" class="main-chat-interface container" style="display: none;">
-    <div class="online-users-panel" id="online-users-panel">
-        <div class="online-users-header">
-            <h3 class="online-users-title">
-                Online Users 
-                <span id="online-count" class="online-count-badge">0</span>
-            </h3>
-            <button id="toggle-online-panel" class="toggle-online-panel" title="Toggle Online Users Panel">
-                <i class="fas fa-chevron-down"></i>
+    <div id="chat" class="main-chat-interface container" style="display: none;">
+        <div class="online-users-panel" id="online-users-panel">
+            <div class="online-users-header">
+                <h3 class="online-users-title">
+                    Online Users 
+                    <span id="online-count" class="online-count-badge">0</span>
+                </h3>
+                <button id="toggle-online-panel" class="toggle-online-panel" title="Toggle Online Users Panel">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+            <div id="online-users-list" class="online-users-list"></div>
+        </div>
+        
+        <div class="chat-container">
+            <div class="chat-messages" id="chat-container"></div>
+            
+            <!-- ADDED: Typing Indicator -->
+            <div id="typing-indicator"></div>
+            
+            <div id="reply-preview-container"></div>
+        </div>
+        
+        <div class="chat-input" style="display: none;">
+            <textarea id="user-input" placeholder="Type your message..."></textarea>
+            <button id="send-button" onclick="sendMessage()" disabled>
+                <i class="fas fa-paper-plane"></i>
             </button>
         </div>
-        <div id="online-users-list" class="online-users-list"></div>
-    </div>
-    
-    <div class="chat-container">
-        <div class="chat-messages" id="chat-container"></div>
         
-        <!-- ADDED: Typing Indicator -->
-        <div id="typing-indicator"></div>
-        
-        <div id="reply-preview-container"></div>
+        <!-- FIXED: Scroll to bottom button specifically for main chat -->
+        <div class="scroll-to-bottom-btn" id="scrollToBottomBtn">
+            <i class="fas fa-chevron-down"></i>
+            <div class="new-messages-notification" id="newMessagesCount">0</div>
+        </div>
     </div>
-    
-    <div class="chat-input" style="display: none;">
-        <textarea id="user-input" placeholder="Type your message..."></textarea>
-        <button id="send-button" onclick="sendMessage()" disabled>
-            <i class="fas fa-paper-plane"></i>
-        </button>
-    </div>
-    
-    <!-- FIXED: Scroll to bottom button specifically for main chat -->
-    <div class="scroll-to-bottom-btn" id="scrollToBottomBtn">
-        <i class="fas fa-chevron-down"></i>
-        <div class="new-messages-notification" id="newMessagesCount">0</div>
-    </div>
-</div>
     
     <!-- MODIFIED: Private AI container with collapsible online users panel -->
     <div id="private-ai" class="main-chat-interface container" style="display: none;">
@@ -155,66 +156,66 @@
     </div>
 
     <!-- MODIFIED: Private Messages Container with updated structure -->
-<div id="private-messages" class="main-chat-interface container" style="display: none;">
-    <div class="private-messages-header" id="private-messages-header">
-        <h3 id="private-messages-title">Private Messages</h3>
-        <div class="search-container">
-            <input type="text" id="search-users" placeholder="Search users...">
-        </div>
-    </div>
-    
-    <div class="private-messages-layout">
-        <!-- Users List Panel - Show initially -->
-        <div class="users-panel" id="users-panel">
-            <div class="users-list" id="users-list">
-                <!-- Users will be dynamically loaded here -->
+    <div id="private-messages" class="main-chat-interface container" style="display: none;">
+        <div class="private-messages-header" id="private-messages-header">
+            <h3 id="private-messages-title">Private Messages</h3>
+            <div class="search-container">
+                <input type="text" id="search-users" placeholder="Search users...">
             </div>
         </div>
         
-        <!-- Chat Container - Hide initially -->
-        <div class="private-chat-container" id="private-chat-container">
-            <div class="private-chat-header" id="private-chat-header">
-                <button class="back-to-users" onclick="showUsersPanel()">← Back</button>
-                <div class="chat-partner-info">
-                    <div class="partner-avatar" id="partner-avatar">
-                        <img src="https://i.pravatar.cc/50?u=default" alt="User">
-                    </div>
-                    <div class="partner-details">
-                        <div class="partner-name" id="partner-name">Select a user to start chatting</div>
-                        <div class="partner-status" id="partner-status"></div>
-                    </div>
+        <div class="private-messages-layout">
+            <!-- Users List Panel - Show initially -->
+            <div class="users-panel" id="users-panel">
+                <div class="users-list" id="users-list">
+                    <!-- Users will be dynamically loaded here -->
                 </div>
             </div>
             
-            <div class="private-chat-messages" id="private-chat-messages">
-                <!-- Private messages will appear here -->
-                <div class="no-chat-selected">
-                    <p>Select a user from the list to start a private conversation</p>
+            <!-- Chat Container - Hide initially -->
+            <div class="private-chat-container" id="private-chat-container">
+                <div class="private-chat-header" id="private-chat-header">
+                    <button class="back-to-users" onclick="showUsersPanel()">← Back</button>
+                    <div class="chat-partner-info">
+                        <div class="partner-avatar" id="partner-avatar">
+                            <img src="https://i.pravatar.cc/50?u=default" alt="User">
+                        </div>
+                        <div class="partner-details">
+                            <div class="partner-name" id="partner-name">Select a user to start chatting</div>
+                            <div class="partner-status" id="partner-status"></div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            
-            <!-- FIXED: Changed ID to avoid conflict -->
-            <div class="private-chat-input chat-input" style="display: none;" id="private-chat-input">
-                <textarea id="private-message-input" placeholder="Type your private message..."></textarea>
-                <button id="private-messages-send-button" onclick="sendPrivateMessageToUser()" disabled>
-                    <i class="fas fa-paper-plane"></i>
-                </button>
+                
+                <div class="private-chat-messages" id="private-chat-messages">
+                    <!-- Private messages will appear here -->
+                    <div class="no-chat-selected">
+                        <p>Select a user from the list to start a private conversation</p>
+                    </div>
+                </div>
+                
+                <!-- FIXED: Changed ID to avoid conflict -->
+                <div class="private-chat-input chat-input" style="display: none;" id="private-chat-input">
+                    <textarea id="private-message-input" placeholder="Type your private message..."></textarea>
+                    <button id="private-messages-send-button" onclick="sendPrivateMessageToUser()" disabled>
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
-</div>
   
     <button class="news-toggle" onclick="toggleNews()" title="Toggle News" style="display: none;">
         <i class="fas fa-newspaper"></i>
     </button>
   
-    <div class="news-container" id="news-container">
+    <div class="news-container" id="news-container" style="display: none;">
         <div class="news-header">Latest News</div>
         <div class="news-items" id="news-items"></div>
     </div>
 
     <!-- ADDED: Profile Container -->
-    <div id="profile" class="profile-container">
+    <div id="profile" class="profile-container" style="display: none;">
         <span class="close-btn" onclick="hideContainer('profile')">&times;</span>
         <div class="profile-box">
             <div class="profile-header">
@@ -288,7 +289,7 @@
     </div>
 
     <!-- ADDED: User Profile Popup -->
-    <div id="user-profile-popup" class="user-profile-popup">
+    <div id="user-profile-popup" class="user-profile-popup" style="display: none;">
         <div class="user-profile-card">
             <div class="user-profile-header">
                 <button class="user-profile-close" onclick="hideUserProfile()">&times;</button>
@@ -336,7 +337,7 @@
     </div>
 
     <!-- ADDED: Secret Code Container -->
-    <div id="secret-code" class="secret-code-container">
+    <div id="secret-code" class="secret-code-container" style="display: none;">
         <span class="close-btn" onclick="hideContainer('secret-code')">&times;</span>
         <div class="secret-code-box">
             <h2 class="section-title">Secret Code Verification</h2>
@@ -352,7 +353,7 @@
     </div>
  
      <!-- FIXED: SQL Editor Container -->
-    <div id="sql-editor-container" class="sql-editor-container">
+    <div id="sql-editor-container" class="sql-editor-container" style="display: none;">
         <span class="close-btn" onclick="hideContainer('sql-editor-container')">&times;</span>
         <div class="sql-editor-box">
             <h2 class="section-title">SQL Editor</h2>
@@ -392,50 +393,17 @@
         </div>
     </div>
   
-    <div id="zoom-overlay" style="
-        display: none;
-        justify-content: center;
-        align-items: center;
-        position: fixed;
-        top: 0; left: 0;
-        width: 100vw; height: 100vh;
-        background: rgba(0, 0, 0, 0.95);
-        z-index: 9999;
-    ">
-        <div id="zoom-content" style="
-            position: relative;
-            z-index: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        ">
-            <div style="
-                position: absolute;
-                top: 15px;
-                right: 20px;
-                display: flex;
-                gap: 16px;
-                z-index: 2;
-            ">
-                <button onclick="closeZoom()" style="
-                    background: none;
-                    border: none;
-                    cursor: pointer;
-                    padding: 0;
-                ">
+    <div id="zoom-overlay" style="display: none;">
+        <div id="zoom-content">
+            <div style="position: absolute; top: 15px; right: 20px; display: flex; gap: 16px; z-index: 2;">
+                <button onclick="closeZoom()" style="background: none; border: none; cursor: pointer; padding: 0;">
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="18" y1="6" x2="6" y2="18" />
                         <line x1="6" y1="6" x2="18" y2="18" />
                     </svg>
                 </button>
 
-                <a id="download-btn" download style="
-                    background: none;
-                    border: none;
-                    cursor: pointer;
-                    padding: 0;
-                ">
+                <a id="download-btn" download style="background: none; border: none; cursor: pointer; padding: 0;">
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                         <polyline points="7 10 12 15 17 10" />
@@ -444,28 +412,15 @@
                 </a>
             </div>
 
-            <img id="zoom-image" style="
-                width: 100vw;
-                height: 100vh;
-                object-fit: contain;
-                border-radius: 0;
-                z-index: 1;
-            " />
+            <img id="zoom-image" />
         </div>
 
-        <div onclick="closeZoom()" style="
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            top: 0;
-            left: 0;
-            z-index: 0;
-        "></div>
+        <div onclick="closeZoom()" style="position: absolute; width: 100%; height: 100%; top: 0; left: 0; z-index: 0;"></div>
     </div>
 
-    <div class="overlay" id="overlay"></div>
+    <div class="overlay" id="overlay" style="display: none;"></div>
 
-    <div id="about" class="about-container">
+    <div id="about" class="about-container" style="display: none;">
         <span class="close-btn" onclick="hideContainer('about')">&times;</span>
         <h2 class="section-title">About this AI Chatbot</h2>
         <div class="section-content">
@@ -476,7 +431,7 @@
         </div>
     </div>
 
-    <div id="features" class="features-container">
+    <div id="features" class="features-container" style="display: none;">
         <span class="close-btn" onclick="hideContainer('features')">&times;</span>
         <h2 class="section-title">Features</h2>
         <ul class="features-list">
@@ -492,7 +447,7 @@
         </ul>
     </div>
 
-    <div id="help" class="help-container">
+    <div id="help" class="help-container" style="display: none;">
         <span class="close-btn" onclick="hideContainer('help')">&times;</span>
         <h2 class="section-title">Help Center</h2>
         <div class="help-section">
@@ -504,16 +459,16 @@
             <div class="help-answer">Yes, click the copy button below any bot message to copy its content to your clipboard.</div>
         </div>
         <div class="help-section">
-  <div class="help-question">How can I edit images using a link?</div>
-  <div class="help-answer">
-    You can easily edit or transform any image using the <b>!nanoedit</b> command.<br><br>
-    <b>Usage:</b><br>
-    <code>!nanoedit &lt;image_link&gt; | &lt;prompt&gt;</code><br><br>
-    <b>Example:</b><br>
-    <code>!nanoedit https://example.com/photo.jpg | turn this person into a cartoon superhero</code><br><br>
-    ➤ The bot will automatically process the image using Nano Banana AI and send back the edited image.<br><br>
-    💡 <i>Tip:</i> Make sure your image link is public and ends with .jpg, .png, or .jpeg.
-  </div>
+            <div class="help-question">How can I edit images using a link?</div>
+            <div class="help-answer">
+                You can easily edit or transform any image using the <b>!nanoedit</b> command.<br><br>
+                <b>Usage:</b><br>
+                <code>!nanoedit &lt;image_link&gt; | &lt;prompt&gt;</code><br><br>
+                <b>Example:</b><br>
+                <code>!nanoedit https://example.com/photo.jpg | turn this person into a cartoon superhero</code><br><br>
+                ➤ The bot will automatically process the image using Nano Banana AI and send back the edited image.<br><br>
+                💡 <i>Tip:</i> Make sure your image link is public and ends with .jpg, .png, or .jpeg.
+            </div>
         </div>
         <div class="help-section">
             <div class="help-question">How do I change my settings?</div>
