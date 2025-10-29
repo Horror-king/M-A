@@ -780,10 +780,13 @@ app.get('/api/auth-test', (req, res) => {
   });
 });
 
-// Get user profile - GET
-app.get('/api/user/profile/:username', async (req, res) => {
+// ===== FIXED PROFILE MANAGEMENT ENDPOINTS =====
+
+// Get current user's profile - FIXED
+app.get('/api/user/profile', verifyToken, async (req, res) => {
   try {
-    const { username } = req.params;
+    const username = req.user.username;
+    console.log('📋 Loading profile for:', username);
 
     const { data: profiles, error } = await supabase
       .from('user_profiles')
@@ -800,14 +803,26 @@ app.get('/api/user/profile/:username', async (req, res) => {
     }
 
     if (!profiles || profiles.length === 0) {
+      // Return default profile if none exists
+      const defaultProfile = {
+        username: username,
+        firstname: '',
+        lastname: '',
+        bio: '',
+        age: '',
+        gender: '',
+        location: '',
+        interests: '',
+        avatar: `https://i.pravatar.cc/150?u=${username}`
+      };
       return res.json({ 
-        exists: false,
-        profile: null 
+        success: true,
+        profile: defaultProfile
       });
     }
 
     res.json({ 
-      exists: true,
+      success: true,
       profile: profiles[0]
     });
 
@@ -820,10 +835,14 @@ app.get('/api/user/profile/:username', async (req, res) => {
   }
 });
 
-// Update user profile - POST
-app.post('/api/user/profile', async (req, res) => {
+// Update user profile - FIXED: Now using PUT method
+app.put('/api/user/profile', verifyToken, async (req, res) => {
   try {
-    const { username, profileData } = req.body;
+    const username = req.user.username;
+    const profileData = req.body;
+
+    console.log('💾 Saving profile for:', username);
+    console.log('📝 Profile data:', profileData);
 
     if (!username) {
       return res.status(400).json({ 
@@ -848,13 +867,22 @@ app.post('/api/user/profile', async (req, res) => {
     }
 
     let result;
+    const now = new Date().toISOString();
+    
     if (existingProfiles && existingProfiles.length > 0) {
       // Update existing profile
       result = await supabase
         .from('user_profiles')
         .update({
-          ...profileData,
-          updated_at: new Date().toISOString()
+          firstname: profileData.firstname || '',
+          lastname: profileData.lastname || '',
+          bio: profileData.bio || '',
+          age: profileData.age || '',
+          gender: profileData.gender || '',
+          location: profileData.location || '',
+          interests: profileData.interests || '',
+          avatar: profileData.avatar || `https://i.pravatar.cc/150?u=${username}`,
+          updated_at: now
         })
         .eq('username', username)
         .select();
@@ -865,9 +893,16 @@ app.post('/api/user/profile', async (req, res) => {
         .insert([
           {
             username: username,
-            ...profileData,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            firstname: profileData.firstname || '',
+            lastname: profileData.lastname || '',
+            bio: profileData.bio || '',
+            age: profileData.age || '',
+            gender: profileData.gender || '',
+            location: profileData.location || '',
+            interests: profileData.interests || '',
+            avatar: profileData.avatar || `https://i.pravatar.cc/150?u=${username}`,
+            created_at: now,
+            updated_at: now
           }
         ])
         .select();
@@ -877,10 +912,12 @@ app.post('/api/user/profile', async (req, res) => {
       console.error('❌ Database error saving profile:', result.error);
       return res.status(500).json({ 
         success: false, 
-        error: "Failed to save profile" 
+        error: "Failed to save profile: " + result.error.message 
       });
     }
 
+    console.log('✅ Profile saved successfully for:', username);
+    
     res.json({ 
       success: true, 
       message: "Profile updated successfully",
@@ -889,6 +926,59 @@ app.post('/api/user/profile', async (req, res) => {
 
   } catch (error) {
     console.error('❌ Update profile error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Internal server error: " + error.message 
+    });
+  }
+});
+
+// Get user profile by username (for profile popups) - FIXED
+app.get('/api/user/profile/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    console.log('📋 Loading profile for user:', username);
+
+    const { data: profiles, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('username', username)
+      .limit(1);
+
+    if (error) {
+      console.error('❌ Database error fetching profile:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Database error" 
+      });
+    }
+
+    if (!profiles || profiles.length === 0) {
+      // Return basic profile if none exists
+      const defaultProfile = {
+        username: username,
+        firstname: '',
+        lastname: '',
+        bio: '',
+        age: '',
+        gender: '',
+        location: '',
+        interests: '',
+        avatar: `https://i.pravatar.cc/150?u=${username}`
+      };
+      return res.json({ 
+        success: true,
+        profile: defaultProfile
+      });
+    }
+
+    res.json({ 
+      success: true,
+      profile: profiles[0]
+    });
+
+  } catch (error) {
+    console.error('❌ Get user profile error:', error);
     res.status(500).json({ 
       success: false, 
       error: "Internal server error" 
