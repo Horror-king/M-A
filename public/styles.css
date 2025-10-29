@@ -708,9 +708,9 @@ html, body {
     touch-action: auto;
     gap: 2px;
     box-sizing: border-box;
-    /* DYNAMIC: Will be adjusted based on online panel state */
-    padding-bottom: 125px;
-    margin-bottom: 65px;
+    /* FIXED: Use consistent padding that works for both states */
+    padding-bottom: 100px;
+    margin-bottom: 60px;
 }
 
 /* FIXED: Ensure the chat container itself has proper spacing */
@@ -722,7 +722,7 @@ html, body {
     background-color: white;
     overflow: hidden;
     position: relative;
-    padding-bottom: 65px;
+    padding-bottom: 60px;
 }
 
 #private-ai {
@@ -1569,18 +1569,27 @@ html, body {
 }
 
 /* FIXED: DYNAMIC BOTTOM SPACING BASED ON ONLINE PANEL STATE */
-/* When online users panel is collapsed, reduce the bottom spacing */
-.online-users-panel.collapsed + .chat-container .chat-messages,
-.online-users-panel.collapsed + .chat-container #private-ai-container {
-    padding-bottom: 85px; /* Reduced from 125px */
-    margin-bottom: 45px;  /* Reduced from 65px */
+/* When online users panel is collapsed, use less bottom spacing */
+.online-users-panel.collapsed ~ .chat-container .chat-messages,
+.online-users-panel.collapsed ~ .chat-container #private-ai-container {
+    padding-bottom: 80px; /* Reduced bottom padding when panel collapsed */
+    margin-bottom: 40px;  /* Reduced margin when panel collapsed */
 }
 
-/* When online users panel is expanded, use normal spacing */
-.online-users-panel:not(.collapsed) + .chat-container .chat-messages,
-.online-users-panel:not(.collapsed) + .chat-container #private-ai-container {
-    padding-bottom: 125px; /* Normal bottom padding when panel expanded */
-    margin-bottom: 65px;   /* Normal margin when panel expanded */
+/* When online users panel is expanded, use more bottom spacing */
+.online-users-panel:not(.collapsed) ~ .chat-container .chat-messages,
+.online-users-panel:not(.collapsed) ~ .chat-container #private-ai-container {
+    padding-bottom: 100px; /* Normal bottom padding when panel expanded */
+    margin-bottom: 60px;   /* Normal margin when panel expanded */
+}
+
+/* FIXED: Chat container bottom padding adjustments */
+.chat-container {
+    padding-bottom: 60px; /* Consistent bottom padding for chat container */
+}
+
+#private-ai {
+    padding-bottom: 45px; /* Consistent bottom padding for private AI */
 }
 
 /* Responsive adjustments for mobile */
@@ -1652,21 +1661,25 @@ html, body {
     }
     
     /* FIXED: Adjust dynamic spacing for mobile */
-    .online-users-panel.collapsed + .chat-container .chat-messages,
-    .online-users-panel.collapsed + .chat-container #private-ai-container {
-        padding-bottom: 80px; /* Reduced for mobile when collapsed */
-        margin-bottom: 40px; /* Reduced for mobile when collapsed */
+    .online-users-panel.collapsed ~ .chat-container .chat-messages,
+    .online-users-panel.collapsed ~ .chat-container #private-ai-container {
+        padding-bottom: 75px; /* Reduced for mobile when collapsed */
+        margin-bottom: 35px; /* Reduced for mobile when collapsed */
     }
     
-    .online-users-panel:not(.collapsed) + .chat-container .chat-messages,
-    .online-users-panel:not(.collapsed) + .chat-container #private-ai-container {
-        padding-bottom: 110px; /* Normal for mobile when expanded */
-        margin-bottom: 55px; /* Normal for mobile when expanded */
+    .online-users-panel:not(.collapsed) ~ .chat-container .chat-messages,
+    .online-users-panel:not(.collapsed) ~ .chat-container #private-ai-container {
+        padding-bottom: 90px; /* Normal for mobile when expanded */
+        margin-bottom: 50px; /* Normal for mobile when expanded */
     }
     
     /* FIXED: Adjust container padding for mobile */
-    .chat-container, #private-ai {
-        padding-bottom: 45px;
+    .chat-container {
+        padding-bottom: 50px;
+    }
+    
+    #private-ai {
+        padding-bottom: 40px;
     }
     
     /* FIXED: Help container mobile responsiveness */
