@@ -61,14 +61,14 @@
             box-sizing: border-box;
             
             /* DEFAULT: Collapsed state - less padding */
-            padding-bottom: 80px;
+            padding-bottom: 170px;
             transition: padding-bottom 0.3s ease;
         }
 
         /* FIXED: When online panel is EXPANDED - add more bottom padding */
         .online-users-panel:not(.collapsed) ~ .chat-container .chat-messages,
         .online-users-panel:not(.collapsed) ~ .chat-container #private-ai-container {
-            padding-bottom: 120px; /* More space when panel is expanded */
+            padding-bottom: 180px; /* More space when panel is expanded */
         }
 
         /* FIXED: When online panel is COLLAPSED - normal padding */
