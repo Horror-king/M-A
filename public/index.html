@@ -41,41 +41,41 @@
             position: relative;
         }
 
-        /* FIXED: Dynamic padding based on online panel state */
-        .chat-messages, #private-ai-container {
-            flex: 1;
-            padding: 5px 15px;
-            overflow-y: auto;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            scroll-behavior: smooth;
-            background-color: white;
-            position: relative;
-            margin-top: 0;
-            font-size: 16px;
-            -webkit-overflow-scrolling: touch;
-            overscroll-behavior: contain;
-            touch-action: auto;
-            gap: 2px;
-            box-sizing: border-box;
-            
-            /* DEFAULT: Collapsed state - less padding */
-            padding-bottom: 170px;
-            transition: padding-bottom 0.3s ease;
-        }
+        /* FIXED: Dynamic padding for online users panel states */
+.chat-messages, #private-ai-container {
+    flex: 1;
+    padding: 5px 15px;
+    overflow-y: auto;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    scroll-behavior: smooth;
+    background-color: white;
+    position: relative;
+    margin-top: 0;
+    font-size: 16px;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: auto;
+    gap: 2px;
+    box-sizing: border-box;
+    
+    /* DEFAULT: Collapsed state - less padding */
+    padding-bottom: 80px;
+    transition: padding-bottom 0.3s ease;
+}
 
-        /* FIXED: When online panel is EXPANDED - add more bottom padding */
-        .online-users-panel:not(.collapsed) ~ .chat-container .chat-messages,
-        .online-users-panel:not(.collapsed) ~ .chat-container #private-ai-container {
-            padding-bottom: 180px; /* More space when panel is expanded */
-        }
+/* FIXED: When online panel is EXPANDED - add more bottom padding */
+.online-users-panel:not(.collapsed) ~ .chat-container .chat-messages,
+.online-users-panel:not(.collapsed) ~ .chat-container #private-ai-container {
+    padding-bottom: 120px; /* More space when panel is expanded */
+}
 
-        /* FIXED: When online panel is COLLAPSED - normal padding */
-        .online-users-panel.collapsed ~ .chat-container .chat-messages,
-        .online-users-panel.collapsed ~ .chat-container #private-ai-container {
-            padding-bottom: 80px; /* Less space when panel is collapsed */
-        }
+/* FIXED: When online panel is COLLAPSED - normal padding */
+.online-users-panel.collapsed ~ .chat-container .chat-messages,
+.online-users-panel.collapsed ~ .chat-container #private-ai-container {
+    padding-bottom: 80px; /* Less space when panel is collapsed */
+}
 
         /* FIXED: Chat input positioning */
         .chat-input {
