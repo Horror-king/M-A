@@ -690,7 +690,7 @@ html, body {
     box-shadow: none;
 }
 
-/* FIXED: Chat messages container with proper scrolling and padding */
+/* FIXED: Chat messages container with dynamic bottom spacing based on online panel state */
 .chat-messages, #private-ai-container {
     flex: 1;
     padding: 5px 15px;
@@ -708,9 +708,8 @@ html, body {
     touch-action: auto;
     gap: 2px;
     box-sizing: border-box;
-    /* FIXED: Much larger bottom padding to ensure messages are visible above input */
-    padding-bottom: 125px; /* Increased significantly from 120px */
-    /* FIXED: Add margin at the bottom to create space for the input */
+    /* DYNAMIC: Will be adjusted based on online panel state */
+    padding-bottom: 125px;
     margin-bottom: 65px;
 }
 
@@ -723,7 +722,6 @@ html, body {
     background-color: white;
     overflow: hidden;
     position: relative;
-    /* FIXED: Add padding at the bottom of the container */
     padding-bottom: 65px;
 }
 
@@ -735,7 +733,6 @@ html, body {
     background-color: white;
     overflow: hidden;
     position: relative;
-    /* FIXED: Add padding at the bottom of the container */
     padding-bottom: 45px;
 }
             
@@ -1414,7 +1411,8 @@ html, body {
     border-bottom: 1px solid #e4e6eb;
     flex-shrink: 0; /* Prevent shrinking */
     height: auto; /* Let it take the space it needs */
-    transition: height 0.3s ease;
+    transition: all 0.3s ease;
+    max-height: 150px; /* Maximum height when expanded */
 }
 
 /* ADDED: Online Users Header with Toggle */
@@ -1466,8 +1464,9 @@ html, body {
 }
 
 .online-users-panel.collapsed {
-    height: 50px; /* Only show header when collapsed */
+    max-height: 50px; /* Only show header when collapsed */
     overflow: hidden;
+    padding: 8px 15px; /* Reduced padding when collapsed */
 }
 
 .online-users-panel.collapsed .online-users-list {
@@ -1569,11 +1568,27 @@ html, body {
     background: #a8a8a8;
 }
 
+/* FIXED: DYNAMIC BOTTOM SPACING BASED ON ONLINE PANEL STATE */
+/* When online users panel is collapsed, reduce the bottom spacing */
+.online-users-panel.collapsed + .chat-container .chat-messages,
+.online-users-panel.collapsed + .chat-container #private-ai-container {
+    padding-bottom: 85px; /* Reduced from 125px */
+    margin-bottom: 45px;  /* Reduced from 65px */
+}
+
+/* When online users panel is expanded, use normal spacing */
+.online-users-panel:not(.collapsed) + .chat-container .chat-messages,
+.online-users-panel:not(.collapsed) + .chat-container #private-ai-container {
+    padding-bottom: 125px; /* Normal bottom padding when panel expanded */
+    margin-bottom: 65px;   /* Normal margin when panel expanded */
+}
+
 /* Responsive adjustments for mobile */
 @media (max-width: 480px) {
     .online-users-panel {
         padding: 10px 12px;
         margin: 0;
+        max-height: 140px; /* Slightly smaller on mobile when expanded */
     }
     
     .online-users-header {
@@ -1593,7 +1608,8 @@ html, body {
     }
     
     .online-users-panel.collapsed {
-        height: 40px; /* Smaller height on mobile when collapsed */
+        max-height: 40px; /* Smaller height on mobile when collapsed */
+        padding: 6px 12px; /* Reduced padding on mobile when collapsed */
     }
     
     .online-users-list {
@@ -1635,10 +1651,17 @@ html, body {
         height: 36px;
     }
     
-    /* FIXED: Increased padding for mobile to ensure messages are visible */
-    .chat-messages, #private-ai-container {
-        padding-bottom: 125px; /* Even more padding for mobile */
-        margin-bottom: 63px; /* More margin for mobile */
+    /* FIXED: Adjust dynamic spacing for mobile */
+    .online-users-panel.collapsed + .chat-container .chat-messages,
+    .online-users-panel.collapsed + .chat-container #private-ai-container {
+        padding-bottom: 80px; /* Reduced for mobile when collapsed */
+        margin-bottom: 40px; /* Reduced for mobile when collapsed */
+    }
+    
+    .online-users-panel:not(.collapsed) + .chat-container .chat-messages,
+    .online-users-panel:not(.collapsed) + .chat-container #private-ai-container {
+        padding-bottom: 110px; /* Normal for mobile when expanded */
+        margin-bottom: 55px; /* Normal for mobile when expanded */
     }
     
     /* FIXED: Adjust container padding for mobile */
