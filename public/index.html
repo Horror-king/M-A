@@ -71,7 +71,7 @@
         /* When online panel is collapsed - use default padding */
         .online-users-panel.collapsed ~ .chat-container .chat-messages,
         .online-users-panel.collapsed ~ .chat-container #private-ai-container {
-            padding-bottom: 80px !important; /* Normal padding when panel is collapsed */
+            padding-bottom: 85px !important; /* Normal padding when panel is collapsed */
         }
 
         .online-users-panel:not(.collapsed) {
@@ -150,7 +150,7 @@
         /* Mobile responsive adjustments */
         @media (max-width: 480px) {
             .chat-messages, #private-ai-container {
-                padding-bottom: 75px; /* Slightly less on mobile when collapsed */
+                padding-bottom: 80px; /* Slightly less on mobile when collapsed */
             }
             
             .online-users-panel:not(.collapsed) ~ .chat-container .chat-messages,
@@ -168,7 +168,7 @@
             }
             
             .online-users-panel.collapsed {
-                max-height: 40px; /* Smaller collapsed height on mobile */
+                max-height: 50px; /* Smaller 40 collapsed height on mobile */
             }
         }
 
