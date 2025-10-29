@@ -65,6 +65,9 @@ let userPanelVisible = true;
 // ✅ ADDED: Current user session
 let currentUserSession = null;
 
+// ✅ ADDED: Online Panel State
+let onlinePanelCollapsed = false;
+
 const elements = {
     usernameInput: document.getElementById('auth-username'),
     messageInput: document.getElementById('user-input'),
@@ -1647,6 +1650,7 @@ async function fetchPrivateAIResponse(userInput) {
     }
 }
 
+// --- CUT HERE ---
 // ===== IMAGE HANDLING FUNCTIONS =====
 function displayImageImmediately(imgUrl, container) {
     return new Promise((resolve) => {
