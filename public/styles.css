@@ -1572,20 +1572,20 @@ html, body {
 /* When online users panel is collapsed, use less bottom spacing */
 .online-users-panel.collapsed ~ .chat-container .chat-messages,
 .online-users-panel.collapsed ~ .chat-container #private-ai-container {
-    padding-bottom: 80px; /* Reduced bottom padding when panel collapsed */
-    margin-bottom: 40px;  /* Reduced margin when panel collapsed */
+    padding-bottom: 100px; /* Reduced bottom padding when panel collapsed */
+    margin-bottom: 80px;  /* Reduced margin when panel collapsed */
 }
 
 /* When online users panel is expanded, use more bottom spacing */
 .online-users-panel:not(.collapsed) ~ .chat-container .chat-messages,
 .online-users-panel:not(.collapsed) ~ .chat-container #private-ai-container {
-    padding-bottom: 100px; /* Normal bottom padding when panel expanded */
-    margin-bottom: 60px;   /* Normal margin when panel expanded */
+    padding-bottom: 170px; /* Normal bottom padding when panel expanded */
+    margin-bottom: 70px;   /* Normal margin when panel expanded */
 }
 
 /* FIXED: Chat container bottom padding adjustments */
 .chat-container {
-    padding-bottom: 60px; /* Consistent bottom padding for chat container */
+    padding-bottom: 70px; /* Consistent bottom padding for chat container */
 }
 
 #private-ai {
@@ -1663,13 +1663,13 @@ html, body {
     /* FIXED: Adjust dynamic spacing for mobile */
     .online-users-panel.collapsed ~ .chat-container .chat-messages,
     .online-users-panel.collapsed ~ .chat-container #private-ai-container {
-        padding-bottom: 75px; /* Reduced for mobile when collapsed */
+        padding-bottom: 80px; /* Reduced for mobile when collapsed */
         margin-bottom: 35px; /* Reduced for mobile when collapsed */
     }
     
     .online-users-panel:not(.collapsed) ~ .chat-container .chat-messages,
     .online-users-panel:not(.collapsed) ~ .chat-container #private-ai-container {
-        padding-bottom: 90px; /* Normal for mobile when expanded */
+        padding-bottom: 60px; /* Normal for mobile when expanded */
         margin-bottom: 50px; /* Normal for mobile when expanded */
     }
     
