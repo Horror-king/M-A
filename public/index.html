@@ -64,14 +64,15 @@
 }
 
 /* When online panel is expanded */
-/* EMERGENCY FIX: Force padding for online panel */
-.chat-messages, #private-ai-container {
-    padding-bottom: 120px !important;
+/* When online panel is EXPANDED - more padding */
+.online-users-panel:not(.collapsed) + .chat-container .chat-messages,
+.online-users-panel:not(.collapsed) + .chat-container #private-ai-container {
+    padding-bottom: 183px !important;
 }
 
-/* When online panel is collapsed */
-.chat-messages.online-panel-collapsed, 
-#private-ai-container.online-panel-collapsed {
+/* When online panel is COLLAPSED - less padding */
+.online-users-panel.collapsed + .chat-container .chat-messages,
+.online-users-panel.collapsed + .chat-container #private-ai-container {
     padding-bottom: 80px !important;
 }
 
