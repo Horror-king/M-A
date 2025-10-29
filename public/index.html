@@ -66,15 +66,13 @@
 }
 
 /* FIXED: When online panel is EXPANDED - add more bottom padding */
-.online-users-panel:not(.collapsed) ~ .chat-container .chat-messages,
-.online-users-panel:not(.collapsed) ~ .chat-container #private-ai-container {
-    padding-bottom: 120px; /* More space when panel is expanded */
+/* Debug: Check if selectors are working */
+.online-users-panel:not(.collapsed) ~ .chat-container .chat-messages {
+    border: 2px solid red !important; /* Should appear when panel expanded */
 }
 
-/* FIXED: When online panel is COLLAPSED - normal padding */
-.online-users-panel.collapsed ~ .chat-container .chat-messages,
-.online-users-panel.collapsed ~ .chat-container #private-ai-container {
-    padding-bottom: 80px; /* Less space when panel is collapsed */
+.online-users-panel.collapsed ~ .chat-container .chat-messages {
+    border: 2px solid blue !important; /* Should appear when panel collapsed */
 }
 
         /* FIXED: Chat input positioning */
