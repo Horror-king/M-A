@@ -709,8 +709,8 @@ html, body {
     gap: 2px;
     box-sizing: border-box;
     /* FIXED: Use consistent padding that works for both states */
-    padding-bottom: 100px;
-    margin-bottom: 60px;
+    padding-bottom: 120px;
+    margin-bottom: 70px;
 }
 
 /* FIXED: Ensure the chat container itself has proper spacing */
