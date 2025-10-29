@@ -64,18 +64,15 @@
 }
 
 /* When online panel is expanded */
-/* When online panel is EXPANDED - more padding */
-.online-users-panel:not(.collapsed) + .chat-container .chat-messages,
-.online-users-panel:not(.collapsed) + .chat-container #private-ai-container {
-    padding-bottom: 183px !important;
+        /* Remove your current emergency fix and use this instead */
+.chat-messages, #private-ai-container {
+    padding-bottom: 184px !important; /* Normal padding */
 }
 
-/* When online panel is COLLAPSED - less padding */
-.online-users-panel.collapsed + .chat-container .chat-messages,
-.online-users-panel.collapsed + .chat-container #private-ai-container {
-    padding-bottom: 80px !important;
+.online-users-panel:not(.collapsed) {
+    /* This will make the chat container adjust automatically */
+    height: auto !important;
 }
-
         /* FIXED: Chat input positioning */
         .chat-input {
             display: none;
