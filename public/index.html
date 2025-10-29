@@ -14,9 +14,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        /* ===== COMPLETELY FIXED CHAT CONTAINER PADDING ===== */
-
-        /* Main chat interface structure */
+        /* FIXED: Dynamic padding for online users panel states */
         .main-chat-interface {
             flex: 1;
             display: flex;
@@ -32,7 +30,7 @@
             box-shadow: none;
         }
 
-        /* Chat container that holds messages */
+        /* FIXED: Chat container with proper spacing */
         .chat-container {
             flex: 1;
             display: flex;
@@ -43,10 +41,10 @@
             position: relative;
         }
 
-        /* FIXED: Dynamic padding for chat messages */
+        /* FIXED: Dynamic padding for online users panel states */
         .chat-messages, #private-ai-container {
             flex: 1;
-            padding: 5px 10px;
+            padding: 5px 10px 80px 10px; /* Default padding when panel is collapsed */
             overflow-y: auto;
             height: 100%;
             display: flex;
@@ -64,54 +62,24 @@
             transition: padding-bottom 0.3s ease;
         }
 
-        /* Default state - panel expanded */
-        .chat-messages, #private-ai-container {
-            padding-bottom: 180px !important;
+        /* When online panel is expanded - increase bottom padding */
+        .online-users-panel:not(.collapsed) ~ .chat-container .chat-messages,
+        .online-users-panel:not(.collapsed) ~ .chat-container #private-ai-container {
+            padding-bottom: 183px !important; /* Increased padding when panel is expanded */
         }
 
-        /* Class to be added by JavaScript when panel is collapsed */
-        .online-panel-collapsed .chat-messages,
-        .online-panel-collapsed #private-ai-container {
-            padding-bottom: 80px !important;
+        /* When online panel is collapsed - use default padding */
+        .online-users-panel.collapsed ~ .chat-container .chat-messages,
+        .online-users-panel.collapsed ~ .chat-container #private-ai-container {
+            padding-bottom: 80px !important; /* Normal padding when panel is collapsed */
         }
 
-        /* Mobile adjustments */
-        @media (max-width: 480px) {
-            .chat-messages, #private-ai-container {
-                padding-bottom: 160px !important;
-            }
-            
-            .online-panel-collapsed .chat-messages,
-            .online-panel-collapsed #private-ai-container {
-                padding-bottom: 70px !important;
-            }
+        .online-users-panel:not(.collapsed) {
+            /* This will make the chat container adjust automatically */
+            height: auto !important;
         }
 
-        /* Online users panel styling */
-        .online-users-panel {
-            background: white;
-            border-radius: 0;
-            padding: 12px 15px;
-            margin: 0;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            overflow-x: auto;
-            border-bottom: 1px solid #e4e6eb;
-            flex-shrink: 0;
-            height: auto;
-            transition: all 0.3s ease;
-            max-height: 200px; /* Expanded height */
-        }
-
-        .online-users-panel.collapsed {
-            max-height: 50px; /* Collapsed height - header only */
-            overflow: hidden;
-        }
-
-        .online-users-panel.collapsed .online-users-list {
-            display: none;
-        }
-
-        /* Chat input positioning */
+        /* FIXED: Chat input positioning */
         .chat-input {
             display: none;
             align-items: center;
@@ -137,18 +105,36 @@
             background: #f5f5f5;
             display: flex;
             flex-direction: column;
-            padding-bottom: 180px; /* Base padding when panel expanded */
-            transition: padding-bottom 0.3s ease;
-        }
-
-        /* Adjust private chat padding when online panel is collapsed */
-        .online-panel-collapsed .private-chat-messages {
-            padding-bottom: 80px !important;
+            padding-bottom: 80px; /* Base padding */
         }
 
         /* FIXED: Ensure proper spacing for private chat when active */
         .private-chat-container.active .private-chat-messages {
             padding-bottom: 120px; /* More space when chat is active */
+        }
+
+        /* FIXED: Online users panel transitions */
+        .online-users-panel {
+            background: white;
+            border-radius: 0;
+            padding: 12px 15px;
+            margin: 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow-x: auto;
+            border-bottom: 1px solid #e4e6eb;
+            flex-shrink: 0;
+            height: auto;
+            transition: all 0.3s ease;
+            max-height: 200px; /* Expanded height */
+        }
+
+        .online-users-panel.collapsed {
+            max-height: 50px; /* Collapsed height - header only */
+            overflow: hidden;
+        }
+
+        .online-users-panel.collapsed .online-users-list {
+            display: none;
         }
 
         /* FIXED: Toggle button animation */
@@ -159,6 +145,508 @@
 
         .online-users-panel.collapsed .toggle-online-panel i {
             transform: rotate(180deg);
+        }
+
+        /* Mobile responsive adjustments */
+        @media (max-width: 480px) {
+            .chat-messages, #private-ai-container {
+                padding-bottom: 75px; /* Slightly less on mobile when collapsed */
+            }
+            
+            .online-users-panel:not(.collapsed) ~ .chat-container .chat-messages,
+            .online-users-panel:not(.collapsed) ~ .chat-container #private-ai-container {
+                padding-bottom: 160px; /* Slightly less on mobile when expanded */
+            }
+            
+            .online-users-panel.collapsed ~ .chat-container .chat-messages,
+            .online-users-panel.collapsed ~ .chat-container #private-ai-container {
+                padding-bottom: 75px; /* Slightly less on mobile when collapsed */
+            }
+            
+            .online-users-panel {
+                max-height: 180px; /* Slightly smaller on mobile */
+            }
+            
+            .online-users-panel.collapsed {
+                max-height: 40px; /* Smaller collapsed height on mobile */
+            }
+        }
+
+        /* COMPLETELY FIXED: Secret Code Container */
+        .secret-code-container {
+            padding: 20px;
+            width: 100vw;
+            height: 100vh;
+            max-width: 100vw;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-radius: 0;
+            box-shadow: none;
+            overflow-y: auto;
+            overflow-x: hidden;
+            display: none;
+            z-index: 1002;
+            box-sizing: border-box;
+        }
+
+        .secret-code-box {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.1);
+            width: calc(100% - 40px);
+            max-width: 400px;
+            margin: 50px auto;
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        .secret-code-box h2 {
+            color: #1c1e21;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .secret-code-box p {
+            color: #65676b;
+            margin-bottom: 25px;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .secret-code-box input {
+            width: 100%;
+            height: 50px;
+            padding: 0 15px;
+            margin-bottom: 20px;
+            border: 1px solid #DADAF2;
+            background: #F8F8FB;
+            border-radius: 8px;
+            outline: none;
+            font-size: 16px;
+            transition: 0.2s ease;
+            text-align: center;
+            letter-spacing: 2px;
+            font-family: monospace;
+            font-size: 18px;
+            box-sizing: border-box;
+            max-width: 100%;
+        }
+
+        .secret-code-box input:focus {
+            border-color: #4267B2;
+            background-color: #fff;
+            box-shadow: 0 0 0 2px rgba(66, 103, 178, 0.2);
+        }
+
+        .secret-code-box button {
+            width: 100%;
+            height: 50px;
+            background-color: #4267B2;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: 0.3s ease;
+        }
+
+        .secret-code-box button:hover {
+            background-color: #365899;
+        }
+
+        .secret-code-box button:disabled {
+            background-color: #a0a4ab;
+            cursor: not-allowed;
+        }
+
+        .secret-code-error {
+            color: #e53e3e;
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+            display: none;
+        }
+
+        .secret-code-success {
+            color: #2f855a;
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+            display: none;
+        }
+
+        .attempts-warning {
+            color: #ed8936;
+            font-size: 0.8rem;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .lockout-message {
+            color: #e53e3e;
+            font-size: 0.9rem;
+            margin-top: 15px;
+            display: none;
+            background: #fed7d7;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .code-hint {
+            font-size: 0.8rem;
+            color: #718096;
+            margin-top: 15px;
+            font-style: italic;
+        }
+
+        /* COMPLETELY FIXED: SQL Editor Container */
+        .sql-editor-container {
+            padding: 20px;
+            width: 100vw;
+            height: 100vh;
+            max-width: 100vw;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-radius: 0;
+            box-shadow: none;
+            overflow-y: auto;
+            overflow-x: hidden;
+            display: none;
+            z-index: 1002;
+            box-sizing: border-box;
+        }
+
+        .sql-editor-box {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.1);
+            width: calc(100% - 40px);
+            max-width: 1000px;
+            margin: 50px auto;
+            box-sizing: border-box;
+        }
+
+        /* FIXED: Ensure all elements inside don't cause overflow */
+        .sql-editor-box * {
+            max-width: 100%;
+        }
+
+        .sql-editor-toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .sql-btn {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            background: #f8f9fa;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .sql-btn.primary {
+            background: #4267B2;
+            color: white;
+            border-color: #4267B2;
+        }
+
+        .sql-btn:hover {
+            background: #e9ecef;
+        }
+
+        .sql-btn.primary:hover {
+            background: #365899;
+        }
+
+        #sql-textarea {
+            width: 100%;
+            height: 150px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            resize: vertical;
+            margin-bottom: 20px;
+            box-sizing: border-box;
+            max-width: 100%;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .sql-results-container {
+            margin-bottom: 20px;
+        }
+
+        .sql-results {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            min-height: 100px;
+            max-height: 400px;
+            overflow-y: auto;
+            background: #f8f9fa;
+        }
+
+        .sql-result-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+
+        .sql-result-table th,
+        .sql-result-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .sql-result-table th {
+            background: #e9ecef;
+            font-weight: bold;
+        }
+
+        .sql-result-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        .sql-row-count {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+        }
+
+        .sql-success-message {
+            color: #2f855a;
+            background: #f0fff4;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #9ae6b4;
+        }
+
+        .sql-error-message {
+            color: #e53e3e;
+            background: #fed7d7;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #feb2b2;
+        }
+
+        .saved-queries-container {
+            margin-bottom: 20px;
+        }
+
+        .saved-queries-list {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .saved-query-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .saved-query-item:last-child {
+            border-bottom: none;
+        }
+
+        .query-name {
+            font-weight: 500;
+        }
+
+        .query-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .query-btn {
+            padding: 4px 8px;
+            font-size: 12px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .load-btn {
+            color: #4267B2;
+            border-color: #4267B2;
+        }
+
+        .delete-btn {
+            color: #e53e3e;
+            border-color: #e53e3e;
+        }
+
+        .no-queries {
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+
+        .sql-help {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+        }
+
+        .sql-help h4 {
+            margin: 10px 0 5px 0;
+            color: #333;
+        }
+
+        .sql-help ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .sql-help li {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+
+        .sql-help code {
+            background: #e9ecef;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+
+        /* MOBILE FIXES */
+        @media (max-width: 768px) {
+            .secret-code-container,
+            .sql-editor-container {
+                padding: 15px;
+                width: 100vw;
+            }
+            
+            .secret-code-box,
+            .sql-editor-box {
+                padding: 20px 15px;
+                margin: 20px auto;
+                width: calc(100% - 30px);
+                max-width: calc(100% - 30px);
+            }
+            
+            .sql-editor-toolbar {
+                flex-wrap: wrap;
+                gap: 5px;
+            }
+            
+            .sql-btn {
+                padding: 8px 12px;
+                font-size: 14px;
+                flex: 1;
+                min-width: 120px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .secret-code-container,
+            .sql-editor-container {
+                padding: 10px;
+            }
+            
+            .secret-code-box,
+            .sql-editor-box {
+                padding: 15px 10px;
+                margin: 10px auto;
+                width: calc(100% - 20px);
+                max-width: calc(100% - 20px);
+                border-radius: 8px;
+            }
+            
+            .sql-editor-toolbar {
+                flex-direction: column;
+            }
+            
+            .sql-btn {
+                width: 100%;
+                margin-bottom: 5px;
+            }
+            
+            /* Ensure tables don't cause horizontal scroll */
+            .sql-result-table {
+                font-size: 12px;
+            }
+            
+            .sql-result-table th,
+            .sql-result-table td {
+                padding: 4px 6px;
+            }
+        }
+
+        /* EMERGENCY FIX: If still having issues, add this */
+        body {
+            overflow-x: hidden;
+            max-width: 100vw;
+        }
+
+        /* Fix close button positioning */
+        .close-btn {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            font-size: 30px;
+            cursor: pointer;
+            color: #333;
+            z-index: 1003;
+            background: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        /* FIXED: Image loading styles - Remove transitions and ensure immediate display */
+        .message img {
+            width: 100%;
+            margin: 4px 0 0 0;
+            display: block;
+            border-radius: 10px;
+            object-fit: cover;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            /* REMOVE transitions that cause slow reveal */
+            transition: none !important;
+            opacity: 1 !important;
+            animation: none !important;
+            /* Force immediate rendering */
+            visibility: visible !important;
+        }
+
+        /* Ensure images are always fully visible */
+        .message img[src] {
+            opacity: 1 !important;
+            visibility: visible !important;
+        }
+
+        /* Preload helper for images */
+        .img-preload {
+            position: absolute;
+            opacity: 0;
+            visibility: hidden;
+            width: 0;
+            height: 0;
         }
 
         /* Rest of your existing styles remain the same */
@@ -2661,6 +3149,7 @@
     </div>
 
     <script>
+         // --- CUT HERE ---
         let isLogin = true;
         let longPressTimer;
         let isLongPress = false;
@@ -2741,155 +3230,6 @@
         };
 
         let replyToText = null;
-
-        // ===== FIXED: Dynamic padding adjustment for online panel =====
-        function updateChatPadding() {
-            const mainChatInterfaces = document.querySelectorAll('.main-chat-interface');
-            
-            mainChatInterfaces.forEach(interface => {
-                const onlinePanel = interface.querySelector('.online-users-panel');
-                
-                if (onlinePanel) {
-                    if (onlinePanel.classList.contains('collapsed')) {
-                        interface.classList.add('online-panel-collapsed');
-                    } else {
-                        interface.classList.remove('online-panel-collapsed');
-                    }
-                }
-            });
-        }
-
-        // ===== FIXED: Toggle online panel with proper state management =====
-        function toggleOnlinePanel(panel, toggleBtn) {
-            const isCollapsed = panel.classList.contains('collapsed');
-            
-            if (isCollapsed) {
-                // Expand the panel
-                panel.classList.remove('collapsed');
-                if (toggleBtn.querySelector('i')) {
-                    toggleBtn.querySelector('i').className = 'fas fa-chevron-down';
-                }
-                toggleBtn.title = "Collapse Online Users Panel";
-                console.log('Online panel expanded');
-            } else {
-                // Collapse the panel
-                panel.classList.add('collapsed');
-                if (toggleBtn.querySelector('i')) {
-                    toggleBtn.querySelector('i').className = 'fas fa-chevron-up';
-                }
-                toggleBtn.title = "Expand Online Users Panel";
-                console.log('Online panel collapsed');
-            }
-            
-            // Update the main chat interface class
-            updateChatPadding();
-            
-            // Save state to localStorage
-            saveOnlinePanelState();
-            
-            // Force scroll to bottom after panel state change
-            setTimeout(() => {
-                const currentContainer = getCurrentChatContainer();
-                if (currentContainer) {
-                    forceScrollToBottom(currentContainer.id || currentContainer.className);
-                }
-            }, 150);
-        }
-
-        // ===== FIXED: Initialize online panel toggle =====
-        function initializeOnlinePanelToggle() {
-            // Main chat panel
-            const mainToggleBtn = document.getElementById('toggle-online-panel');
-            const mainOnlinePanel = document.getElementById('online-users-panel');
-            
-            // Private AI panel
-            const privateToggleBtn = document.getElementById('toggle-private-online-panel');
-            const privateOnlinePanel = document.getElementById('private-online-users-panel');
-            
-            if (mainToggleBtn && mainOnlinePanel) {
-                mainToggleBtn.addEventListener('click', function() {
-                    toggleOnlinePanel(mainOnlinePanel, mainToggleBtn);
-                });
-            }
-            
-            if (privateToggleBtn && privateOnlinePanel) {
-                privateToggleBtn.addEventListener('click', function() {
-                    toggleOnlinePanel(privateOnlinePanel, privateToggleBtn);
-                });
-            }
-            
-            // Load saved panel state
-            loadOnlinePanelState();
-            
-            // Update padding initially
-            updateChatPadding();
-        }
-
-        // ===== FIXED: Save panel state to localStorage =====
-        function saveOnlinePanelState() {
-            const mainPanel = document.getElementById('online-users-panel');
-            const privatePanel = document.getElementById('private-online-users-panel');
-            
-            const state = {
-                mainCollapsed: mainPanel ? mainPanel.classList.contains('collapsed') : false,
-                privateCollapsed: privatePanel ? privatePanel.classList.contains('collapsed') : false
-            };
-            
-            localStorage.setItem('onlinePanelState', JSON.stringify(state));
-        }
-
-        // ===== FIXED: Load panel state from localStorage =====
-        function loadOnlinePanelState() {
-            const savedState = localStorage.getItem('onlinePanelState');
-            if (savedState) {
-                try {
-                    const state = JSON.parse(savedState);
-                    
-                    const mainPanel = document.getElementById('online-users-panel');
-                    const mainToggleBtn = document.getElementById('toggle-online-panel');
-                    const privatePanel = document.getElementById('private-online-users-panel');
-                    const privateToggleBtn = document.getElementById('toggle-private-online-panel');
-                    
-                    // Apply main panel state
-                    if (mainPanel) {
-                        if (state.mainCollapsed) {
-                            mainPanel.classList.add('collapsed');
-                            if (mainToggleBtn) mainToggleBtn.title = "Expand Online Users Panel";
-                            if (mainToggleBtn && mainToggleBtn.querySelector('i')) {
-                                mainToggleBtn.querySelector('i').className = 'fas fa-chevron-up';
-                            }
-                        } else {
-                            mainPanel.classList.remove('collapsed');
-                            if (mainToggleBtn) mainToggleBtn.title = "Collapse Online Users Panel";
-                            if (mainToggleBtn && mainToggleBtn.querySelector('i')) {
-                                mainToggleBtn.querySelector('i').className = 'fas fa-chevron-down';
-                            }
-                        }
-                    }
-                    
-                    // Apply private panel state
-                    if (privatePanel) {
-                        if (state.privateCollapsed) {
-                            privatePanel.classList.add('collapsed');
-                            if (privateToggleBtn) privateToggleBtn.title = "Expand Online Users Panel";
-                            if (privateToggleBtn && privateToggleBtn.querySelector('i')) {
-                                privateToggleBtn.querySelector('i').className = 'fas fa-chevron-up';
-                            }
-                        } else {
-                            privatePanel.classList.remove('collapsed');
-                            if (privateToggleBtn) privateToggleBtn.title = "Collapse Online Users Panel";
-                            if (privateToggleBtn && privateToggleBtn.querySelector('i')) {
-                                privateToggleBtn.querySelector('i').className = 'fas fa-chevron-down';
-                            }
-                        }
-                    }
-                    
-                    console.log('Online panel state loaded from localStorage');
-                } catch (error) {
-                    console.error('Error loading online panel state:', error);
-                }
-            }
-        }
 
         // ===== TYPING INDICATOR FUNCTIONS =====
         function showTypingIndicator(username) {
@@ -3435,9 +3775,6 @@
             
             const kebabDropdown = document.querySelector('.kebab-dropdown');
             if (kebabDropdown) kebabDropdown.classList.remove('active');
-            
-            // Update padding after showing container
-            setTimeout(updateChatPadding, 100);
         }
 
         function hideContainer(containerId) {
@@ -6589,6 +6926,114 @@
                 `;
                 newsItems.appendChild(newsItem);
             });
+        }
+
+        // ===== FIXED: Online users panel toggle functionality =====
+        function initializeOnlinePanelToggle() {
+            // Main chat panel
+            const mainToggleBtn = document.getElementById('toggle-online-panel');
+            const mainOnlinePanel = document.getElementById('online-users-panel');
+            
+            // Private AI panel
+            const privateToggleBtn = document.getElementById('toggle-private-online-panel');
+            const privateOnlinePanel = document.getElementById('private-online-users-panel');
+            
+            if (mainToggleBtn && mainOnlinePanel) {
+                mainToggleBtn.addEventListener('click', function() {
+                    toggleOnlinePanel(mainOnlinePanel, mainToggleBtn);
+                });
+            }
+            
+            if (privateToggleBtn && privateOnlinePanel) {
+                privateToggleBtn.addEventListener('click', function() {
+                    toggleOnlinePanel(privateOnlinePanel, privateToggleBtn);
+                });
+            }
+            
+            // Load saved panel state
+            loadOnlinePanelState();
+        }
+
+        // ===== FIXED: Toggle online panel with proper state management =====
+        function toggleOnlinePanel(panel, toggleBtn) {
+            const isCollapsed = panel.classList.contains('collapsed');
+            
+            if (isCollapsed) {
+                // Expand the panel
+                panel.classList.remove('collapsed');
+                toggleBtn.title = "Collapse Online Users Panel";
+                console.log('Online panel expanded');
+            } else {
+                // Collapse the panel
+                panel.classList.add('collapsed');
+                toggleBtn.title = "Expand Online Users Panel";
+                console.log('Online panel collapsed');
+            }
+            
+            // Save state to localStorage
+            saveOnlinePanelState();
+            
+            // FIXED: Force scroll to bottom after panel state change
+            setTimeout(() => {
+                const currentContainer = getCurrentChatContainer();
+                if (currentContainer) {
+                    forceScrollToBottom(currentContainer);
+                }
+            }, 100);
+        }
+
+        // ===== FIXED: Save panel state to localStorage =====
+        function saveOnlinePanelState() {
+            const mainPanel = document.getElementById('online-users-panel');
+            const privatePanel = document.getElementById('private-online-users-panel');
+            
+            const state = {
+                mainCollapsed: mainPanel ? mainPanel.classList.contains('collapsed') : false,
+                privateCollapsed: privatePanel ? privatePanel.classList.contains('collapsed') : false
+            };
+            
+            localStorage.setItem('onlinePanelState', JSON.stringify(state));
+        }
+
+        // ===== FIXED: Load panel state from localStorage =====
+        function loadOnlinePanelState() {
+            const savedState = localStorage.getItem('onlinePanelState');
+            if (savedState) {
+                try {
+                    const state = JSON.parse(savedState);
+                    
+                    const mainPanel = document.getElementById('online-users-panel');
+                    const mainToggleBtn = document.getElementById('toggle-online-panel');
+                    const privatePanel = document.getElementById('private-online-users-panel');
+                    const privateToggleBtn = document.getElementById('toggle-private-online-panel');
+                    
+                    // Apply main panel state
+                    if (mainPanel) {
+                        if (state.mainCollapsed) {
+                            mainPanel.classList.add('collapsed');
+                            if (mainToggleBtn) mainToggleBtn.title = "Expand Online Users Panel";
+                        } else {
+                            mainPanel.classList.remove('collapsed');
+                            if (mainToggleBtn) mainToggleBtn.title = "Collapse Online Users Panel";
+                        }
+                    }
+                    
+                    // Apply private panel state
+                    if (privatePanel) {
+                        if (state.privateCollapsed) {
+                            privatePanel.classList.add('collapsed');
+                            if (privateToggleBtn) privateToggleBtn.title = "Expand Online Users Panel";
+                        } else {
+                            privatePanel.classList.remove('collapsed');
+                            if (privateToggleBtn) privateToggleBtn.title = "Collapse Online Users Panel";
+                        }
+                    }
+                    
+                    console.log('Online panel state loaded from localStorage');
+                } catch (error) {
+                    console.error('Error loading online panel state:', error);
+                }
+            }
         }
 
         // ===== FIXED: Helper function to get current chat container =====
