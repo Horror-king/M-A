@@ -42,9 +42,10 @@
         }
 
         /* FIXED: Dynamic padding for online users panel states */
+       /* ALTERNATIVE FIX: Use JavaScript to add classes */
 .chat-messages, #private-ai-container {
     flex: 1;
-    padding: 5px 15px;
+    padding: 5px 15px 100px 15px; /* Default: 80px bottom padding */
     overflow-y: auto;
     height: 100%;
     display: flex;
@@ -59,20 +60,19 @@
     touch-action: auto;
     gap: 2px;
     box-sizing: border-box;
-    
-    /* DEFAULT: Collapsed state - less padding */
-    padding-bottom: 80px;
     transition: padding-bottom 0.3s ease;
 }
 
-/* FIXED: When online panel is EXPANDED - add more bottom padding */
-/* Debug: Check if selectors are working */
-.online-users-panel:not(.collapsed) ~ .chat-container .chat-messages {
-    border: 2px solid red !important; /* Should appear when panel expanded */
+/* When online panel is expanded */
+.chat-messages.online-panel-expanded, 
+#private-ai-container.online-panel-expanded {
+    padding-bottom: 120px !important;
 }
 
-.online-users-panel.collapsed ~ .chat-container .chat-messages {
-    border: 2px solid blue !important; /* Should appear when panel collapsed */
+/* When online panel is collapsed */
+.chat-messages.online-panel-collapsed, 
+#private-ai-container.online-panel-collapsed {
+    padding-bottom: 80px !important;
 }
 
         /* FIXED: Chat input positioning */
