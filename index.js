@@ -933,104 +933,6 @@ app.put('/api/user/profile', verifyToken, async (req, res) => {
   }
 });
 
-// FIXED: Add POST endpoint for profile updates (for client compatibility)
-app.post('/api/user/profile', verifyToken, async (req, res) => {
-  try {
-    const username = req.user.username;
-    const profileData = req.body;
-
-    console.log('💾 Saving profile via POST for:', username);
-    console.log('📝 Profile data:', profileData);
-
-    if (!username) {
-      return res.status(400).json({ 
-        success: false, 
-        error: "Username is required" 
-      });
-    }
-
-    // Check if profile exists
-    const { data: existingProfiles, error: checkError } = await supabase
-      .from('user_profiles')
-      .select('id')
-      .eq('username', username)
-      .limit(1);
-
-    if (checkError) {
-      console.error('❌ Database error checking profile:', checkError);
-      return res.status(500).json({ 
-        success: false, 
-        error: "Database error" 
-      });
-    }
-
-    let result;
-    const now = new Date().toISOString();
-    
-    if (existingProfiles && existingProfiles.length > 0) {
-      // Update existing profile
-      result = await supabase
-        .from('user_profiles')
-        .update({
-          firstname: profileData.firstname || '',
-          lastname: profileData.lastname || '',
-          bio: profileData.bio || '',
-          age: profileData.age || '',
-          gender: profileData.gender || '',
-          location: profileData.location || '',
-          interests: profileData.interests || '',
-          avatar: profileData.avatar || `https://i.pravatar.cc/150?u=${username}`,
-          updated_at: now
-        })
-        .eq('username', username)
-        .select();
-    } else {
-      // Create new profile
-      result = await supabase
-        .from('user_profiles')
-        .insert([
-          {
-            username: username,
-            firstname: profileData.firstname || '',
-            lastname: profileData.lastname || '',
-            bio: profileData.bio || '',
-            age: profileData.age || '',
-            gender: profileData.gender || '',
-            location: profileData.location || '',
-            interests: profileData.interests || '',
-            avatar: profileData.avatar || `https://i.pravatar.cc/150?u=${username}`,
-            created_at: now,
-            updated_at: now
-          }
-        ])
-        .select();
-    }
-
-    if (result.error) {
-      console.error('❌ Database error saving profile:', result.error);
-      return res.status(500).json({ 
-        success: false, 
-        error: "Failed to save profile: " + result.error.message 
-      });
-    }
-
-    console.log('✅ Profile saved successfully via POST for:', username);
-    
-    res.json({ 
-      success: true, 
-      message: "Profile updated successfully",
-      profile: result.data[0]
-    });
-
-  } catch (error) {
-    console.error('❌ Update profile error via POST:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: "Internal server error: " + error.message 
-    });
-  }
-});
-
 // Get user profile by username (for profile popups) - FIXED
 app.get('/api/user/profile/:username', async (req, res) => {
   try {
@@ -1082,87 +984,6 @@ app.get('/api/user/profile/:username', async (req, res) => {
       error: "Internal server error" 
     });
   }
-});
-
-// ===== ADD DEBUG ENDPOINTS FOR PROFILE =====
-
-// Debug endpoint for profile issues
-app.get('/api/debug/profile', verifyToken, async (req, res) => {
-  try {
-    const username = req.user.username;
-    console.log('🔍 Debug profile for:', username);
-    
-    // Check user exists
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('username')
-      .eq('username', username)
-      .single();
-    
-    if (userError) {
-      return res.json({
-        success: false,
-        error: 'User not found in users table',
-        details: userError.message
-      });
-    }
-    
-    // Check profile exists
-    const { data: profile, error: profileError } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .eq('username', username)
-      .single();
-    
-    res.json({
-      success: true,
-      user: user,
-      profile: profile || 'No profile found',
-      profileExists: !!profile,
-      message: profile ? 'Profile exists' : 'No profile found, will create on save'
-    });
-    
-  } catch (error) {
-    console.error('Debug profile error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-// Test endpoint to verify authentication
-app.get('/api/debug/auth-test', verifyToken, (req, res) => {
-  res.json({
-    success: true,
-    message: 'Authentication is working!',
-    user: req.user,
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Test all endpoints
-app.get('/api/test-all', (req, res) => {
-  res.json({
-    message: "✅ All endpoints are working!",
-    endpoints: {
-      auth: {
-        register: "POST /api/register",
-        login: "POST /api/login", 
-        profile: "GET/POST /api/user/profile"
-      },
-      debug: {
-        authTest: "GET /api/debug/auth-test",
-        profile: "GET /api/debug/profile"
-      }
-    },
-    instructions: [
-      "1. Use POST /api/register to create account",
-      "2. Use POST /api/login to get token",
-      "3. Use GET /api/user/profile with Bearer token to get profile",
-      "4. Use POST /api/user/profile with Bearer token to update profile"
-    ]
-  });
 });
 
 // ===== ADD MISSING AI ENDPOINTS =====
@@ -3174,17 +2995,12 @@ server.listen(port, () => {
   console.log(`   POST /api/auth/check-username - Check username availability (client-compatible)`);
   console.log(`   POST /api/auth/auto-login - Auto-login with token`);
   console.log(`   GET /api/user/profile/:username - Get user profile`);
-  console.log(`   POST /api/user/profile - Update user profile (NEW - client compatible)`);
-  console.log(`   PUT /api/user/profile - Update user profile (existing)`);
+  console.log(`   POST /api/user/profile - Update user profile`);
   console.log(`   GET /api/auth-test - Test all authentication endpoints`);
   console.log(`📨 MESSAGES ENDPOINTS:`);
   console.log(`   GET /api/messages - Get messages (client-compatible)`);
   console.log(`   POST /api/messages - Send message (client-compatible)`);
   console.log(`   DELETE /api/messages/:id - Delete message (client-compatible)`);
-  console.log(`🔍 DEBUG ENDPOINTS:`);
-  console.log(`   GET /api/debug/profile - Debug profile issues`);
-  console.log(`   GET /api/debug/auth-test - Test authentication`);
-  console.log(`   GET /api/test-all - Test all endpoints`);
   console.log(`🧪 Test Supabase (GET): http://localhost:${port}/test-supabase`);
   console.log(`🧪 Test Message (POST): http://localhost:${port}/test-message`);
   console.log(`🔍 Debug ALL Commands: http://localhost:${port}/debug-all-commands`);
