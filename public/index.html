@@ -2556,7 +2556,7 @@
 
         /* Ensure proper wrapping for private messages */
         .private-chat-messages .private-message {
-            max-width: 70%;
+            max-width: 100%;
             overflow-wrap: break-word;
             word-break: break-word;
             white-space: pre-wrap;
@@ -2573,7 +2573,10 @@
             font-family: 'Courier New', monospace;
             font-size: 14px;
             line-height: 1.4;
-            max-width: 70%;
+            max-width: 100%;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            word-break: break-word;
             white-space: pre-wrap;
         }
 
@@ -2591,7 +2594,7 @@
 
         /* Prevent horizontal scrolling in private messages */
         .private-chat-messages .private-message .message-content {
-            max-width: 70%;
+            max-width: 100%;
             box-sizing: border-box;
         }
 
@@ -2603,7 +2606,7 @@
             word-break: break-word;
             white-space: pre-wrap;
             position: relative;
-            max-width: 70%;
+            max-width: 100%;
         }
 
         .private-chat-messages .private-message.sent pre,
@@ -2617,7 +2620,7 @@
             font-family: 'Courier New', monospace;
             font-size: 14px;
             line-height: 1.4;
-            max-width: 70%;
+            max-width: 100%;
             word-wrap: break-word;
             overflow-wrap: break-word;
             word-break: break-word;
@@ -2696,27 +2699,43 @@
             cursor: not-allowed;
         }
 
-        /* Message styles for private chat */
+        /* UPDATED: Message styles for private chat with fixed 24px width and proper alignment */
         .private-message {
             padding: 8px 15px;
             margin-bottom: 8px;
             max-width: 70%;
+            min-width: 24px; /* ADDED: Fixed minimum width of 24px */
             word-wrap: break-word;
             position: relative;
+            display: flex;
+            flex-direction: column;
         }
 
+        /* UPDATED: Sent messages - appear on RIGHT side */
         .private-message.sent {
-            align-self: flex-end;
+            align-self: flex-end; /* RIGHT side */
             background: #4267B2;
             color: white;
             border-radius: 18px 18px 0 18px;
+            margin-left: auto; /* Pushes to right */
+            text-align: right;
         }
 
+        /* UPDATED: Received messages - appear on LEFT side */
         .private-message.received {
-            align-self: flex-start;
+            align-self: flex-start; /* LEFT side */
             background: #e4e6eb;
             color: #1c1e21;
             border-radius: 18px 18px 18px 0;
+            margin-right: auto; /* Pushes to left */
+            text-align: left;
+        }
+
+        /* ADDED: Ensure minimum width for very short messages */
+        .private-message.sent .message-content,
+        .private-message.received .message-content {
+            min-width: 70%;
+            display: inline-block;
         }
 
         .message-time {
@@ -2724,6 +2743,15 @@
             margin-top: 5px;
             opacity: 0.7;
             text-align: right;
+        }
+
+        /* UPDATED: Time alignment based on message type */
+        .private-message.sent .message-time {
+            text-align: right;
+        }
+
+        .private-message.received .message-time {
+            text-align: left;
         }
 
         /* Responsive Design for Private Messages */
@@ -2755,6 +2783,12 @@
             .user-avatar {
                 width: 45px;
                 height: 45px;
+            }
+            
+            /* UPDATED: Private message sizing for mobile */
+            .private-message {
+                min-width: 20px; /* Slightly smaller on mobile */
+                max-width: 85%; /* More width on mobile */
             }
             
             /* FIXED: Hide private messages header when chat container is active */
@@ -2791,6 +2825,12 @@
             
             .user-last-message {
                 font-size: 12px;
+            }
+            
+            /* UPDATED: Private message sizing for small mobile */
+            .private-message {
+                min-width: 18px; /* Even smaller on very small screens */
+                max-width: 90%; /* More width on very small screens */
             }
             
             /* FIXED: Hide private messages header when chat container is active */
