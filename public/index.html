@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
@@ -13,6 +14,116 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
+        /* NEW: Welcome screen styles */
+        .welcome-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease;
+        }
+
+        .animated-logo {
+            font-family: 'Poppins', sans-serif;
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: #4267B2;
+            text-align: center;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .animated-text {
+            display: inline-block;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .animated-text::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% {
+                left: -100%;
+            }
+            100% {
+                left: 100%;
+            }
+        }
+
+        .letter {
+            display: inline-block;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeInUp 0.5s forwards;
+        }
+
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: #65676b;
+            margin-top: 10px;
+            opacity: 0;
+            animation: fadeIn 1s forwards 2s;
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+
+        .loading-bar {
+            width: 200px;
+            height: 4px;
+            background-color: #e4e6eb;
+            border-radius: 2px;
+            margin-top: 30px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .loading-progress {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 0;
+            background-color: #4267B2;
+            border-radius: 2px;
+            animation: loading 2s ease-in-out forwards;
+        }
+
+        @keyframes loading {
+            0% {
+                width: 0;
+            }
+            100% {
+                width: 100%;
+            }
+        }
+
         /* FIXED: Dynamic padding for online users panel states */
         .main-chat-interface {
             flex: 1;
@@ -168,6 +279,15 @@
             
             .online-users-panel.collapsed {
                 max-height: 40px; /* Smaller collapsed height on mobile */
+            }
+
+            /* NEW: Mobile adjustments for welcome screen */
+            .animated-logo {
+                font-size: 2.5rem;
+            }
+            
+            .subtitle {
+                font-size: 1rem;
             }
         }
 
@@ -2679,11 +2799,24 @@
     </style>
 </head>
 <body>
+    <!-- NEW: Welcome screen with animated text -->
+    <div class="welcome-screen" id="welcome-screen">
+        <div class="animated-logo">
+            <div class="animated-text" id="animated-text">
+                <!-- Letters will be added by JavaScript -->
+            </div>
+        </div>
+        <div class="subtitle">Your smart messaging companion</div>
+        <div class="loading-bar">
+            <div class="loading-progress"></div>
+        </div>
+    </div>
+
     <div class="loader" id="loader">
         <div class="spinner"></div>
     </div>
 
-    <div class="auth-container" id="auth-container">
+    <div class="auth-container" id="auth-container" style="display: none;">
         <div class="auth-box">
             <h2 id="auth-title">Login</h2>
             <input type="text" id="auth-username" placeholder="Username">
