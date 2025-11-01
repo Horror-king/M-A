@@ -2315,7 +2315,7 @@
             height: calc(100vh - 150px);
             overflow: hidden;
         }
-
+       // --- CUT HERE ---
         /* Users Panel Styles - Show initially */
         .users-panel {
             width: 100%;
@@ -2543,6 +2543,100 @@
             background: #f5f5f5;
             display: flex;
             flex-direction: column;
+        }
+
+        /* FIXED: Code block formatting for Private Messages */
+        .private-chat-messages .private-message .message-content {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            word-break: break-word;
+            white-space: pre-wrap;
+            position: relative;
+        }
+
+        /* Ensure proper wrapping for private messages */
+        .private-chat-messages .private-message {
+            max-width: 100%;
+            overflow-wrap: break-word;
+            word-break: break-word;
+            white-space: pre-wrap;
+        }
+
+        /* Code block styling for private messages */
+        .private-chat-messages .private-message pre {
+            background: #f4f4f4;
+            border-left: 4px solid #4267B2;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+            max-width: 100%;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            word-break: break-word;
+            white-space: pre-wrap;
+        }
+
+        .private-chat-messages .private-message code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            word-break: break-word;
+            white-space: pre-wrap;
+        }
+
+        /* Prevent horizontal scrolling in private messages */
+        .private-chat-messages .private-message .message-content {
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* For both sent and received private messages */
+        .private-chat-messages .private-message.sent .message-content,
+        .private-chat-messages .private-message.received .message-content {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            word-break: break-word;
+            white-space: pre-wrap;
+            position: relative;
+            max-width: 100%;
+        }
+
+        .private-chat-messages .private-message.sent pre,
+        .private-chat-messages .private-message.received pre {
+            background: #f4f4f4;
+            border-left: 4px solid #4267B2;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+            max-width: 100%;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            word-break: break-word;
+            white-space: pre-wrap;
+        }
+
+        .private-chat-messages .private-message.sent code,
+        .private-chat-messages .private-message.received code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            word-break: break-word;
         }
 
         .no-chat-selected {
@@ -3282,7 +3376,7 @@
 
     <script>
 // --- CUT HERE ---
-        // NEW: Welcome screen animation function
+            // NEW: Welcome screen animation function
 function animateWelcomeText() {
     const text = "MessageMate";
     const animatedText = document.getElementById('animated-text');
