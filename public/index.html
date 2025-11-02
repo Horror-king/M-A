@@ -2796,6 +2796,434 @@
             border-radius: 0;
             z-index: 1;
         }
+        /* ===== POSTS FEED STYLES ===== */
+.posts-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    border-bottom: 1px solid #e4e6eb;
+    background: white;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.posts-header h2 {
+    margin: 0;
+    font-size: 20px;
+    color: #1c1e21;
+}
+
+.create-post-btn {
+    background: #4267B2;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: background 0.3s;
+}
+
+.create-post-btn:hover {
+    background: #365899;
+}
+
+.posts-container {
+    padding: 15px;
+    max-height: calc(100vh - 150px);
+    overflow-y: auto;
+}
+
+.no-posts {
+    text-align: center;
+    padding: 40px 20px;
+    color: #65676b;
+    font-size: 16px;
+}
+
+/* Post Card Styles */
+.post-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    margin-bottom: 16px;
+    overflow: hidden;
+}
+
+.post-header {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+}
+
+.post-author-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin-right: 10px;
+}
+
+.post-author-info {
+    flex: 1;
+}
+
+.post-author-name {
+    font-weight: 600;
+    font-size: 15px;
+    color: #1c1e21;
+    margin-bottom: 2px;
+}
+
+.post-meta {
+    font-size: 13px;
+    color: #65676b;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.post-time {
+    font-size: 12px;
+}
+
+.post-visibility {
+    font-size: 12px;
+}
+
+.post-content {
+    padding: 0 16px 12px;
+    font-size: 15px;
+    line-height: 1.4;
+    color: #1c1e21;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.post-media {
+    width: 100%;
+    margin: 0;
+}
+
+.post-media img, .post-media video {
+    width: 100%;
+    max-height: 400px;
+    object-fit: contain;
+    display: block;
+}
+
+.post-stats {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-top: 1px solid #e4e6eb;
+    font-size: 14px;
+    color: #65676b;
+}
+
+.post-actions {
+    display: flex;
+    border-top: 1px solid #e4e6eb;
+}
+
+.post-action {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #65676b;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.post-action:hover {
+    background: #f0f2f5;
+}
+
+.post-action i {
+    margin-right: 5px;
+    font-size: 16px;
+}
+
+/* Post Modal Styles */
+.post-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.post-modal-content {
+    background: white;
+    border-radius: 8px;
+    width: 100%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.post-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid #e4e6eb;
+}
+
+.post-modal-header h3 {
+    margin: 0;
+    font-size: 20px;
+    color: #1c1e21;
+}
+
+.close-modal {
+    font-size: 24px;
+    cursor: pointer;
+    color: #65676b;
+    padding: 5px;
+}
+
+.close-modal:hover {
+    color: #1c1e21;
+}
+
+.post-modal-body {
+    padding: 16px;
+}
+
+.post-author-info {
+    display: flex;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.post-author-info img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin-right: 10px;
+}
+
+#post-content {
+    width: 100%;
+    min-height: 120px;
+    border: none;
+    resize: none;
+    font-size: 16px;
+    font-family: inherit;
+    outline: none;
+    margin-bottom: 8px;
+}
+
+.post-content-counter {
+    text-align: right;
+    font-size: 12px;
+    color: #65676b;
+    margin-bottom: 16px;
+}
+
+.post-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.post-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 12px;
+    background: #f0f2f5;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #65676b;
+    transition: background 0.2s;
+}
+
+.post-action-btn:hover {
+    background: #e4e6eb;
+}
+
+.post-media-preview {
+    margin-bottom: 16px;
+}
+
+.media-preview-item {
+    position: relative;
+    margin-bottom: 8px;
+}
+
+.media-preview-item img, .media-preview-item video {
+    width: 100%;
+    max-height: 200px;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
+.remove-media {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.post-submit-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.submit-post-btn {
+    background: #4267B2;
+    color: white;
+    border: none;
+    padding: 8px 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.3s;
+}
+
+.submit-post-btn:hover:not(:disabled) {
+    background: #365899;
+}
+
+.submit-post-btn:disabled {
+    background: #ccd0d5;
+    cursor: not-allowed;
+}
+
+/* Comments Section */
+.post-comments {
+    padding: 0 16px 16px;
+    border-top: 1px solid #e4e6eb;
+}
+
+.comment {
+    display: flex;
+    margin-top: 12px;
+}
+
+.comment-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.comment-content {
+    flex: 1;
+    background: #f0f2f5;
+    border-radius: 18px;
+    padding: 8px 12px;
+}
+
+.comment-author {
+    font-weight: 600;
+    font-size: 13px;
+    color: #1c1e21;
+    margin-bottom: 2px;
+}
+
+.comment-text {
+    font-size: 14px;
+    color: #1c1e21;
+    line-height: 1.4;
+}
+
+.comment-input {
+    display: flex;
+    margin-top: 12px;
+}
+
+.comment-input input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #e4e6eb;
+    border-radius: 18px;
+    background: #f0f2f5;
+    outline: none;
+    font-size: 14px;
+}
+
+.comment-input input:focus {
+    background: white;
+    border-color: #4267B2;
+}
+
+/* Responsive Design for Posts */
+@media (max-width: 768px) {
+    .posts-header {
+        padding: 12px;
+    }
+    
+    .posts-container {
+        padding: 12px;
+    }
+    
+    .post-modal {
+        padding: 10px;
+    }
+    
+    .post-modal-content {
+        max-height: 95vh;
+    }
+}
+
+@media (max-width: 480px) {
+    .posts-header h2 {
+        font-size: 18px;
+    }
+    
+    .create-post-btn {
+        padding: 6px 12px;
+        font-size: 14px;
+    }
+    
+    .post-header {
+        padding: 10px 12px;
+    }
+    
+    .post-content {
+        padding: 0 12px 10px;
+    }
+    
+    .post-stats, .post-actions {
+        padding: 8px 12px;
+    }
+    
+    .post-action {
+        font-size: 13px;
+    }
+}
     </style>
 </head>
 <body>
@@ -2866,11 +3294,67 @@
                 Edit
             </div>
         </div>
+        
+        <!-- Add this to your existing HTML structure -->
+<!-- NEW: Posts Container -->
+<div id="posts" class="main-chat-interface container" style="display: none;">
+    <div class="posts-header">
+        <h2>Community Posts</h2>
+        <button id="create-post-btn" class="create-post-btn">
+            <i class="fas fa-plus"></i> Create Post
+        </button>
+    </div>
+    
+    <div class="posts-container" id="posts-container">
+        <!-- Posts will be loaded here -->
+        <div class="no-posts">
+            <p>No posts yet. Be the first to share something!</p>
+        </div>
+    </div>
+    
+    <!-- Create Post Modal -->
+    <div id="create-post-modal" class="post-modal" style="display: none;">
+        <div class="post-modal-content">
+            <div class="post-modal-header">
+                <h3>Create Post</h3>
+                <span class="close-modal" onclick="closeCreatePostModal()">&times;</span>
+            </div>
+            <div class="post-modal-body">
+                <div class="post-author-info">
+                    <img id="post-author-avatar" src="https://i.pravatar.cc/50?u=default" alt="Your Avatar">
+                    <div>
+                        <div id="post-author-name">You</div>
+                        <div class="post-visibility">Public</div>
+                    </div>
+                </div>
+                <textarea id="post-content" placeholder="What's on your mind?" maxlength="500"></textarea>
+                <div class="post-content-counter">
+                    <span id="post-char-count">0</span>/500
+                </div>
+                <div class="post-actions">
+                    <button class="post-action-btn" onclick="openImageUpload()">
+                        <i class="fas fa-image"></i> Photo
+                    </button>
+                    <button class="post-action-btn" onclick="openVideoUpload()">
+                        <i class="fas fa-video"></i> Video
+                    </button>
+                    <button class="post-action-btn" onclick="openLocationShare()">
+                        <i class="fas fa-map-marker-alt"></i> Location
+                    </button>
+                </div>
+                <div id="post-media-preview" class="post-media-preview"></div>
+                <div class="post-submit-actions">
+                    <button id="submit-post-btn" class="submit-post-btn" onclick="createPost()" disabled>Post</button>
+                </div>
+            </div>
+        </div>
+    </div>
         <div class="menu-divider"></div>
         <a href="#" onclick="showContainer('chat')">MessageMate</a>
         <a href="#" onclick="showContainer('private-ai')">Private AI</a>
         <!-- ADDED: Private Messages Link -->
         <a href="#" onclick="showContainer('private-messages')">Private Messages</a>
+        <a href="#" onclick="showContainer('posts')">Posts Feed</a>
         <a href="#" onclick="showContainer('profile')">Edit Profile</a>
         <a href="#" onclick="showContainer('about')">About</a>
         <a href="#" onclick="showContainer('features')">Features</a>
@@ -3000,7 +3484,7 @@
             </div>
         </div>
     </div>
-  
+     
     <button class="news-toggle" onclick="toggleNews()" title="Toggle News" style="display: none;">
         <i class="fas fa-newspaper"></i>
     </button>
@@ -3279,9 +3763,476 @@
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
+    
+       <script>
+               // ===== POSTS FEED JAVASCRIPT =====
 
-    <script>
-           // NEW: Welcome screen animation function
+// Posts data structure
+let posts = JSON.parse(localStorage.getItem('messageMatePosts')) || [];
+let currentPostMedia = [];
+
+// Initialize posts functionality
+function initializePosts() {
+    loadPosts();
+    setupPostInputHandlers();
+    
+    // Listen for real-time post updates
+    if (socket) {
+        socket.on('new-post', (post) => {
+            addPostToFeed(post);
+        });
+    }
+}
+
+// Load posts from localStorage
+function loadPosts() {
+    const postsContainer = document.getElementById('posts-container');
+    if (!postsContainer) return;
+    
+    // Clear container
+    postsContainer.innerHTML = '';
+    
+    if (posts.length === 0) {
+        postsContainer.innerHTML = '<div class="no-posts"><p>No posts yet. Be the first to share something!</p></div>';
+        return;
+    }
+    
+    // Sort posts by timestamp (newest first)
+    const sortedPosts = [...posts].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    // Display posts
+    sortedPosts.forEach(post => {
+        displayPost(post);
+    });
+}
+
+// Display a single post
+function displayPost(post) {
+    const postsContainer = document.getElementById('posts-container');
+    if (!postsContainer) return;
+    
+    // Remove no-posts message if it exists
+    const noPosts = postsContainer.querySelector('.no-posts');
+    if (noPosts) noPosts.remove();
+    
+    const postElement = document.createElement('div');
+    postElement.className = 'post-card';
+    postElement.dataset.postId = post.id;
+    
+    // Format timestamp
+    const timeAgo = formatPostTime(post.timestamp);
+    
+    // Get user profile for avatar and display name
+    const userProfile = getUserProfile(post.author);
+    
+    postElement.innerHTML = `
+        <div class="post-header">
+            <img class="post-author-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/50?u=${post.author}`}" alt="${post.author}">
+            <div class="post-author-info">
+                <div class="post-author-name">${userProfile.displayName || post.author}</div>
+                <div class="post-meta">
+                    <span class="post-time">${timeAgo}</span>
+                    <span>•</span>
+                    <span class="post-visibility">Public</span>
+                </div>
+            </div>
+        </div>
+        <div class="post-content">${escapeHtml(post.content)}</div>
+        ${post.media ? `
+            <div class="post-media">
+                ${post.media.type === 'image' ? 
+                    `<img src="${post.media.url}" alt="Post image" onclick="openZoom('${post.media.url}')">` : 
+                    `<video controls><source src="${post.media.url}" type="video/mp4">Your browser does not support the video tag.</video>`
+                }
+            </div>
+        ` : ''}
+        <div class="post-stats">
+            <div class="post-likes">
+                <i class="fas fa-thumbs-up"></i> ${post.likes || 0}
+            </div>
+            <div class="post-comments-count">
+                ${post.comments ? post.comments.length : 0} comments
+            </div>
+        </div>
+        <div class="post-actions">
+            <button class="post-action" onclick="likePost('${post.id}')">
+                <i class="far fa-thumbs-up"></i> Like
+            </button>
+            <button class="post-action" onclick="focusCommentInput('${post.id}')">
+                <i class="far fa-comment"></i> Comment
+            </button>
+            <button class="post-action" onclick="sharePost('${post.id}')">
+                <i class="far fa-share-square"></i> Share
+            </button>
+        </div>
+        <div class="post-comments">
+            ${post.comments ? post.comments.map(comment => `
+                <div class="comment">
+                    <img class="comment-avatar" src="${getUserProfile(comment.author).avatar || `https://i.pravatar.cc/32?u=${comment.author}`}" alt="${comment.author}">
+                    <div class="comment-content">
+                        <div class="comment-author">${getUserProfile(comment.author).displayName || comment.author}</div>
+                        <div class="comment-text">${escapeHtml(comment.text)}</div>
+                    </div>
+                </div>
+            `).join('') : ''}
+            <div class="comment-input">
+                <input type="text" placeholder="Write a comment..." onkeypress="handleCommentKeypress(event, '${post.id}')">
+            </div>
+        </div>
+    `;
+    
+    postsContainer.appendChild(postElement);
+}
+
+// Format post time (relative time)
+function formatPostTime(timestamp) {
+    const now = new Date();
+    const postTime = new Date(timestamp);
+    const diffMs = now - postTime;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    
+    return postTime.toLocaleDateString();
+}
+
+// Get user profile data for posts
+function getUserProfile(username) {
+    // In a real app, this would fetch from the server
+    // For now, we'll use a simple approach
+    const profiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
+    return profiles[username] || { username: username };
+}
+
+// Open create post modal
+function openCreatePostModal() {
+    const modal = document.getElementById('create-post-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        
+        // Set author info
+        const currentUser = currentUserSession?.username;
+        if (currentUser) {
+            const userProfile = getUserProfile(currentUser);
+            document.getElementById('post-author-avatar').src = userProfile.avatar || `https://i.pravatar.cc/50?u=${currentUser}`;
+            document.getElementById('post-author-name').textContent = userProfile.displayName || currentUser;
+        }
+        
+        // Reset form
+        document.getElementById('post-content').value = '';
+        document.getElementById('post-char-count').textContent = '0';
+        document.getElementById('post-media-preview').innerHTML = '';
+        document.getElementById('submit-post-btn').disabled = true;
+        currentPostMedia = [];
+    }
+}
+
+// Close create post modal
+function closeCreatePostModal() {
+    const modal = document.getElementById('create-post-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// Setup post input handlers
+function setupPostInputHandlers() {
+    const postContent = document.getElementById('post-content');
+    const createPostBtn = document.getElementById('create-post-btn');
+    
+    if (postContent) {
+        postContent.addEventListener('input', function() {
+            const charCount = this.value.length;
+            document.getElementById('post-char-count').textContent = charCount;
+            
+            // Enable/disable submit button
+            const submitBtn = document.getElementById('submit-post-btn');
+            if (submitBtn) {
+                submitBtn.disabled = charCount === 0 && currentPostMedia.length === 0;
+            }
+        });
+    }
+    
+    if (createPostBtn) {
+        createPostBtn.addEventListener('click', openCreatePostModal);
+    }
+    
+    // Close modal when clicking outside
+    const modal = document.getElementById('create-post-modal');
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                closeCreatePostModal();
+            }
+        });
+    }
+}
+
+// Create a new post
+function createPost() {
+    const content = document.getElementById('post-content').value.trim();
+    const author = currentUserSession?.username;
+    
+    if (!author) {
+        showError('You must be logged in to create a post');
+        return;
+    }
+    
+    if (!content && currentPostMedia.length === 0) {
+        showError('Post cannot be empty');
+        return;
+    }
+    
+    const newPost = {
+        id: generatePostId(),
+        author: author,
+        content: content,
+        media: currentPostMedia.length > 0 ? currentPostMedia[0] : null, // For simplicity, only one media per post
+        timestamp: new Date().toISOString(),
+        likes: 0,
+        comments: []
+    };
+    
+    // Add to posts array
+    posts.unshift(newPost);
+    
+    // Save to localStorage
+    localStorage.setItem('messageMatePosts', JSON.stringify(posts));
+    
+    // Add to feed
+    addPostToFeed(newPost);
+    
+    // Close modal
+    closeCreatePostModal();
+    
+    // Show success message
+    showSuccess('Post published successfully!');
+    
+    // Broadcast via Socket.io if available
+    if (socket) {
+        socket.emit('new-post', newPost);
+    }
+}
+
+// Generate unique post ID
+function generatePostId() {
+    return 'post_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+// Add post to feed (for real-time updates)
+function addPostToFeed(post) {
+    const postsContainer = document.getElementById('posts-container');
+    if (!postsContainer) return;
+    
+    // Remove no-posts message if it exists
+    const noPosts = postsContainer.querySelector('.no-posts');
+    if (noPosts) noPosts.remove();
+    
+    // Check if post already exists
+    const existingPost = document.querySelector(`[data-post-id="${post.id}"]`);
+    if (existingPost) return;
+    
+    // Add to beginning of feed
+    displayPost(post);
+    
+    // Scroll to top to show new post
+    postsContainer.scrollTop = 0;
+}
+
+// Like a post
+function likePost(postId) {
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+    
+    // Toggle like
+    if (!post.likes) post.likes = 0;
+    post.likes += 1;
+    
+    // Update localStorage
+    localStorage.setItem('messageMatePosts', JSON.stringify(posts));
+    
+    // Update UI
+    const postElement = document.querySelector(`[data-post-id="${postId}"]`);
+    if (postElement) {
+        const likesElement = postElement.querySelector('.post-likes');
+        if (likesElement) {
+            likesElement.innerHTML = `<i class="fas fa-thumbs-up"></i> ${post.likes}`;
+        }
+    }
+    
+    // Show animation or feedback
+    showSuccess('Liked!');
+}
+
+// Focus comment input
+function focusCommentInput(postId) {
+    const postElement = document.querySelector(`[data-post-id="${postId}"]`);
+    if (postElement) {
+        const commentInput = postElement.querySelector('.comment-input input');
+        if (commentInput) {
+            commentInput.focus();
+        }
+    }
+}
+
+// Handle comment keypress
+function handleCommentKeypress(event, postId) {
+    if (event.key === 'Enter') {
+        const input = event.target;
+        const text = input.value.trim();
+        
+        if (text) {
+            addComment(postId, text);
+            input.value = '';
+        }
+    }
+}
+
+// Add comment to post
+function addComment(postId, text) {
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+    
+    const author = currentUserSession?.username;
+    if (!author) return;
+    
+    // Initialize comments array if needed
+    if (!post.comments) post.comments = [];
+    
+    // Add new comment
+    const newComment = {
+        author: author,
+        text: text,
+        timestamp: new Date().toISOString()
+    };
+    
+    post.comments.push(newComment);
+    
+    // Update localStorage
+    localStorage.setItem('messageMatePosts', JSON.stringify(posts));
+    
+    // Update UI
+    const postElement = document.querySelector(`[data-post-id="${postId}"]`);
+    if (postElement) {
+        const commentsContainer = postElement.querySelector('.post-comments');
+        if (commentsContainer) {
+            // Update comments count
+            const commentsCount = postElement.querySelector('.post-comments-count');
+            if (commentsCount) {
+                commentsCount.textContent = `${post.comments.length} comments`;
+            }
+            
+            // Add new comment
+            const commentElement = document.createElement('div');
+            commentElement.className = 'comment';
+            
+            const userProfile = getUserProfile(author);
+            
+            commentElement.innerHTML = `
+                <img class="comment-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/32?u=${author}`}" alt="${author}">
+                <div class="comment-content">
+                    <div class="comment-author">${userProfile.displayName || author}</div>
+                    <div class="comment-text">${escapeHtml(text)}</div>
+                </div>
+            `;
+            
+            // Insert before the comment input
+            const commentInput = commentsContainer.querySelector('.comment-input');
+            commentsContainer.insertBefore(commentElement, commentInput);
+        }
+    }
+}
+
+// Share a post
+function sharePost(postId) {
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+    
+    // In a real app, this would open a share dialog
+    // For now, we'll just copy the post content to clipboard
+    const shareText = `${post.author}: ${post.content}`;
+    
+    navigator.clipboard.writeText(shareText).then(() => {
+        showSuccess('Post content copied to clipboard!');
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+        showError('Failed to share post');
+    });
+}
+
+// Media upload functions (simplified for demo)
+function openImageUpload() {
+    // In a real app, this would open a file picker
+    // For demo purposes, we'll use a placeholder
+    const imageUrl = prompt('Enter image URL (for demo purposes):');
+    if (imageUrl) {
+        addMediaToPost('image', imageUrl);
+    }
+}
+
+function openVideoUpload() {
+    // In a real app, this would open a file picker
+    // For demo purposes, we'll use a placeholder
+    const videoUrl = prompt('Enter video URL (for demo purposes):');
+    if (videoUrl) {
+        addMediaToPost('video', videoUrl);
+    }
+}
+
+function openLocationShare() {
+    // This would use the Geolocation API in a real app
+    alert('Location sharing would be implemented here in a real app');
+}
+
+// Add media to post
+function addMediaToPost(type, url) {
+    // For simplicity, we'll only allow one media item per post
+    currentPostMedia = [{ type, url }];
+    
+    const previewContainer = document.getElementById('post-media-preview');
+    if (previewContainer) {
+        previewContainer.innerHTML = `
+            <div class="media-preview-item">
+                ${type === 'image' ? 
+                    `<img src="${url}" alt="Preview">` : 
+                    `<video controls><source src="${url}" type="video/mp4">Your browser does not support the video tag.</video>`
+                }
+                <button class="remove-media" onclick="removeMedia()">×</button>
+            </div>
+        `;
+    }
+    
+    // Enable submit button if there's media
+    const submitBtn = document.getElementById('submit-post-btn');
+    if (submitBtn) {
+        submitBtn.disabled = false;
+    }
+}
+
+// Remove media from post
+function removeMedia() {
+    currentPostMedia = [];
+    const previewContainer = document.getElementById('post-media-preview');
+    if (previewContainer) {
+        previewContainer.innerHTML = '';
+    }
+    
+    // Disable submit button if no content
+    const content = document.getElementById('post-content').value.trim();
+    const submitBtn = document.getElementById('submit-post-btn');
+    if (submitBtn && !content) {
+        submitBtn.disabled = true;
+    }
+}
+
+// ===== YOUR EXISTING CODE CONTINUES BELOW =====
+
+// NEW: Welcome screen animation function
 function animateWelcomeText() {
     const text = "MessageMate";
     const animatedText = document.getElementById('animated-text');
@@ -3426,10 +4377,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// ===== CUT HERE - ALL YOUR EXISTING JAVASCRIPT CODE FOLLOWS =====
-// ... (ALL YOUR EXISTING JAVASCRIPT CODE REMAINS THE SAME)
-// I'm including the JavaScript code below, but note that it's very long
-// The code below is exactly the same as in your original file
+// ===== YOUR EXISTING VARIABLES AND FUNCTIONS =====
 
 let isLogin = true;
 let longPressTimer;
@@ -3934,12 +4882,17 @@ function showContainer(containerId) {
             }
             initializeSQLEditor();
         }
+        
+        // MODIFIED: Initialize posts if showing that container
+        if (containerId === 'posts') {
+            initializePosts();
+        }
     }
     
     // Show overlay for non-chat containers
     const overlay = document.getElementById('overlay');
     if (overlay) {
-        if (containerId === 'chat' || containerId === 'private-ai' || containerId === 'private-messages') {
+        if (containerId === 'chat' || containerId === 'private-ai' || containerId === 'private-messages' || containerId === 'posts') {
             overlay.style.display = 'none';
         } else {
             overlay.style.display = 'block';
@@ -5900,6 +6853,11 @@ function loadProfile() {
         
         // Update display section
         updateProfileDisplay(profile);
+        
+        // MODIFIED: Also update userProfiles in localStorage for posts functionality
+        const userProfiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
+        userProfiles[username] = profile;
+        localStorage.setItem('userProfiles', JSON.stringify(userProfiles));
     })
     .catch(error => {
         console.error('Error loading profile:', error);
@@ -5952,6 +6910,11 @@ function saveProfile() {
         if (data.success) {
             // Update display section with the returned profile data
             updateProfileDisplay(data.profile || profileData);
+            
+            // MODIFIED: Update localStorage for userProfiles (for posts functionality)
+            const userProfiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
+            userProfiles[username] = data.profile || profileData;
+            localStorage.setItem('userProfiles', JSON.stringify(userProfiles));
             
             // Show success message
             showSuccess('Profile updated successfully!');
@@ -7410,6 +8373,6 @@ document.addEventListener('click', function (e) {
         openZoom(e.target.src);
     }
 });
-    </script>
+ </script>
 </body>
 </html>
