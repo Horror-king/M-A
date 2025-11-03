@@ -1,14 +1,12 @@
 const axios = require("axios");
-const fs = require("fs");
-const path = require("path");
 
 module.exports = {
   config: {
     name: "gen",
-    version: "1.1",
+    version: "1.3",
     hasPermssion: 0,
     credits: "Hassan",
-    description: "Generate AI image using TheOne API (auto sends image)",
+    description: "Generate AI image using TheOne API (for Page Bot display)",
     commandCategory: "AI-Image",
     usages: "gen <prompt>",
     cooldowns: 5,
@@ -16,32 +14,25 @@ module.exports = {
     aliases: ["gimg", "genimage"]
   },
 
-  onStart: async function ({ api, event, args, message }) {
+  onStart: async function ({ message, args }) {
     try {
-      const inputText = args.join(" ").trim();
-      if (!inputText) {
-        return message.reply("📝 Please provide a prompt.\nExample: -gen futuristic city on Mars");
+      const prompt = args.join(" ").trim();
+      if (!prompt) {
+        return message.reply("📝 Please enter a prompt.\nExample: gen futuristic car");
       }
 
-      const encodedPrompt = encodeURIComponent(inputText);
+      // Encode and build image URL
+      const encodedPrompt = encodeURIComponent(prompt);
       const imageUrl = `https://theone-fast-image-gen.vercel.app/view?prompt=${encodedPrompt}`;
 
-      // Download image temporarily
-      const imgPath = path.join(__dirname, `${Date.now()}_gen.jpg`);
-      const response = await axios.get(imageUrl, { responseType: "arraybuffer" });
-      fs.writeFileSync(imgPath, Buffer.from(response.data, "binary"));
+      // Compose final message — must contain the URL for your frontend to show the image
+      const responseText = `✨ Prompt: "${prompt}"\n${imageUrl}`;
 
-      // Send image directly
-      await api.sendMessage(
-        {
-          body: `✨ Prompt: "${inputText}"`,
-          attachment: fs.createReadStream(imgPath)
-        },
-        event.threadID,
-        () => fs.unlinkSync(imgPath) // delete after sending
-      );
+      // Send message back to page
+      return message.reply(responseText);
+
     } catch (err) {
-      console.error("GEN CMD ERROR:", err.message);
+      console.error("GEN CMD ERROR:", err);
       return message.reply(`🚨 Error: ${err.message || "Failed to generate image"}`);
     }
   }
