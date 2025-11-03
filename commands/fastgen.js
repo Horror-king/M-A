@@ -3,7 +3,7 @@ const axios = require("axios");
 module.exports = {
   config: {
     name: "fastgen",
-    version: "2.0",
+    version: "2.1",
     hasPermssion: 0,
     credits: "TawsiN (Modified by Hassan)",
     description: "Fast AI image generation (returns image_url for HTML display)",
@@ -14,16 +14,16 @@ module.exports = {
     aliases: ["quickimg", "aigen"]
   },
 
-  onStart: async function ({ event, args, api }) {
+  onStart: async function ({ api, event, args, message }) {
     try {
       const inputText = args.join(" ").trim();
       if (!inputText) {
-        return {
-          reply: "📝 Please provide a prompt.\nExample: -fastgen a castle on clouds --ar 2:3"
-        };
+        return message.reply(
+          "📝 Please provide a prompt.\nExample: -fastgen a castle on clouds --ar 2:3"
+        );
       }
 
-      // Extract aspect ratio if provided
+      // Extract aspect ratio
       let aspectRatio = "1:1";
       const arMatch = inputText.match(/--ar\s*(\d+:\d+)/i);
       const prompt = arMatch ? inputText.replace(arMatch[0], "").trim() : inputText;
@@ -32,9 +32,9 @@ module.exports = {
       const imageUrls = [];
       const count = 4;
 
-      // Generate images (4)
+      // Generate multiple images
       for (let i = 0; i < count; i++) {
-        const res = await axios.get(`https://www.ai4chat.co/api/image/generate`, {
+        const res = await axios.get("https://www.ai4chat.co/api/image/generate", {
           params: { prompt, aspect_ratio: aspectRatio },
           timeout: 25000
         });
@@ -47,20 +47,19 @@ module.exports = {
       }
 
       if (imageUrls.length === 0) {
-        return { reply: "❌ Failed to generate images. Please try again." };
+        return message.reply("❌ Failed to generate images. Please try again.");
       }
 
-      // Return clean structure for your HTML front-end
-      return {
-        reply: {
-          message: `✨ Prompt: "${prompt}"\n📐 Aspect Ratio: ${aspectRatio}\n🖼 Generated ${imageUrls.length} Images`,
-          image_url: imageUrls
-        }
-      };
+      // Send the URLs in one message
+      const output = `✨ Prompt: "${prompt}"\n📐 Aspect Ratio: ${aspectRatio}\n🖼 Generated ${imageUrls.length} Images\n\n` +
+        imageUrls.map((url, i) => `🔹 Image ${i + 1}: ${url}`).join("\n");
+
+      // Works with your /api/command system
+      return api.sendMessage(output, event.threadID);
 
     } catch (err) {
       console.error("FASTGEN ERROR:", err.message);
-      return { reply: `🚨 Error: ${err.message || "Failed to generate image"}` };
+      return message.reply(`🚨 Error: ${err.message || "Failed to generate image"}`);
     }
   }
 };
