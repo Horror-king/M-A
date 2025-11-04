@@ -2796,416 +2796,336 @@
             border-radius: 0;
             z-index: 1;
         }
-     // --- CUT HERE ---
-        /* Posts Feed Styles */
-        .posts-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px 20px;
-            background: var(--card-bg);
-            border-bottom: 1px solid var(--border-color);
-        }
+        /* FIXED: Posts Feed Styling */
+.posts-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    background: white;
+    border-bottom: 1px solid #e4e6eb;
+    position: sticky;
+    top: 50px;
+    z-index: 10;
+}
 
-        .posts-header h2 {
-            margin: 0;
-            color: var(--text-color);
-            font-size: 1.5rem;
-        }
+.posts-header h2 {
+    margin: 0;
+    color: #1c1e21;
+    font-size: 1.5rem;
+}
 
-        .create-post-btn {
-            background: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: background 0.3s ease;
-        }
+.create-post-btn {
+    background: #4267B2;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.3s ease;
+}
 
-        .create-post-btn:hover {
-            background: var(--primary-dark);
-        }
+.create-post-btn:hover {
+    background: #365899;
+}
 
-        .posts-container {
-            padding: 20px;
-            max-height: calc(100vh - 150px);
-            overflow-y: auto;
-        }
+.posts-container {
+    padding: 20px;
+    max-height: calc(100vh - 150px);
+    overflow-y: auto;
+    background: #f0f2f5;
+}
 
-        .post-card {
-            background: var(--card-bg);
-            border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 15px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            border: 1px solid var(--border-color);
-        }
+.post-card {
+    background: white;
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: 1px solid #e4e6eb;
+}
 
-        .post-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 12px;
-        }
+.post-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
 
-        .post-author-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            object-fit: cover;
-        }
+.post-author-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+}
 
-        .post-author-info {
-            flex: 1;
-        }
+.post-author-info {
+    flex: 1;
+}
 
-        .post-author-name {
-            font-weight: 600;
-            color: var(--text-color);
-            margin-bottom: 2px;
-        }
+.post-author-name {
+    font-weight: 600;
+    color: #1c1e21;
+    margin-bottom: 2px;
+}
 
-        .post-meta {
-            font-size: 12px;
-            color: var(--text-muted);
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
+.post-meta {
+    font-size: 12px;
+    color: #65676b;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
 
-        .post-content {
-            color: var(--text-color);
-            line-height: 1.4;
-            margin-bottom: 15px;
-            white-space: pre-wrap;
-        }
+.post-content {
+    color: #1c1e21;
+    line-height: 1.4;
+    margin-bottom: 15px;
+    white-space: pre-wrap;
+}
 
-        .post-media {
-            margin: 15px 0;
-            border-radius: 8px;
-            overflow: hidden;
-        }
+.post-stats {
+    display: flex;
+    gap: 20px;
+    padding: 10px 0;
+    border-bottom: 1px solid #e4e6eb;
+    color: #65676b;
+    font-size: 14px;
+}
 
-        .post-media img {
-            width: 100%;
-            max-height: 400px;
-            object-fit: cover;
-            border-radius: 8px;
-            cursor: pointer;
-        }
+.post-likes, .post-comments-count {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
 
-        .post-media video {
-            width: 100%;
-            max-height: 400px;
-            border-radius: 8px;
-        }
+.post-actions {
+    display: flex;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid #e4e6eb;
+}
 
-        .post-stats {
-            display: flex;
-            gap: 20px;
-            padding: 10px 0;
-            border-bottom: 1px solid var(--border-color);
-            color: var(--text-muted);
-            font-size: 14px;
-        }
+.post-action {
+    flex: 1;
+    background: none;
+    border: none;
+    padding: 8px;
+    border-radius: 5px;
+    color: #65676b;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    transition: all 0.3s ease;
+}
 
-        .post-likes, .post-comments-count {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
+.post-action:hover {
+    background: #f0f2f5;
+    color: #1c1e21;
+}
 
-        .post-actions {
-            display: flex;
-            gap: 10px;
-            padding: 10px 0;
-            border-bottom: 1px solid var(--border-color);
-        }
+.post-comments {
+    margin-top: 15px;
+}
 
-        .post-action {
-            flex: 1;
-            background: none;
-            border: none;
-            padding: 8px;
-            border-radius: 5px;
-            color: var(--text-muted);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 5px;
-            transition: all 0.3s ease;
-        }
+.comment {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+}
 
-        .post-action:hover {
-            background: var(--hover-color);
-            color: var(--text-color);
-        }
+.comment-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+}
 
-        .post-comments {
-            margin-top: 15px;
-        }
+.comment-content {
+    flex: 1;
+    background: #f0f2f5;
+    padding: 10px;
+    border-radius: 10px;
+}
 
-        .comment {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 12px;
-        }
+.comment-author {
+    font-weight: 600;
+    font-size: 14px;
+    color: #1c1e21;
+    margin-bottom: 4px;
+}
 
-        .comment-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            object-fit: cover;
-        }
+.comment-text {
+    color: #1c1e21;
+    font-size: 14px;
+    line-height: 1.3;
+}
 
-        .comment-content {
-            flex: 1;
-            background: var(--hover-color);
-            padding: 10px;
-            border-radius: 10px;
-        }
+.comment-input {
+    margin-top: 10px;
+}
 
-        .comment-author {
-            font-weight: 600;
-            font-size: 14px;
-            color: var(--text-color);
-            margin-bottom: 4px;
-        }
+.comment-input input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #e4e6eb;
+    border-radius: 20px;
+    background: #f0f2f5;
+    color: #1c1e21;
+    font-size: 14px;
+    outline: none;
+}
 
-        .comment-text {
-            color: var(--text-color);
-            font-size: 14px;
-            line-height: 1.3;
-        }
+.comment-input input:focus {
+    border-color: #4267B2;
+}
 
-        .comment-input {
-            margin-top: 10px;
-        }
+.no-posts {
+    text-align: center;
+    padding: 40px 20px;
+    color: #65676b;
+}
 
-        .comment-input input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid var(--border-color);
-            border-radius: 20px;
-            background: var(--hover-color);
-            color: var(--text-color);
-            font-size: 14px;
-        }
+/* Post Modal */
+.post-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
 
-        .comment-input input:focus {
-            outline: none;
-            border-color: var(--primary-color);
-        }
+.post-modal-content {
+    background: white;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
 
-        .no-posts {
-            text-align: center;
-            padding: 40px 20px;
-            color: var(--text-muted);
-        }
+.post-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid #e4e6eb;
+}
 
-        /* Post Modal Styles */
-        .post-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
+.post-modal-header h3 {
+    margin: 0;
+    color: #1c1e21;
+}
 
-        .post-modal-content {
-            background: var(--card-bg);
-            border-radius: 10px;
-            width: 90%;
-            max-width: 500px;
-            max-height: 80vh;
-            overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        }
+.close-modal {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #65676b;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
 
-        .post-modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px 20px;
-            border-bottom: 1px solid var(--border-color);
-        }
+.post-modal-body {
+    padding: 20px;
+}
 
-        .post-modal-header h3 {
-            margin: 0;
-            color: var(--text-color);
-        }
+.post-author-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 15px;
+}
 
-        .close-modal {
-            background: none;
-            border: none;
-            font-size: 24px;
-            color: var(--text-muted);
-            cursor: pointer;
-            padding: 0;
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+#post-author-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+}
 
-        .post-modal-body {
-            padding: 20px;
-        }
+#post-content {
+    width: 100%;
+    min-height: 120px;
+    border: none;
+    background: transparent;
+    color: #1c1e21;
+    font-size: 16px;
+    resize: none;
+    margin-bottom: 10px;
+    outline: none;
+    font-family: inherit;
+}
 
-        .post-author-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 15px;
-        }
+.post-content-counter {
+    text-align: right;
+    font-size: 12px;
+    color: #65676b;
+    margin-bottom: 15px;
+}
 
-        #post-author-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            object-fit: cover;
-        }
+.post-action-btn {
+    flex: 1;
+    background: #f0f2f5;
+    border: 1px solid #e4e6eb;
+    padding: 10px;
+    border-radius: 8px;
+    color: #1c1e21;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+}
 
-        #post-content {
-            width: 100%;
-            min-height: 120px;
-            border: none;
-            background: transparent;
-            color: var(--text-color);
-            font-size: 16px;
-            resize: none;
-            margin-bottom: 10px;
-        }
+.post-action-btn:hover {
+    background: #e4e6eb;
+}
 
-        #post-content:focus {
-            outline: none;
-        }
+.post-submit-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 20px;
+}
 
-        .post-content-counter {
-            text-align: right;
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-bottom: 15px;
-        }
+.submit-post-btn {
+    background: #4267B2;
+    color: white;
+    border: none;
+    padding: 10px 30px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s ease;
+}
 
-        .post-actions {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
+.submit-post-btn:disabled {
+    background: #a0a4ab;
+    cursor: not-allowed;
+}
 
-        .post-action-btn {
-            flex: 1;
-            background: var(--hover-color);
-            border: 1px solid var(--border-color);
-            padding: 10px;
-            border-radius: 8px;
-            color: var(--text-color);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            transition: all 0.3s ease;
-        }
-
-        .post-action-btn:hover {
-            background: var(--primary-light);
-            border-color: var(--primary-color);
-        }
-
-        .post-media-preview {
-            margin: 15px 0;
-            border-radius: 8px;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .media-preview-item {
-            position: relative;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
-        .media-preview-item img,
-        .media-preview-item video {
-            width: 100%;
-            max-height: 200px;
-            object-fit: cover;
-        }
-
-        .remove-media {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.7);
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .post-submit-actions {
-            display: flex;
-            justify-content: flex-end;
-        }
-
-        .submit-post-btn {
-            background: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 10px 30px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background 0.3s ease;
-        }
-
-        .submit-post-btn:disabled {
-            background: var(--text-muted);
-            cursor: not-allowed;
-        }
-
-        .submit-post-btn:not(:disabled):hover {
-            background: var(--primary-dark);
-        }
-
-        /* Dark theme adjustments */
-        .dark-theme .post-card {
-            background: #2d3748;
-            border-color: #4a5568;
-        }
-
-        .dark-theme .post-action-btn {
-            background: #4a5568;
-            border-color: #718096;
-        }
-
-        .dark-theme .comment-content {
-            background: #4a5568;
-        }
-
-        .dark-theme .comment-input input {
-            background: #4a5568;
-            border-color: #718096;
-        }
+.submit-post-btn:not(:disabled):hover {
+    background: #365899;
+}
+// --- CUT HERE ---
     </style>
 </head>
 <body>
@@ -3765,35 +3685,70 @@
     </div>
 
     <script>
-      // ===== POSTS FEED JAVASCRIPT =====
+       // ===== ENHANCED POSTS FUNCTIONALITY =====
 
-// Posts data structure
-let posts = JSON.parse(localStorage.getItem('messageMatePosts')) || [];
-let currentPostMedia = [];
+// Initialize posts when the page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize posts if user is logged in
+    if (currentUserSession) {
+        initializePosts();
+    }
+});
 
-// Initialize posts functionality
+// Enhanced posts initialization
 function initializePosts() {
+    console.log('📝 Initializing posts functionality...');
+    
+    // Load existing posts
     loadPosts();
+    
+    // Setup post input handlers
     setupPostInputHandlers();
     
-    // Listen for real-time post updates
+    // Setup create post button
+    const createPostBtn = document.getElementById('create-post-btn');
+    if (createPostBtn) {
+        createPostBtn.onclick = openCreatePostModal;
+    }
+    
+    // Listen for real-time post updates via Socket.io
     if (socket) {
         socket.on('new-post', (post) => {
             addPostToFeed(post);
         });
+        
+        socket.on('post-liked', (data) => {
+            updatePostLikes(data.postId, data.likes);
+        });
+        
+        socket.on('new-comment', (data) => {
+            addCommentToPost(data.postId, data.comment);
+        });
     }
+    
+    console.log('✅ Posts functionality initialized');
 }
 
-// Load posts from localStorage
+// Enhanced load posts function
 function loadPosts() {
     const postsContainer = document.getElementById('posts-container');
-    if (!postsContainer) return;
+    if (!postsContainer) {
+        console.error('❌ Posts container not found');
+        return;
+    }
     
     // Clear container
     postsContainer.innerHTML = '';
     
     if (posts.length === 0) {
-        postsContainer.innerHTML = '<div class="no-posts"><p>No posts yet. Be the first to share something!</p></div>';
+        postsContainer.innerHTML = `
+            <div class="no-posts">
+                <p>No posts yet. Be the first to share something!</p>
+                <button class="create-post-btn" onclick="openCreatePostModal()" style="margin-top: 15px;">
+                    <i class="fas fa-plus"></i> Create Your First Post
+                </button>
+            </div>
+        `;
         return;
     }
     
@@ -3806,7 +3761,7 @@ function loadPosts() {
     });
 }
 
-// Display a single post
+// Enhanced display post function
 function displayPost(post) {
     const postsContainer = document.getElementById('posts-container');
     if (!postsContainer) return;
@@ -3824,12 +3779,13 @@ function displayPost(post) {
     
     // Get user profile for avatar and display name
     const userProfile = getUserProfile(post.author);
-    
+    const displayName = userProfile.displayName || userProfile.firstname + ' ' + userProfile.lastname || post.author;
+
     postElement.innerHTML = `
         <div class="post-header">
             <img class="post-author-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/50?u=${post.author}`}" alt="${post.author}">
             <div class="post-author-info">
-                <div class="post-author-name">${userProfile.displayName || post.author}</div>
+                <div class="post-author-name">${displayName}</div>
                 <div class="post-meta">
                     <span class="post-time">${timeAgo}</span>
                     <span>•</span>
@@ -3841,8 +3797,11 @@ function displayPost(post) {
         ${post.media ? `
             <div class="post-media">
                 ${post.media.type === 'image' ? 
-                    `<img src="${post.media.url}" alt="Post image" onclick="openZoom('${post.media.url}')">` : 
-                    `<video controls><source src="${post.media.url}" type="video/mp4">Your browser does not support the video tag.</video>`
+                    `<img src="${post.media.url}" alt="Post image" onclick="openZoom('${post.media.url}')" style="cursor: pointer;">` : 
+                    `<video controls style="width: 100%; border-radius: 8px;">
+                        <source src="${post.media.url}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>`
                 }
             </div>
         ` : ''}
@@ -3884,55 +3843,39 @@ function displayPost(post) {
     postsContainer.appendChild(postElement);
 }
 
-// Format post time (relative time)
-function formatPostTime(timestamp) {
-    const now = new Date();
-    const postTime = new Date(timestamp);
-    const diffMs = now - postTime;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-    
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    
-    return postTime.toLocaleDateString();
-}
-
-// Get user profile data for posts
-function getUserProfile(username) {
-    // In a real app, this would fetch from the server
-    // For now, we'll use a simple approach
-    const profiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
-    return profiles[username] || { username: username };
-}
-
-// Open create post modal
+// Enhanced create post modal
 function openCreatePostModal() {
     const modal = document.getElementById('create-post-modal');
-    if (modal) {
-        modal.style.display = 'flex';
-        
-        // Set author info
-        const currentUser = currentUserSession?.username;
-        if (currentUser) {
-            const userProfile = getUserProfile(currentUser);
-            document.getElementById('post-author-avatar').src = userProfile.avatar || `https://i.pravatar.cc/50?u=${currentUser}`;
-            document.getElementById('post-author-name').textContent = userProfile.displayName || currentUser;
-        }
-        
-        // Reset form
-        document.getElementById('post-content').value = '';
-        document.getElementById('post-char-count').textContent = '0';
-        document.getElementById('post-media-preview').innerHTML = '';
-        document.getElementById('submit-post-btn').disabled = true;
-        currentPostMedia = [];
+    if (!modal) {
+        console.error('❌ Create post modal not found');
+        return;
     }
+    
+    modal.style.display = 'flex';
+    
+    // Set author info
+    const currentUser = currentUserSession?.username;
+    if (currentUser) {
+        const userProfile = getUserProfile(currentUser);
+        const displayName = userProfile.displayName || userProfile.firstname + ' ' + userProfile.lastname || currentUser;
+        
+        document.getElementById('post-author-avatar').src = userProfile.avatar || `https://i.pravatar.cc/50?u=${currentUser}`;
+        document.getElementById('post-author-name').textContent = displayName;
+    }
+    
+    // Reset form
+    document.getElementById('post-content').value = '';
+    document.getElementById('post-char-count').textContent = '0';
+    document.getElementById('post-media-preview').innerHTML = '';
+    document.getElementById('submit-post-btn').disabled = true;
+    currentPostMedia = [];
+    
+    // Focus on textarea
+    setTimeout(() => {
+        document.getElementById('post-content').focus();
+    }, 100);
 }
 
-// Close create post modal
 function closeCreatePostModal() {
     const modal = document.getElementById('create-post-modal');
     if (modal) {
@@ -3940,10 +3883,10 @@ function closeCreatePostModal() {
     }
 }
 
-// Setup post input handlers
+// Enhanced setup post input handlers
 function setupPostInputHandlers() {
     const postContent = document.getElementById('post-content');
-    const createPostBtn = document.getElementById('create-post-btn');
+    const postModal = document.getElementById('create-post-modal');
     
     if (postContent) {
         postContent.addEventListener('input', function() {
@@ -3956,24 +3899,26 @@ function setupPostInputHandlers() {
                 submitBtn.disabled = charCount === 0 && currentPostMedia.length === 0;
             }
         });
-    }
-    
-    if (createPostBtn) {
-        createPostBtn.addEventListener('click', openCreatePostModal);
+        
+        // Allow Enter key to submit (with Ctrl/Cmd)
+        postContent.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                createPost();
+            }
+        });
     }
     
     // Close modal when clicking outside
-    const modal = document.getElementById('create-post-modal');
-    if (modal) {
-        modal.addEventListener('click', function(e) {
-            if (e.target === modal) {
+    if (postModal) {
+        postModal.addEventListener('click', function(e) {
+            if (e.target === postModal) {
                 closeCreatePostModal();
             }
         });
     }
 }
 
-// Create a new post
+// Enhanced create post function
 function createPost() {
     const content = document.getElementById('post-content').value.trim();
     const author = currentUserSession?.username;
@@ -3992,9 +3937,10 @@ function createPost() {
         id: generatePostId(),
         author: author,
         content: content,
-        media: currentPostMedia.length > 0 ? currentPostMedia[0] : null, // For simplicity, only one media per post
+        media: currentPostMedia.length > 0 ? currentPostMedia[0] : null,
         timestamp: new Date().toISOString(),
         likes: 0,
+        likedBy: [],
         comments: []
     };
     
@@ -4017,59 +3963,74 @@ function createPost() {
     if (socket) {
         socket.emit('new-post', newPost);
     }
+    
+    console.log('✅ New post created:', newPost);
 }
 
-// Generate unique post ID
-function generatePostId() {
-    return 'post_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-}
-
-// Add post to feed (for real-time updates)
-function addPostToFeed(post) {
-    const postsContainer = document.getElementById('posts-container');
-    if (!postsContainer) return;
-    
-    // Remove no-posts message if it exists
-    const noPosts = postsContainer.querySelector('.no-posts');
-    if (noPosts) noPosts.remove();
-    
-    // Check if post already exists
-    const existingPost = document.querySelector(`[data-post-id="${post.id}"]`);
-    if (existingPost) return;
-    
-    // Add to beginning of feed
-    displayPost(post);
-    
-    // Scroll to top to show new post
-    postsContainer.scrollTop = 0;
-}
-
-// Like a post
+// Enhanced like post function
 function likePost(postId) {
     const post = posts.find(p => p.id === postId);
     if (!post) return;
     
-    // Toggle like
-    if (!post.likes) post.likes = 0;
-    post.likes += 1;
+    const currentUser = currentUserSession?.username;
+    if (!currentUser) {
+        showError('You must be logged in to like posts');
+        return;
+    }
+    
+    // Initialize likedBy array if needed
+    if (!post.likedBy) post.likedBy = [];
+    
+    // Check if user already liked the post
+    const userIndex = post.likedBy.indexOf(currentUser);
+    
+    if (userIndex > -1) {
+        // Unlike the post
+        post.likedBy.splice(userIndex, 1);
+        post.likes = Math.max(0, (post.likes || 1) - 1);
+    } else {
+        // Like the post
+        post.likedBy.push(currentUser);
+        post.likes = (post.likes || 0) + 1;
+    }
     
     // Update localStorage
     localStorage.setItem('messageMatePosts', JSON.stringify(posts));
     
     // Update UI
+    updatePostLikesUI(postId, post.likes, userIndex > -1);
+    
+    // Broadcast via Socket.io
+    if (socket) {
+        socket.emit('post-liked', {
+            postId: postId,
+            likes: post.likes,
+            likedBy: post.likedBy
+        });
+    }
+}
+
+function updatePostLikesUI(postId, likes, isLiked) {
     const postElement = document.querySelector(`[data-post-id="${postId}"]`);
     if (postElement) {
         const likesElement = postElement.querySelector('.post-likes');
+        const likeButton = postElement.querySelector('.post-action:first-child');
+        
         if (likesElement) {
-            likesElement.innerHTML = `<i class="fas fa-thumbs-up"></i> ${post.likes}`;
+            likesElement.innerHTML = `<i class="fas fa-thumbs-up"></i> ${likes}`;
+        }
+        
+        if (likeButton) {
+            if (isLiked) {
+                likeButton.innerHTML = '<i class="far fa-thumbs-up"></i> Like';
+            } else {
+                likeButton.innerHTML = '<i class="fas fa-thumbs-up"></i> Liked';
+            }
         }
     }
-    
-    // Show animation or feedback
-    showSuccess('Liked!');
 }
 
-// Focus comment input
+// Enhanced comment functionality
 function focusCommentInput(postId) {
     const postElement = document.querySelector(`[data-post-id="${postId}"]`);
     if (postElement) {
@@ -4080,7 +4041,6 @@ function focusCommentInput(postId) {
     }
 }
 
-// Handle comment keypress
 function handleCommentKeypress(event, postId) {
     if (event.key === 'Enter') {
         const input = event.target;
@@ -4093,19 +4053,22 @@ function handleCommentKeypress(event, postId) {
     }
 }
 
-// Add comment to post
 function addComment(postId, text) {
     const post = posts.find(p => p.id === postId);
     if (!post) return;
     
     const author = currentUserSession?.username;
-    if (!author) return;
+    if (!author) {
+        showError('You must be logged in to comment');
+        return;
+    }
     
     // Initialize comments array if needed
     if (!post.comments) post.comments = [];
     
     // Add new comment
     const newComment = {
+        id: generateCommentId(),
         author: author,
         text: text,
         timestamp: new Date().toISOString()
@@ -4132,11 +4095,12 @@ function addComment(postId, text) {
             commentElement.className = 'comment';
             
             const userProfile = getUserProfile(author);
+            const displayName = userProfile.displayName || userProfile.firstname + ' ' + userProfile.lastname || author;
             
             commentElement.innerHTML = `
                 <img class="comment-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/32?u=${author}`}" alt="${author}">
                 <div class="comment-content">
-                    <div class="comment-author">${userProfile.displayName || author}</div>
+                    <div class="comment-author">${displayName}</div>
                     <div class="comment-text">${escapeHtml(text)}</div>
                 </div>
             `;
@@ -4144,11 +4108,70 @@ function addComment(postId, text) {
             // Insert before the comment input
             const commentInput = commentsContainer.querySelector('.comment-input');
             commentsContainer.insertBefore(commentElement, commentInput);
+            
+            // Scroll to show new comment
+            commentElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     }
+    
+    // Broadcast via Socket.io
+    if (socket) {
+        socket.emit('new-comment', {
+            postId: postId,
+            comment: newComment
+        });
+    }
+    
+    showSuccess('Comment added!');
 }
 
-// Share a post
+// Helper functions
+function generatePostId() {
+    return 'post_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+function generateCommentId() {
+    return 'comment_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+function formatPostTime(timestamp) {
+    const now = new Date();
+    const postTime = new Date(timestamp);
+    const diffMs = now - postTime;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    
+    return postTime.toLocaleDateString();
+}
+
+function addPostToFeed(post) {
+    const postsContainer = document.getElementById('posts-container');
+    if (!postsContainer) return;
+    
+    // Remove no-posts message if it exists
+    const noPosts = postsContainer.querySelector('.no-posts');
+    if (noPosts) noPosts.remove();
+    
+    // Check if post already exists
+    const existingPost = document.querySelector(`[data-post-id="${post.id}"]`);
+    if (existingPost) return;
+    
+    // Add to beginning of feed
+    displayPost(post);
+    
+    // Scroll to top to show new post
+    postsContainer.scrollTop = 0;
+    
+    // Show notification
+    showSuccess('New post added to feed!');
+}
+
 function sharePost(postId) {
     const post = posts.find(p => p.id === postId);
     if (!post) return;
@@ -4186,25 +4209,45 @@ function openVideoUpload() {
 
 function openLocationShare() {
     // This would use the Geolocation API in a real app
-    alert('Location sharing would be implemented here in a real app');
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const locationUrl = `https://maps.google.com/?q=${lat},${lng}`;
+            addMediaToPost('location', locationUrl);
+            showSuccess('Location added to post!');
+        }, (error) => {
+            showError('Unable to get your location: ' + error.message);
+        });
+    } else {
+        showError('Geolocation is not supported by this browser');
+    }
 }
 
-// Add media to post
 function addMediaToPost(type, url) {
     // For simplicity, we'll only allow one media item per post
     currentPostMedia = [{ type, url }];
     
     const previewContainer = document.getElementById('post-media-preview');
     if (previewContainer) {
-        previewContainer.innerHTML = `
-            <div class="media-preview-item">
-                ${type === 'image' ? 
-                    `<img src="${url}" alt="Preview">` : 
-                    `<video controls><source src="${url}" type="video/mp4">Your browser does not support the video tag.</video>`
-                }
-                <button class="remove-media" onclick="removeMedia()">×</button>
-            </div>
-        `;
+        let previewHTML = '';
+        
+        if (type === 'image') {
+            previewHTML = `<img src="${url}" alt="Preview" style="max-width: 100%; border-radius: 8px; margin-bottom: 10px;">`;
+        } else if (type === 'video') {
+            previewHTML = `<video controls style="max-width: 100%; border-radius: 8px; margin-bottom: 10px;">
+                <source src="${url}" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>`;
+        } else if (type === 'location') {
+            previewHTML = `<div style="padding: 10px; background: #f0f2f5; border-radius: 8px; margin-bottom: 10px;">
+                <i class="fas fa-map-marker-alt"></i> Location: <a href="${url}" target="_blank">View on Map</a>
+            </div>`;
+        }
+        
+        previewHTML += `<button class="remove-media" onclick="removeMedia()" style="background: #ff4444; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Remove</button>`;
+        
+        previewContainer.innerHTML = previewHTML;
     }
     
     // Enable submit button if there's media
@@ -4214,7 +4257,6 @@ function addMediaToPost(type, url) {
     }
 }
 
-// Remove media from post
 function removeMedia() {
     currentPostMedia = [];
     const previewContainer = document.getElementById('post-media-preview');
@@ -4229,7 +4271,6 @@ function removeMedia() {
         submitBtn.disabled = true;
     }
 }
-
 // --- CUT HERE ---
 
 // ===== YOUR EXISTING CODE CONTINUES BELOW =====
