@@ -3765,7 +3765,7 @@
     </div>
 
     <script>
-             // ===== POSTS FEED JAVASCRIPT =====
+      // ===== POSTS FEED JAVASCRIPT =====
 
 // Posts data structure
 let posts = JSON.parse(localStorage.getItem('messageMatePosts')) || [];
@@ -4230,7 +4230,9 @@ function removeMedia() {
     }
 }
 
-// ===== EXISTING CODE CONTINUES BELOW =====
+// --- CUT HERE ---
+
+// ===== YOUR EXISTING CODE CONTINUES BELOW =====
 
 // NEW: Welcome screen animation function
 function animateWelcomeText() {
@@ -4377,7 +4379,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// ===== EXISTING VARIABLES AND FUNCTIONS =====
+// ===== YOUR EXISTING VARIABLES AND FUNCTIONS =====
 
 let isLogin = true;
 let longPressTimer;
@@ -4825,7 +4827,15 @@ function autoResize(textarea) {
     }
 }
 
-// ===== SECTION MANAGEMENT FUNCTIONS =====
+// --- CUT HERE ---
+// Helper function to escape HTML
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ===== MODIFIED: Update showContainer function to initialize posts =====
 function showContainer(containerId) {
     console.log('🔄 Showing container:', containerId);
     
@@ -4948,6 +4958,16 @@ function showContainer(containerId) {
             privateGoTopBtn.style.display = 'none';
             privateGoTopBtn.classList.remove('visible');
         }
+    } else if (containerId === 'posts') {
+        // Hide both buttons for posts feed
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'none';
+            scrollToBottomBtn.classList.remove('visible');
+        }
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.classList.remove('visible');
+        }
     } else {
         // For other containers, hide both buttons
         if (scrollToBottomBtn) {
@@ -4967,6 +4987,8 @@ function showContainer(containerId) {
     const kebabDropdown = document.querySelector('.kebab-dropdown');
     if (kebabDropdown) kebabDropdown.classList.remove('active');
 }
+
+// --- CUT HERE ---
 
 function hideContainer(containerId) {
     console.log('🔄 Hiding container:', containerId);
@@ -8373,6 +8395,12 @@ document.addEventListener('click', function (e) {
         openZoom(e.target.src);
     }
 });
+        // ===== YOUR COMPLETE JAVASCRIPT CODE GOES HERE =====
+        // This should include all the JavaScript code I provided in the previous response
+        // including the posts functionality and all your existing code
+        
+        // For brevity, I'm not repeating the entire JavaScript code here
+        // but make sure to include the complete JavaScript from the previous response
     </script>
 </body>
 </html>
