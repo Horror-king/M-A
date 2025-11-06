@@ -3342,6 +3342,153 @@
         justify-content: flex-start;
         padding: 10px;
     }
+    /* Facebook-style create post box */
+.create-post-box {
+    background: white;
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 15px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    border: 1px solid #e4e6eb;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.create-post-box:hover {
+    background: #f8f9fa;
+}
+
+.create-post-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.create-post-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.create-post-input {
+    flex: 1;
+    background: #f0f2f5;
+    border: none;
+    border-radius: 20px;
+    padding: 12px 15px;
+    font-size: 15px;
+    color: #65676b;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.create-post-input:hover {
+    background: #e4e6eb;
+}
+
+.create-post-actions {
+    display: flex;
+    gap: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e4e6eb;
+    margin-top: 10px;
+}
+
+.create-post-action {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px;
+    border: none;
+    background: none;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #65676b;
+    font-size: 14px;
+    transition: background 0.3s ease;
+}
+
+.create-post-action:hover {
+    background: #f0f2f5;
+}
+
+.create-post-action i {
+    font-size: 16px;
+}
+
+/* Remove the create post button from header */
+.posts-header {
+    display: flex;
+    justify-content: center; /* Center the title */
+    align-items: center;
+    padding: 15px 20px;
+    background: white;
+    border-bottom: 1px solid #e4e6eb;
+    position: sticky;
+    top: 50px;
+    z-index: 10;
+}
+
+/* Hide the create post button */
+#create-post-btn {
+    display: none !important;
+}
+    @media (max-width: 768px) {
+    .create-post-box {
+        margin: 10px;
+        border-radius: 8px;
+    }
+    
+    .posts-header {
+        padding: 12px 15px;
+    }
+    
+    .posts-header h2 {
+        font-size: 1.2rem;
+    }
+    
+    .create-post-actions {
+        gap: 5px;
+    }
+    
+    .create-post-action {
+        padding: 6px;
+        font-size: 13px;
+    }
+    
+    .create-post-action i {
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    .create-post-box {
+        margin: 8px;
+        padding: 12px;
+    }
+    
+    .create-post-avatar {
+        width: 36px;
+        height: 36px;
+    }
+    
+    .create-post-input {
+        padding: 10px 12px;
+        font-size: 14px;
+    }
+    
+    .create-post-actions {
+        flex-direction: column;
+        gap: 2px;
+    }
+    
+    .create-post-action {
+        justify-content: flex-start;
+        padding: 8px;
+    }
 }
     </style>
 </head>
@@ -3430,21 +3577,23 @@
         <a href="#" onclick="logout()" style="color: #ff4444;">Logout</a>
     </div>
 
-    <!-- NEW: Posts Container -->
-    <div id="posts" class="main-chat-interface container" style="display: none;">
-        <div class="posts-header">
-            <h2>Community Posts</h2>
-            <button id="create-post-btn" class="create-post-btn" onclick="openCreatePostModal()">
-                <i class="fas fa-plus"></i> Create Post
-            </button>
+// --- CUT HERE ---
+        <!-- UPDATED: Posts Container without Create Post Button -->
+<div id="posts" class="main-chat-interface container" style="display: none;">
+    <div class="posts-header">
+        <h2>Community Posts</h2>
+        <!-- REMOVED: Create Post Button -->
+    </div>
+    
+    <div class="posts-container" id="posts-container">
+        <!-- Facebook-style create post box will be inserted here by JavaScript -->
+        <!-- Posts will be loaded here -->
+        <div class="no-posts">
+            <p>No posts yet. Be the first to share something!</p>
         </div>
-        
-        <div class="posts-container" id="posts-container">
-            <!-- Posts will be loaded here -->
-            <div class="no-posts">
-                <p>No posts yet. Be the first to share something!</p>
-            </div>
-        </div>
+    </div>
+    
+   
         
         <!-- Create Post Modal -->
         <div id="create-post-modal" class="post-modal" style="display: none;">
@@ -3902,8 +4051,8 @@
     </div>
 
     <script>
-       // --- CUT HERE ---
-      // ===== ENHANCED POSTS FEED JAVASCRIPT =====
+// --- CUT HERE ---
+       // ===== ENHANCED POSTS FEED JAVASCRIPT =====
 
 // Posts data structure
 let posts = JSON.parse(localStorage.getItem('messageMatePosts')) || [];
@@ -3939,26 +4088,28 @@ function setupCreatePostBox() {
     // Create Facebook-style create post box
     const createPostBox = document.createElement('div');
     createPostBox.className = 'create-post-box';
+    createPostBox.onclick = openCreatePostModal; // Make entire box clickable
+    
     createPostBox.innerHTML = `
         <div class="create-post-header">
             <img class="create-post-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/50?u=${currentUser}`}" alt="Your Avatar">
-            <div class="create-post-input" onclick="openCreatePostModal()">
+            <div class="create-post-input">
                 What's on your mind?
             </div>
         </div>
         <div class="create-post-actions">
-            <button class="create-post-action" onclick="openImageUpload()">
+            <div class="create-post-action" onclick="event.stopPropagation(); openImageUpload()">
                 <i class="fas fa-image" style="color: #45bd62;"></i>
                 Photo
-            </button>
-            <button class="create-post-action" onclick="openVideoUpload()">
+            </div>
+            <div class="create-post-action" onclick="event.stopPropagation(); openVideoUpload()">
                 <i class="fas fa-video" style="color: #f5533d;"></i>
                 Video
-            </button>
-            <button class="create-post-action" onclick="openLocationShare()">
+            </div>
+            <div class="create-post-action" onclick="event.stopPropagation(); openLocationShare()">
                 <i class="fas fa-map-marker-alt" style="color: #f7b928;"></i>
                 Location
-            </button>
+            </div>
         </div>
     `;
     
@@ -4149,7 +4300,6 @@ function closeCreatePostModal() {
 // Setup post input handlers
 function setupPostInputHandlers() {
     const postContent = document.getElementById('post-content');
-    const createPostBtn = document.getElementById('create-post-btn');
     
     if (postContent) {
         postContent.addEventListener('input', function() {
@@ -4162,10 +4312,6 @@ function setupPostInputHandlers() {
                 submitBtn.disabled = charCount === 0 && currentPostMedia.length === 0;
             }
         });
-    }
-    
-    if (createPostBtn) {
-        createPostBtn.addEventListener('click', openCreatePostModal);
     }
     
     // Close modal when clicking outside
@@ -4435,8 +4581,6 @@ function removeMedia() {
         submitBtn.disabled = true;
     }
 }
-
-// --- CUT HERE ---
 
 // ===== YOUR EXISTING CODE CONTINUES BELOW =====
 
