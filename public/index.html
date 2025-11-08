@@ -2796,7 +2796,7 @@
             border-radius: 0;
             z-index: 1;
         }
-     // --- CUT HERE ---
+       // --- CUT HERE ---
         /* ===== FIXED POSTS FEED STYLES ===== */
 #posts {
     background: #f0f2f5;
@@ -2805,7 +2805,7 @@
 
 .posts-header {
     display: flex;
-    justify-content: space-between;
+    justify-content: center; /* Center the title */
     align-items: center;
     padding: 15px 20px;
     background: white;
@@ -2822,23 +2822,9 @@
     font-weight: 600;
 }
 
-.create-post-btn {
-    background: #4267B2;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    transition: background 0.3s ease;
-    font-weight: 500;
-}
-
-.create-post-btn:hover {
-    background: #365899;
+/* Hide the create post button */
+#create-post-btn {
+    display: none !important;
 }
 
 .posts-container {
@@ -2855,13 +2841,18 @@
     margin-bottom: 15px;
     box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     border: 1px solid #e4e6eb;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.create-post-box:hover {
+    background: #f8f9fa;
 }
 
 .create-post-header {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 15px;
 }
 
 .create-post-avatar {
@@ -2892,6 +2883,7 @@
     gap: 10px;
     padding-top: 10px;
     border-top: 1px solid #e4e6eb;
+    margin-top: 10px;
 }
 
 .create-post-action {
@@ -3002,6 +2994,11 @@
     display: flex;
     align-items: center;
     gap: 5px;
+    cursor: pointer;
+}
+
+.post-likes:hover, .post-comments-count:hover {
+    text-decoration: underline;
 }
 
 .post-actions {
@@ -3031,16 +3028,73 @@
     background: #f0f2f5;
 }
 
+/* ===== FACEBOOK-STYLE HIDDEN COMMENTS ===== */
 .post-comments {
     margin-top: 15px;
     padding-top: 15px;
     border-top: 1px solid #f0f2f5;
+    background: #f8f9fa;
+    border-radius: 0 0 10px 10px;
+    margin: 15px -15px -15px -15px;
+    padding: 15px;
+    display: none; /* Hidden by default */
+}
+
+.post-comments.show-comments {
+    display: block; /* Show when toggled */
+}
+
+.comments-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e4e6eb;
+}
+
+.comments-title {
+    font-weight: 600;
+    color: #1c1e21;
+    font-size: 16px;
+}
+
+.close-comments {
+    background: none;
+    border: none;
+    color: #65676b;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s;
+}
+
+.close-comments:hover {
+    background-color: #e4e6eb;
+}
+
+.comments-list {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 12px;
 }
 
 .comment {
     display: flex;
     gap: 10px;
     margin-bottom: 12px;
+    padding: 8px;
+    border-radius: 8px;
+    transition: background-color 0.2s;
+}
+
+.comment:hover {
+    background-color: #f0f2f5;
 }
 
 .comment-avatar {
@@ -3048,13 +3102,15 @@
     height: 32px;
     border-radius: 50%;
     object-fit: cover;
+    flex-shrink: 0;
 }
 
 .comment-content {
     flex: 1;
-    background: #f0f2f5;
+    background: white;
     padding: 10px;
     border-radius: 15px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
 
 .comment-author {
@@ -3070,10 +3126,17 @@
     line-height: 1.3;
 }
 
+.no-comments {
+    text-align: center;
+    padding: 20px;
+    color: #65676b;
+    font-style: italic;
+}
+
 .comment-input {
-    margin-top: 10px;
     display: flex;
     gap: 10px;
+    align-items: center;
 }
 
 .comment-input input {
@@ -3081,14 +3144,14 @@
     padding: 10px 15px;
     border: 1px solid #e4e6eb;
     border-radius: 20px;
-    background: #f0f2f5;
+    background: white;
     color: #1c1e21;
     font-size: 14px;
     outline: none;
+    transition: border-color 0.2s;
 }
 
 .comment-input input:focus {
-    background: white;
     border-color: #4267B2;
 }
 
@@ -3100,6 +3163,11 @@
     padding: 10px 15px;
     cursor: pointer;
     font-size: 14px;
+    transition: background 0.2s;
+}
+
+.comment-input button:hover {
+    background: #365899;
 }
 
 .no-posts {
@@ -3311,6 +3379,8 @@
     
     .create-post-box {
         padding: 12px;
+        margin: 10px;
+        border-radius: 8px;
     }
     
     .post-card {
@@ -3321,129 +3391,22 @@
         margin: 10px;
         max-width: calc(100% - 20px);
     }
-}
-
-@media (max-width: 480px) {
-    .posts-header h2 {
-        font-size: 1.1rem;
+    
+    .post-comments {
+        margin: 12px -12px -12px -12px;
+        padding: 12px;
     }
     
-    .create-post-btn {
-        padding: 6px 12px;
-        font-size: 13px;
+    .comments-list {
+        max-height: 250px;
     }
     
-    .create-post-actions {
-        flex-direction: column;
-        gap: 5px;
+    .comment {
+        padding: 6px;
     }
     
-    .create-post-action {
-        justify-content: flex-start;
-        padding: 10px;
-    }
-    /* Facebook-style create post box */
-.create-post-box {
-    background: white;
-    border-radius: 10px;
-    padding: 15px;
-    margin-bottom: 15px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-    border: 1px solid #e4e6eb;
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-
-.create-post-box:hover {
-    background: #f8f9fa;
-}
-
-.create-post-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.create-post-avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    object-fit: cover;
-}
-
-.create-post-input {
-    flex: 1;
-    background: #f0f2f5;
-    border: none;
-    border-radius: 20px;
-    padding: 12px 15px;
-    font-size: 15px;
-    color: #65676b;
-    cursor: pointer;
-    transition: background 0.3s ease;
-}
-
-.create-post-input:hover {
-    background: #e4e6eb;
-}
-
-.create-post-actions {
-    display: flex;
-    gap: 10px;
-    padding-top: 10px;
-    border-top: 1px solid #e4e6eb;
-    margin-top: 10px;
-}
-
-.create-post-action {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 8px;
-    border: none;
-    background: none;
-    border-radius: 6px;
-    cursor: pointer;
-    color: #65676b;
-    font-size: 14px;
-    transition: background 0.3s ease;
-}
-
-.create-post-action:hover {
-    background: #f0f2f5;
-}
-
-.create-post-action i {
-    font-size: 16px;
-}
-
-/* Remove the create post button from header */
-.posts-header {
-    display: flex;
-    justify-content: center; /* Center the title */
-    align-items: center;
-    padding: 15px 20px;
-    background: white;
-    border-bottom: 1px solid #e4e6eb;
-    position: sticky;
-    top: 50px;
-    z-index: 10;
-}
-
-/* Hide the create post button */
-#create-post-btn {
-    display: none !important;
-}
-    @media (max-width: 768px) {
-    .create-post-box {
-        margin: 10px;
-        border-radius: 8px;
-    }
-    
-    .posts-header {
-        padding: 12px 15px;
+    .comment-content {
+        padding: 8px;
     }
     
     .posts-header h2 {
@@ -3465,6 +3428,10 @@
 }
 
 @media (max-width: 480px) {
+    .posts-header h2 {
+        font-size: 1.1rem;
+    }
+    
     .create-post-box {
         margin: 8px;
         padding: 12px;
@@ -3488,6 +3455,33 @@
     .create-post-action {
         justify-content: flex-start;
         padding: 8px;
+    }
+    
+    .post-comments {
+        margin: 10px -10px -10px -10px;
+        padding: 10px;
+    }
+    
+    .comments-header {
+        margin-bottom: 10px;
+    }
+    
+    .comments-title {
+        font-size: 14px;
+    }
+    
+    .comment-input {
+        gap: 8px;
+    }
+    
+    .comment-input input {
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+    
+    .comment-input button {
+        padding: 8px 12px;
+        font-size: 13px;
     }
 }
     </style>
@@ -3577,6 +3571,7 @@
         <a href="#" onclick="logout()" style="color: #ff4444;">Logout</a>
     </div>
 
+// --- CUT HERE ---
         <!-- UPDATED: Posts Container without Create Post Button -->
 <div id="posts" class="main-chat-interface container" style="display: none;">
     <div class="posts-header">
@@ -4051,7 +4046,7 @@
 
     <script>
 // --- CUT HERE ---
-       // ===== ENHANCED POSTS FEED JAVASCRIPT =====
+        // ===== ENHANCED POSTS FEED JAVASCRIPT =====
 
 // Posts data structure
 let posts = JSON.parse(localStorage.getItem('messageMatePosts')) || [];
@@ -4147,7 +4142,7 @@ function loadPosts() {
     });
 }
 
-// Display a single post
+// Display a single post with Facebook-style comments (hidden by default)
 function displayPost(post) {
     const postsList = document.getElementById('posts-list');
     if (!postsList) return;
@@ -4199,25 +4194,33 @@ function displayPost(post) {
             <button class="post-action" onclick="likePost('${post.id}')">
                 <i class="far fa-thumbs-up"></i> Like
             </button>
-            <button class="post-action" onclick="focusCommentInput('${post.id}')">
+            <button class="post-action" onclick="toggleComments('${post.id}')">
                 <i class="far fa-comment"></i> Comment
             </button>
             <button class="post-action" onclick="sharePost('${post.id}')">
                 <i class="far fa-share-square"></i> Share
             </button>
         </div>
-        <div class="post-comments">
-            ${post.comments ? post.comments.map(comment => `
-                <div class="comment">
-                    <img class="comment-avatar" src="${getUserProfile(comment.author).avatar || `https://i.pravatar.cc/32?u=${comment.author}`}" alt="${comment.author}">
-                    <div class="comment-content">
-                        <div class="comment-author">${getUserProfile(comment.author).displayName || comment.author}</div>
-                        <div class="comment-text">${escapeHtml(comment.text)}</div>
+        <div class="post-comments" id="comments-${post.id}" style="display: none;">
+            <div class="comments-header">
+                <span class="comments-title">Comments</span>
+                <button class="close-comments" onclick="closeComments('${post.id}')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="comments-list" id="comments-list-${post.id}">
+                ${post.comments ? post.comments.map(comment => `
+                    <div class="comment">
+                        <img class="comment-avatar" src="${getUserProfile(comment.author).avatar || `https://i.pravatar.cc/32?u=${comment.author}`}" alt="${comment.author}">
+                        <div class="comment-content">
+                            <div class="comment-author">${getUserProfile(comment.author).displayName || comment.author}</div>
+                            <div class="comment-text">${escapeHtml(comment.text)}</div>
+                        </div>
                     </div>
-                </div>
-            `).join('') : ''}
+                `).join('') : '<div class="no-comments">No comments yet</div>'}
+            </div>
             <div class="comment-input">
-                <input type="text" placeholder="Write a comment..." onkeypress="handleCommentKeypress(event, '${post.id}')">
+                <input type="text" id="comment-input-${post.id}" placeholder="Write a comment..." onkeypress="handleCommentKeypress(event, '${post.id}')">
                 <button onclick="addCommentFromInput('${post.id}')">Post</button>
             </div>
         </div>
@@ -4226,12 +4229,43 @@ function displayPost(post) {
     postsList.appendChild(postElement);
 }
 
+// Toggle comments visibility (like Facebook)
+function toggleComments(postId) {
+    const commentsSection = document.getElementById(`comments-${postId}`);
+    const commentInput = document.getElementById(`comment-input-${postId}`);
+    
+    if (commentsSection) {
+        if (commentsSection.style.display === 'none') {
+            // Show comments
+            commentsSection.style.display = 'block';
+            
+            // Focus the comment input after a short delay
+            setTimeout(() => {
+                if (commentInput) {
+                    commentInput.focus();
+                }
+            }, 100);
+        } else {
+            // Hide comments
+            commentsSection.style.display = 'none';
+        }
+    }
+}
+
+// Close comments section
+function closeComments(postId) {
+    const commentsSection = document.getElementById(`comments-${postId}`);
+    if (commentsSection) {
+        commentsSection.style.display = 'none';
+    }
+}
+
 // Add comment from input
 function addCommentFromInput(postId) {
     const postElement = document.querySelector(`[data-post-id="${postId}"]`);
     if (!postElement) return;
     
-    const input = postElement.querySelector('.comment-input input');
+    const input = document.getElementById(`comment-input-${postId}`);
     const text = input.value.trim();
     
     if (text) {
@@ -4420,17 +4454,6 @@ function likePost(postId) {
     showSuccess('Liked!');
 }
 
-// Focus comment input
-function focusCommentInput(postId) {
-    const postElement = document.querySelector(`[data-post-id="${postId}"]`);
-    if (postElement) {
-        const commentInput = postElement.querySelector('.comment-input input');
-        if (commentInput) {
-            commentInput.focus();
-        }
-    }
-}
-
 // Handle comment keypress
 function handleCommentKeypress(event, postId) {
     if (event.key === 'Enter') {
@@ -4471,12 +4494,18 @@ function addComment(postId, text) {
     const postElement = document.querySelector(`[data-post-id="${postId}"]`);
     if (postElement) {
         const commentsContainer = postElement.querySelector('.post-comments');
-        if (commentsContainer) {
+        const commentsList = document.getElementById(`comments-list-${postId}`);
+        
+        if (commentsContainer && commentsList) {
             // Update comments count
             const commentsCount = postElement.querySelector('.post-comments-count');
             if (commentsCount) {
                 commentsCount.textContent = `${post.comments.length} comments`;
             }
+            
+            // Remove "no comments" message if it exists
+            const noComments = commentsList.querySelector('.no-comments');
+            if (noComments) noComments.remove();
             
             // Add new comment
             const commentElement = document.createElement('div');
@@ -4492,9 +4521,10 @@ function addComment(postId, text) {
                 </div>
             `;
             
-            // Insert before the comment input
-            const commentInput = commentsContainer.querySelector('.comment-input');
-            commentsContainer.insertBefore(commentElement, commentInput);
+            commentsList.appendChild(commentElement);
+            
+            // Ensure comments section is visible when adding a comment
+            commentsContainer.style.display = 'block';
         }
     }
 }
