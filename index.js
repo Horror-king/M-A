@@ -1890,7 +1890,7 @@ app.get('/private-messages', async (req, res) => {
 // ===== SUPABASE POSTS AND COMMENTS ENDPOINTS =====
 
 // Create posts table if it doesn't exist
-app.post('/api/create-posts-table', async (req, res) => {
+app.get'/api/create-posts-table', async (req, res) => {
   try {
     console.log('🔧 Creating posts table...');
     
