@@ -1889,10 +1889,84 @@ app.get('/private-messages', async (req, res) => {
 
 // ===== SUPABASE POSTS AND COMMENTS ENDPOINTS =====
 
-// Create posts table if it doesn't exist
-app.get'/api/create-posts-table', async (req, res) => {
+// FIXED: Add GET endpoint for /api/create-posts-table
+app.get('/api/create-posts-table', async (req, res) => {
   try {
-    console.log('🔧 Creating posts table...');
+    console.log('🔧 Checking posts table via GET...');
+    
+    const { data: tableCheck, error: checkError } = await supabase
+      .from('posts')
+      .select('*')
+      .limit(1);
+
+    if (checkError && checkError.code === '42P01') {
+      res.json({
+        success: false,
+        error: "Table doesn't exist",
+        instructions: [
+          "1. Go to your Supabase dashboard",
+          "2. Go to the SQL Editor", 
+          "3. Run this SQL to create the table:",
+          `
+          CREATE TABLE IF NOT EXISTS posts (
+            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+            author_username TEXT NOT NULL,
+            content TEXT NOT NULL,
+            media_url TEXT,
+            media_type TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            likes_count INTEGER DEFAULT 0,
+            comments_count INTEGER DEFAULT 0
+          );
+          `,
+          "4. Create comments table:",
+          `
+          CREATE TABLE IF NOT EXISTS post_comments (
+            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+            post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
+            author_username TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          );
+          `,
+          "5. Create post_likes table:",
+          `
+          CREATE TABLE IF NOT EXISTS post_likes (
+            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+            post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
+            username TEXT NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            UNIQUE(post_id, username)
+          );
+          `
+        ]
+      });
+    } else if (checkError) {
+      throw checkError;
+    } else {
+      console.log('✅ Posts table exists (GET check)');
+      res.json({
+        success: true,
+        message: "Posts table exists",
+        sampleData: tableCheck?.[0],
+        instructions: "Use POST /api/create-posts-table to create the table if it doesn't exist"
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Error checking posts table (GET):', error);
+    res.status(500).json({ 
+      success: false,
+      error: "Error checking table: " + error.message 
+    });
+  }
+});
+
+// Create posts table if it doesn't exist - POST endpoint (original)
+app.post('/api/create-posts-table', async (req, res) => {
+  try {
+    console.log('🔧 Creating posts table via POST...');
     
     const { data: tableCheck, error: checkError } = await supabase
       .from('posts')
@@ -3473,6 +3547,7 @@ server.listen(port, () => {
   console.log(`   POST /api/messages - Send message (client-compatible)`);
   console.log(`   DELETE /api/messages/:id - Delete message (client-compatible)`);
   console.log(`📝 POSTS SYSTEM: ENABLED via Supabase`);
+  console.log(`   GET /api/create-posts-table - Check posts table (NEW!)`);
   console.log(`   POST /api/create-posts-table - Create posts table if needed`);
   console.log(`   GET /api/posts - Get all posts with comments and likes`);
   console.log(`   POST /api/posts - Create a new post`);
@@ -3485,6 +3560,7 @@ server.listen(port, () => {
   console.log(`🔍 Debug ALL Commands: http://localhost:${port}/debug-all-commands`);
   console.log(`🔍 Debug Private Messages: http://localhost:${port}/debug-private-messages`);
   console.log(`🔍 Debug Table Structure: http://localhost:${port}/api/debug/private-messages-structure`);
+  console.log(`📝 Test Posts Table: http://localhost:${port}/api/create-posts-table`);
   if (isRender && renderExternalUrl) {
     console.log(`🌐 Render External URL: ${renderExternalUrl}`);
     console.log(`⏱️ UptimeRobot monitoring URL: ${renderExternalUrl}/health`);
@@ -3494,6 +3570,7 @@ server.listen(port, () => {
     console.log(`🔍 Debug Private Messages: ${renderExternalUrl}/debug-private-messages`);
     console.log(`🧪 Test Private Message (GET): ${renderExternalUrl}/test-private-messages`);
     console.log(`🔐 Test Authentication: ${renderExternalUrl}/api/auth-test`);
+    console.log(`📝 Test Posts Table: ${renderExternalUrl}/api/create-posts-table`);
   }
 });
 
