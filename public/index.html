@@ -4042,8 +4042,7 @@
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
-
-    <script>
+<script>
 // --- CUT HERE ---
       // Posts functionality for client-side
 let posts = [];
@@ -4223,7 +4222,7 @@ function renderPosts() {
         return;
     }
     
-    // Sort posts by timestamp (newest first)
+    // Sort posts by timestamp (newest first) - POSTS SHOULD BE NEWEST FIRST (TOP)
     const sortedPosts = [...posts].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     
     sortedPosts.forEach(post => {
@@ -4712,12 +4711,11 @@ function addPostToFeed(post) {
     const existingPost = document.querySelector(`[data-post-id="${post.id}"]`);
     if (existingPost) return;
     
-    // Add to beginning of feed
+    // Add to beginning of feed (POSTS: NEWEST AT TOP)
     const postElement = createPostElement(post);
     postsList.insertBefore(postElement, postsList.firstChild);
     
-    // Scroll to top to show new post
-    postsList.scrollTop = 0;
+    console.log('✅ New post added to feed (top position)');
 }
 
 // Generate unique post ID
@@ -5961,7 +5959,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
         messageDiv.appendChild(contentDiv);
     }
     
-    // FIXED: Always append new messages to the bottom
+    // FIXED: ALWAYS append new messages to the bottom for CHAT (MESSAGES AT BOTTOM)
     elements.chatContainer.appendChild(messageDiv);
     
     messageDiv.addEventListener('touchstart', handleTouchStart);
@@ -5975,7 +5973,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
     // Force image rendering after adding message
     setTimeout(forceImageRendering, 50);
 
-    // FIXED: ALWAYS SCROLL TO BOTTOM FOR NEW MESSAGES
+    // FIXED: ALWAYS SCROLL TO BOTTOM FOR NEW MESSAGES IN CHAT
     if (isNew) {
         setTimeout(() => {
             forceScrollToBottom('chat-container');
@@ -6055,7 +6053,7 @@ function displayPrivateMessage(text, sender, repliedTo = null, username = 'Priva
     messageBody.appendChild(contentDiv);
     messageDiv.appendChild(messageBody);
     
-    // FIXED: Always append to the bottom of private chat container
+    // FIXED: Always append to the bottom of private chat container (MESSAGES AT BOTTOM)
     container.appendChild(messageDiv);
 
     // ADDED: Add event listeners for long press and context menu to private AI messages
@@ -6067,7 +6065,7 @@ function displayPrivateMessage(text, sender, repliedTo = null, username = 'Priva
         showPrivateMessageContextMenu(e, messageDiv);
     });
 
-    // FIXED: IMMEDIATELY scroll to bottom for private chat
+    // FIXED: IMMEDIATELY scroll to bottom for private chat (MESSAGES AT BOTTOM)
     setTimeout(() => {
         forceScrollToBottom('private-ai-container');
         setTimeout(() => forceScrollToBottom('private-ai-container'), 50);
@@ -8011,7 +8009,7 @@ function renderMessages(messages) {
     // FIXED: Clear container but maintain scroll position
     elements.chatContainer.innerHTML = '';
     
-    // FIXED: Display messages in correct chronological order (oldest to newest)
+    // FIXED: Display messages in correct chronological order (oldest to newest) - MESSAGES AT BOTTOM
     messages.forEach(msg => {
         const isOwn = msg.username?.trim().toLowerCase() === currentUserSession?.username?.trim().toLowerCase();
         displayMessage(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id, false);
