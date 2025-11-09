@@ -4045,23 +4045,86 @@
 
     <script>
 // --- CUT HERE ---
-        // ===== ENHANCED POSTS FEED JAVASCRIPT =====
-
-// Posts data structure
-let posts = JSON.parse(localStorage.getItem('messageMatePosts')) || [];
+      // Posts functionality for client-side
+let posts = [];
+let lastUpdateTimestamp = null;
 let currentPostMedia = [];
 
-// Initialize posts functionality with Facebook-style create post box
+// Initialize posts functionality
 function initializePosts() {
     loadPosts();
     setupPostInputHandlers();
     setupCreatePostBox();
     
+    // Start polling for updates every 5 seconds
+    setInterval(pollForPostUpdates, 5000);
+    
     // Listen for real-time post updates
-    if (socket) {
+    if (typeof socket !== 'undefined' && socket) {
         socket.on('new-post', (post) => {
             addPostToFeed(post);
         });
+    }
+}
+
+// Load posts from server
+async function loadPosts() {
+    try {
+        const currentUser = currentUserSession?.username;
+        const response = await fetch(`/api/posts?username=${currentUser}`);
+        
+        if (response.ok) {
+            posts = await response.json();
+            renderPosts();
+            lastUpdateTimestamp = new Date().toISOString();
+        } else {
+            console.error('Failed to load posts');
+            // Fallback to localStorage if server fails
+            loadPostsFromLocalStorage();
+        }
+    } catch (error) {
+        console.error('Error loading posts:', error);
+        // Fallback to localStorage if server fails
+        loadPostsFromLocalStorage();
+    }
+}
+
+// Fallback: Load posts from localStorage
+function loadPostsFromLocalStorage() {
+    const localPosts = JSON.parse(localStorage.getItem('messageMatePosts')) || [];
+    if (localPosts.length > 0) {
+        posts = localPosts;
+        renderPosts();
+        showInfo('Using locally saved posts (server unavailable)');
+    }
+}
+
+// Poll for new posts and updates
+async function pollForPostUpdates() {
+    try {
+        const response = await fetch(`/api/posts/updates?lastUpdate=${lastUpdateTimestamp}`);
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.posts.length > 0) {
+                // Update existing posts or add new ones
+                data.posts.forEach(updatedPost => {
+                    const existingIndex = posts.findIndex(p => p.id === updatedPost.id);
+                    if (existingIndex >= 0) {
+                        // Update existing post
+                        posts[existingIndex] = updatedPost;
+                    } else {
+                        // Add new post to beginning
+                        posts.unshift(updatedPost);
+                    }
+                });
+                
+                renderPosts();
+                lastUpdateTimestamp = data.timestamp;
+            }
+        }
+    } catch (error) {
+        console.error('Error polling for updates:', error);
     }
 }
 
@@ -4111,8 +4174,8 @@ function setupCreatePostBox() {
     postsContainer.insertBefore(createPostBox, postsList);
 }
 
-// Load posts from localStorage
-function loadPosts() {
+// Render all posts
+function renderPosts() {
     const postsContainer = document.getElementById('posts-container');
     if (!postsContainer) return;
     
@@ -4124,43 +4187,32 @@ function loadPosts() {
         postsContainer.appendChild(postsList);
     }
     
-    // Clear posts list
     postsList.innerHTML = '';
     
     if (posts.length === 0) {
-        postsList.innerHTML = '<div class="no-posts"><p>No posts yet. Be the first to share something!</p></div>';
+        postsList.innerHTML = '<div class="no-posts">No posts yet. Be the first to share something!</div>';
         return;
     }
     
     // Sort posts by timestamp (newest first)
     const sortedPosts = [...posts].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     
-    // Display posts
     sortedPosts.forEach(post => {
-        displayPost(post);
+        const postElement = createPostElement(post);
+        postsList.appendChild(postElement);
     });
 }
 
-// Display a single post with Facebook-style comments (hidden by default)
-function displayPost(post) {
-    const postsList = document.getElementById('posts-list');
-    if (!postsList) return;
+// Create post element
+function createPostElement(post) {
+    const postDiv = document.createElement('div');
+    postDiv.className = 'post-card';
+    postDiv.dataset.postId = post.id;
     
-    // Remove no-posts message if it exists
-    const noPosts = postsList.querySelector('.no-posts');
-    if (noPosts) noPosts.remove();
-    
-    const postElement = document.createElement('div');
-    postElement.className = 'post-card';
-    postElement.dataset.postId = post.id;
-    
-    // Format timestamp
     const timeAgo = formatPostTime(post.timestamp);
-    
-    // Get user profile for avatar and display name
     const userProfile = getUserProfile(post.author);
     
-    postElement.innerHTML = `
+    postDiv.innerHTML = `
         <div class="post-header">
             <img class="post-author-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/50?u=${post.author}`}" alt="${post.author}">
             <div class="post-author-info">
@@ -4182,16 +4234,16 @@ function displayPost(post) {
             </div>
         ` : ''}
         <div class="post-stats">
-            <div class="post-likes">
+            <div class="post-likes" onclick="likePost('${post.id}')">
                 <i class="fas fa-thumbs-up"></i> ${post.likes || 0}
             </div>
-            <div class="post-comments-count">
+            <div class="post-comments-count" onclick="toggleComments('${post.id}')">
                 ${post.comments ? post.comments.length : 0} comments
             </div>
         </div>
         <div class="post-actions">
-            <button class="post-action" onclick="likePost('${post.id}')">
-                <i class="far fa-thumbs-up"></i> Like
+            <button class="post-action like" onclick="likePost('${post.id}')">
+                <i class="${post.userLiked ? 'fas' : 'far'} fa-thumbs-up"></i> Like
             </button>
             <button class="post-action" onclick="toggleComments('${post.id}')">
                 <i class="far fa-comment"></i> Comment
@@ -4210,10 +4262,10 @@ function displayPost(post) {
             <div class="comments-list" id="comments-list-${post.id}">
                 ${post.comments ? post.comments.map(comment => `
                     <div class="comment">
-                        <img class="comment-avatar" src="${getUserProfile(comment.author).avatar || `https://i.pravatar.cc/32?u=${comment.author}`}" alt="${comment.author}">
+                        <img class="comment-avatar" src="${getUserProfile(comment.author_username || comment.author).avatar || `https://i.pravatar.cc/32?u=${comment.author_username || comment.author}`}" alt="${comment.author_username || comment.author}">
                         <div class="comment-content">
-                            <div class="comment-author">${getUserProfile(comment.author).displayName || comment.author}</div>
-                            <div class="comment-text">${escapeHtml(comment.text)}</div>
+                            <div class="comment-author">${getUserProfile(comment.author_username || comment.author).displayName || (comment.author_username || comment.author)}</div>
+                            <div class="comment-text">${escapeHtml(comment.content || comment.text)}</div>
                         </div>
                     </div>
                 `).join('') : '<div class="no-comments">No comments yet</div>'}
@@ -4225,7 +4277,320 @@ function displayPost(post) {
         </div>
     `;
     
-    postsList.appendChild(postElement);
+    return postDiv;
+}
+
+// Create a new post
+async function createPost() {
+    const content = document.getElementById('post-content').value.trim();
+    const author = currentUserSession?.username;
+    
+    if (!author) {
+        showError('You must be logged in to create a post');
+        return;
+    }
+    
+    if (!content && currentPostMedia.length === 0) {
+        showError('Post content cannot be empty');
+        return;
+    }
+    
+    try {
+        const postData = {
+            author_username: author,
+            content: content
+        };
+        
+        // Add media if present
+        if (currentPostMedia.length > 0) {
+            postData.media = currentPostMedia[0];
+        }
+        
+        const response = await fetch('/api/posts', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
+            },
+            body: JSON.stringify(postData)
+        });
+        
+        if (response.ok) {
+            const newPost = await response.json();
+            
+            // Add to local posts array
+            posts.unshift(newPost);
+            renderPosts();
+            
+            // Also save to localStorage as backup
+            savePostsToLocalStorage();
+            
+            // Close modal and reset form
+            closeCreatePostModal();
+            showSuccess('Post published successfully!');
+        } else {
+            const error = await response.json();
+            showError(error.error || 'Failed to create post');
+            
+            // Fallback: Create post locally
+            createPostLocally(content, author);
+        }
+    } catch (error) {
+        console.error('Error creating post:', error);
+        showError('Failed to create post. Saving locally.');
+        
+        // Fallback: Create post locally
+        createPostLocally(content, author);
+    }
+}
+
+// Fallback: Create post locally
+function createPostLocally(content, author) {
+    const newPost = {
+        id: generatePostId(),
+        author: author,
+        content: content,
+        media: currentPostMedia.length > 0 ? currentPostMedia[0] : null,
+        timestamp: new Date().toISOString(),
+        likes: 0,
+        comments: []
+    };
+    
+    // Add to posts array
+    posts.unshift(newPost);
+    
+    // Save to localStorage
+    savePostsToLocalStorage();
+    
+    // Add to feed
+    addPostToFeed(newPost);
+    
+    // Close modal
+    closeCreatePostModal();
+    
+    // Show success message
+    showSuccess('Post published locally!');
+}
+
+// Save posts to localStorage
+function savePostsToLocalStorage() {
+    localStorage.setItem('messageMatePosts', JSON.stringify(posts));
+}
+
+// Like a post
+async function likePost(postId) {
+    const username = currentUserSession?.username;
+    
+    if (!username) {
+        showError('You must be logged in to like posts');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/posts/${postId}/like`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
+            },
+            body: JSON.stringify({ username })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            
+            // Update local post data
+            const postIndex = posts.findIndex(p => p.id === postId);
+            if (postIndex >= 0) {
+                posts[postIndex].likes = result.likesCount;
+                posts[postIndex].userLiked = result.userLiked;
+                
+                // Update UI
+                updatePostLikesUI(postId, result.likesCount, result.userLiked);
+                
+                // Save to localStorage
+                savePostsToLocalStorage();
+            }
+        } else {
+            const error = await response.json();
+            showError(error.error || 'Failed to like post');
+            
+            // Fallback: Like post locally
+            likePostLocally(postId);
+        }
+    } catch (error) {
+        console.error('Error liking post:', error);
+        showError('Failed to like post. Liking locally.');
+        
+        // Fallback: Like post locally
+        likePostLocally(postId);
+    }
+}
+
+// Fallback: Like post locally
+function likePostLocally(postId) {
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+    
+    // Toggle like
+    if (!post.likes) post.likes = 0;
+    post.likes += 1;
+    post.userLiked = true;
+    
+    // Update localStorage
+    savePostsToLocalStorage();
+    
+    // Update UI
+    updatePostLikesUI(postId, post.likes, true);
+    
+    // Show animation or feedback
+    showSuccess('Liked!');
+}
+
+// Update post likes UI
+function updatePostLikesUI(postId, likesCount, userLiked) {
+    const postElement = document.querySelector(`[data-post-id="${postId}"]`);
+    if (postElement) {
+        const likesElement = postElement.querySelector('.post-likes');
+        const likeButton = postElement.querySelector('.post-action.like i');
+        
+        if (likesElement) {
+            likesElement.innerHTML = `<i class="fas fa-thumbs-up"></i> ${likesCount}`;
+        }
+        
+        if (likeButton) {
+            likeButton.className = userLiked ? 'fas fa-thumbs-up' : 'far fa-thumbs-up';
+        }
+    }
+}
+
+// Add comment to post
+async function addComment(postId, text) {
+    const username = currentUserSession?.username;
+    
+    if (!username) {
+        showError('You must be logged in to comment');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/posts/${postId}/comments`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
+            },
+            body: JSON.stringify({
+                author_username: username,
+                content: text
+            })
+        });
+        
+        if (response.ok) {
+            const newComment = await response.json();
+            
+            // Update local post data
+            const postIndex = posts.findIndex(p => p.id === postId);
+            if (postIndex >= 0) {
+                if (!posts[postIndex].comments) {
+                    posts[postIndex].comments = [];
+                }
+                posts[postIndex].comments.push(newComment);
+                
+                // Update UI
+                updateCommentsUI(postId);
+                
+                // Save to localStorage
+                savePostsToLocalStorage();
+            }
+        } else {
+            const error = await response.json();
+            showError(error.error || 'Failed to add comment');
+            
+            // Fallback: Add comment locally
+            addCommentLocally(postId, text, username);
+        }
+    } catch (error) {
+        console.error('Error adding comment:', error);
+        showError('Failed to add comment. Adding locally.');
+        
+        // Fallback: Add comment locally
+        addCommentLocally(postId, text, username);
+    }
+}
+
+// Fallback: Add comment locally
+function addCommentLocally(postId, text, username) {
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+    
+    // Initialize comments array if needed
+    if (!post.comments) post.comments = [];
+    
+    // Add new comment
+    const newComment = {
+        author: username,
+        text: text,
+        timestamp: new Date().toISOString()
+    };
+    
+    post.comments.push(newComment);
+    
+    // Update localStorage
+    savePostsToLocalStorage();
+    
+    // Update UI
+    updateCommentsUI(postId);
+}
+
+// Update comments UI
+function updateCommentsUI(postId) {
+    const postIndex = posts.findIndex(p => p.id === postId);
+    if (postIndex < 0) return;
+    
+    const post = posts[postIndex];
+    const postElement = document.querySelector(`[data-post-id="${postId}"]`);
+    
+    if (postElement) {
+        // Update comments count
+        const commentsCount = postElement.querySelector('.post-comments-count');
+        if (commentsCount) {
+            commentsCount.textContent = `${post.comments ? post.comments.length : 0} comments`;
+        }
+        
+        // Update comments list
+        const commentsList = document.getElementById(`comments-list-${postId}`);
+        if (commentsList) {
+            commentsList.innerHTML = '';
+            
+            if (post.comments && post.comments.length > 0) {
+                post.comments.forEach(comment => {
+                    const commentElement = document.createElement('div');
+                    commentElement.className = 'comment';
+                    
+                    const userProfile = getUserProfile(comment.author_username || comment.author);
+                    
+                    commentElement.innerHTML = `
+                        <img class="comment-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/32?u=${comment.author_username || comment.author}`}" alt="${comment.author_username || comment.author}">
+                        <div class="comment-content">
+                            <div class="comment-author">${userProfile.displayName || (comment.author_username || comment.author)}</div>
+                            <div class="comment-text">${escapeHtml(comment.content || comment.text)}</div>
+                        </div>
+                    `;
+                    
+                    commentsList.appendChild(commentElement);
+                });
+            } else {
+                commentsList.innerHTML = '<div class="no-comments">No comments yet</div>';
+            }
+        }
+        
+        // Ensure comments section is visible when adding a comment
+        const commentsSection = document.getElementById(`comments-${postId}`);
+        if (commentsSection) {
+            commentsSection.style.display = 'block';
+        }
+    }
 }
 
 // Toggle comments visibility (like Facebook)
@@ -4273,29 +4638,60 @@ function addCommentFromInput(postId) {
     }
 }
 
-// Format post time (relative time)
-function formatPostTime(timestamp) {
-    const now = new Date();
-    const postTime = new Date(timestamp);
-    const diffMs = now - postTime;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-    
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    
-    return postTime.toLocaleDateString();
+// Handle comment keypress
+function handleCommentKeypress(event, postId) {
+    if (event.key === 'Enter') {
+        const input = event.target;
+        const text = input.value.trim();
+        
+        if (text) {
+            addComment(postId, text);
+            input.value = '';
+        }
+    }
 }
 
-// Get user profile data for posts
-function getUserProfile(username) {
-    // In a real app, this would fetch from the server
-    // For now, we'll use a simple approach
-    const profiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
-    return profiles[username] || { username: username };
+// Share a post
+function sharePost(postId) {
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+    
+    // In a real app, this would open a share dialog
+    // For now, we'll just copy the post content to clipboard
+    const shareText = `${post.author}: ${post.content}`;
+    
+    navigator.clipboard.writeText(shareText).then(() => {
+        showSuccess('Post content copied to clipboard!');
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+        showError('Failed to share post');
+    });
+}
+
+// Add post to feed (for real-time updates)
+function addPostToFeed(post) {
+    const postsList = document.getElementById('posts-list');
+    if (!postsList) return;
+    
+    // Remove no-posts message if it exists
+    const noPosts = postsList.querySelector('.no-posts');
+    if (noPosts) noPosts.remove();
+    
+    // Check if post already exists
+    const existingPost = document.querySelector(`[data-post-id="${post.id}"]`);
+    if (existingPost) return;
+    
+    // Add to beginning of feed
+    const postElement = createPostElement(post);
+    postsList.insertBefore(postElement, postsList.firstChild);
+    
+    // Scroll to top to show new post
+    postsList.scrollTop = 0;
+}
+
+// Generate unique post ID
+function generatePostId() {
+    return 'post_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
 // Open create post modal
@@ -4355,194 +4751,6 @@ function setupPostInputHandlers() {
             }
         });
     }
-}
-
-// Create a new post
-function createPost() {
-    const content = document.getElementById('post-content').value.trim();
-    const author = currentUserSession?.username;
-    
-    if (!author) {
-        showError('You must be logged in to create a post');
-        return;
-    }
-    
-    if (!content && currentPostMedia.length === 0) {
-        showError('Post cannot be empty');
-        return;
-    }
-    
-    const newPost = {
-        id: generatePostId(),
-        author: author,
-        content: content,
-        media: currentPostMedia.length > 0 ? currentPostMedia[0] : null, // For simplicity, only one media per post
-        timestamp: new Date().toISOString(),
-        likes: 0,
-        comments: []
-    };
-    
-    // Add to posts array
-    posts.unshift(newPost);
-    
-    // Save to localStorage
-    localStorage.setItem('messageMatePosts', JSON.stringify(posts));
-    
-    // Add to feed
-    addPostToFeed(newPost);
-    
-    // Close modal
-    closeCreatePostModal();
-    
-    // Show success message
-    showSuccess('Post published successfully!');
-    
-    // Broadcast via Socket.io if available
-    if (socket) {
-        socket.emit('new-post', newPost);
-    }
-}
-
-// Generate unique post ID
-function generatePostId() {
-    return 'post_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-}
-
-// Add post to feed (for real-time updates)
-function addPostToFeed(post) {
-    const postsList = document.getElementById('posts-list');
-    if (!postsList) return;
-    
-    // Remove no-posts message if it exists
-    const noPosts = postsList.querySelector('.no-posts');
-    if (noPosts) noPosts.remove();
-    
-    // Check if post already exists
-    const existingPost = document.querySelector(`[data-post-id="${post.id}"]`);
-    if (existingPost) return;
-    
-    // Add to beginning of feed
-    displayPost(post);
-    
-    // Scroll to top to show new post
-    postsList.scrollTop = 0;
-}
-
-// Like a post
-function likePost(postId) {
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
-    
-    // Toggle like
-    if (!post.likes) post.likes = 0;
-    post.likes += 1;
-    
-    // Update localStorage
-    localStorage.setItem('messageMatePosts', JSON.stringify(posts));
-    
-    // Update UI
-    const postElement = document.querySelector(`[data-post-id="${postId}"]`);
-    if (postElement) {
-        const likesElement = postElement.querySelector('.post-likes');
-        if (likesElement) {
-            likesElement.innerHTML = `<i class="fas fa-thumbs-up"></i> ${post.likes}`;
-        }
-    }
-    
-    // Show animation or feedback
-    showSuccess('Liked!');
-}
-
-// Handle comment keypress
-function handleCommentKeypress(event, postId) {
-    if (event.key === 'Enter') {
-        const input = event.target;
-        const text = input.value.trim();
-        
-        if (text) {
-            addComment(postId, text);
-            input.value = '';
-        }
-    }
-}
-
-// Add comment to post
-function addComment(postId, text) {
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
-    
-    const author = currentUserSession?.username;
-    if (!author) return;
-    
-    // Initialize comments array if needed
-    if (!post.comments) post.comments = [];
-    
-    // Add new comment
-    const newComment = {
-        author: author,
-        text: text,
-        timestamp: new Date().toISOString()
-    };
-    
-    post.comments.push(newComment);
-    
-    // Update localStorage
-    localStorage.setItem('messageMatePosts', JSON.stringify(posts));
-    
-    // Update UI
-    const postElement = document.querySelector(`[data-post-id="${postId}"]`);
-    if (postElement) {
-        const commentsContainer = postElement.querySelector('.post-comments');
-        const commentsList = document.getElementById(`comments-list-${postId}`);
-        
-        if (commentsContainer && commentsList) {
-            // Update comments count
-            const commentsCount = postElement.querySelector('.post-comments-count');
-            if (commentsCount) {
-                commentsCount.textContent = `${post.comments.length} comments`;
-            }
-            
-            // Remove "no comments" message if it exists
-            const noComments = commentsList.querySelector('.no-comments');
-            if (noComments) noComments.remove();
-            
-            // Add new comment
-            const commentElement = document.createElement('div');
-            commentElement.className = 'comment';
-            
-            const userProfile = getUserProfile(author);
-            
-            commentElement.innerHTML = `
-                <img class="comment-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/32?u=${author}`}" alt="${author}">
-                <div class="comment-content">
-                    <div class="comment-author">${userProfile.displayName || author}</div>
-                    <div class="comment-text">${escapeHtml(text)}</div>
-                </div>
-            `;
-            
-            commentsList.appendChild(commentElement);
-            
-            // Ensure comments section is visible when adding a comment
-            commentsContainer.style.display = 'block';
-        }
-    }
-}
-
-// Share a post
-function sharePost(postId) {
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
-    
-    // In a real app, this would open a share dialog
-    // For now, we'll just copy the post content to clipboard
-    const shareText = `${post.author}: ${post.content}`;
-    
-    navigator.clipboard.writeText(shareText).then(() => {
-        showSuccess('Post content copied to clipboard!');
-    }).catch(err => {
-        console.error('Failed to copy: ', err);
-        showError('Failed to share post');
-    });
 }
 
 // Media upload functions (simplified for demo)
@@ -4608,6 +4816,80 @@ function removeMedia() {
     if (submitBtn && !content) {
         submitBtn.disabled = true;
     }
+}
+
+// Utility functions
+function formatPostTime(timestamp) {
+    const now = new Date();
+    const postTime = new Date(timestamp);
+    const diffMs = now - postTime;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    
+    return postTime.toLocaleDateString();
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function getUserProfile(username) {
+    const profiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
+    return profiles[username] || { username: username };
+}
+
+// Initialize posts when showing posts container
+function showContainer(containerId) {
+    // Hide all containers
+    const containers = document.querySelectorAll('.main-content > div');
+    containers.forEach(container => {
+        container.style.display = 'none';
+    });
+    
+    // Show selected container
+    const selectedContainer = document.getElementById(containerId);
+    if (selectedContainer) {
+        selectedContainer.style.display = 'block';
+    }
+    
+    // Initialize specific functionality based on container
+    if (containerId === 'posts') {
+        initializePosts();
+    }
+}
+
+// Open zoom modal for media
+function openZoom(mediaUrl) {
+    // Implementation for zoom modal
+    console.log('Opening zoom for:', mediaUrl);
+    // You would implement a modal here to show the media in full size
+}
+
+// Notification functions
+function showError(message) {
+    // Implementation for showing error messages
+    console.error('Error:', message);
+    alert('Error: ' + message);
+}
+
+function showSuccess(message) {
+    // Implementation for showing success messages
+    console.log('Success:', message);
+    alert('Success: ' + message);
+}
+
+function showInfo(message) {
+    // Implementation for showing info messages
+    console.log('Info:', message);
+    alert('Info: ' + message);
 }
 
 // ===== YOUR EXISTING CODE CONTINUES BELOW =====
