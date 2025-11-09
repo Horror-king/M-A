@@ -4049,15 +4049,23 @@
 let posts = [];
 let lastUpdateTimestamp = null;
 let currentPostMedia = [];
+let postUpdateInterval = null;
 
 // Initialize posts functionality
 function initializePosts() {
+    console.log('📝 Initializing posts functionality...');
+    
+    // Clear existing interval if any
+    if (postUpdateInterval) {
+        clearInterval(postUpdateInterval);
+    }
+
     loadPosts();
     setupPostInputHandlers();
     setupCreatePostBox();
     
     // Start polling for updates every 5 seconds
-    setInterval(pollForPostUpdates, 5000);
+    postUpdateInterval = setInterval(pollForPostUpdates, 5000);
     
     // Listen for real-time post updates
     if (typeof socket !== 'undefined' && socket) {
@@ -4065,18 +4073,27 @@ function initializePosts() {
             addPostToFeed(post);
         });
     }
+    
+    console.log('✅ Posts functionality initialized');
 }
 
 // Load posts from server
 async function loadPosts() {
     try {
         const currentUser = currentUserSession?.username;
+        if (!currentUser) {
+            console.log('❌ No user logged in, cannot load posts');
+            return;
+        }
+        
+        console.log('📥 Loading posts for user:', currentUser);
         const response = await fetch(`/api/posts?username=${currentUser}`);
         
         if (response.ok) {
             posts = await response.json();
             renderPosts();
             lastUpdateTimestamp = new Date().toISOString();
+            console.log('✅ Posts loaded successfully:', posts.length, 'posts');
         } else {
             console.error('Failed to load posts');
             // Fallback to localStorage if server fails
@@ -4102,7 +4119,10 @@ function loadPostsFromLocalStorage() {
 // Poll for new posts and updates
 async function pollForPostUpdates() {
     try {
-        const response = await fetch(`/api/posts/updates?lastUpdate=${lastUpdateTimestamp}`);
+        const currentUser = currentUserSession?.username;
+        if (!currentUser) return;
+        
+        const response = await fetch(`/api/posts/updates?lastUpdate=${lastUpdateTimestamp}&username=${currentUser}`);
         
         if (response.ok) {
             const data = await response.json();
@@ -4131,7 +4151,10 @@ async function pollForPostUpdates() {
 // Setup Facebook-style create post box
 function setupCreatePostBox() {
     const postsContainer = document.getElementById('posts-container');
-    if (!postsContainer) return;
+    if (!postsContainer) {
+        console.log('❌ Posts container not found');
+        return;
+    }
     
     // Remove existing create post box if it exists
     const existingBox = postsContainer.querySelector('.create-post-box');
@@ -4139,6 +4162,11 @@ function setupCreatePostBox() {
     
     // Get current user info
     const currentUser = currentUserSession?.username;
+    if (!currentUser) {
+        console.log('❌ No user logged in, cannot create post box');
+        return;
+    }
+    
     const userProfile = getUserProfile(currentUser);
     
     // Create Facebook-style create post box
@@ -4172,6 +4200,7 @@ function setupCreatePostBox() {
     // Insert at the top of posts container
     const postsList = document.getElementById('posts-list') || postsContainer;
     postsContainer.insertBefore(createPostBox, postsList);
+    console.log('✅ Create post box setup completed');
 }
 
 // Render all posts
@@ -4201,6 +4230,8 @@ function renderPosts() {
         const postElement = createPostElement(post);
         postsList.appendChild(postElement);
     });
+    
+    console.log('✅ Posts rendered:', posts.length, 'posts');
 }
 
 // Create post element
@@ -4848,6 +4879,8 @@ function getUserProfile(username) {
 
 // Initialize posts when showing posts container
 function showContainer(containerId) {
+    console.log('🔄 Showing container:', containerId);
+    
     // Hide all containers
     const containers = document.querySelectorAll('.main-content > div');
     containers.forEach(container => {
@@ -4862,6 +4895,7 @@ function showContainer(containerId) {
     
     // Initialize specific functionality based on container
     if (containerId === 'posts') {
+        console.log('📝 Initializing posts container...');
         initializePosts();
     }
 }
@@ -4950,6 +4984,10 @@ function initializeMainApp() {
     // IMPORTANT: Create profile section and load profile data
     updateProfileSection(); // Create the profile section first
     loadProfile(); // Then load the actual profile data
+    
+    // MODIFIED: Initialize posts functionality when user logs in
+    console.log('📝 Initializing posts functionality on login...');
+    initializePosts();
     
     initializeChat();
 
@@ -5555,6 +5593,7 @@ function showContainer(containerId) {
         
         // MODIFIED: Initialize posts if showing that container
         if (containerId === 'posts') {
+            console.log('📝 Showing posts container, initializing posts...');
             initializePosts();
         }
     }
@@ -6496,6 +6535,12 @@ function logout() {
         socket.emit('user-offline', username);
         // Disconnect socket
         socket.disconnect();
+    }
+    
+    // Clear posts polling interval
+    if (postUpdateInterval) {
+        clearInterval(postUpdateInterval);
+        postUpdateInterval = null;
     }
     
     // Clear user session from both storage locations
@@ -9055,12 +9100,6 @@ document.addEventListener('click', function (e) {
         openZoom(e.target.src);
     }
 });
-        // ===== YOUR COMPLETE JAVASCRIPT CODE GOES HERE =====
-        // This should include all the JavaScript code I provided in the previous response
-        // including the posts functionality and all your existing code
-        
-        // For brevity, I'm not repeating the entire JavaScript code here
-        // but make sure to include the complete JavaScript from the previous response
     </script>
 </body>
 </html>
