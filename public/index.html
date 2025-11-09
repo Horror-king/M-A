@@ -5867,7 +5867,8 @@ async function sendPrivateMessage() {
     }, 1000);
 }
 
-// ===== MESSAGE DISPLAY FUNCTIONS =====
+// --- CUT HERE ---
+// ===== FIXED: MESSAGE DISPLAY FUNCTIONS - NEWEST MESSAGES AT BOTTOM =====
 function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
     if (!elements.chatContainer) return;
     
@@ -5974,7 +5975,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
         messageDiv.appendChild(contentDiv);
     }
     
-    // FIXED: ALWAYS append new messages to the bottom for CHAT (MESSAGES AT BOTTOM)
+    // FIXED: ALWAYS append new messages to the bottom for CHAT (NEWEST AT BOTTOM)
     elements.chatContainer.appendChild(messageDiv);
     
     messageDiv.addEventListener('touchstart', handleTouchStart);
@@ -6068,7 +6069,7 @@ function displayPrivateMessage(text, sender, repliedTo = null, username = 'Priva
     messageBody.appendChild(contentDiv);
     messageDiv.appendChild(messageBody);
     
-    // FIXED: Always append to the bottom of private chat container (MESSAGES AT BOTTOM)
+    // FIXED: Always append to the bottom of private chat container (NEWEST AT BOTTOM)
     container.appendChild(messageDiv);
 
     // ADDED: Add event listeners for long press and context menu to private AI messages
@@ -6080,10 +6081,35 @@ function displayPrivateMessage(text, sender, repliedTo = null, username = 'Priva
         showPrivateMessageContextMenu(e, messageDiv);
     });
 
-    // FIXED: IMMEDIATELY scroll to bottom for private chat (MESSAGES AT BOTTOM)
+    // FIXED: IMMEDIATELY scroll to bottom for private chat (NEWEST AT BOTTOM)
     setTimeout(() => {
         forceScrollToBottom('private-ai-container');
         setTimeout(() => forceScrollToBottom('private-ai-container'), 50);
+    }, 10);
+}
+
+// ===== FIXED: RENDER MESSAGES WITH CORRECT ORDER - NEWEST AT BOTTOM =====
+function renderMessages(messages) {
+    if (!elements.chatContainer) return;
+    
+    // FIXED: Clear container but maintain scroll position
+    elements.chatContainer.innerHTML = '';
+    
+    // FIXED: Display messages in correct chronological order (oldest to newest) - NEWEST AT BOTTOM
+    messages.forEach(msg => {
+        const isOwn = msg.username?.trim().toLowerCase() === currentUserSession?.username?.trim().toLowerCase();
+        displayMessage(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id, false);
+    });
+
+    // Update scroll state after rendering messages
+    setTimeout(updateScrollState, 0);
+
+    // FIXED: IMMEDIATELY scroll to bottom after loading ALL messages (NEWEST AT BOTTOM)
+    setTimeout(() => {
+        forceScrollToBottom('chat-container');
+        // Additional attempts to ensure it works
+        setTimeout(() => forceScrollToBottom('chat-container'), 50);
+        setTimeout(() => forceScrollToBottom('chat-container'), 100);
     }, 10);
 }
 
