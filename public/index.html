@@ -4042,7 +4042,6 @@
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
-// --- CUT HERE ---
 <script>
 // --- CUT HERE ---
       // Posts functionality for client-side
@@ -4969,7 +4968,7 @@ function animateWelcomeText() {
     }, 2500); // Total animation time: 2.5 seconds
 }
 
-// NEW: Function to initialize main app when user is already logged in
+// MODIFIED: Function to initialize main app when user is already logged in
 function initializeMainApp() {
     console.log('🚀 Initializing main application for logged-in user...');
     
@@ -4990,7 +4989,22 @@ function initializeMainApp() {
     
     initializeChat();
 
+    // MODIFIED: Initialize socket connection FIRST and ensure user is marked as online
+    console.log('🔌 Initializing socket connection for online status...');
     initSocket();
+    
+    // NEW: Force online status update after socket is ready
+    setTimeout(() => {
+        const username = currentUserSession?.username;
+        if (username && socket) {
+            console.log('🔄 Forcing online status update for:', username);
+            socket.emit('user-online', username);
+            
+            // Request current online users list
+            socket.emit('get-online-users');
+        }
+    }, 1000);
+    
     setupTypingHandlers();
     setupTypingDetection();
     setupTypingSocketEvents();
@@ -6071,7 +6085,8 @@ function displayPrivateMessage(text, sender, repliedTo = null, username = 'Priva
         forceScrollToBottom('private-ai-container');
         setTimeout(() => forceScrollToBottom('private-ai-container'), 50);
     }, 10);
-}// --- CUT HERE ---
+}
+
 // ===== SCROLL FUNCTIONS =====
 function forceScrollToBottom(containerId) {
     const container = document.getElementById(containerId);
@@ -6533,6 +6548,12 @@ function logout() {
         socket.emit('user-offline', username);
         // Disconnect socket
         socket.disconnect();
+    }
+    
+    // Clear posts polling interval
+    if (postUpdateInterval) {
+        clearInterval(postUpdateInterval);
+        postUpdateInterval = null;
     }
     
     // Clear user session from both storage locations
@@ -7872,7 +7893,7 @@ function messageUser() {
 
 // ===== FIXED: MESSAGE ORDER AND SECTION MANAGEMENT =====
 
-// Initialize socket connection for real-time messaging
+// MODIFIED: Initialize socket connection for real-time messaging with better online status handling
 function initSocket() {
     console.log('🔌 Initializing socket connection...');
     socket = io();
@@ -7881,9 +7902,15 @@ function initSocket() {
         console.log('✅ Socket connected');
         const username = currentUserSession?.username;
         if (username) {
+            // Force online status immediately when socket connects
             socket.emit('user-online', username);
+            console.log('🔄 Emitted user-online for:', username);
+            
             // Request existing messages when connecting
             socket.emit('request-messages');
+            
+            // Request current online users
+            socket.emit('get-online-users');
         }
     });
 
@@ -7923,12 +7950,19 @@ function initSocket() {
         renderMessages(messages);
     });
 
-    // User status updates
+    // User status updates - FIXED: Ensure online users list is always updated
     socket.on('user-status-change', (data) => {
         console.log('👤 User status change:', data);
         onlineUsers = data.onlineUsers || [];
         updateOnlineUsersList(onlineUsers);
         updateUserStatusIndicator(data.username, data.status);
+    });
+
+    // NEW: Listen specifically for online users list updates
+    socket.on('online-users-update', (data) => {
+        console.log('👥 Online users update received:', data.onlineUsers);
+        onlineUsers = data.onlineUsers || [];
+        updateOnlineUsersList(onlineUsers);
     });
 
     // ADDED: Typing events
@@ -7952,6 +7986,9 @@ function initSocket() {
         if (username && socket.connected) {
             socket.emit('user-online', username);
             console.log('💓 Heartbeat sent - keeping user online');
+            
+            // Also request fresh online users list
+            socket.emit('get-online-users');
         }
     }, 120000); // 2 minutes
 
@@ -8003,7 +8040,7 @@ function renderMessages(messages) {
     // FIXED: Clear container but maintain scroll position
     elements.chatContainer.innerHTML = '';
     
-    // FIXED: Display messages in correct chronological order (oldest to newest)
+    // FIXED: Display messages in correct chronological order (oldest to newest) - MESSAGES AT BOTTOM
     messages.forEach(msg => {
         const isOwn = msg.username?.trim().toLowerCase() === currentUserSession?.username?.trim().toLowerCase();
         displayMessage(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id, false);
@@ -9092,12 +9129,6 @@ document.addEventListener('click', function (e) {
         openZoom(e.target.src);
     }
 });
-        // ===== YOUR COMPLETE JAVASCRIPT CODE GOES HERE =====
-        // This should include all the JavaScript code I provided in the previous response
-        // including the posts functionality and all your existing code
-        
-        // For brevity, I'm not repeating the entire JavaScript code here
-        // but make sure to include the complete JavaScript from the previous response
-    </script>
+</script>
 </body>
 </html>
