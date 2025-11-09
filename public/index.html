@@ -4044,11 +4044,7 @@
     </div>
 
     <script>
-// --- CUT HERE ---
-      // Posts functionality for client-side
-let posts = [];
-let lastUpdateTimestamp = null;
-let currentPostMedia = [];
+       // ===== ENHANCED POST FUNCTIONALITY WITH IMAGE AUTO-DETECTION =====
 
 // Initialize posts functionality
 function initializePosts() {
@@ -4203,7 +4199,7 @@ function renderPosts() {
     });
 }
 
-// Create post element
+// ENHANCED: Create post element with image auto-detection
 function createPostElement(post) {
     const postDiv = document.createElement('div');
     postDiv.className = 'post-card';
@@ -4211,6 +4207,9 @@ function createPostElement(post) {
     
     const timeAgo = formatPostTime(post.timestamp);
     const userProfile = getUserProfile(post.author);
+    
+    // Parse content for image URLs and display them
+    const { contentHtml, hasImages } = parsePostContent(post.content);
     
     postDiv.innerHTML = `
         <div class="post-header">
@@ -4224,7 +4223,7 @@ function createPostElement(post) {
                 </div>
             </div>
         </div>
-        <div class="post-content">${escapeHtml(post.content)}</div>
+        <div class="post-content">${contentHtml}</div>
         ${post.media ? `
             <div class="post-media">
                 ${post.media.type === 'image' ? 
@@ -4233,6 +4232,7 @@ function createPostElement(post) {
                 }
             </div>
         ` : ''}
+        ${hasImages ? '<div class="post-media-auto" id="auto-media-' + post.id + '"></div>' : ''}
         <div class="post-stats">
             <div class="post-likes" onclick="likePost('${post.id}')">
                 <i class="fas fa-thumbs-up"></i> ${post.likes || 0}
@@ -4277,7 +4277,92 @@ function createPostElement(post) {
         </div>
     `;
     
+    // If post has auto-detected images, render them after the DOM is created
+    if (hasImages) {
+        setTimeout(() => {
+            renderAutoDetectedImages(post.id, post.content);
+        }, 0);
+    }
+    
     return postDiv;
+}
+
+// Function to parse post content and detect image URLs
+function parsePostContent(content) {
+    if (!content) return { contentHtml: '', hasImages: false };
+    
+    // Enhanced image URL pattern to match various image hosting services
+    const imagePattern = /(https?:\/\/[^\s]+\.(?:jpg|jpeg|png|gif|webp|bmp|svg))(?:[^\s<])*/gi;
+    const imageUrls = content.match(imagePattern) || [];
+    
+    let processedContent = escapeHtml(content);
+    let hasImages = false;
+    
+    // Replace image URLs with placeholders in the text
+    if (imageUrls.length > 0) {
+        hasImages = true;
+        imageUrls.forEach(url => {
+            processedContent = processedContent.replace(url, `[IMAGE:${url}]`);
+        });
+    }
+    
+    // Convert line breaks to <br> tags
+    processedContent = processedContent.replace(/\n/g, '<br>');
+    
+    return {
+        contentHtml: processedContent,
+        hasImages: hasImages,
+        imageUrls: imageUrls
+    };
+}
+
+// Function to render auto-detected images
+function renderAutoDetectedImages(postId, content) {
+    const mediaContainer = document.getElementById(`auto-media-${postId}`);
+    if (!mediaContainer) return;
+    
+    const imagePattern = /(https?:\/\/[^\s]+\.(?:jpg|jpeg|png|gif|webp|bmp|svg))(?:[^\s<])*/gi;
+    const imageUrls = content.match(imagePattern) || [];
+    
+    if (imageUrls.length > 0) {
+        mediaContainer.innerHTML = '';
+        
+        imageUrls.forEach(url => {
+            const imgWrapper = document.createElement('div');
+            imgWrapper.className = 'auto-detected-image';
+            imgWrapper.style.margin = '10px 0';
+            imgWrapper.style.borderRadius = '8px';
+            imgWrapper.style.overflow = 'hidden';
+            imgWrapper.style.maxWidth = '100%';
+            
+            const img = document.createElement('img');
+            img.src = url;
+            img.alt = 'Post image';
+            img.style.width = '100%';
+            img.style.height = 'auto';
+            img.style.maxHeight = '400px';
+            img.style.objectFit = 'cover';
+            img.style.borderRadius = '8px';
+            img.style.cursor = 'pointer';
+            img.onclick = () => openZoom(url);
+            
+            // Add loading state
+            img.style.opacity = '0.7';
+            img.style.transition = 'opacity 0.3s ease';
+            
+            img.onload = function() {
+                img.style.opacity = '1';
+            };
+            
+            img.onerror = function() {
+                // If image fails to load, remove the wrapper
+                imgWrapper.remove();
+            };
+            
+            imgWrapper.appendChild(img);
+            mediaContainer.appendChild(imgWrapper);
+        });
+    }
 }
 
 // Create a new post
@@ -4892,154 +4977,211 @@ function showInfo(message) {
     alert('Info: ' + message);
 }
 
-// ===== YOUR EXISTING CODE CONTINUES BELOW =====
+// ===== ENHANCED MESSAGE DISPLAY WITH IMAGE AUTO-DETECTION =====
 
-// NEW: Welcome screen animation function
-function animateWelcomeText() {
-    const text = "MessageMate";
-    const animatedText = document.getElementById('animated-text');
+// ENHANCED: Display message with image auto-detection
+function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
+    if (!elements.chatContainer) return;
     
-    // Clear any existing content
-    animatedText.innerHTML = '';
-    
-    // Create individual letter elements
-    for (let i = 0; i < text.length; i++) {
-        const letter = document.createElement('span');
-        letter.className = 'letter';
-        letter.textContent = text[i];
-        letter.style.animationDelay = `${i * 0.1}s`;
-        animatedText.appendChild(letter);
+    // Check if message already exists to prevent duplicates
+    const existingMessage = document.querySelector(`[data-id="${messageId}"]`);
+    if (existingMessage) {
+        console.log('⚠️ Message already exists, skipping:', messageId);
+        return;
     }
     
-    // Check if user is already logged in
-    const isLoggedIn = currentUserSession !== null;
-    
-    console.log('User login status:', isLoggedIn ? 'Logged in' : 'Not logged in');
-    
-    // Hide welcome screen after animation completes
-    setTimeout(() => {
-        const welcomeScreen = document.getElementById('welcome-screen');
-        welcomeScreen.style.opacity = '0';
-        setTimeout(() => {
-            welcomeScreen.style.display = 'none';
-            
-            if (isLoggedIn) {
-                // User is already logged in - go directly to main app
-                console.log('✅ User already logged in, skipping auth screen');
-                initializeMainApp();
-            } else {
-                // User not logged in - show auth container
-                console.log('❌ User not logged in, showing auth screen');
-                document.getElementById('auth-container').style.display = 'flex';
-            }
-        }, 500);
-    }, 2500); // Total animation time: 2.5 seconds
-}
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${sender}`;
+    if (messageId) messageDiv.dataset.id = messageId;
+    messageDiv.dataset.content = text;
+    messageDiv.dataset.username = username;
 
-// NEW: Function to initialize main app when user is already logged in
-function initializeMainApp() {
-    console.log('🚀 Initializing main application for logged-in user...');
+    // Parse content for auto image detection
+    const { contentHtml, hasImages } = parseMessageContent(text);
     
-    // Show main interface elements
-    document.querySelector('.menu').style.display = 'flex';
-    document.querySelector('.news-toggle').style.display = 'block';
-    
-    initializeButtons();
-    showContainer('chat');
-    
-    // IMPORTANT: Create profile section and load profile data
-    updateProfileSection(); // Create the profile section first
-    loadProfile(); // Then load the actual profile data
-    
-    initializeChat();
+    // Only create avatar for received messages
+    if (sender === 'received') {
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'avatar';
+        
+        // Get user profile to display correct avatar
+        const avatarUrl = `https://i.pravatar.cc/50?u=${encodeURIComponent(username)}`;
+        
+        avatarDiv.innerHTML = `<img src="${avatarUrl}" alt="avatar">`;
+        
+        // ADDED: Add click event to show user profile
+        avatarDiv.onclick = (e) => {
+            e.stopPropagation();
+            showUserProfile(username);
+        };
+        
+        messageDiv.appendChild(avatarDiv);
 
-    initSocket();
-    setupTypingHandlers();
-    setupTypingDetection();
-    setupTypingSocketEvents();
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    window.addEventListener('pagehide', handlePageHide);
-    
-    if (hasVerifiedCode()) {
-        enableSQLEditorAccess();
+        const messageBody = document.createElement('div');
+        messageBody.className = 'message-body';
+        
+        // Username with status indicator
+        const usernameDiv = document.createElement('div');
+        usernameDiv.className = 'username';
+        
+        // ADDED: Add click event to username to show user profile
+        usernameDiv.onclick = (e) => {
+            e.stopPropagation();
+            showUserProfile(username);
+        };
+        
+        const statusIndicator = document.createElement('span');
+        statusIndicator.className = 'user-status-indicator online';
+        usernameDiv.appendChild(document.createTextNode(username));
+        usernameDiv.appendChild(statusIndicator);
+        messageBody.appendChild(usernameDiv);
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'content';
+        if (repliedTo) {
+            const replyBubble = document.createElement('div');
+            replyBubble.className = 'reply-preview';
+            replyBubble.textContent = repliedTo;
+            contentDiv.appendChild(replyBubble);
+        }
+
+        // Add the parsed content
+        const textDiv = document.createElement('div');
+        textDiv.innerHTML = contentHtml;
+        contentDiv.appendChild(textDiv);
+
+        // Add auto-detected images if any
+        if (hasImages) {
+            renderMessageImages(contentDiv, text);
+        }
+
+        messageBody.appendChild(contentDiv);
+        messageDiv.appendChild(messageBody);
+    } else {
+        // For sent messages - simpler structure without avatar/username
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'content';
+        if (repliedTo) {
+            const replyBubble = document.createElement('div');
+            replyBubble.className = 'reply-preview';
+            replyBubble.textContent = repliedTo;
+            contentDiv.appendChild(replyBubble);
+        }
+        
+        const textDiv = document.createElement('div');
+        textDiv.innerHTML = parseMessageContent(text).contentHtml;
+        contentDiv.appendChild(textDiv);
+        
+        // Add auto-detected images for sent messages too
+        if (parseMessageContent(text).hasImages) {
+            renderMessageImages(contentDiv, text);
+        }
+        
+        messageDiv.appendChild(contentDiv);
     }
     
-    // Show welcome message instead of login prompt
-    showSuccess(`Welcome back, ${currentUserSession?.username || 'User'}!`);
+    // FIXED: Always append new messages to the bottom
+    elements.chatContainer.appendChild(messageDiv);
     
-    console.log('✅ Main application initialized successfully');
-}
-
-// Initialize welcome screen animation when page loads
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize current year
-    if (document.getElementById("year")) {
-        document.getElementById("year").textContent = new Date().getFullYear();
-    }
-    
-    // First, try auto-login to check if user is already logged in
-    attemptAutoLogin().then(success => {
-        if (success) {
-            console.log('✅ User auto-logged in successfully');
-            // User is logged in - start the welcome animation
-            // The animation will detect the login status and skip auth screen
-            animateWelcomeText();
-        } else {
-            // User not logged in - start the welcome animation
-            console.log('❌ No valid session found, showing welcome then login');
-            animateWelcomeText();
-        }
-        
-        // Initialize buttons and other common components
-        initializeButtons();
-        
-        // FIXED: Initialize online panel toggle
-        initializeOnlinePanelToggle();
-        
-        // Load user panel preference
-        loadUserPanelPreference();
-        
-        if ('Notification' in window) {
-            Notification.requestPermission().then(permission => {
-                notificationPermissionGranted = permission === 'granted';
-                console.log('📢 Notification permission:', permission);
-            });
-        }
-
-        initializeChat();
-        
-        // ADDED: Setup typing detection
-        setupTypingDetection();
-        setupTypingSocketEvents();
-
-        // Add scroll event listener for main chat
-        if (elements.chatContainer) {
-            elements.chatContainer.addEventListener('scroll', updateScrollState);
-        }
-
-        // Initialize Private AI input handler
-        if (elements.privateInput) {
-            elements.privateInput.addEventListener('input', () => {
-                autoResize(elements.privateInput);
-                const hasText = elements.privateInput.value.trim().length > 0;
-                elements.privateSendButton.disabled = !hasText;
-                elements.privateSendButton.classList.toggle('enabled', hasText);
-            });
-            elements.privateInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendPrivateMessage();
-                }
-            });
-        }
-
-        console.log('🎯 Application initialization complete');
+    messageDiv.addEventListener('touchstart', handleTouchStart);
+    messageDiv.addEventListener('touchend', handleTouchEnd);
+    messageDiv.addEventListener('touchmove', handleTouchMove);
+    messageDiv.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showMessageContextMenu(e, messageDiv);
     });
-});
 
-// ===== YOUR EXISTING VARIABLES AND FUNCTIONS =====
+    // Force image rendering after adding message
+    setTimeout(forceImageRendering, 50);
+
+    // FIXED: ALWAYS SCROLL TO BOTTOM FOR NEW MESSAGES
+    if (isNew) {
+        setTimeout(() => {
+            forceScrollToBottom('chat-container');
+            // Additional scroll to ensure it works
+            setTimeout(() => forceScrollToBottom('chat-container'), 30);
+        }, 10);
+    }
+
+    // Update scroll state after adding message
+    setTimeout(updateScrollState, 0);
+}
+
+// Function to parse message content for images
+function parseMessageContent(text) {
+    if (!text) return { contentHtml: '', hasImages: false };
+    
+    const imagePattern = /(https?:\/\/[^\s]+\.(?:jpg|jpeg|png|gif|webp|bmp|svg))(?:[^\s<])*/gi;
+    const imageUrls = text.match(imagePattern) || [];
+    
+    let processedContent = escapeHtml(text);
+    let hasImages = false;
+    
+    // Replace image URLs with placeholders in the text
+    if (imageUrls.length > 0) {
+        hasImages = true;
+        imageUrls.forEach(url => {
+            processedContent = processedContent.replace(url, '');
+        });
+        
+        // Clean up extra spaces
+        processedContent = processedContent.replace(/\s+/g, ' ').trim();
+    }
+    
+    // Convert line breaks to <br> tags
+    processedContent = processedContent.replace(/\n/g, '<br>');
+    
+    return {
+        contentHtml: processedContent,
+        hasImages: hasImages,
+        imageUrls: imageUrls
+    };
+}
+
+// Function to render images in messages
+function renderMessageImages(container, text) {
+    const imagePattern = /(https?:\/\/[^\s]+\.(?:jpg|jpeg|png|gif|webp|bmp|svg))(?:[^\s<])*/gi;
+    const imageUrls = text.match(imagePattern) || [];
+    
+    if (imageUrls.length > 0) {
+        imageUrls.forEach(url => {
+            const imgWrapper = document.createElement('div');
+            imgWrapper.style.margin = '5px 0';
+            imgWrapper.style.borderRadius = '8px';
+            imgWrapper.style.overflow = 'hidden';
+            imgWrapper.style.maxWidth = '100%';
+            
+            const img = document.createElement('img');
+            img.src = url;
+            img.alt = 'Image';
+            img.style.width = '100%';
+            img.style.height = 'auto';
+            img.style.maxHeight = '300px';
+            img.style.objectFit = 'cover';
+            img.style.borderRadius = '8px';
+            img.style.cursor = 'pointer';
+            img.onclick = () => openZoom(url);
+            
+            // Add loading state
+            img.style.opacity = '0.7';
+            img.style.transition = 'opacity 0.3s ease';
+            
+            img.onload = function() {
+                img.style.opacity = '1';
+            };
+            
+            img.onerror = function() {
+                // If image fails to load, remove the wrapper
+                imgWrapper.remove();
+            };
+            
+            imgWrapper.appendChild(img);
+            container.appendChild(imgWrapper);
+        });
+    }
+}
+
+// ===== YOUR EXISTING VARIABLES AND FUNCTIONS CONTINUE BELOW =====
 
 let isLogin = true;
 let longPressTimer;
@@ -5487,14 +5629,6 @@ function autoResize(textarea) {
     }
 }
 
-// --- CUT HERE ---
-// Helper function to escape HTML
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
 // ===== MODIFIED: Update showContainer function to initialize posts =====
 function showContainer(containerId) {
     console.log('🔄 Showing container:', containerId);
@@ -5647,8 +5781,6 @@ function showContainer(containerId) {
     const kebabDropdown = document.querySelector('.kebab-dropdown');
     if (kebabDropdown) kebabDropdown.classList.remove('active');
 }
-
-// --- CUT HERE ---
 
 function hideContainer(containerId) {
     console.log('🔄 Hiding container:', containerId);
@@ -5815,140 +5947,7 @@ async function sendPrivateMessage() {
     }, 1000);
 }
 
-// ===== MESSAGE DISPLAY FUNCTIONS =====
-function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
-    if (!elements.chatContainer) return;
-    
-    // Check if message already exists to prevent duplicates
-    const existingMessage = document.querySelector(`[data-id="${messageId}"]`);
-    if (existingMessage) {
-        console.log('⚠️ Message already exists, skipping:', messageId);
-        return;
-    }
-    
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${sender}`;
-    if (messageId) messageDiv.dataset.id = messageId;
-    messageDiv.dataset.content = text;
-    messageDiv.dataset.username = username;
-
-    // Only create avatar for received messages
-    if (sender === 'received') {
-        const avatarDiv = document.createElement('div');
-        avatarDiv.className = 'avatar';
-        
-        // Get user profile to display correct avatar
-        const avatarUrl = `https://i.pravatar.cc/50?u=${encodeURIComponent(username)}`;
-        
-        avatarDiv.innerHTML = `<img src="${avatarUrl}" alt="avatar">`;
-        
-        // ADDED: Add click event to show user profile
-        avatarDiv.onclick = (e) => {
-            e.stopPropagation();
-            showUserProfile(username);
-        };
-        
-        messageDiv.appendChild(avatarDiv);
-
-        const messageBody = document.createElement('div');
-        messageBody.className = 'message-body';
-        
-        // Username with status indicator
-        const usernameDiv = document.createElement('div');
-        usernameDiv.className = 'username';
-        
-        // ADDED: Add click event to username to show user profile
-        usernameDiv.onclick = (e) => {
-            e.stopPropagation();
-            showUserProfile(username);
-        };
-        
-        const statusIndicator = document.createElement('span');
-        statusIndicator.className = 'user-status-indicator online';
-        usernameDiv.appendChild(document.createTextNode(username));
-        usernameDiv.appendChild(statusIndicator);
-        messageBody.appendChild(usernameDiv);
-
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'content';
-        if (repliedTo) {
-            const replyBubble = document.createElement('div');
-            replyBubble.className = 'reply-preview';
-            replyBubble.textContent = repliedTo;
-            contentDiv.appendChild(replyBubble);
-        }
-
-        const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
-        const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
-        const imageMatches = [...text.matchAll(imagePattern)];
-        const audioMatches = [...text.matchAll(audioPattern)];
-        let modifiedText = text;
-        [...imageMatches, ...audioMatches].forEach(match => {
-            modifiedText = modifiedText.replace(match[0], '');
-        });
-        modifiedText = modifiedText.trim();
-        if (modifiedText) {
-            const textDiv = document.createElement('div');
-            textDiv.textContent = modifiedText;
-            contentDiv.appendChild(textDiv);
-        }
-
-        // FIXED: Use immediate image loading
-        imageMatches.forEach(match => {
-            displayImageImmediately(match[0], contentDiv);
-        });
-
-        audioMatches.forEach(match => {
-            const audio = document.createElement('audio');
-            audio.controls = true;
-            audio.src = match[0];
-            contentDiv.appendChild(audio);
-        });
-        messageBody.appendChild(contentDiv);
-        messageDiv.appendChild(messageBody);
-    } else {
-        // For sent messages - simpler structure without avatar/username
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'content';
-        if (repliedTo) {
-            const replyBubble = document.createElement('div');
-            replyBubble.className = 'reply-preview';
-            replyBubble.textContent = repliedTo;
-            contentDiv.appendChild(replyBubble);
-        }
-        const textDiv = document.createElement('div');
-        textDiv.textContent = text;
-        contentDiv.appendChild(textDiv);
-        messageDiv.appendChild(contentDiv);
-    }
-    
-    // FIXED: Always append new messages to the bottom
-    elements.chatContainer.appendChild(messageDiv);
-    
-    messageDiv.addEventListener('touchstart', handleTouchStart);
-    messageDiv.addEventListener('touchend', handleTouchEnd);
-    messageDiv.addEventListener('touchmove', handleTouchMove);
-    messageDiv.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        showMessageContextMenu(e, messageDiv);
-    });
-
-    // Force image rendering after adding message
-    setTimeout(forceImageRendering, 50);
-
-    // FIXED: ALWAYS SCROLL TO BOTTOM FOR NEW MESSAGES
-    if (isNew) {
-        setTimeout(() => {
-            forceScrollToBottom('chat-container');
-            // Additional scroll to ensure it works
-            setTimeout(() => forceScrollToBottom('chat-container'), 30);
-        }, 10);
-    }
-
-    // Update scroll state after adding message
-    setTimeout(updateScrollState, 0);
-}
-
+// ===== PRIVATE MESSAGE DISPLAY FUNCTIONS =====
 function displayPrivateMessage(text, sender, repliedTo = null, username = 'Private AI', messageId = null) {
     const container = document.getElementById('private-ai-container');
     if (!container) return;
@@ -5958,6 +5957,9 @@ function displayPrivateMessage(text, sender, repliedTo = null, username = 'Priva
     messageDiv.dataset.content = text;
     messageDiv.dataset.username = username;
 
+    // Parse content for auto image detection
+    const { contentHtml, hasImages } = parseMessageContent(text);
+    
     // Only create avatar for received messages
     if (sender === 'received') {
         const avatarDiv = document.createElement('div');
@@ -5982,36 +5984,15 @@ function displayPrivateMessage(text, sender, repliedTo = null, username = 'Priva
     const contentDiv = document.createElement('div');
     contentDiv.className = 'content';
     
-    // Parse for image URLs and render them as images
-    const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
-    const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
-    const imageMatches = [...text.matchAll(imagePattern)];
-    const audioMatches = [...text.matchAll(audioPattern)];
-    let modifiedText = text;
-    
-    [...imageMatches, ...audioMatches].forEach(match => {
-        modifiedText = modifiedText.replace(match[0], '');
-    });
-    modifiedText = modifiedText.trim();
-    
-    if (modifiedText) {
-        const textDiv = document.createElement('div');
-        textDiv.textContent = modifiedText;
-        contentDiv.appendChild(textDiv);
+    // Add the parsed content
+    const textDiv = document.createElement('div');
+    textDiv.innerHTML = contentHtml;
+    contentDiv.appendChild(textDiv);
+
+    // Add auto-detected images if any
+    if (hasImages) {
+        renderMessageImages(contentDiv, text);
     }
-
-    // Add images to the message - FIXED: Use immediate loading
-    imageMatches.forEach(match => {
-        displayImageImmediately(match[0], contentDiv);
-    });
-
-    // Add audio files to the message
-    audioMatches.forEach(match => {
-        const audio = document.createElement('audio');
-        audio.controls = true;
-        audio.src = match[0];
-        contentDiv.appendChild(audio);
-    });
 
     messageBody.appendChild(contentDiv);
     messageDiv.appendChild(messageBody);
@@ -8181,6 +8162,7 @@ function formatMessageTime(timestamp) {
         return 'Just now';
     }
     
+// --- CUT HERE ---
     // If less than an hour ago
     if (diff < 3600000) {
         const minutes = Math.floor(diff / 60000);
