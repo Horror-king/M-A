@@ -1450,6 +1450,491 @@ app.put('/api/private/messages/read', async (req, res) => {
   }
 });
 
+// ===== SUPABASE POSTS AND COMMENTS ENDPOINTS =====
+
+// Create posts table if it doesn't exist
+app.post('/api/create-posts-table', async (req, res) => {
+  try {
+    console.log('🔧 Creating posts table...');
+    
+    const { data: tableCheck, error: checkError } = await supabase
+      .from('posts')
+      .select('*')
+      .limit(1);
+
+    if (checkError && checkError.code === '42P01') {
+      res.json({
+        success: false,
+        error: "Table doesn't exist",
+        instructions: [
+          "1. Go to your Supabase dashboard",
+          "2. Go to the SQL Editor", 
+          "3. Run this SQL to create the table:",
+          `
+          CREATE TABLE IF NOT EXISTS posts (
+            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+            author_username TEXT NOT NULL,
+            content TEXT NOT NULL,
+            media_url TEXT,
+            media_type TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            likes_count INTEGER DEFAULT 0,
+            comments_count INTEGER DEFAULT 0
+          );
+          `,
+          "4. Create comments table:",
+          `
+          CREATE TABLE IF NOT EXISTS post_comments (
+            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+            post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
+            author_username TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          );
+          `,
+          "5. Create post_likes table:",
+          `
+          CREATE TABLE IF NOT EXISTS post_likes (
+            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+            post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
+            username TEXT NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            UNIQUE(post_id, username)
+          );
+          `
+        ]
+      });
+    } else if (checkError) {
+      throw checkError;
+    } else {
+      console.log('✅ Posts table exists');
+      res.json({
+        success: true,
+        message: "Posts table exists",
+        sampleData: tableCheck?.[0]
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Error checking posts table:', error);
+    res.status(500).json({ 
+      success: false,
+      error: "Error checking table: " + error.message 
+    });
+  }
+});
+
+// Get all posts with comments and like status
+app.get('/api/posts', async (req, res) => {
+  try {
+    const { username } = req.query; // Current user for like status
+    
+    console.log('📝 Fetching posts from Supabase...');
+
+    // Get posts with author info
+    const { data: posts, error: postsError } = await supabase
+      .from('posts')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (postsError) {
+      console.error('❌ Error fetching posts:', postsError);
+      return res.status(500).json({ error: 'Failed to fetch posts' });
+    }
+
+    // For each post, get comments and check if current user liked it
+    const postsWithDetails = await Promise.all(
+      (posts || []).map(async (post) => {
+        // Get comments for this post
+        const { data: comments } = await supabase
+          .from('post_comments')
+          .select('*')
+          .eq('post_id', post.id)
+          .order('created_at', { ascending: true });
+
+        // Check if current user liked this post
+        let userLiked = false;
+        if (username) {
+          const { data: like } = await supabase
+            .from('post_likes')
+            .select('id')
+            .eq('post_id', post.id)
+            .eq('username', username)
+            .single();
+          userLiked = !!like;
+        }
+
+        return {
+          ...post,
+          comments: comments || [],
+          userLiked: userLiked,
+          // For compatibility with existing frontend
+          author: post.author_username,
+          timestamp: post.created_at,
+          likes: post.likes_count || 0,
+          media: post.media_url ? {
+            url: post.media_url,
+            type: post.media_type || 'image'
+          } : null
+        };
+      })
+    );
+
+    console.log(`✅ Found ${postsWithDetails.length} posts`);
+    res.json(postsWithDetails);
+
+  } catch (error) {
+    console.error('❌ Error in get posts:', error);
+    res.status(500).json({ error: 'Failed to fetch posts' });
+  }
+});
+
+// Create a new post
+app.post('/api/posts', async (req, res) => {
+  try {
+    const { author_username, content, media_url, media_type } = req.body;
+
+    console.log('📝 Creating new post:', { author_username, content, media_url, media_type });
+
+    if (!author_username || !content) {
+      return res.status(400).json({ error: "Author and content are required" });
+    }
+
+    const postData = {
+      author_username: author_username.trim(),
+      content: content.trim(),
+      media_url: media_url || null,
+      media_type: media_type || null,
+      likes_count: 0,
+      comments_count: 0
+    };
+
+    const { data: post, error } = await supabase
+      .from('posts')
+      .insert([postData])
+      .select();
+
+    if (error) {
+      console.error('❌ Error creating post:', error);
+      return res.status(500).json({ error: "Failed to create post: " + error.message });
+    }
+
+    console.log('✅ Post created successfully:', post[0]?.id);
+
+    res.status(201).json({
+      ...post[0],
+      author: post[0].author_username,
+      timestamp: post[0].created_at,
+      likes: 0,
+      comments: [],
+      userLiked: false,
+      media: post[0].media_url ? {
+        url: post[0].media_url,
+        type: post[0].media_type || 'image'
+      } : null
+    });
+
+  } catch (error) {
+    console.error('❌ Error creating post:', error);
+    res.status(500).json({ error: "Failed to create post: " + error.message });
+  }
+});
+
+// Add a comment to a post
+app.post('/api/posts/:postId/comments', async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const { author_username, content } = req.body;
+
+    console.log('💬 Adding comment to post:', { postId, author_username, content });
+
+    if (!author_username || !content) {
+      return res.status(400).json({ error: "Author and content are required" });
+    }
+
+    // First, verify the post exists
+    const { data: post, error: postError } = await supabase
+      .from('posts')
+      .select('id')
+      .eq('id', postId)
+      .single();
+
+    if (postError || !post) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+
+    // Create the comment
+    const commentData = {
+      post_id: postId,
+      author_username: author_username.trim(),
+      content: content.trim()
+    };
+
+    const { data: comment, error } = await supabase
+      .from('post_comments')
+      .insert([commentData])
+      .select();
+
+    if (error) {
+      console.error('❌ Error adding comment:', error);
+      return res.status(500).json({ error: "Failed to add comment: " + error.message });
+    }
+
+    // Update comments count on the post
+    await supabase
+      .from('posts')
+      .update({ 
+        comments_count: await getCommentsCount(postId),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', postId);
+
+    console.log('✅ Comment added successfully:', comment[0]?.id);
+
+    res.status(201).json(comment[0]);
+
+  } catch (error) {
+    console.error('❌ Error adding comment:', error);
+    res.status(500).json({ error: "Failed to add comment: " + error.message });
+  }
+});
+
+// Like a post
+app.post('/api/posts/:postId/like', async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const { username } = req.body;
+
+    console.log('❤️ Liking post:', { postId, username });
+
+    if (!username) {
+      return res.status(400).json({ error: "Username is required" });
+    }
+
+    // First, verify the post exists
+    const { data: post, error: postError } = await supabase
+      .from('posts')
+      .select('id')
+      .eq('id', postId)
+      .single();
+
+    if (postError || !post) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+
+    // Check if user already liked the post
+    const { data: existingLike } = await supabase
+      .from('post_likes')
+      .select('id')
+      .eq('post_id', postId)
+      .eq('username', username)
+      .single();
+
+    if (existingLike) {
+      // Unlike the post
+      await supabase
+        .from('post_likes')
+        .delete()
+        .eq('id', existingLike.id);
+    } else {
+      // Like the post
+      await supabase
+        .from('post_likes')
+        .insert([{
+          post_id: postId,
+          username: username
+        }]);
+    }
+
+    // Update likes count
+    const newLikesCount = await getLikesCount(postId);
+    await supabase
+      .from('posts')
+      .update({ 
+        likes_count: newLikesCount,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', postId);
+
+    console.log('✅ Post like updated. New count:', newLikesCount);
+
+    res.json({ 
+      success: true, 
+      likesCount: newLikesCount,
+      userLiked: !existingLike
+    });
+
+  } catch (error) {
+    console.error('❌ Error liking post:', error);
+    res.status(500).json({ error: "Failed to like post: " + error.message });
+  }
+});
+
+// Get posts for a specific user
+app.get('/api/posts/user/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    const { currentUser } = req.query; // For like status
+
+    console.log('📝 Fetching posts for user:', username);
+
+    const { data: posts, error } = await supabase
+      .from('posts')
+      .select('*')
+      .eq('author_username', username)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('❌ Error fetching user posts:', error);
+      return res.status(500).json({ error: 'Failed to fetch user posts' });
+    }
+
+    // Add comments and like status
+    const postsWithDetails = await Promise.all(
+      (posts || []).map(async (post) => {
+        const { data: comments } = await supabase
+          .from('post_comments')
+          .select('*')
+          .eq('post_id', post.id)
+          .order('created_at', { ascending: true });
+
+        let userLiked = false;
+        if (currentUser) {
+          const { data: like } = await supabase
+            .from('post_likes')
+            .select('id')
+            .eq('post_id', post.id)
+            .eq('username', currentUser)
+            .single();
+          userLiked = !!like;
+        }
+
+        return {
+          ...post,
+          comments: comments || [],
+          userLiked: userLiked,
+          author: post.author_username,
+          timestamp: post.created_at,
+          likes: post.likes_count || 0,
+          media: post.media_url ? {
+            url: post.media_url,
+            type: post.media_type || 'image'
+          } : null
+        };
+      })
+    );
+
+    console.log(`✅ Found ${postsWithDetails.length} posts for user ${username}`);
+    res.json(postsWithDetails);
+
+  } catch (error) {
+    console.error('❌ Error in get user posts:', error);
+    res.status(500).json({ error: 'Failed to fetch user posts' });
+  }
+});
+
+// Delete a post (only by author)
+app.delete('/api/posts/:postId', async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const { username } = req.body; // Current user trying to delete
+
+    console.log('🗑️ Deleting post:', { postId, username });
+
+    if (!username) {
+      return res.status(400).json({ error: "Username is required" });
+    }
+
+    // First, verify the post exists and user is the author
+    const { data: post, error: postError } = await supabase
+      .from('posts')
+      .select('author_username')
+      .eq('id', postId)
+      .single();
+
+    if (postError || !post) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+
+    if (post.author_username !== username) {
+      return res.status(403).json({ error: "You can only delete your own posts" });
+    }
+
+    // Delete the post (cascade will delete comments and likes)
+    const { error: deleteError } = await supabase
+      .from('posts')
+      .delete()
+      .eq('id', postId);
+
+    if (deleteError) {
+      console.error('❌ Error deleting post:', deleteError);
+      return res.status(500).json({ error: "Failed to delete post: " + deleteError.message });
+    }
+
+    console.log('✅ Post deleted successfully');
+
+    res.json({ success: true, message: "Post deleted successfully" });
+
+  } catch (error) {
+    console.error('❌ Error deleting post:', error);
+    res.status(500).json({ error: "Failed to delete post: " + error.message });
+  }
+});
+
+// Helper function to get comments count
+async function getCommentsCount(postId) {
+  const { count, error } = await supabase
+    .from('post_comments')
+    .select('*', { count: 'exact', head: true })
+    .eq('post_id', postId);
+
+  return count || 0;
+}
+
+// Helper function to get likes count
+async function getLikesCount(postId) {
+  const { count, error } = await supabase
+    .from('post_likes')
+    .select('*', { count: 'exact', head: true })
+    .eq('post_id', postId);
+
+  return count || 0;
+}
+
+// Real-time posts polling endpoint (alternative to WebSockets)
+app.get('/api/posts/updates', async (req, res) => {
+  try {
+    const { lastUpdate } = req.query;
+    
+    // Get posts updated since lastUpdate
+    const query = supabase
+      .from('posts')
+      .select('*')
+      .order('updated_at', { ascending: false });
+
+    if (lastUpdate) {
+      query.gt('updated_at', new Date(lastUpdate).toISOString());
+    }
+
+    const { data: posts, error } = await query;
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({
+      success: true,
+      posts: posts || [],
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching post updates:', error);
+    res.status(500).json({ error: 'Failed to fetch updates' });
+  }
+});
+
 // ===== ADD DEBUG ENDPOINT FOR TABLE STRUCTURE =====
 
 // Debug endpoint to check table structure
@@ -1960,475 +2445,6 @@ app.get('/api/create-posts-table', async (req, res) => {
       success: false,
       error: "Error checking table: " + error.message 
     });
-  }
-});
-
-// Create posts table if it doesn't exist - POST endpoint (original)
-app.post('/api/create-posts-table', async (req, res) => {
-  try {
-    console.log('🔧 Creating posts table via POST...');
-    
-    const { data: tableCheck, error: checkError } = await supabase
-      .from('posts')
-      .select('*')
-      .limit(1);
-
-    if (checkError && checkError.code === '42P01') {
-      res.json({
-        success: false,
-        error: "Table doesn't exist",
-        instructions: [
-          "1. Go to your Supabase dashboard",
-          "2. Go to the SQL Editor", 
-          "3. Run this SQL to create the table:",
-          `
-          CREATE TABLE IF NOT EXISTS posts (
-            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-            author_username TEXT NOT NULL,
-            content TEXT NOT NULL,
-            media_url TEXT,
-            media_type TEXT,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            likes_count INTEGER DEFAULT 0,
-            comments_count INTEGER DEFAULT 0
-          );
-          `,
-          "4. Create comments table:",
-          `
-          CREATE TABLE IF NOT EXISTS post_comments (
-            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-            post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
-            author_username TEXT NOT NULL,
-            content TEXT NOT NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-          );
-          `,
-          "5. Create post_likes table:",
-          `
-          CREATE TABLE IF NOT EXISTS post_likes (
-            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-            post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
-            username TEXT NOT NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            UNIQUE(post_id, username)
-          );
-          `
-        ]
-      });
-    } else if (checkError) {
-      throw checkError;
-    } else {
-      console.log('✅ Posts table exists');
-      res.json({
-        success: true,
-        message: "Posts table exists",
-        sampleData: tableCheck?.[0]
-      });
-    }
-
-  } catch (error) {
-    console.error('❌ Error checking posts table:', error);
-    res.status(500).json({ 
-      success: false,
-      error: "Error checking table: " + error.message 
-    });
-  }
-});
-
-// Get all posts with comments and like status
-app.get('/api/posts', async (req, res) => {
-  try {
-    const { username } = req.query; // Current user for like status
-    
-    console.log('📝 Fetching posts from Supabase...');
-
-    // Get posts with author info
-    const { data: posts, error: postsError } = await supabase
-      .from('posts')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (postsError) {
-      console.error('❌ Error fetching posts:', postsError);
-      return res.status(500).json({ error: 'Failed to fetch posts' });
-    }
-
-    // For each post, get comments and check if current user liked it
-    const postsWithDetails = await Promise.all(
-      (posts || []).map(async (post) => {
-        // Get comments for this post
-        const { data: comments } = await supabase
-          .from('post_comments')
-          .select('*')
-          .eq('post_id', post.id)
-          .order('created_at', { ascending: true });
-
-        // Check if current user liked this post
-        let userLiked = false;
-        if (username) {
-          const { data: like } = await supabase
-            .from('post_likes')
-            .select('id')
-            .eq('post_id', post.id)
-            .eq('username', username)
-            .single();
-          userLiked = !!like;
-        }
-
-        return {
-          ...post,
-          comments: comments || [],
-          userLiked: userLiked,
-          // For compatibility with existing frontend
-          author: post.author_username,
-          timestamp: post.created_at,
-          likes: post.likes_count || 0,
-          media: post.media_url ? {
-            url: post.media_url,
-            type: post.media_type || 'image'
-          } : null
-        };
-      })
-    );
-
-    console.log(`✅ Found ${postsWithDetails.length} posts`);
-    res.json(postsWithDetails);
-
-  } catch (error) {
-    console.error('❌ Error in get posts:', error);
-    res.status(500).json({ error: 'Failed to fetch posts' });
-  }
-});
-
-// Create a new post
-app.post('/api/posts', async (req, res) => {
-  try {
-    const { author_username, content, media_url, media_type } = req.body;
-
-    console.log('📝 Creating new post:', { author_username, content, media_url, media_type });
-
-    if (!author_username || !content) {
-      return res.status(400).json({ error: "Author and content are required" });
-    }
-
-    const postData = {
-      author_username: author_username.trim(),
-      content: content.trim(),
-      media_url: media_url || null,
-      media_type: media_type || null,
-      likes_count: 0,
-      comments_count: 0
-    };
-
-    const { data: post, error } = await supabase
-      .from('posts')
-      .insert([postData])
-      .select();
-
-    if (error) {
-      console.error('❌ Error creating post:', error);
-      return res.status(500).json({ error: "Failed to create post: " + error.message });
-    }
-
-    console.log('✅ Post created successfully:', post[0]?.id);
-    
-    // Broadcast new post via Socket.io
-    io.emit('new-post', {
-      ...post[0],
-      author: post[0].author_username,
-      timestamp: post[0].created_at,
-      likes: 0,
-      comments: [],
-      userLiked: false,
-      media: post[0].media_url ? {
-        url: post[0].media_url,
-        type: post[0].media_type || 'image'
-      } : null
-    });
-
-    res.status(201).json(post[0]);
-
-  } catch (error) {
-    console.error('❌ Error creating post:', error);
-    res.status(500).json({ error: "Failed to create post: " + error.message });
-  }
-});
-
-// Add a comment to a post
-app.post('/api/posts/:postId/comments', async (req, res) => {
-  try {
-    const { postId } = req.params;
-    const { author_username, content } = req.body;
-
-    console.log('💬 Adding comment to post:', { postId, author_username, content });
-
-    if (!author_username || !content) {
-      return res.status(400).json({ error: "Author and content are required" });
-    }
-
-    // First, verify the post exists
-    const { data: post, error: postError } = await supabase
-      .from('posts')
-      .select('id')
-      .eq('id', postId)
-      .single();
-
-    if (postError || !post) {
-      return res.status(404).json({ error: "Post not found" });
-    }
-
-    // Create the comment
-    const commentData = {
-      post_id: postId,
-      author_username: author_username.trim(),
-      content: content.trim()
-    };
-
-    const { data: comment, error } = await supabase
-      .from('post_comments')
-      .insert([commentData])
-      .select();
-
-    if (error) {
-      console.error('❌ Error adding comment:', error);
-      return res.status(500).json({ error: "Failed to add comment: " + error.message });
-    }
-
-    // Update comments count on the post
-    await supabase
-      .from('posts')
-      .update({ 
-        comments_count: await getCommentsCount(postId),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', postId);
-
-    console.log('✅ Comment added successfully:', comment[0]?.id);
-    
-    // Broadcast new comment via Socket.io
-    io.emit('new-comment', {
-      postId: postId,
-      comment: comment[0]
-    });
-
-    res.status(201).json(comment[0]);
-
-  } catch (error) {
-    console.error('❌ Error adding comment:', error);
-    res.status(500).json({ error: "Failed to add comment: " + error.message });
-  }
-});
-
-// Like a post
-app.post('/api/posts/:postId/like', async (req, res) => {
-  try {
-    const { postId } = req.params;
-    const { username } = req.body;
-
-    console.log('❤️ Liking post:', { postId, username });
-
-    if (!username) {
-      return res.status(400).json({ error: "Username is required" });
-    }
-
-    // First, verify the post exists
-    const { data: post, error: postError } = await supabase
-      .from('posts')
-      .select('id')
-      .eq('id', postId)
-      .single();
-
-    if (postError || !post) {
-      return res.status(404).json({ error: "Post not found" });
-    }
-
-    // Check if user already liked the post
-    const { data: existingLike } = await supabase
-      .from('post_likes')
-      .select('id')
-      .eq('post_id', postId)
-      .eq('username', username)
-      .single();
-
-    if (existingLike) {
-      // Unlike the post
-      await supabase
-        .from('post_likes')
-        .delete()
-        .eq('id', existingLike.id);
-    } else {
-      // Like the post
-      await supabase
-        .from('post_likes')
-        .insert([{
-          post_id: postId,
-          username: username
-        }]);
-    }
-
-    // Update likes count
-    const newLikesCount = await getLikesCount(postId);
-    await supabase
-      .from('posts')
-      .update({ 
-        likes_count: newLikesCount,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', postId);
-
-    console.log('✅ Post like updated. New count:', newLikesCount);
-    
-    // Broadcast like update via Socket.io
-    io.emit('post-like-updated', {
-      postId: postId,
-      likesCount: newLikesCount,
-      userLiked: !existingLike // If there was no existing like, now user liked it
-    });
-
-    res.json({ 
-      success: true, 
-      likesCount: newLikesCount,
-      userLiked: !existingLike
-    });
-
-  } catch (error) {
-    console.error('❌ Error liking post:', error);
-    res.status(500).json({ error: "Failed to like post: " + error.message });
-  }
-});
-
-// Helper function to get comments count
-async function getCommentsCount(postId) {
-  const { count, error } = await supabase
-    .from('post_comments')
-    .select('*', { count: 'exact', head: true })
-    .eq('post_id', postId);
-
-  return count || 0;
-}
-
-// Helper function to get likes count
-async function getLikesCount(postId) {
-  const { count, error } = await supabase
-    .from('post_likes')
-    .select('*', { count: 'exact', head: true })
-    .eq('post_id', postId);
-
-  return count || 0;
-}
-
-// Get posts for a specific user
-app.get('/api/posts/user/:username', async (req, res) => {
-  try {
-    const { username } = req.params;
-    const { currentUser } = req.query; // For like status
-
-    console.log('📝 Fetching posts for user:', username);
-
-    const { data: posts, error } = await supabase
-      .from('posts')
-      .select('*')
-      .eq('author_username', username)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('❌ Error fetching user posts:', error);
-      return res.status(500).json({ error: 'Failed to fetch user posts' });
-    }
-
-    // Add comments and like status
-    const postsWithDetails = await Promise.all(
-      (posts || []).map(async (post) => {
-        const { data: comments } = await supabase
-          .from('post_comments')
-          .select('*')
-          .eq('post_id', post.id)
-          .order('created_at', { ascending: true });
-
-        let userLiked = false;
-        if (currentUser) {
-          const { data: like } = await supabase
-            .from('post_likes')
-            .select('id')
-            .eq('post_id', post.id)
-            .eq('username', currentUser)
-            .single();
-          userLiked = !!like;
-        }
-
-        return {
-          ...post,
-          comments: comments || [],
-          userLiked: userLiked,
-          author: post.author_username,
-          timestamp: post.created_at,
-          likes: post.likes_count || 0,
-          media: post.media_url ? {
-            url: post.media_url,
-            type: post.media_type || 'image'
-          } : null
-        };
-      })
-    );
-
-    console.log(`✅ Found ${postsWithDetails.length} posts for user ${username}`);
-    res.json(postsWithDetails);
-
-  } catch (error) {
-    console.error('❌ Error in get user posts:', error);
-    res.status(500).json({ error: 'Failed to fetch user posts' });
-  }
-});
-
-// Delete a post (only by author)
-app.delete('/api/posts/:postId', async (req, res) => {
-  try {
-    const { postId } = req.params;
-    const { username } = req.body; // Current user trying to delete
-
-    console.log('🗑️ Deleting post:', { postId, username });
-
-    if (!username) {
-      return res.status(400).json({ error: "Username is required" });
-    }
-
-    // First, verify the post exists and user is the author
-    const { data: post, error: postError } = await supabase
-      .from('posts')
-      .select('author_username')
-      .eq('id', postId)
-      .single();
-
-    if (postError || !post) {
-      return res.status(404).json({ error: "Post not found" });
-    }
-
-    if (post.author_username !== username) {
-      return res.status(403).json({ error: "You can only delete your own posts" });
-    }
-
-    // Delete the post (cascade will delete comments and likes)
-    const { error: deleteError } = await supabase
-      .from('posts')
-      .delete()
-      .eq('id', postId);
-
-    if (deleteError) {
-      console.error('❌ Error deleting post:', deleteError);
-      return res.status(500).json({ error: "Failed to delete post: " + deleteError.message });
-    }
-
-    console.log('✅ Post deleted successfully');
-    
-    // Broadcast deletion via Socket.io
-    io.emit('post-deleted', { postId });
-
-    res.json({ success: true, message: "Post deleted successfully" });
-
-  } catch (error) {
-    console.error('❌ Error deleting post:', error);
-    res.status(500).json({ error: "Failed to delete post: " + error.message });
   }
 });
 
