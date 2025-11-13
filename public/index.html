@@ -4043,7 +4043,6 @@
         </div>
     </div>
 
-// --- CUT HERE ---
     <script>
 // --- CUT HERE ---
       // Posts functionality for client-side
@@ -4862,10 +4861,11 @@ function showContainer(containerId) {
     }
     
     // Initialize specific functionality based on container
-if (containerId === 'posts') {
-    initializePosts(); // Ensure posts work when navigating to posts tab
+    if (containerId === 'posts') {
+        initializePosts();
+    }
 }
-    
+
 // Open zoom modal for media
 function openZoom(mediaUrl) {
     // Implementation for zoom modal
@@ -4936,6 +4936,7 @@ function animateWelcomeText() {
     }, 2500); // Total animation time: 2.5 seconds
 }
 
+// NEW: Function to initialize main app when user is already logged in
 function initializeMainApp() {
     console.log('🚀 Initializing main application for logged-in user...');
     
@@ -4944,7 +4945,8 @@ function initializeMainApp() {
     document.querySelector('.news-toggle').style.display = 'block';
     
     initializeButtons();
-    showContainer('chat');
+    // MODIFIED: Show posts container by default instead of chat
+    showContainer('posts');
     
     // IMPORTANT: Create profile section and load profile data
     updateProfileSection(); // Create the profile section first
@@ -4956,9 +4958,6 @@ function initializeMainApp() {
     setupTypingHandlers();
     setupTypingDetection();
     setupTypingSocketEvents();
-    
-    // 🔥 ADD THIS LINE RIGHT HERE:
-    initializePosts(); // Initialize posts functionality immediately after login
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -5667,8 +5666,8 @@ function hideContainer(containerId) {
     const kebabDropdown = document.querySelector('.kebab-dropdown');
     if (kebabDropdown) kebabDropdown.classList.remove('active');
     
-    // Show chat container and input after closing any section
-    showContainer('chat');
+    // MODIFIED: Show posts container after closing any section instead of chat
+    showContainer('posts');
 }
 
 // ===== MESSAGE FUNCTIONS =====
@@ -8971,8 +8970,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 container.style.display = 'none';
             });
             this.style.display = 'none';
-            // Show main chat
-            showContainer('chat');
+            // MODIFIED: Show posts container after closing overlay instead of chat
+            showContainer('posts');
         });
     }
 
@@ -9027,7 +9026,7 @@ function setupPrivateMessageInputHandlers() {
 // Initialize if user is logged in
 const currentUser = currentUserSession?.username;
 if (currentUser) {
-    showContainer('chat');
+    showContainer('posts');
     
     const chatInput = document.querySelector('.chat-input');
     if (chatInput) chatInput.style.display = 'flex';
@@ -9065,4 +9064,4 @@ document.addEventListener('click', function (e) {
         // but make sure to include the complete JavaScript from the previous response
     </script>
 </body>
-</html>
+</html>m
