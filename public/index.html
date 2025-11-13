@@ -4042,31 +4042,23 @@
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
-   // --- CUT HERE ---
 
+// --- CUT HERE ---
     <script>
 // --- CUT HERE ---
       // Posts functionality for client-side
 let posts = [];
 let lastUpdateTimestamp = null;
 let currentPostMedia = [];
-let postUpdateInterval = null;
 
 // Initialize posts functionality
 function initializePosts() {
-    console.log('📝 Initializing posts functionality...');
-    
-    // Clear existing interval if any
-    if (postUpdateInterval) {
-        clearInterval(postUpdateInterval);
-    }
-
     loadPosts();
     setupPostInputHandlers();
     setupCreatePostBox();
     
     // Start polling for updates every 5 seconds
-    postUpdateInterval = setInterval(pollForPostUpdates, 5000);
+    setInterval(pollForPostUpdates, 5000);
     
     // Listen for real-time post updates
     if (typeof socket !== 'undefined' && socket) {
@@ -4074,27 +4066,18 @@ function initializePosts() {
             addPostToFeed(post);
         });
     }
-    
-    console.log('✅ Posts functionality initialized');
 }
 
 // Load posts from server
 async function loadPosts() {
     try {
         const currentUser = currentUserSession?.username;
-        if (!currentUser) {
-            console.log('❌ No user logged in, cannot load posts');
-            return;
-        }
-        
-        console.log('📥 Loading posts for user:', currentUser);
         const response = await fetch(`/api/posts?username=${currentUser}`);
         
         if (response.ok) {
             posts = await response.json();
             renderPosts();
             lastUpdateTimestamp = new Date().toISOString();
-            console.log('✅ Posts loaded successfully:', posts.length, 'posts');
         } else {
             console.error('Failed to load posts');
             // Fallback to localStorage if server fails
@@ -4120,10 +4103,7 @@ function loadPostsFromLocalStorage() {
 // Poll for new posts and updates
 async function pollForPostUpdates() {
     try {
-        const currentUser = currentUserSession?.username;
-        if (!currentUser) return;
-        
-        const response = await fetch(`/api/posts/updates?lastUpdate=${lastUpdateTimestamp}&username=${currentUser}`);
+        const response = await fetch(`/api/posts/updates?lastUpdate=${lastUpdateTimestamp}`);
         
         if (response.ok) {
             const data = await response.json();
@@ -4152,10 +4132,7 @@ async function pollForPostUpdates() {
 // Setup Facebook-style create post box
 function setupCreatePostBox() {
     const postsContainer = document.getElementById('posts-container');
-    if (!postsContainer) {
-        console.log('❌ Posts container not found');
-        return;
-    }
+    if (!postsContainer) return;
     
     // Remove existing create post box if it exists
     const existingBox = postsContainer.querySelector('.create-post-box');
@@ -4163,11 +4140,6 @@ function setupCreatePostBox() {
     
     // Get current user info
     const currentUser = currentUserSession?.username;
-    if (!currentUser) {
-        console.log('❌ No user logged in, cannot create post box');
-        return;
-    }
-    
     const userProfile = getUserProfile(currentUser);
     
     // Create Facebook-style create post box
@@ -4201,7 +4173,6 @@ function setupCreatePostBox() {
     // Insert at the top of posts container
     const postsList = document.getElementById('posts-list') || postsContainer;
     postsContainer.insertBefore(createPostBox, postsList);
-    console.log('✅ Create post box setup completed');
 }
 
 // Render all posts
@@ -4231,8 +4202,6 @@ function renderPosts() {
         const postElement = createPostElement(post);
         postsList.appendChild(postElement);
     });
-    
-    console.log('✅ Posts rendered:', posts.length, 'posts');
 }
 
 // Create post element
@@ -4880,8 +4849,6 @@ function getUserProfile(username) {
 
 // Initialize posts when showing posts container
 function showContainer(containerId) {
-    console.log('🔄 Showing container:', containerId);
-    
     // Hide all containers
     const containers = document.querySelectorAll('.main-content > div');
     containers.forEach(container => {
@@ -4894,11 +4861,16 @@ function showContainer(containerId) {
         selectedContainer.style.display = 'block';
     }
     
-    // Initialize specific functionality based on container
-    if (containerId === 'posts') {
-        console.log('📝 Initializing posts container...');
+    // MODIFIED: Initialize posts if showing that container (this is a backup)
+if (containerId === 'posts') {
+    // Ensure posts are initialized when navigating to posts
+    if (posts.length === 0) {
         initializePosts();
     }
+}
+// Initialize specific functionality based on container
+if (containerId === 'posts') {
+    initializePosts(); // Ensure posts work when navigating to posts tab
 }
 
 // Open zoom modal for media
@@ -4971,7 +4943,6 @@ function animateWelcomeText() {
     }, 2500); // Total animation time: 2.5 seconds
 }
 
-// NEW: Function to initialize main app when user is already logged in
 function initializeMainApp() {
     console.log('🚀 Initializing main application for logged-in user...');
     
@@ -4986,16 +4957,15 @@ function initializeMainApp() {
     updateProfileSection(); // Create the profile section first
     loadProfile(); // Then load the actual profile data
     
-    // MODIFIED: Initialize posts functionality when user logs in
-    console.log('📝 Initializing posts functionality on login...');
-    initializePosts();
-    
     initializeChat();
 
     initSocket();
     setupTypingHandlers();
     setupTypingDetection();
     setupTypingSocketEvents();
+    
+    // 🔥 ADD THIS LINE RIGHT HERE:
+    initializePosts(); // Initialize posts functionality immediately after login
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -5594,7 +5564,6 @@ function showContainer(containerId) {
         
         // MODIFIED: Initialize posts if showing that container
         if (containerId === 'posts') {
-            console.log('📝 Showing posts container, initializing posts...');
             initializePosts();
         }
     }
@@ -5751,9 +5720,6 @@ async function sendMessage() {
             return;
         }
     }
-
-// --- CUT HERE ---
-// --- CUT HERE ---
 
     // Spam protection
     const now = Date.now();
