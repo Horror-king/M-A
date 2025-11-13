@@ -4043,11 +4043,8 @@
         </div>
     </div>
 
-    <script>
-// --- CUT HERE ---
-        // --- CUT HERE ---
-// --- CUT HERE ---
-      // Posts functionality for client-side
+<script>
+// Posts functionality for client-side
 let posts = [];
 let lastUpdateTimestamp = null;
 let currentPostMedia = [];
@@ -4082,7 +4079,7 @@ function initializePosts() {
 // Load posts from server
 async function loadPosts() {
     try {
-        const currentUser = currentUserSession?.username;
+        const currentUser = getCurrentUsername();
         if (!currentUser) {
             console.log('❌ No user logged in, cannot load posts');
             return;
@@ -4121,7 +4118,7 @@ function loadPostsFromLocalStorage() {
 // Poll for new posts and updates
 async function pollForPostUpdates() {
     try {
-        const currentUser = currentUserSession?.username;
+        const currentUser = getCurrentUsername();
         if (!currentUser) return;
         
         const response = await fetch(`/api/posts/updates?lastUpdate=${lastUpdateTimestamp}&username=${currentUser}`);
@@ -4150,7 +4147,7 @@ async function pollForPostUpdates() {
     }
 }
 
-// Setup Facebook-style create post box
+// Setup Facebook-style create post box - MODIFIED TO USE getCurrentUsername()
 function setupCreatePostBox() {
     const postsContainer = document.getElementById('posts-container');
     if (!postsContainer) {
@@ -4162,10 +4159,12 @@ function setupCreatePostBox() {
     const existingBox = postsContainer.querySelector('.create-post-box');
     if (existingBox) existingBox.remove();
     
-    // Get current user info
-    const currentUser = currentUserSession?.username;
+    // Get current user info - MODIFIED: Use getCurrentUsername() instead of currentUserSession
+    const currentUser = getCurrentUsername();
     if (!currentUser) {
         console.log('❌ No user logged in, cannot create post box');
+        // Even if no user, we'll still create the box but disable functionality
+        createDisabledPostBox();
         return;
     }
     
@@ -4203,6 +4202,41 @@ function setupCreatePostBox() {
     const postsList = document.getElementById('posts-list') || postsContainer;
     postsContainer.insertBefore(createPostBox, postsList);
     console.log('✅ Create post box setup completed');
+}
+
+// NEW: Create disabled post box when user is not logged in
+function createDisabledPostBox() {
+    const postsContainer = document.getElementById('posts-container');
+    if (!postsContainer) return;
+    
+    const createPostBox = document.createElement('div');
+    createPostBox.className = 'create-post-box disabled';
+    
+    createPostBox.innerHTML = `
+        <div class="create-post-header">
+            <img class="create-post-avatar" src="https://i.pravatar.cc/50?u=anonymous" alt="Anonymous">
+            <div class="create-post-input">
+                Please log in to create posts
+            </div>
+        </div>
+        <div class="create-post-actions">
+            <div class="create-post-action disabled">
+                <i class="fas fa-image" style="color: #ccc;"></i>
+                Photo
+            </div>
+            <div class="create-post-action disabled">
+                <i class="fas fa-video" style="color: #ccc;"></i>
+                Video
+            </div>
+            <div class="create-post-action disabled">
+                <i class="fas fa-map-marker-alt" style="color: #ccc;"></i>
+                Location
+            </div>
+        </div>
+    `;
+    
+    const postsList = document.getElementById('posts-list') || postsContainer;
+    postsContainer.insertBefore(createPostBox, postsList);
 }
 
 // Render all posts
@@ -4313,10 +4347,10 @@ function createPostElement(post) {
     return postDiv;
 }
 
-// Create a new post
+// Create a new post - MODIFIED TO USE getCurrentUsername()
 async function createPost() {
     const content = document.getElementById('post-content').value.trim();
-    const author = currentUserSession?.username;
+    const author = getCurrentUsername(); // MODIFIED
     
     if (!author) {
         showError('You must be logged in to create a post');
@@ -4410,9 +4444,9 @@ function savePostsToLocalStorage() {
     localStorage.setItem('messageMatePosts', JSON.stringify(posts));
 }
 
-// Like a post
+// Like a post - MODIFIED TO USE getCurrentUsername()
 async function likePost(postId) {
-    const username = currentUserSession?.username;
+    const username = getCurrentUsername(); // MODIFIED
     
     if (!username) {
         showError('You must be logged in to like posts');
@@ -4497,9 +4531,9 @@ function updatePostLikesUI(postId, likesCount, userLiked) {
     }
 }
 
-// Add comment to post
+// Add comment to post - MODIFIED TO USE getCurrentUsername()
 async function addComment(postId, text) {
-    const username = currentUserSession?.username;
+    const username = getCurrentUsername(); // MODIFIED
     
     if (!username) {
         showError('You must be logged in to comment');
@@ -4726,19 +4760,23 @@ function generatePostId() {
     return 'post_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
-// Open create post modal
+// Open create post modal - MODIFIED TO USE getCurrentUsername()
 function openCreatePostModal() {
     const modal = document.getElementById('create-post-modal');
     if (modal) {
+        // Check if user is logged in
+        const currentUser = getCurrentUsername();
+        if (!currentUser) {
+            showError('Please log in to create posts');
+            return;
+        }
+        
         modal.style.display = 'flex';
         
         // Set author info
-        const currentUser = currentUserSession?.username;
-        if (currentUser) {
-            const userProfile = getUserProfile(currentUser);
-            document.getElementById('post-author-avatar').src = userProfile.avatar || `https://i.pravatar.cc/50?u=${currentUser}`;
-            document.getElementById('post-author-name').textContent = userProfile.displayName || currentUser;
-        }
+        const userProfile = getUserProfile(currentUser);
+        document.getElementById('post-author-avatar').src = userProfile.avatar || `https://i.pravatar.cc/50?u=${currentUser}`;
+        document.getElementById('post-author-name').textContent = userProfile.displayName || currentUser;
         
         // Reset form
         document.getElementById('post-content').value = '';
@@ -4787,6 +4825,13 @@ function setupPostInputHandlers() {
 
 // Media upload functions (simplified for demo)
 function openImageUpload() {
+    // Check if user is logged in
+    const currentUser = getCurrentUsername();
+    if (!currentUser) {
+        showError('Please log in to add images');
+        return;
+    }
+    
     // In a real app, this would open a file picker
     // For demo purposes, we'll use a placeholder
     const imageUrl = prompt('Enter image URL (for demo purposes):');
@@ -4796,6 +4841,13 @@ function openImageUpload() {
 }
 
 function openVideoUpload() {
+    // Check if user is logged in
+    const currentUser = getCurrentUsername();
+    if (!currentUser) {
+        showError('Please log in to add videos');
+        return;
+    }
+    
     // In a real app, this would open a file picker
     // For demo purposes, we'll use a placeholder
     const videoUrl = prompt('Enter video URL (for demo purposes):');
@@ -4805,6 +4857,13 @@ function openVideoUpload() {
 }
 
 function openLocationShare() {
+    // Check if user is logged in
+    const currentUser = getCurrentUsername();
+    if (!currentUser) {
+        showError('Please log in to share location');
+        return;
+    }
+    
     // This would use the Geolocation API in a real app
     alert('Location sharing would be implemented here in a real app');
 }
@@ -4878,7 +4937,81 @@ function getUserProfile(username) {
     return profiles[username] || { username: username };
 }
 
-// Initialize posts when showing posts container
+// NEW: Get current username from multiple sources
+function getCurrentUsername() {
+    // First check the global currentUserSession
+    if (currentUserSession && currentUserSession.username) {
+        return currentUserSession.username;
+    }
+    
+    // Then check localStorage for persistent login
+    const savedSession = localStorage.getItem('userSession');
+    if (savedSession) {
+        try {
+            const sessionData = JSON.parse(savedSession);
+            if (sessionData && sessionData.username) {
+                return sessionData.username;
+            }
+        } catch (e) {
+            console.error('Error parsing userSession from localStorage:', e);
+        }
+    }
+    
+    // Then check sessionStorage
+    const sessionData = sessionStorage.getItem('currentUserSession');
+    if (sessionData) {
+        try {
+            const session = JSON.parse(sessionData);
+            if (session && session.username) {
+                return session.username;
+            }
+        } catch (e) {
+            console.error('Error parsing currentUserSession from sessionStorage:', e);
+        }
+    }
+    
+    // Finally check auth token
+    const authToken = localStorage.getItem('auth_token');
+    if (authToken) {
+        // If we have auth token but no username in session, try to get from server
+        fetchCurrentUserFromToken();
+    }
+    
+    return null;
+}
+
+// NEW: Fetch current user from token if session is missing
+async function fetchCurrentUserFromToken() {
+    try {
+        const token = localStorage.getItem('auth_token');
+        if (!token) return;
+        
+        const response = await fetch('/api/auth/me', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (response.ok) {
+            const userData = await response.json();
+            if (userData.username) {
+                // Update the session
+                saveUserSession(userData);
+                console.log('✅ User session restored from token');
+                
+                // Refresh posts if we're on the posts page
+                if (document.getElementById('posts-container') && 
+                    document.getElementById('posts-container').style.display === 'block') {
+                    initializePosts();
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching user from token:', error);
+    }
+}
+
+// Initialize posts when showing posts container - MODIFIED TO BE MORE ROBUST
 function showContainer(containerId) {
     console.log('🔄 Showing container:', containerId);
     
@@ -4897,7 +5030,10 @@ function showContainer(containerId) {
     // Initialize specific functionality based on container
     if (containerId === 'posts') {
         console.log('📝 Initializing posts container...');
-        initializePosts();
+        // Use setTimeout to ensure DOM is ready
+        setTimeout(() => {
+            initializePosts();
+        }, 100);
     }
 }
 
@@ -5159,7 +5295,7 @@ let replyToText = null;
 
 // ===== TYPING INDICATOR FUNCTIONS =====
 function showTypingIndicator(username) {
-    if (!username || username === currentUserSession?.username) return;
+    if (!username || username === getCurrentUsername()) return;
     
     typingUsers[username] = Date.now();
     updateTypingIndicator();
@@ -5215,14 +5351,14 @@ function updateTypingIndicator() {
 }
 
 function sendTypingStart() {
-    const username = currentUserSession?.username;
+    const username = getCurrentUsername();
     if (username && socket) {
         socket.emit('typing-start', { username });
     }
 }
 
 function sendTypingStop() {
-    const username = currentUserSession?.username;
+    const username = getCurrentUsername();
     if (username && socket) {
         socket.emit('typing-stop', { username });
     }
@@ -5522,7 +5658,6 @@ function autoResize(textarea) {
     }
 }
 
-// --- CUT HERE ---
 // Helper function to escape HTML
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -5590,7 +5725,10 @@ function showContainer(containerId) {
         
         // MODIFIED: Initialize posts if showing that container
         if (containerId === 'posts') {
-            initializePosts();
+            // Use setTimeout to ensure DOM is ready
+            setTimeout(() => {
+                initializePosts();
+            }, 100);
         }
     }
     
@@ -5683,8 +5821,6 @@ function showContainer(containerId) {
     if (kebabDropdown) kebabDropdown.classList.remove('active');
 }
 
-// --- CUT HERE ---
-
 function hideContainer(containerId) {
     console.log('🔄 Hiding container:', containerId);
     const container = document.getElementById(containerId);
@@ -5710,7 +5846,7 @@ async function sendMessage() {
     isSending = true;
     
     const content = elements.messageInput.value.trim();
-    const username = currentUserSession?.username;
+    const username = getCurrentUsername(); // MODIFIED
     
     if (!content || !username) {
         isSending = false;
@@ -6524,7 +6660,7 @@ function showSettings() {
 
 // ===== ENHANCED LOGOUT FUNCTION =====
 function logout() {
-    const username = currentUserSession?.username;
+    const username = getCurrentUsername(); // MODIFIED
     
     // Notify server that user is going offline
     if (username && socket) {
@@ -6917,7 +7053,7 @@ async function loadPrivateUsers() {
     const usersList = document.getElementById('users-list');
     if (!usersList) return;
     
-    const currentUser = currentUserSession?.username;
+    const currentUser = getCurrentUsername(); // MODIFIED
     if (!currentUser) {
         console.error('No current user found');
         usersList.innerHTML = '<div class="no-users">Please log in to view conversations</div>';
@@ -7031,7 +7167,7 @@ async function openPrivateChat(username) {
     
     // Join Socket.io room for real-time updates
     if (socket) {
-        const currentUser = currentUserSession?.username;
+        const currentUser = getCurrentUsername(); // MODIFIED
         socket.emit('join-private-chat', { username: currentUser, otherUser: username });
     }
     
@@ -7047,7 +7183,7 @@ async function loadPrivateMessages(username) {
     const messagesContainer = document.getElementById('private-chat-messages');
     if (!messagesContainer) return;
     
-    const currentUser = currentUserSession?.username;
+    const currentUser = getCurrentUsername(); // MODIFIED
     if (!currentUser) {
         console.error('No current user found');
         return;
@@ -7151,7 +7287,7 @@ async function sendPrivateMessageToUser() {
     
     if (!content) return;
     
-    const currentUser = currentUserSession?.username;
+    const currentUser = getCurrentUsername(); // MODIFIED
     
     // ADDED: Check for duplicate message
     const messageKey = `${currentUser}-${currentPrivateChatUser}-${content}`;
@@ -7221,7 +7357,7 @@ async function sendPrivateMessageToUser() {
 
 // MODIFIED: Handle new private message with duplicate check
 function handleNewPrivateMessage(message) {
-    const currentUser = currentUserSession?.username;
+    const currentUser = getCurrentUsername(); // MODIFIED
     
     // Check if this message is relevant to current user
     if (message.sender_username === currentUser || message.receiver_username === currentUser) {
@@ -7276,7 +7412,7 @@ function showPrivateMessageNotification(message) {
 
 // Mark messages as read
 async function markMessagesAsRead(senderUsername) {
-    const currentUser = currentUserSession?.username;
+    const currentUser = getCurrentUsername(); // MODIFIED
     
     try {
         const token = localStorage.getItem('auth_token');
@@ -7301,7 +7437,7 @@ async function markMessagesAsRead(senderUsername) {
 
 // Load unread message counts
 async function loadUnreadCounts() {
-    const currentUser = currentUserSession?.username;
+    const currentUser = getCurrentUsername(); // MODIFIED
     if (!currentUser) return;
     
     try {
@@ -7416,7 +7552,7 @@ function setupPrivateMessageTypingHandlers() {
     let typingTimer;
     
     input.addEventListener('input', () => {
-        const currentUser = currentUserSession?.username;
+        const currentUser = getCurrentUsername(); // MODIFIED
         if (!currentUser || !currentPrivateChatUser) return;
         
         if (!typing) {
@@ -7481,7 +7617,7 @@ function showUsersPanel() {
         
         // Leave any private chat room
         if (socket) {
-            const currentUser = currentUserSession?.username;
+            const currentUser = getCurrentUsername(); // MODIFIED
             if (currentUser && currentPrivateChatUser) {
                 socket.emit('leave-private-chat', { 
                     username: currentUser, 
@@ -7545,7 +7681,7 @@ setInterval(clearOldMessageTracking, 30000);
 
 // ===== PROFILE MANAGEMENT FUNCTIONS =====
 function loadProfile() {
-    const username = currentUserSession?.username;
+    const username = getCurrentUsername(); // MODIFIED
     if (!username) return;
     
     // Load profile from API
@@ -7595,7 +7731,7 @@ function loadProfile() {
 }
 
 function saveProfile() {
-    const username = currentUserSession?.username;
+    const username = getCurrentUsername(); // MODIFIED
     if (!username) {
         showError('You must be logged in to save profile');
         return;
@@ -7665,7 +7801,7 @@ function updateProfileDisplay(profile) {
             displayUsername.textContent = profile.lastname;
         } else {
             // Use username if no first/last name
-            displayUsername.textContent = profile.username || currentUserSession?.username || 'User';
+            displayUsername.textContent = profile.username || getCurrentUsername() || 'User';
         }
     }
     
@@ -7674,7 +7810,7 @@ function updateProfileDisplay(profile) {
     }
     
     if (displayAvatar) {
-        displayAvatar.src = profile.avatar || `https://i.pravatar.cc/50?u=${profile.username || currentUserSession?.username || 'default'}`;
+        displayAvatar.src = profile.avatar || `https://i.pravatar.cc/50?u=${profile.username || getCurrentUsername() || 'default'}`;
     }
     
     // Update profile picture in messages if needed
@@ -7711,7 +7847,7 @@ function updateProfileSection() {
     const dropdown = document.getElementById('dropdown');
     if (!dropdown) return;
     
-    const currentUsername = currentUserSession?.username;
+    const currentUsername = getCurrentUsername(); // MODIFIED
     
     // Remove existing profile section if it exists
     const existingProfile = document.querySelector('.profile-display-section');
@@ -7812,7 +7948,7 @@ function showUserProfile(username) {
         
         // Update message button
         const messageBtn = document.getElementById('popup-message-btn');
-        const currentUser = currentUserSession?.username;
+        const currentUser = getCurrentUsername(); // MODIFIED
         if (username === currentUser) {
             messageBtn.style.display = 'none';
         } else {
@@ -7844,7 +7980,7 @@ function showUserProfile(username) {
             document.getElementById('popup-interests').textContent = 'Not specified';
             
             const messageBtn = document.getElementById('popup-message-btn');
-            const currentUser = currentUserSession?.username;
+            const currentUser = getCurrentUsername(); // MODIFIED
             if (username === currentUser) {
                 messageBtn.style.display = 'none';
             } else {
@@ -7877,7 +8013,7 @@ function initSocket() {
     
     socket.on('connect', () => {
         console.log('✅ Socket connected');
-        const username = currentUserSession?.username;
+        const username = getCurrentUsername(); // MODIFIED
         if (username) {
             socket.emit('user-online', username);
             // Request existing messages when connecting
@@ -7890,7 +8026,7 @@ function initSocket() {
         console.log('💬 New message received via socket:', message);
         
         // Only display if message is from another user or if it's an AI/bot response
-        const isOwnMessage = message.username === currentUserSession?.username;
+        const isOwnMessage = message.username === getCurrentUsername(); // MODIFIED
         const isAIResponse = message.username === 'AI' || message.username === 'Bot';
         
         if (!isOwnMessage || isAIResponse) {
@@ -7946,7 +8082,7 @@ function initSocket() {
 
     // Send heartbeat every 2 minutes to stay online
     const heartbeatInterval = setInterval(() => {
-        const username = currentUserSession?.username;
+        const username = getCurrentUsername(); // MODIFIED
         if (username && socket.connected) {
             socket.emit('user-online', username);
             console.log('💓 Heartbeat sent - keeping user online');
@@ -7976,7 +8112,7 @@ async function loadMessages() {
         if (data.length > 0) {
             const latestMessage = data[data.length - 1];
             if (latestMessage.id !== lastMessageId && 
-                latestMessage.username !== currentUserSession?.username && 
+                latestMessage.username !== getCurrentUsername() &&  // MODIFIED
                 document.visibilityState !== 'visible') {
                 showNotification(latestMessage.username, latestMessage.content);
             }
@@ -8003,7 +8139,7 @@ function renderMessages(messages) {
     
     // FIXED: Display messages in correct chronological order (oldest to newest)
     messages.forEach(msg => {
-        const isOwn = msg.username?.trim().toLowerCase() === currentUserSession?.username?.trim().toLowerCase();
+        const isOwn = msg.username?.trim().toLowerCase() === getCurrentUsername()?.trim().toLowerCase(); // MODIFIED
         displayMessage(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id, false);
     });
 
@@ -8129,7 +8265,7 @@ function setupTypingHandlers() {
     const messageInput = document.getElementById('user-input');
     if (!messageInput) return;
     messageInput.addEventListener('input', () => {
-        const username = currentUserSession?.username;
+        const username = getCurrentUsername(); // MODIFIED
         if (!username || !socket) return;
         if (!isTyping) {
             isTyping = true;
@@ -8177,7 +8313,7 @@ function scrollPrivateToTop(e) {
 
 // Page visibility and unload handlers
 function handleVisibilityChange() {
-    const username = currentUserSession?.username;
+    const username = getCurrentUsername(); // MODIFIED
     if (username && socket) {
         if (document.visibilityState === 'hidden') {
             // User switched tabs or minimized browser - mark as away
@@ -8190,7 +8326,7 @@ function handleVisibilityChange() {
 }
 
 function handleBeforeUnload() {
-    const username = currentUserSession?.username;
+    const username = getCurrentUsername(); // MODIFIED
     if (username && socket) {
         // Send away status instead of offline
         socket.emit('user-away', username);
@@ -8198,7 +8334,7 @@ function handleBeforeUnload() {
 }
 
 function handlePageHide() {
-    const username = currentUserSession?.username;
+    const username = getCurrentUsername(); // MODIFIED
     if (username && socket) {
         // Send away status instead of offline
         socket.emit('user-away', username);
@@ -9058,7 +9194,7 @@ function setupPrivateMessageInputHandlers() {
 }
 
 // Initialize if user is logged in
-const currentUser = currentUserSession?.username;
+const currentUser = getCurrentUsername(); // MODIFIED
 if (currentUser) {
     showContainer('chat');
     
@@ -9090,12 +9226,6 @@ document.addEventListener('click', function (e) {
         openZoom(e.target.src);
     }
 });
-        // ===== YOUR COMPLETE JAVASCRIPT CODE GOES HERE =====
-        // This should include all the JavaScript code I provided in the previous response
-        // including the posts functionality and all your existing code
-        
-        // For brevity, I'm not repeating the entire JavaScript code here
-        // but make sure to include the complete JavaScript from the previous response
-    </script>
+</script>
 </body>
 </html>
