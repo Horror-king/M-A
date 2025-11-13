@@ -4945,8 +4945,7 @@ function initializeMainApp() {
     document.querySelector('.news-toggle').style.display = 'block';
     
     initializeButtons();
-    // MODIFIED: Show posts container by default instead of chat
-    showContainer('posts');
+    showContainer('chat');
     
     // IMPORTANT: Create profile section and load profile data
     updateProfileSection(); // Create the profile section first
@@ -5666,8 +5665,8 @@ function hideContainer(containerId) {
     const kebabDropdown = document.querySelector('.kebab-dropdown');
     if (kebabDropdown) kebabDropdown.classList.remove('active');
     
-    // MODIFIED: Show posts container after closing any section instead of chat
-    showContainer('posts');
+    // Show chat container and input after closing any section
+    showContainer('chat');
 }
 
 // ===== MESSAGE FUNCTIONS =====
@@ -8970,8 +8969,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 container.style.display = 'none';
             });
             this.style.display = 'none';
-            // MODIFIED: Show posts container after closing overlay instead of chat
-            showContainer('posts');
+            // Show main chat
+            showContainer('chat');
         });
     }
 
@@ -9026,7 +9025,7 @@ function setupPrivateMessageInputHandlers() {
 // Initialize if user is logged in
 const currentUser = currentUserSession?.username;
 if (currentUser) {
-    showContainer('posts');
+    showContainer('chat');
     
     const chatInput = document.querySelector('.chat-input');
     if (chatInput) chatInput.style.display = 'flex';
@@ -9064,4 +9063,4 @@ document.addEventListener('click', function (e) {
         // but make sure to include the complete JavaScript from the previous response
     </script>
 </body>
-</html>m
+</html>
