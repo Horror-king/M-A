@@ -4042,7 +4042,8 @@
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
-<script>
+
+    <script>
 // --- CUT HERE ---
       // Posts functionality for client-side
 let posts = [];
@@ -4149,13 +4150,9 @@ async function pollForPostUpdates() {
 
 // Setup Facebook-style create post box
 function setupCreatePostBox() {
-    console.log('🛠️ Setting up create post box...');
-    
     const postsContainer = document.getElementById('posts-container');
     if (!postsContainer) {
-        console.log('❌ Posts container not found, retrying in 100ms...');
-        // Retry after a short delay - this fixes the issue where container isn't ready
-        setTimeout(setupCreatePostBox, 100);
+        console.log('❌ Posts container not found');
         return;
     }
     
@@ -4203,16 +4200,13 @@ function setupCreatePostBox() {
     // Insert at the top of posts container
     const postsList = document.getElementById('posts-list') || postsContainer;
     postsContainer.insertBefore(createPostBox, postsList);
-    console.log('✅ Create post box setup completed - user can now write posts');
+    console.log('✅ Create post box setup completed');
 }
 
 // Render all posts
 function renderPosts() {
     const postsContainer = document.getElementById('posts-container');
-    if (!postsContainer) {
-        console.log('❌ Posts container not found during render');
-        return;
-    }
+    if (!postsContainer) return;
     
     // Find or create posts list container
     let postsList = document.getElementById('posts-list');
@@ -4902,10 +4896,7 @@ function showContainer(containerId) {
     // Initialize specific functionality based on container
     if (containerId === 'posts') {
         console.log('📝 Initializing posts container...');
-        // FIXED: Added delay to ensure DOM is ready
-        setTimeout(() => {
-            initializePosts();
-        }, 100);
+        initializePosts();
     }
 }
 
@@ -4994,11 +4985,6 @@ function initializeMainApp() {
     updateProfileSection(); // Create the profile section first
     loadProfile(); // Then load the actual profile data
     
-    // FIXED: Initialize online users immediately
-    console.log('👥 Initializing online users panel immediately...');
-    initializeOnlinePanelToggle();
-    loadUserPanelPreference();
-    
     // MODIFIED: Initialize posts functionality when user logs in
     console.log('📝 Initializing posts functionality on login...');
     initializePosts();
@@ -5047,11 +5033,11 @@ document.addEventListener('DOMContentLoaded', function() {
         // Initialize buttons and other common components
         initializeButtons();
         
-        // FIXED: Initialize online panel toggle - moved to initializeMainApp
-        // initializeOnlinePanelToggle();
+        // FIXED: Initialize online panel toggle
+        initializeOnlinePanelToggle();
         
-        // FIXED: Load user panel preference - moved to initializeMainApp
-        // loadUserPanelPreference();
+        // Load user panel preference
+        loadUserPanelPreference();
         
         if ('Notification' in window) {
             Notification.requestPermission().then(permission => {
@@ -5605,13 +5591,10 @@ function showContainer(containerId) {
             initializeSQLEditor();
         }
         
-        // MODIFIED: Initialize posts if showing that container - with delay to ensure DOM is ready
+        // MODIFIED: Initialize posts if showing that container
         if (containerId === 'posts') {
             console.log('📝 Showing posts container, initializing posts...');
-            // FIXED: Added delay to ensure DOM is fully rendered
-            setTimeout(() => {
-                initializePosts();
-            }, 100);
+            initializePosts();
         }
     }
     
