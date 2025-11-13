@@ -4044,7 +4044,8 @@
     </div>
 
 // --- CUT HERE ---
-<script>
+
+    <script>
 // --- CUT HERE ---
       // Posts functionality for client-side
 let posts = [];
@@ -4975,7 +4976,10 @@ function initializeMainApp() {
     
     initializeChat();
 
+    // MODIFIED: Initialize socket connection FIRST to ensure online users are loaded
+    console.log('🔌 Initializing socket connection for online users...');
     initSocket();
+    
     setupTypingHandlers();
     setupTypingDetection();
     setupTypingSocketEvents();
@@ -4992,6 +4996,51 @@ function initializeMainApp() {
     showSuccess(`Welcome back, ${currentUserSession?.username || 'User'}!`);
     
     console.log('✅ Main application initialized successfully');
+    
+    // NEW: Force update online users list after a short delay to ensure socket is connected
+    setTimeout(() => {
+        console.log('🔄 Forcing online users update...');
+        if (socket && socket.connected) {
+            const username = currentUserSession?.username;
+            if (username) {
+                socket.emit('user-online', username);
+                console.log('✅ Emitted user-online event for:', username);
+            }
+        }
+        
+        // Also try to load online users directly after a delay
+        setTimeout(loadOnlineUsersDirectly, 1000);
+    }, 500);
+}
+
+// NEW: Function to directly load online users
+function loadOnlineUsersDirectly() {
+    console.log('📡 Attempting to load online users directly...');
+    const currentUser = currentUserSession?.username;
+    if (!currentUser) return;
+    
+    // Try to fetch online users from API
+    fetch('/api/online-users')
+        .then(response => {
+            if (response.ok) {
+                return response.json();
+            }
+            throw new Error('Failed to fetch online users');
+        })
+        .then(onlineUsersList => {
+            console.log('✅ Online users loaded directly:', onlineUsersList);
+            if (onlineUsersList && Array.isArray(onlineUsersList)) {
+                onlineUsers = onlineUsersList;
+                updateOnlineUsersList(onlineUsers);
+            }
+        })
+        .catch(error => {
+            console.log('❌ Could not load online users directly:', error.message);
+            // Fallback: Use socket to get online users
+            if (socket && socket.connected) {
+                socket.emit('get-online-users');
+            }
+        });
 }
 
 // Initialize welcome screen animation when page loads
@@ -7887,8 +7936,10 @@ function initSocket() {
             socket.emit('user-online', username);
             // Request existing messages when connecting
             socket.emit('request-messages');
-            // Request online users list
+            
+            // NEW: Request online users immediately after connection
             socket.emit('get-online-users');
+            console.log('✅ Requested online users list');
         }
     });
 
@@ -7928,32 +7979,16 @@ function initSocket() {
         renderMessages(messages);
     });
 
-    // User status updates - FIXED: This was the main issue
+    // User status updates
     socket.on('user-status-change', (data) => {
         console.log('👤 User status change:', data);
-        
-        // FIXED: Properly update onlineUsers array
-        if (data.onlineUsers && Array.isArray(data.onlineUsers)) {
-            onlineUsers = data.onlineUsers;
-            console.log('✅ Updated online users:', onlineUsers);
-        } else if (data.username && data.status) {
-            // Handle individual user status changes
-            if (data.status === 'online') {
-                if (!onlineUsers.includes(data.username)) {
-                    onlineUsers.push(data.username);
-                }
-            } else if (data.status === 'offline') {
-                onlineUsers = onlineUsers.filter(user => user !== data.username);
-            }
-            console.log('✅ Updated online users (individual):', onlineUsers);
-        }
-        
+        onlineUsers = data.onlineUsers || [];
         updateOnlineUsersList(onlineUsers);
         updateUserStatusIndicator(data.username, data.status);
     });
-
-    // FIXED: Add specific handler for online users list
-    socket.on('online-users', (users) => {
+    
+    // NEW: Listen for online users list specifically
+    socket.on('online-users-list', (users) => {
         console.log('👥 Received online users list:', users);
         if (users && Array.isArray(users)) {
             onlineUsers = users;
@@ -8051,7 +8086,7 @@ function renderMessages(messages) {
     }, 10);
 }
 
-// Update online users lists - FIXED: Enhanced to handle empty lists
+// Update online users lists
 function updateOnlineUsersList(onlineUsers) {
     console.log('Updating online users list:', onlineUsers);
     
@@ -8068,48 +8103,34 @@ function updateSingleOnlineList(listElementId, countElementId, onlineUsers) {
     
     if (onlineList) {
         onlineList.innerHTML = '';
-        
-        // FIXED: Handle case when there are no online users
-        if (!onlineUsers || onlineUsers.length === 0) {
-            const noUsersElement = document.createElement('div');
-            noUsersElement.className = 'no-online-users';
-            noUsersElement.textContent = 'No users online';
-            onlineList.appendChild(noUsersElement);
-        } else {
-            onlineUsers.forEach(user => {
-                // Skip current user from showing in online list
-                if (user === currentUserSession?.username) return;
-                
-                const userElement = document.createElement('div');
-                userElement.className = 'online-user';
-                
-                // Get user profile to display correct avatar
-                const avatarUrl = `https://i.pravatar.cc/50?u=${encodeURIComponent(user)}`;
-                
-                userElement.innerHTML = `
-                    <div class="online-user-avatar">
-                        <img src="${avatarUrl}" alt="${user}">
-                        <div class="online-dot"></div>
-                    </div>
-                    <div class="online-user-info">
-                        <div class="online-user-name">${user}</div>
-                    </div>
-                `;
-                
-                // ADDED: Add click event to show user profile
-                userElement.onclick = () => {
-                    showUserProfile(user);
-                };
-                
-                onlineList.appendChild(userElement);
-            });
-        }
+        onlineUsers.forEach(user => {
+            const userElement = document.createElement('div');
+            userElement.className = 'online-user';
+            
+            // Get user profile to display correct avatar
+            const avatarUrl = `https://i.pravatar.cc/50?u=${encodeURIComponent(user)}`;
+            
+            userElement.innerHTML = `
+                <div class="online-user-avatar">
+                    <img src="${avatarUrl}" alt="${user}">
+                    <div class="online-dot"></div>
+                </div>
+                <div class="online-user-info">
+                    <div class="online-user-name">${user}</div>
+                </div>
+            `;
+            
+            // ADDED: Add click event to show user profile
+            userElement.onclick = () => {
+                showUserProfile(user);
+            };
+            
+            onlineList.appendChild(userElement);
+        });
     }
     
     if (onlineCount) {
-        // Don't count current user in the online count
-        const otherUsers = onlineUsers ? onlineUsers.filter(user => user !== currentUserSession?.username) : [];
-        onlineCount.textContent = otherUsers.length;
+        onlineCount.textContent = onlineUsers.length;
     }
 }
 
