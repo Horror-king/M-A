@@ -4043,7 +4043,8 @@
         </div>
     </div>
 
-    <script>
+// --- CUT HERE ---
+<script>
 // --- CUT HERE ---
       // Posts functionality for client-side
 let posts = [];
@@ -7886,6 +7887,8 @@ function initSocket() {
             socket.emit('user-online', username);
             // Request existing messages when connecting
             socket.emit('request-messages');
+            // Request online users list
+            socket.emit('get-online-users');
         }
     });
 
@@ -7925,12 +7928,37 @@ function initSocket() {
         renderMessages(messages);
     });
 
-    // User status updates
+    // User status updates - FIXED: This was the main issue
     socket.on('user-status-change', (data) => {
         console.log('👤 User status change:', data);
-        onlineUsers = data.onlineUsers || [];
+        
+        // FIXED: Properly update onlineUsers array
+        if (data.onlineUsers && Array.isArray(data.onlineUsers)) {
+            onlineUsers = data.onlineUsers;
+            console.log('✅ Updated online users:', onlineUsers);
+        } else if (data.username && data.status) {
+            // Handle individual user status changes
+            if (data.status === 'online') {
+                if (!onlineUsers.includes(data.username)) {
+                    onlineUsers.push(data.username);
+                }
+            } else if (data.status === 'offline') {
+                onlineUsers = onlineUsers.filter(user => user !== data.username);
+            }
+            console.log('✅ Updated online users (individual):', onlineUsers);
+        }
+        
         updateOnlineUsersList(onlineUsers);
         updateUserStatusIndicator(data.username, data.status);
+    });
+
+    // FIXED: Add specific handler for online users list
+    socket.on('online-users', (users) => {
+        console.log('👥 Received online users list:', users);
+        if (users && Array.isArray(users)) {
+            onlineUsers = users;
+            updateOnlineUsersList(onlineUsers);
+        }
     });
 
     // ADDED: Typing events
@@ -8023,7 +8051,7 @@ function renderMessages(messages) {
     }, 10);
 }
 
-// Update online users lists
+// Update online users lists - FIXED: Enhanced to handle empty lists
 function updateOnlineUsersList(onlineUsers) {
     console.log('Updating online users list:', onlineUsers);
     
@@ -8040,34 +8068,48 @@ function updateSingleOnlineList(listElementId, countElementId, onlineUsers) {
     
     if (onlineList) {
         onlineList.innerHTML = '';
-        onlineUsers.forEach(user => {
-            const userElement = document.createElement('div');
-            userElement.className = 'online-user';
-            
-            // Get user profile to display correct avatar
-            const avatarUrl = `https://i.pravatar.cc/50?u=${encodeURIComponent(user)}`;
-            
-            userElement.innerHTML = `
-                <div class="online-user-avatar">
-                    <img src="${avatarUrl}" alt="${user}">
-                    <div class="online-dot"></div>
-                </div>
-                <div class="online-user-info">
-                    <div class="online-user-name">${user}</div>
-                </div>
-            `;
-            
-            // ADDED: Add click event to show user profile
-            userElement.onclick = () => {
-                showUserProfile(user);
-            };
-            
-            onlineList.appendChild(userElement);
-        });
+        
+        // FIXED: Handle case when there are no online users
+        if (!onlineUsers || onlineUsers.length === 0) {
+            const noUsersElement = document.createElement('div');
+            noUsersElement.className = 'no-online-users';
+            noUsersElement.textContent = 'No users online';
+            onlineList.appendChild(noUsersElement);
+        } else {
+            onlineUsers.forEach(user => {
+                // Skip current user from showing in online list
+                if (user === currentUserSession?.username) return;
+                
+                const userElement = document.createElement('div');
+                userElement.className = 'online-user';
+                
+                // Get user profile to display correct avatar
+                const avatarUrl = `https://i.pravatar.cc/50?u=${encodeURIComponent(user)}`;
+                
+                userElement.innerHTML = `
+                    <div class="online-user-avatar">
+                        <img src="${avatarUrl}" alt="${user}">
+                        <div class="online-dot"></div>
+                    </div>
+                    <div class="online-user-info">
+                        <div class="online-user-name">${user}</div>
+                    </div>
+                `;
+                
+                // ADDED: Add click event to show user profile
+                userElement.onclick = () => {
+                    showUserProfile(user);
+                };
+                
+                onlineList.appendChild(userElement);
+            });
+        }
     }
     
     if (onlineCount) {
-        onlineCount.textContent = onlineUsers.length;
+        // Don't count current user in the online count
+        const otherUsers = onlineUsers ? onlineUsers.filter(user => user !== currentUserSession?.username) : [];
+        onlineCount.textContent = otherUsers.length;
     }
 }
 
