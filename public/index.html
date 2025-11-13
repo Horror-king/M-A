@@ -4861,14 +4861,11 @@ function showContainer(containerId) {
         selectedContainer.style.display = 'block';
     }
     
-    // MODIFIED: Initialize posts if showing that container (this is a backup)
+    // Initialize specific functionality based on container
 if (containerId === 'posts') {
-    // Ensure posts are initialized when navigating to posts
-    if (posts.length === 0) {
-        initializePosts();
-    }
+    initializePosts(); // Ensure posts work when navigating to posts tab
 }
-
+    
 // Open zoom modal for media
 function openZoom(mediaUrl) {
     // Implementation for zoom modal
