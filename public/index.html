@@ -3478,7 +3478,41 @@
         padding: 8px 12px;
         font-size: 13px;
     }
-    
+    /* Post image styling */
+.post-image-container {
+    margin: 10px 0;
+    border-radius: 8px;
+    overflow: hidden;
+    max-width: 100%;
+}
+
+.post-image-container img {
+    width: 100%;
+    max-width: 500px;
+    height: auto;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.post-image-container img:hover {
+    transform: scale(1.02);
+}
+
+.post-media {
+    margin: 10px 0;
+}
+
+.post-media video {
+    width: 100%;
+    max-width: 500px;
+    border-radius: 8px;
+}
+
+.post-text-content {
+    margin-bottom: 10px;
+    line-height: 1.4;
+ }
     .comment-input button {
         padding: 8px 12px;
         font-size: 13px;
@@ -4043,7 +4077,7 @@
         </div>
     </div>
 
-
+// --- CUT HERE ---
     <script>
 // --- CUT HERE ---
       // Posts functionality for client-side
@@ -4189,6 +4223,71 @@ function setupCreatePostBox() {
     console.log('✅ Create post box setup complete');
 }
 
+// NEW: Function to detect and convert image URLs in text
+function processContentWithImages(content) {
+    if (!content) return '';
+    
+    // Regular expression to match image URLs
+    const imageUrlRegex = /(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|bmp|webp|svg))(\?[^\s]*)?/gi;
+    
+    // Split content by image URLs
+    const parts = content.split(imageUrlRegex);
+    
+    // If no images found, return original content
+    if (parts.length <= 1) {
+        return escapeHtml(content);
+    }
+    
+    let processedContent = '';
+    let isImage = false;
+    
+    for (let i = 0; i < parts.length; i++) {
+        if (parts[i] === undefined) continue;
+        
+        // Every 3rd part starting from index 1 is an image URL (due to regex groups)
+        if ((i % 3 === 1) && parts[i]) {
+            const imageUrl = parts[i] + (parts[i+1] || '') + (parts[i+2] || '');
+            processedContent += `<div class="post-content-image">
+                <img src="${escapeHtml(imageUrl)}" alt="Post image" onclick="openZoom('${escapeHtml(imageUrl)}')" loading="lazy">
+            </div>`;
+            // Skip the next two parts (file extension and query params)
+            i += 2;
+            isImage = true;
+        } else if (parts[i] && parts[i].trim()) {
+            // Regular text content
+            processedContent += `<div class="post-text-content">${escapeHtml(parts[i])}</div>`;
+            isImage = false;
+        }
+    }
+    
+    return processedContent;
+}
+
+// NEW: Function to detect and convert multiple image URLs in text
+function processContentForMultipleImages(content) {
+    if (!content) return { text: '', images: [] };
+    
+    // Regular expression to match image URLs
+    const imageUrlRegex = /(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|bmp|webp|svg))(\?[^\s]*)?/gi;
+    
+    const images = [];
+    let textContent = content;
+    
+    // Find all image URLs
+    let match;
+    while ((match = imageUrlRegex.exec(content)) !== null) {
+        const fullUrl = match[0];
+        images.push(fullUrl);
+        // Replace the URL with a marker in text content
+        textContent = textContent.replace(fullUrl, ` [IMAGE_${images.length - 1}] `);
+    }
+    
+    return {
+        text: escapeHtml(textContent).replace(/\[IMAGE_(\d+)\]/g, ''),
+        images: images
+    };
+}
+
 // Render all posts
 function renderPosts() {
     const postsContainer = document.getElementById('posts-container');
@@ -4221,7 +4320,7 @@ function renderPosts() {
     });
 }
 
-// Create post element
+// UPDATED: Create post element with image URL detection
 function createPostElement(post) {
     const postDiv = document.createElement('div');
     postDiv.className = 'post-card';
@@ -4229,6 +4328,9 @@ function createPostElement(post) {
     
     const timeAgo = formatPostTime(post.timestamp);
     const userProfile = getUserProfile(post.author);
+    
+    // Process content to detect and display images
+    const processedContent = processContentForMultipleImages(post.content);
     
     postDiv.innerHTML = `
         <div class="post-header">
@@ -4242,11 +4344,22 @@ function createPostElement(post) {
                 </div>
             </div>
         </div>
-        <div class="post-content">${escapeHtml(post.content)}</div>
+        ${processedContent.text ? `<div class="post-content">${processedContent.text}</div>` : ''}
+        ${processedContent.images.length > 0 ? `
+            <div class="post-media">
+                ${processedContent.images.map(url => `
+                    <div class="post-image-container">
+                        <img src="${escapeHtml(url)}" alt="Post image" onclick="openZoom('${escapeHtml(url)}')" loading="lazy">
+                    </div>
+                `).join('')}
+            </div>
+        ` : ''}
         ${post.media ? `
             <div class="post-media">
                 ${post.media.type === 'image' ? 
-                    `<img src="${post.media.url}" alt="Post image" onclick="openZoom('${post.media.url}')">` : 
+                    `<div class="post-image-container">
+                        <img src="${post.media.url}" alt="Post image" onclick="openZoom('${post.media.url}')" loading="lazy">
+                    </div>` : 
                     `<video controls><source src="${post.media.url}" type="video/mp4">Your browser does not support the video tag.</video>`
                 }
             </div>
