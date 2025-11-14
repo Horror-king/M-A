@@ -988,7 +988,7 @@ app.get('/api/user/profile/:username', async (req, res) => {
 
 // ===== ADD MISSING AI ENDPOINTS =====
 
-// Private AI endpoint - FIXED: This was missing
+// Enhanced Private AI endpoint - allows messages without prefix
 app.post('/api/ai/private', async (req, res) => {
   try {
     const { message } = req.body;
@@ -998,9 +998,16 @@ app.post('/api/ai/private', async (req, res) => {
       return res.status(400).json({ error: "Message is required" });
     }
 
-    // Use the same AI service as the main chat
+    // Check if message starts with prefix (like "example-help")
+    const PREFIX = config.prefix || "!";
+    if (message.trim().toLowerCase().startsWith('example-help')) {
+      console.log('🔇 Ignoring AI response for prefix message:', message);
+      return res.json({ reply: "" }); // Return empty response to ignore AI
+    }
+
+    // Use the specified API endpoint
     const response = await axios.get(
-      `https://yau-ai-runing-station.vercel.app/ai?prompt=${encodeURIComponent(message)}&cb=${Date.now()}`,
+      `https://tawsif.is-a.dev/gemini/chat?message=${encodeURIComponent(message)}&id=1`,
       { 
         headers: { 
           Accept: "application/json",
@@ -1018,6 +1025,7 @@ app.post('/api/ai/private', async (req, res) => {
       try {
         responseData = JSON.parse(response.data);
       } catch (e) {
+        // If it's a string response, use it directly
         if (response.data.includes('error') || response.status !== 200) {
           throw new Error(response.data || `API returned status ${response.status}`);
         }
@@ -1028,17 +1036,21 @@ app.post('/api/ai/private', async (req, res) => {
     }
 
     if (!aiResponse) {
+      // Try to extract response from different possible formats
       if (responseData.response) {
         aiResponse = responseData.response;
       } else if (responseData.message) {
         aiResponse = responseData.message;
       } else if (responseData.data) {
         aiResponse = responseData.data;
+      } else if (responseData.text) {
+        aiResponse = responseData.text;
       } else {
         aiResponse = JSON.stringify(responseData) || "⚠️ No recognizable response format";
       }
     }
 
+    console.log('🤖 Private AI Response:', aiResponse);
     res.json({ reply: aiResponse });
   } catch (error) {
     console.error("❌ Private AI Error:", error);
@@ -1046,7 +1058,7 @@ app.post('/api/ai/private', async (req, res) => {
   }
 });
 
-// Main AI chat endpoint - FIXED: This was missing
+// Enhanced Main AI chat endpoint - also uses the new API
 app.post('/api/ai/chat', async (req, res) => {
   try {
     const { message } = req.body;
@@ -1056,9 +1068,9 @@ app.post('/api/ai/chat', async (req, res) => {
       return res.status(400).json({ error: "Message is required" });
     }
 
-    // Use the same AI service
+    // Use the specified API endpoint
     const response = await axios.get(
-      `https://yau-ai-runing-station.vercel.app/ai?prompt=${encodeURIComponent(message)}&cb=${Date.now()}`,
+      `https://tawsif.is-a.dev/gemini/chat?message=${encodeURIComponent(message)}&id=1`,
       { 
         headers: { 
           Accept: "application/json",
@@ -1092,6 +1104,8 @@ app.post('/api/ai/chat', async (req, res) => {
         aiResponse = responseData.message;
       } else if (responseData.data) {
         aiResponse = responseData.data;
+      } else if (responseData.text) {
+        aiResponse = responseData.text;
       } else {
         aiResponse = JSON.stringify(responseData) || "⚠️ No recognizable response format";
       }
