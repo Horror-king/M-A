@@ -3605,52 +3605,61 @@
         <a href="#" onclick="logout()" style="color: #ff4444;">Logout</a>
     </div>
 
-    <!-- Add this to your posts container section -->
+        <!-- UPDATED: Posts Container without Create Post Button -->
 <div id="posts" class="main-chat-interface container" style="display: none;">
     <div class="posts-header">
         <h2>Community Posts</h2>
+        <!-- REMOVED: Create Post Button -->
     </div>
     
     <div class="posts-container" id="posts-container">
+        <!-- Facebook-style create post box will be inserted here by JavaScript -->
         <!-- Posts will be loaded here -->
-    </div>
-</div>
-
-<!-- Add this modal for creating posts (if not already there) -->
-<div id="create-post-modal" class="post-modal" style="display: none;">
-    <div class="post-modal-content">
-        <div class="post-modal-header">
-            <h3>Create Post</h3>
-            <span class="close-modal" onclick="closeCreatePostModal()">&times;</span>
+        <div class="no-posts">
+            <p>No posts yet. Be the first to share something!</p>
         </div>
-        <div class="post-modal-body">
-            <div class="post-author-info">
-                <img id="post-author-avatar" src="https://i.pravatar.cc/50?u=default" alt="Your Avatar">
-                <div>
-                    <div id="post-author-name">You</div>
-                    <div class="post-visibility">Public</div>
+    </div>
+    
+   
+        
+        <!-- Create Post Modal -->
+        <div id="create-post-modal" class="post-modal" style="display: none;">
+            <div class="post-modal-content">
+                <div class="post-modal-header">
+                    <h3>Create Post</h3>
+                    <span class="close-modal" onclick="closeCreatePostModal()">&times;</span>
+                </div>
+                <div class="post-modal-body">
+                    <div class="post-author-info">
+                        <img id="post-author-avatar" src="https://i.pravatar.cc/50?u=default" alt="Your Avatar">
+                        <div>
+                            <div id="post-author-name">You</div>
+                            <div class="post-visibility">Public</div>
+                        </div>
+                    </div>
+                    <textarea id="post-content" placeholder="What's on your mind?" maxlength="500"></textarea>
+                    <div class="post-content-counter">
+                        <span id="post-char-count">0</span>/500
+                    </div>
+                    <div class="post-actions">
+                        <button class="post-action-btn" onclick="openImageUpload()">
+                            <i class="fas fa-image"></i> Photo
+                        </button>
+                        <button class="post-action-btn" onclick="openVideoUpload()">
+                            <i class="fas fa-video"></i> Video
+                        </button>
+                        <button class="post-action-btn" onclick="openLocationShare()">
+                            <i class="fas fa-map-marker-alt"></i> Location
+                        </button>
+                    </div>
+                    <div id="post-media-preview" class="post-media-preview"></div>
+                    <div class="post-submit-actions">
+                        <button id="submit-post-btn" class="submit-post-btn" onclick="createPost()" disabled>Post</button>
+                    </div>
                 </div>
             </div>
-            <textarea id="post-content" placeholder="What's on your mind?" maxlength="500"></textarea>
-            <div class="post-content-counter">
-                <span id="post-char-count">0</span>/500
-            </div>
-            <div class="post-actions-modal">
-                <button class="post-action-btn" onclick="openImageUpload()">
-                    <i class="fas fa-image"></i> Photo
-                </button>
-                <button class="post-action-btn" onclick="openVideoUpload()">
-                    <i class="fas fa-video"></i> Video
-                </button>
-            </div>
-            <div id="post-media-preview" class="post-media-preview"></div>
-            <div class="post-submit-actions">
-                <button id="submit-post-btn" class="submit-post-btn" onclick="createPost()" disabled>Post</button>
-            </div>
         </div>
-     </div>
-  </div>
-</div>
+    </div>
 
     <!-- MODIFIED: Chat container with collapsible online users panel -->
     <div id="chat" class="main-chat-interface container" style="display: none;">
@@ -4068,8 +4077,9 @@
         </div>
     </div>
 
-   <script>
-// Posts functionality for client-side
+    <script>
+// --- CUT HERE ---
+      // Posts functionality for client-side
 let posts = [];
 let lastUpdateTimestamp = null;
 let currentPostMedia = [];
@@ -4123,10 +4133,42 @@ function loadPostsFromLocalStorage() {
     }
 }
 
-// Setup Facebook-style create post box
+// Poll for new posts and updates
+async function pollForPostUpdates() {
+    try {
+        const response = await fetch(`/api/posts/updates?lastUpdate=${lastUpdateTimestamp}`);
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.posts.length > 0) {
+                // Update existing posts or add new ones
+                data.posts.forEach(updatedPost => {
+                    const existingIndex = posts.findIndex(p => p.id === updatedPost.id);
+                    if (existingIndex >= 0) {
+                        // Update existing post
+                        posts[existingIndex] = updatedPost;
+                    } else {
+                        // Add new post to beginning
+                        posts.unshift(updatedPost);
+                    }
+                });
+                
+                renderPosts();
+                lastUpdateTimestamp = data.timestamp;
+            }
+        }
+    } catch (error) {
+        console.error('Error polling for updates:', error);
+    }
+}
+
+// Setup Facebook-style create post box - FIXED: Ensure it's always visible
 function setupCreatePostBox() {
     const postsContainer = document.getElementById('posts-container');
-    if (!postsContainer) return;
+    if (!postsContainer) {
+        console.error('Posts container not found');
+        return;
+    }
     
     // Remove existing create post box if it exists
     const existingBox = postsContainer.querySelector('.create-post-box');
@@ -4134,14 +4176,17 @@ function setupCreatePostBox() {
     
     // Get current user info
     const currentUser = currentUserSession?.username;
-    if (!currentUser) return;
+    if (!currentUser) {
+        console.error('No user logged in');
+        return;
+    }
     
     const userProfile = getUserProfile(currentUser);
     
     // Create Facebook-style create post box
     const createPostBox = document.createElement('div');
     createPostBox.className = 'create-post-box';
-    createPostBox.onclick = openCreatePostModal;
+    createPostBox.onclick = openCreatePostModal; // Make entire box clickable
     
     createPostBox.innerHTML = `
         <div class="create-post-header">
@@ -4159,30 +4204,109 @@ function setupCreatePostBox() {
                 <i class="fas fa-video" style="color: #f5533d;"></i>
                 Video
             </div>
+            <div class="create-post-action" onclick="event.stopPropagation(); openLocationShare()">
+                <i class="fas fa-map-marker-alt" style="color: #f7b928;"></i>
+                Location
+            </div>
         </div>
     `;
     
-    // Insert at the top of posts container
-    postsContainer.appendChild(createPostBox);
+    // Insert at the top of posts container - FIXED: Ensure proper placement
+    const postsList = document.getElementById('posts-list');
+    if (postsList) {
+        postsContainer.insertBefore(createPostBox, postsList);
+    } else {
+        postsContainer.appendChild(createPostBox);
+    }
+    
+    console.log('✅ Create post box setup complete');
+}
+
+// NEW: Function to detect and convert image URLs in text
+function processContentWithImages(content) {
+    if (!content) return '';
+    
+    // Regular expression to match image URLs
+    const imageUrlRegex = /(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|bmp|webp|svg))(\?[^\s]*)?/gi;
+    
+    // Split content by image URLs
+    const parts = content.split(imageUrlRegex);
+    
+    // If no images found, return original content
+    if (parts.length <= 1) {
+        return escapeHtml(content);
+    }
+    
+    let processedContent = '';
+    let isImage = false;
+    
+    for (let i = 0; i < parts.length; i++) {
+        if (parts[i] === undefined) continue;
+        
+        // Every 3rd part starting from index 1 is an image URL (due to regex groups)
+        if ((i % 3 === 1) && parts[i]) {
+            const imageUrl = parts[i] + (parts[i+1] || '') + (parts[i+2] || '');
+            processedContent += `<div class="post-content-image">
+                <img src="${escapeHtml(imageUrl)}" alt="Post image" onclick="openZoom('${escapeHtml(imageUrl)}')" loading="lazy">
+            </div>`;
+            // Skip the next two parts (file extension and query params)
+            i += 2;
+            isImage = true;
+        } else if (parts[i] && parts[i].trim()) {
+            // Regular text content
+            processedContent += `<div class="post-text-content">${escapeHtml(parts[i])}</div>`;
+            isImage = false;
+        }
+    }
+    
+    return processedContent;
+}
+
+// NEW: Function to detect and convert multiple image URLs in text
+function processContentForMultipleImages(content) {
+    if (!content) return { text: '', images: [] };
+    
+    // Regular expression to match image URLs
+    const imageUrlRegex = /(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|bmp|webp|svg))(\?[^\s]*)?/gi;
+    
+    const images = [];
+    let textContent = content;
+    
+    // Find all image URLs
+    let match;
+    while ((match = imageUrlRegex.exec(content)) !== null) {
+        const fullUrl = match[0];
+        images.push(fullUrl);
+        // Replace the URL with a marker in text content
+        textContent = textContent.replace(fullUrl, ` [IMAGE_${images.length - 1}] `);
+    }
+    
+    return {
+        text: escapeHtml(textContent).replace(/\[IMAGE_(\d+)\]/g, ''),
+        images: images
+    };
 }
 
 // Render all posts
 function renderPosts() {
     const postsContainer = document.getElementById('posts-container');
-    if (!postsContainer) return;
-    
-    // Clear existing posts (except create post box)
-    const createPostBox = postsContainer.querySelector('.create-post-box');
-    postsContainer.innerHTML = '';
-    if (createPostBox) {
-        postsContainer.appendChild(createPostBox);
+    if (!postsContainer) {
+        console.error('Posts container not found');
+        return;
     }
     
+    // Find or create posts list container
+    let postsList = document.getElementById('posts-list');
+    if (!postsList) {
+        postsList = document.createElement('div');
+        postsList.id = 'posts-list';
+        postsContainer.appendChild(postsList);
+    }
+    
+    postsList.innerHTML = '';
+    
     if (posts.length === 0) {
-        const noPosts = document.createElement('div');
-        noPosts.className = 'no-posts';
-        noPosts.innerHTML = '<p>No posts yet. Be the first to share something!</p>';
-        postsContainer.appendChild(noPosts);
+        postsList.innerHTML = '<div class="no-posts">No posts yet. Be the first to share something!</div>';
         return;
     }
     
@@ -4191,11 +4315,11 @@ function renderPosts() {
     
     sortedPosts.forEach(post => {
         const postElement = createPostElement(post);
-        postsContainer.appendChild(postElement);
+        postsList.appendChild(postElement);
     });
 }
 
-// Create post element with clickable user profile
+// UPDATED: Create post element with image URL detection
 function createPostElement(post) {
     const postDiv = document.createElement('div');
     postDiv.className = 'post-card';
@@ -4204,14 +4328,14 @@ function createPostElement(post) {
     const timeAgo = formatPostTime(post.timestamp);
     const userProfile = getUserProfile(post.author);
     
+    // Process content to detect and display images
+    const processedContent = processContentForMultipleImages(post.content);
+    
     postDiv.innerHTML = `
         <div class="post-header">
-            <img class="post-author-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/50?u=${post.author}`}" alt="${post.author}" 
-                 onclick="openUserProfileFromPost('${post.author}')" style="cursor: pointer;">
+            <img class="post-author-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/50?u=${post.author}`}" alt="${post.author}">
             <div class="post-author-info">
-                <div class="post-author-name" onclick="openUserProfileFromPost('${post.author}')" style="cursor: pointer;">
-                    ${userProfile.displayName || post.author}
-                </div>
+                <div class="post-author-name">${userProfile.displayName || post.author}</div>
                 <div class="post-meta">
                     <span class="post-time">${timeAgo}</span>
                     <span>•</span>
@@ -4219,11 +4343,22 @@ function createPostElement(post) {
                 </div>
             </div>
         </div>
-        <div class="post-content">${escapeHtml(post.content)}</div>
+        ${processedContent.text ? `<div class="post-content">${processedContent.text}</div>` : ''}
+        ${processedContent.images.length > 0 ? `
+            <div class="post-media">
+                ${processedContent.images.map(url => `
+                    <div class="post-image-container">
+                        <img src="${escapeHtml(url)}" alt="Post image" onclick="openZoom('${escapeHtml(url)}')" loading="lazy">
+                    </div>
+                `).join('')}
+            </div>
+        ` : ''}
         ${post.media ? `
             <div class="post-media">
                 ${post.media.type === 'image' ? 
-                    `<img src="${post.media.url}" alt="Post image" onclick="openZoom('${post.media.url}')" loading="lazy">` : 
+                    `<div class="post-image-container">
+                        <img src="${post.media.url}" alt="Post image" onclick="openZoom('${post.media.url}')" loading="lazy">
+                    </div>` : 
                     `<video controls><source src="${post.media.url}" type="video/mp4">Your browser does not support the video tag.</video>`
                 }
             </div>
@@ -4243,8 +4378,8 @@ function createPostElement(post) {
             <button class="post-action" onclick="toggleComments('${post.id}')">
                 <i class="far fa-comment"></i> Comment
             </button>
-            <button class="post-action" onclick="messagePostAuthor('${post.author}')">
-                <i class="far fa-envelope"></i> Message
+            <button class="post-action" onclick="sharePost('${post.id}')">
+                <i class="far fa-share-square"></i> Share
             </button>
         </div>
         <div class="post-comments" id="comments-${post.id}" style="display: none;">
@@ -4257,13 +4392,10 @@ function createPostElement(post) {
             <div class="comments-list" id="comments-list-${post.id}">
                 ${post.comments ? post.comments.map(comment => `
                     <div class="comment">
-                        <img class="comment-avatar" src="${getUserProfile(comment.author).avatar || `https://i.pravatar.cc/32?u=${comment.author}`}" alt="${comment.author}"
-                             onclick="openUserProfileFromPost('${comment.author}')" style="cursor: pointer;">
+                        <img class="comment-avatar" src="${getUserProfile(comment.author_username || comment.author).avatar || `https://i.pravatar.cc/32?u=${comment.author_username || comment.author}`}" alt="${comment.author_username || comment.author}">
                         <div class="comment-content">
-                            <div class="comment-author" onclick="openUserProfileFromPost('${comment.author}')" style="cursor: pointer;">
-                                ${getUserProfile(comment.author).displayName || comment.author}
-                            </div>
-                            <div class="comment-text">${escapeHtml(comment.content)}</div>
+                            <div class="comment-author">${getUserProfile(comment.author_username || comment.author).displayName || (comment.author_username || comment.author)}</div>
+                            <div class="comment-text">${escapeHtml(comment.content || comment.text)}</div>
                         </div>
                     </div>
                 `).join('') : '<div class="no-comments">No comments yet</div>'}
@@ -4276,36 +4408,6 @@ function createPostElement(post) {
     `;
     
     return postDiv;
-}
-
-// NEW: Function to open user profile from post
-function openUserProfileFromPost(username) {
-    showUserProfile(username);
-}
-
-// NEW: Function to message post author
-function messagePostAuthor(username) {
-    const currentUser = currentUserSession?.username;
-    
-    if (!currentUser) {
-        showError('You must be logged in to send messages');
-        return;
-    }
-    
-    if (username === currentUser) {
-        showError('You cannot message yourself');
-        return;
-    }
-    
-    // Switch to private messages and open chat with this user
-    showContainer('private-messages');
-    
-    // Small delay to ensure the private messages container is loaded
-    setTimeout(() => {
-        openPrivateChat(username);
-    }, 100);
-    
-    showSuccess(`Opening chat with ${username}`);
 }
 
 // Create a new post
@@ -4325,7 +4427,7 @@ async function createPost() {
     
     try {
         const postData = {
-            author: author,
+            author_username: author,
             content: content
         };
         
@@ -4338,6 +4440,7 @@ async function createPost() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
             },
             body: JSON.stringify(postData)
         });
@@ -4356,7 +4459,11 @@ async function createPost() {
             closeCreatePostModal();
             showSuccess('Post published successfully!');
         } else {
-            throw new Error('Failed to create post');
+            const error = await response.json();
+            showError(error.error || 'Failed to create post');
+            
+            // Fallback: Create post locally
+            createPostLocally(content, author);
         }
     } catch (error) {
         console.error('Error creating post:', error);
@@ -4414,6 +4521,7 @@ async function likePost(postId) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
             },
             body: JSON.stringify({ username })
         });
@@ -4434,7 +4542,11 @@ async function likePost(postId) {
                 savePostsToLocalStorage();
             }
         } else {
-            throw new Error('Failed to like post');
+            const error = await response.json();
+            showError(error.error || 'Failed to like post');
+            
+            // Fallback: Like post locally
+            likePostLocally(postId);
         }
     } catch (error) {
         console.error('Error liking post:', error);
@@ -4496,9 +4608,10 @@ async function addComment(postId, text) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
             },
             body: JSON.stringify({
-                author: username,
+                author_username: username,
                 content: text
             })
         });
@@ -4521,7 +4634,11 @@ async function addComment(postId, text) {
                 savePostsToLocalStorage();
             }
         } else {
-            throw new Error('Failed to add comment');
+            const error = await response.json();
+            showError(error.error || 'Failed to add comment');
+            
+            // Fallback: Add comment locally
+            addCommentLocally(postId, text, username);
         }
     } catch (error) {
         console.error('Error adding comment:', error);
@@ -4543,7 +4660,7 @@ function addCommentLocally(postId, text, username) {
     // Add new comment
     const newComment = {
         author: username,
-        content: text,
+        text: text,
         timestamp: new Date().toISOString()
     };
     
@@ -4581,14 +4698,13 @@ function updateCommentsUI(postId) {
                     const commentElement = document.createElement('div');
                     commentElement.className = 'comment';
                     
+                    const userProfile = getUserProfile(comment.author_username || comment.author);
+                    
                     commentElement.innerHTML = `
-                        <img class="comment-avatar" src="${getUserProfile(comment.author).avatar || `https://i.pravatar.cc/32?u=${comment.author}`}" alt="${comment.author}"
-                             onclick="openUserProfileFromPost('${comment.author}')" style="cursor: pointer;">
+                        <img class="comment-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/32?u=${comment.author_username || comment.author}`}" alt="${comment.author_username || comment.author}">
                         <div class="comment-content">
-                            <div class="comment-author" onclick="openUserProfileFromPost('${comment.author}')" style="cursor: pointer;">
-                                ${getUserProfile(comment.author).displayName || comment.author}
-                            </div>
-                            <div class="comment-text">${escapeHtml(comment.content)}</div>
+                            <div class="comment-author">${userProfile.displayName || (comment.author_username || comment.author)}</div>
+                            <div class="comment-text">${escapeHtml(comment.content || comment.text)}</div>
                         </div>
                     `;
                     
@@ -4607,7 +4723,7 @@ function updateCommentsUI(postId) {
     }
 }
 
-// Toggle comments visibility
+// Toggle comments visibility (like Facebook)
 function toggleComments(postId) {
     const commentsSection = document.getElementById(`comments-${postId}`);
     const commentInput = document.getElementById(`comment-input-${postId}`);
@@ -4640,6 +4756,9 @@ function closeComments(postId) {
 
 // Add comment from input
 function addCommentFromInput(postId) {
+    const postElement = document.querySelector(`[data-post-id="${postId}"]`);
+    if (!postElement) return;
+    
     const input = document.getElementById(`comment-input-${postId}`);
     const text = input.value.trim();
     
@@ -4662,56 +4781,42 @@ function handleCommentKeypress(event, postId) {
     }
 }
 
-// Poll for new posts and updates
-async function pollForPostUpdates() {
-    try {
-        const response = await fetch(`/api/posts/updates?lastUpdate=${lastUpdateTimestamp}`);
-        
-        if (response.ok) {
-            const data = await response.json();
-            if (data.success && data.posts.length > 0) {
-                // Update existing posts or add new ones
-                data.posts.forEach(updatedPost => {
-                    const existingIndex = posts.findIndex(p => p.id === updatedPost.id);
-                    if (existingIndex >= 0) {
-                        // Update existing post
-                        posts[existingIndex] = updatedPost;
-                    } else {
-                        // Add new post to beginning
-                        posts.unshift(updatedPost);
-                    }
-                });
-                
-                renderPosts();
-                lastUpdateTimestamp = data.timestamp;
-            }
-        }
-    } catch (error) {
-        console.error('Error polling for updates:', error);
-    }
+// Share a post
+function sharePost(postId) {
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+    
+    // In a real app, this would open a share dialog
+    // For now, we'll just copy the post content to clipboard
+    const shareText = `${post.author}: ${post.content}`;
+    
+    navigator.clipboard.writeText(shareText).then(() => {
+        showSuccess('Post content copied to clipboard!');
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+        showError('Failed to share post');
+    });
 }
 
 // Add post to feed (for real-time updates)
 function addPostToFeed(post) {
-    const postsContainer = document.getElementById('posts-container');
-    if (!postsContainer) return;
+    const postsList = document.getElementById('posts-list');
+    if (!postsList) return;
     
     // Remove no-posts message if it exists
-    const noPosts = postsContainer.querySelector('.no-posts');
+    const noPosts = postsList.querySelector('.no-posts');
     if (noPosts) noPosts.remove();
     
     // Check if post already exists
     const existingPost = document.querySelector(`[data-post-id="${post.id}"]`);
     if (existingPost) return;
     
-    // Add to beginning of feed (after create post box)
+    // Add to beginning of feed
     const postElement = createPostElement(post);
-    const createPostBox = postsContainer.querySelector('.create-post-box');
-    if (createPostBox) {
-        postsContainer.insertBefore(postElement, createPostBox.nextSibling);
-    } else {
-        postsContainer.appendChild(postElement);
-    }
+    postsList.insertBefore(postElement, postsList.firstChild);
+    
+    // Scroll to top to show new post
+    postsList.scrollTop = 0;
 }
 
 // Generate unique post ID
@@ -4797,6 +4902,11 @@ function openVideoUpload() {
     }
 }
 
+function openLocationShare() {
+    // This would use the Geolocation API in a real app
+    alert('Location sharing would be implemented here in a real app');
+}
+
 // Add media to post
 function addMediaToPost(type, url) {
     // For simplicity, we'll only allow one media item per post
@@ -4865,7 +4975,6 @@ function getUserProfile(username) {
     const profiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
     return profiles[username] || { username: username };
 }
-
 
 // FIXED: Enhanced showContainer function for posts
 function showContainer(containerId) {
