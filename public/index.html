@@ -4043,6 +4043,7 @@
         </div>
     </div>
 
+
     <script>
 // --- CUT HERE ---
       // Posts functionality for client-side
@@ -4128,10 +4129,13 @@ async function pollForPostUpdates() {
     }
 }
 
-// Setup Facebook-style create post box
+// Setup Facebook-style create post box - FIXED: Ensure it's always visible
 function setupCreatePostBox() {
     const postsContainer = document.getElementById('posts-container');
-    if (!postsContainer) return;
+    if (!postsContainer) {
+        console.error('Posts container not found');
+        return;
+    }
     
     // Remove existing create post box if it exists
     const existingBox = postsContainer.querySelector('.create-post-box');
@@ -4139,6 +4143,11 @@ function setupCreatePostBox() {
     
     // Get current user info
     const currentUser = currentUserSession?.username;
+    if (!currentUser) {
+        console.error('No user logged in');
+        return;
+    }
+    
     const userProfile = getUserProfile(currentUser);
     
     // Create Facebook-style create post box
@@ -4169,15 +4178,24 @@ function setupCreatePostBox() {
         </div>
     `;
     
-    // Insert at the top of posts container
-    const postsList = document.getElementById('posts-list') || postsContainer;
-    postsContainer.insertBefore(createPostBox, postsList);
+    // Insert at the top of posts container - FIXED: Ensure proper placement
+    const postsList = document.getElementById('posts-list');
+    if (postsList) {
+        postsContainer.insertBefore(createPostBox, postsList);
+    } else {
+        postsContainer.appendChild(createPostBox);
+    }
+    
+    console.log('✅ Create post box setup complete');
 }
 
 // Render all posts
 function renderPosts() {
     const postsContainer = document.getElementById('posts-container');
-    if (!postsContainer) return;
+    if (!postsContainer) {
+        console.error('Posts container not found');
+        return;
+    }
     
     // Find or create posts list container
     let postsList = document.getElementById('posts-list');
@@ -4846,52 +4864,173 @@ function getUserProfile(username) {
     return profiles[username] || { username: username };
 }
 
-// Initialize posts when showing posts container
+// FIXED: Enhanced showContainer function for posts
 function showContainer(containerId) {
+    console.log('🔄 Showing container:', containerId);
+    
     // Hide all containers
-    const containers = document.querySelectorAll('.main-content > div');
-    containers.forEach(container => {
+    document.querySelectorAll('.main-chat-interface').forEach(container => {
         container.style.display = 'none';
     });
     
-    // Show selected container
-    const selectedContainer = document.getElementById(containerId);
-    if (selectedContainer) {
-        selectedContainer.style.display = 'block';
+    // Hide all info containers (INCLUDING PROFILE CONTAINER)
+    document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container, .profile-container').forEach(container => {
+        container.style.display = 'none';
+    });
+    
+    // Hide all chat inputs
+    document.querySelectorAll('.chat-input').forEach(input => {
+        input.style.display = 'none';
+    });
+    
+    // Show the selected container
+    const container = document.getElementById(containerId);
+    if (container) {
+        container.style.display = 'block';
+        
+        // Show the appropriate chat input
+        if (containerId === 'chat' || containerId === 'private-ai') {
+            const chatInput = container.querySelector('.chat-input');
+            if (chatInput) chatInput.style.display = 'flex';
+        }
+        
+        // For private messages, only show users panel initially
+        if (containerId === 'private-messages') {
+            showUsersPanel();
+            initializePrivateMessaging();
+        }
+        
+        // Load profile data when showing profile container
+        if (containerId === 'profile') {
+            loadProfile();
+        }
+        
+        // Initialize secret code if showing that container
+        if (containerId === 'secret-code') {
+            resetSecretCodeForm();
+            initializeSecretCodeVerification();
+        }
+        
+        // Initialize SQL editor if showing that container
+        if (containerId === 'sql-editor-container') {
+            // Check if user has verified the secret code
+            if (!hasVerifiedCode()) {
+                showError('Access denied. Please verify the secret code first.');
+                showContainer('secret-code');
+                return;
+            }
+            initializeSQLEditor();
+        }
+        
+        // FIXED: Enhanced posts initialization - ensure create post box is always visible
+        if (containerId === 'posts') {
+            console.log('📝 Initializing posts feed...');
+            // Force re-initialization of create post box
+            initializePosts();
+            
+            // Double-check the create post box is visible
+            setTimeout(() => {
+                const createPostBox = document.querySelector('.create-post-box');
+                if (!createPostBox) {
+                    console.log('🔄 Create post box not found, re-creating...');
+                    setupCreatePostBox();
+                } else {
+                    console.log('✅ Create post box is visible');
+                }
+            }, 100);
+        }
     }
     
-    // Initialize specific functionality based on container
-    if (containerId === 'posts') {
-        initializePosts();
+    // Show overlay for non-chat containers
+    const overlay = document.getElementById('overlay');
+    if (overlay) {
+        if (containerId === 'chat' || containerId === 'private-ai' || containerId === 'private-messages' || containerId === 'posts') {
+            overlay.style.display = 'none';
+        } else {
+            overlay.style.display = 'block';
+        }
     }
+    
+    // Handle button visibility based on container
+    if (containerId === 'chat') {
+        console.log('Showing main chat container');
+        // Re-initialize scroll button for main chat
+        setTimeout(() => {
+            initializeButtons();
+            // FIXED: Force scroll to bottom when switching to chat
+            setTimeout(() => {
+                forceScrollToBottom('chat-container');
+                updateScrollState();
+            }, 200);
+        }, 100);
+        
+        // Show main chat scroll button, hide private AI button
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'flex';
+            updateScrollState();
+        }
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.classList.remove('visible');
+        }
+    } else if (containerId === 'private-ai') {
+        // Show private AI button, hide main chat scroll button
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'flex';
+            handlePrivateScroll();
+        }
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'none';
+            scrollToBottomBtn.classList.remove('visible');
+        }
+        // Attach scroll event for private container
+        if (privateContainer) {
+            privateContainer.addEventListener('scroll', handlePrivateScroll);
+            setTimeout(handlePrivateScroll, 100);
+            // FIXED: Scroll to bottom when switching to private AI
+            setTimeout(() => forceScrollToBottom('private-ai-container'), 200);
+        }
+    } else if (containerId === 'private-messages') {
+        // Hide both buttons for private messages
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'none';
+            scrollToBottomBtn.classList.remove('visible');
+        }
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.classList.remove('visible');
+        }
+    } else if (containerId === 'posts') {
+        // Hide both buttons for posts feed
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'none';
+            scrollToBottomBtn.classList.remove('visible');
+        }
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.classList.remove('visible');
+        }
+    } else {
+        // For other containers, hide both buttons
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'none';
+            scrollToBottomBtn.classList.remove('visible');
+        }
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.classList.remove('visible');
+        }
+    }
+
+    // Close dropdown menu when switching containers
+    const dropdown = document.getElementById('dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    
+    const kebabDropdown = document.querySelector('.kebab-dropdown');
+    if (kebabDropdown) kebabDropdown.classList.remove('active');
 }
 
-// Open zoom modal for media
-function openZoom(mediaUrl) {
-    // Implementation for zoom modal
-    console.log('Opening zoom for:', mediaUrl);
-    // You would implement a modal here to show the media in full size
-}
-
-// Notification functions
-function showError(message) {
-    // Implementation for showing error messages
-    console.error('Error:', message);
-    alert('Error: ' + message);
-}
-
-function showSuccess(message) {
-    // Implementation for showing success messages
-    console.log('Success:', message);
-    alert('Success: ' + message);
-}
-
-function showInfo(message) {
-    // Implementation for showing info messages
-    console.log('Info:', message);
-    alert('Info: ' + message);
-}
-
+// ... REST OF YOUR EXISTING CODE CONTINUES EXACTLY AS BEFORE ...
 // ===== YOUR EXISTING CODE CONTINUES BELOW =====
 
 // NEW: Welcome screen animation function
@@ -4935,6 +5074,9 @@ function animateWelcomeText() {
         }, 500);
     }, 2500); // Total animation time: 2.5 seconds
 }
+
+// ... THE REST OF YOUR CODE REMAINS EXACTLY THE SAME ...
+// --- CUT HERE ---
 
 // NEW: Function to initialize main app when user is already logged in
 function initializeMainApp() {
