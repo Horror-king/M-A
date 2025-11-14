@@ -988,7 +988,7 @@ app.get('/api/user/profile/:username', async (req, res) => {
 
 // ===== ADD MISSING AI ENDPOINTS =====
 
-// Enhanced Private AI endpoint - allows messages without prefix
+// Private AI endpoint - FIXED: This was missing
 app.post('/api/ai/private', async (req, res) => {
   try {
     const { message } = req.body;
@@ -998,16 +998,9 @@ app.post('/api/ai/private', async (req, res) => {
       return res.status(400).json({ error: "Message is required" });
     }
 
-    // Check if message starts with prefix (like "example-help")
-    const PREFIX = config.prefix || "!";
-    if (message.trim().toLowerCase().startsWith('example-help')) {
-      console.log('🔇 Ignoring AI response for prefix message:', message);
-      return res.json({ reply: "" }); // Return empty response to ignore AI
-    }
-
-    // Use the specified API endpoint
+    // Use the same AI service as the main chat
     const response = await axios.get(
-      `https://tawsif.is-a.dev/gemini/chat?message=${encodeURIComponent(message)}&id=1`,
+      `https://yau-ai-runing-station.vercel.app/ai?prompt=${encodeURIComponent(message)}&cb=${Date.now()}`,
       { 
         headers: { 
           Accept: "application/json",
@@ -1025,7 +1018,6 @@ app.post('/api/ai/private', async (req, res) => {
       try {
         responseData = JSON.parse(response.data);
       } catch (e) {
-        // If it's a string response, use it directly
         if (response.data.includes('error') || response.status !== 200) {
           throw new Error(response.data || `API returned status ${response.status}`);
         }
@@ -1036,21 +1028,17 @@ app.post('/api/ai/private', async (req, res) => {
     }
 
     if (!aiResponse) {
-      // Try to extract response from different possible formats
       if (responseData.response) {
         aiResponse = responseData.response;
       } else if (responseData.message) {
         aiResponse = responseData.message;
       } else if (responseData.data) {
         aiResponse = responseData.data;
-      } else if (responseData.text) {
-        aiResponse = responseData.text;
       } else {
         aiResponse = JSON.stringify(responseData) || "⚠️ No recognizable response format";
       }
     }
 
-    console.log('🤖 Private AI Response:', aiResponse);
     res.json({ reply: aiResponse });
   } catch (error) {
     console.error("❌ Private AI Error:", error);
@@ -1058,7 +1046,7 @@ app.post('/api/ai/private', async (req, res) => {
   }
 });
 
-// Enhanced Main AI chat endpoint - also uses the new API
+// Main AI chat endpoint - FIXED: This was missing
 app.post('/api/ai/chat', async (req, res) => {
   try {
     const { message } = req.body;
@@ -1068,9 +1056,9 @@ app.post('/api/ai/chat', async (req, res) => {
       return res.status(400).json({ error: "Message is required" });
     }
 
-    // Use the specified API endpoint
+    // Use the same AI service
     const response = await axios.get(
-      `https://tawsif.is-a.dev/gemini/chat?message=${encodeURIComponent(message)}&id=1`,
+      `https://yau-ai-runing-station.vercel.app/ai?prompt=${encodeURIComponent(message)}&cb=${Date.now()}`,
       { 
         headers: { 
           Accept: "application/json",
@@ -1104,8 +1092,6 @@ app.post('/api/ai/chat', async (req, res) => {
         aiResponse = responseData.message;
       } else if (responseData.data) {
         aiResponse = responseData.data;
-      } else if (responseData.text) {
-        aiResponse = responseData.text;
       } else {
         aiResponse = JSON.stringify(responseData) || "⚠️ No recognizable response format";
       }
@@ -3097,13 +3083,35 @@ app.post('/test-message', async (req, res) => {
   }
 });
 
-// Command API handler - COMPLETELY REWRITTEN: Single response system
+// ===== MODIFIED: Command API handler with prefix-free support for private AI =====
 app.post("/api/command", async (req, res) => {
   try {
-    const { message, source = 'main-chat' } = req.body;
+    let { message, source = 'main-chat' } = req.body;
     console.log('📨 Received command:', { message, source });
     
     if (!message) return res.status(400).json({ reply: "❌ Message is required" });
+
+    // ===== NEW: AUTO-PREFIX FOR PRIVATE AI =====
+    if (source === 'private-ai' && !message.startsWith(PREFIX)) {
+      console.log('🤫 Private AI detected - checking for prefix-free commands...');
+      
+      const trimmedMessage = message.trim().toLowerCase();
+      const firstWord = trimmedMessage.split(' ')[0];
+      
+      // Check if it's a direct command word without prefix
+      const commandWords = ['ai', 'help', 'ping', 'prefix', 'ask', 'chat'];
+      
+      if (commandWords.includes(firstWord)) {
+        // It's a command - add the prefix
+        message = PREFIX + message;
+        console.log('🔍 Auto-added prefix to command:', message);
+      } else {
+        // It's regular text - treat as AI command
+        message = PREFIX + 'ai ' + message;
+        console.log('🤖 Auto-treated as AI command:', message);
+      }
+    }
+    // ===== END AUTO-PREFIX =====
 
     // Handle prefix command separately
     if (message.trim().toLowerCase() === "prefix") {
@@ -3540,6 +3548,7 @@ server.listen(port, () => {
   console.log(`💾 SINGLE RESPONSE SYSTEM: ENABLED`);
   console.log(`🤖 EXCLUSIVE ROUTING: -ai → AI only, other commands → Bot only`);
   console.log(`🚫 DUPLICATE FIX: GUARANTEED no double responses!`);
+  console.log(`🎯 PREFIX-FREE AI: ENABLED for private AI (auto-adds !ai prefix)`);
   console.log(`💬 Real-time messaging: ENABLED via Socket.io`);
   console.log(`🔌 Socket.io events: new-message, message-deleted, user-status-change`);
   console.log(`🤫 PRIVATE MESSAGING: ENABLED via Supabase`);
@@ -3591,6 +3600,11 @@ server.listen(port, () => {
   console.log(`🔍 Debug Private Messages: http://localhost:${port}/debug-private-messages`);
   console.log(`🔍 Debug Table Structure: http://localhost:${port}/api/debug/private-messages-structure`);
   console.log(`📝 Test Posts Table: http://localhost:${port}/api/create-posts-table`);
+  console.log(`🎯 PREFIX-FREE USAGE IN PRIVATE AI:`);
+  console.log(`   "hello" → automatically becomes "!ai hello"`);
+  console.log(`   "help" → automatically becomes "!help"`);
+  console.log(`   "ai tell me a joke" → automatically becomes "!ai tell me a joke"`);
+  console.log(`   "!ping" → works normally (prefix already present)`);
   if (isRender && renderExternalUrl) {
     console.log(`🌐 Render External URL: ${renderExternalUrl}`);
     console.log(`⏱️ UptimeRobot monitoring URL: ${renderExternalUrl}/health`);
