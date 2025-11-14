@@ -6893,37 +6893,43 @@ async function fetchChatResponse(userInput) {
 }
 
 async function fetchPrivateAIResponse(userInput) {
-    try {
-        const response = await fetch('/api/command', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: userInput,
-                source: 'private-ai'
-            }),
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        if (data.reply) {
-            // Display in private AI container
-            if (Array.isArray(data.reply)) {
-                data.reply.forEach(reply => displayPrivateMessage(reply, 'received'));
-            } else {
-                displayPrivateMessage(data.reply, 'received');
-            }
-        } else {
-            throw new Error('No reply from AI');
-        }
-    } catch (error) {
-        console.error("Error fetching Private AI response:", error);
-        displayPrivateMessage("Sorry, I encountered an error processing your message. Please try again.", 'received');
+  try {
+    // Check if message should be ignored (starts with example-help)
+    if (userInput.trim().toLowerCase().startsWith('example-help')) {
+      console.log('🔇 Ignoring private AI response for prefix message');
+      return; // Don't send to AI
     }
+
+    const response = await fetch('/api/ai/private', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: userInput
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    if (data.reply && data.reply.trim() !== '') {
+      // Display in private AI container
+      if (Array.isArray(data.reply)) {
+        data.reply.forEach(reply => displayPrivateMessage(reply, 'received'));
+      } else {
+        displayPrivateMessage(data.reply, 'received');
+      }
+    } else {
+      // Empty response (ignored due to prefix) - don't display anything
+      console.log('🔇 No response from AI (prefix ignored)');
+    }
+  } catch (error) {
+    console.error("Error fetching Private AI response:", error);
+    displayPrivateMessage("Sorry, I encountered an error processing your message. Please try again.", 'received');
+  }
 }
 
 // ===== IMAGE HANDLING FUNCTIONS =====
