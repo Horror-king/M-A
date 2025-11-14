@@ -6894,17 +6894,18 @@ async function fetchChatResponse(userInput) {
 
 async function fetchPrivateAIResponse(userInput) {
     try {
-        // Check if it's a command (starts with !) or should be treated as AI command
+        // Check if it's a command (starts with !) - if it is, send it as-is
+        // If it's not a command, treat it as AI command
         let processedInput = userInput;
         
         // If it doesn't start with prefix and is not empty, treat it as AI command
-        if (!userInput.startsWith('!') && userInput.trim() !== '') {
-            processedInput = `!ai ${userInput}`;
+        if (!userInput.startsWith('-') && userInput.trim() !== '') {
+            processedInput = `-ai ${userInput}`;
         }
         
         // If it's just "ai" without prefix, add the prefix
         if (userInput.trim().toLowerCase() === 'ai') {
-            processedInput = '!ai';
+            processedInput = '-ai';
         }
 
         console.log('🤫 Private AI processing:', { original: userInput, processed: processedInput });
@@ -6939,7 +6940,7 @@ async function fetchPrivateAIResponse(userInput) {
         console.error("Error fetching Private AI response:", error);
         displayPrivateMessage("Sorry, I encountered an error processing your message. Please try again.", 'received');
     }
-}
+    }
 
 // ===== IMAGE HANDLING FUNCTIONS =====
 function displayImageImmediately(imgUrl, container) {
