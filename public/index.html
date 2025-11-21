@@ -3478,6 +3478,32 @@
         padding: 8px 12px;
         font-size: 13px;
     }
+    /* FIXED: Ensure messages display in correct order from top to bottom */
+.chat-messages, #private-ai-container, .private-chat-messages {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start; /* Start from top */
+    align-items: stretch;
+}
+
+/* FIXED: Messages should stack vertically in correct order */
+.message {
+    margin-bottom: 2px;
+    flex-shrink: 0;
+}
+
+/* FIXED: Ensure container doesn't reverse the order */
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* FIXED: Make sure messages container grows correctly */
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+}
     /* Post image styling */
 .post-image-container {
     margin: 10px 0;
@@ -6069,7 +6095,8 @@ async function sendPrivateMessage() {
     }, 1000);
 }
 
-// ===== MESSAGE DISPLAY FUNCTIONS =====
+// --- CUT HERE ---
+// ===== FIXED: MESSAGE DISPLAY FUNCTIONS WITH CORRECT ORDER =====
 function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
     if (!elements.chatContainer) return;
     
@@ -6176,7 +6203,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
         messageDiv.appendChild(contentDiv);
     }
     
-    // FIXED: Always append new messages to the bottom
+    // FIXED: Always append new messages to the bottom (correct order)
     elements.chatContainer.appendChild(messageDiv);
     
     messageDiv.addEventListener('touchstart', handleTouchStart);
@@ -6270,7 +6297,7 @@ function displayPrivateMessage(text, sender, repliedTo = null, username = 'Priva
     messageBody.appendChild(contentDiv);
     messageDiv.appendChild(messageBody);
     
-    // FIXED: Always append to the bottom of private chat container
+    // FIXED: Always append to the bottom of private chat container (correct order)
     container.appendChild(messageDiv);
 
     // ADDED: Add event listeners for long press and context menu to private AI messages
@@ -8229,14 +8256,16 @@ async function loadMessages() {
     }
 }
 
+// --- CUT HERE ---
 // ===== FIXED: RENDER MESSAGES WITH CORRECT ORDER =====
 function renderMessages(messages) {
     if (!elements.chatContainer) return;
     
-    // FIXED: Clear container but maintain scroll position
+    // FIXED: Clear container completely
     elements.chatContainer.innerHTML = '';
     
     // FIXED: Display messages in correct chronological order (oldest to newest)
+    // This ensures newest messages are at the bottom
     messages.forEach(msg => {
         const isOwn = msg.username?.trim().toLowerCase() === currentUserSession?.username?.trim().toLowerCase();
         displayMessage(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id, false);
