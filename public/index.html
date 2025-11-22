@@ -3478,32 +3478,6 @@
         padding: 8px 12px;
         font-size: 13px;
     }
-    /* FIXED: Ensure messages display in correct order from top to bottom */
-.chat-messages, #private-ai-container, .private-chat-messages {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start; /* Start from top */
-    align-items: stretch;
-}
-
-/* FIXED: Messages should stack vertically in correct order */
-.message {
-    margin-bottom: 2px;
-    flex-shrink: 0;
-}
-
-/* FIXED: Ensure container doesn't reverse the order */
-.chat-container {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-}
-
-/* FIXED: Make sure messages container grows correctly */
-.chat-messages {
-    flex: 1;
-    overflow-y: auto;
-}
     /* Post image styling */
 .post-image-container {
     margin: 10px 0;
@@ -5319,6 +5293,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+// --- CUT HERE ---
 // ===== YOUR EXISTING VARIABLES AND FUNCTIONS =====
 
 let isLogin = true;
@@ -5767,7 +5742,6 @@ function autoResize(textarea) {
     }
 }
 
-// --- CUT HERE ---
 // Helper function to escape HTML
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -5927,8 +5901,6 @@ function showContainer(containerId) {
     const kebabDropdown = document.querySelector('.kebab-dropdown');
     if (kebabDropdown) kebabDropdown.classList.remove('active');
 }
-
-// --- CUT HERE ---
 
 function hideContainer(containerId) {
     console.log('🔄 Hiding container:', containerId);
@@ -6095,7 +6067,6 @@ async function sendPrivateMessage() {
     }, 1000);
 }
 
-// --- CUT HERE ---
 // ===== FIXED: MESSAGE DISPLAY FUNCTIONS WITH CORRECT ORDER =====
 function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
     if (!elements.chatContainer) return;
@@ -8256,7 +8227,6 @@ async function loadMessages() {
     }
 }
 
-// --- CUT HERE ---
 // ===== FIXED: RENDER MESSAGES WITH CORRECT ORDER =====
 function renderMessages(messages) {
     if (!elements.chatContainer) return;
@@ -9321,21 +9291,45 @@ function setupPrivateMessageInputHandlers() {
     }
 }
 
-// Initialize if user is logged in
-const currentUser = currentUserSession?.username;
-if (currentUser) {
-    showContainer('chat');
+// ===== ADDED: MAIN APP INITIALIZATION FUNCTION =====
+function initializeMainApp() {
+    console.log('🚀 Initializing main application...');
     
+    // Show main chat interface
+    document.getElementById('chat').style.display = 'block';
+    
+    // Show menu
+    const menu = document.querySelector('.menu');
+    if (menu) menu.style.display = 'flex';
+    
+    // Show chat input
     const chatInput = document.querySelector('.chat-input');
     if (chatInput) chatInput.style.display = 'flex';
     
+    // Show news container and toggle
+    const newsContainer = document.querySelector('.news-container');
+    if (newsContainer) newsContainer.style.display = 'block';
+    const newsToggle = document.querySelector('.news-toggle');
+    if (newsToggle) newsToggle.style.display = 'block';
+    
+    // Update profile section in dropdown
     updateProfileSection();
     
-    // Initialize real-time features
+    // Load user panel preference
+    loadUserPanelPreference();
+    
+    // Initialize chat functionality
+    initializeChat();
+    initializeButtons();
+    
+    // Initialize socket for real-time features
     initSocket();
     setupTypingHandlers();
     setupTypingDetection();
     setupTypingSocketEvents();
+    
+    // Initialize online panel toggle
+    initializeOnlinePanelToggle();
     
     // Add page event listeners
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -9346,7 +9340,34 @@ if (currentUser) {
     if (hasVerifiedCode()) {
         enableSQLEditorAccess();
     }
+    
+    console.log('✅ Main application initialized successfully');
 }
+
+// Initialize if user is logged in
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('📄 DOM Content Loaded');
+    
+    // First try auto-login
+    attemptAutoLogin().then(isLoggedIn => {
+        if (isLoggedIn) {
+            console.log('✅ Auto-login successful');
+            initializeMainApp();
+        } else {
+            // Check if user session exists (for manual login)
+            if (checkUserSession()) {
+                console.log('✅ User session found');
+                initializeMainApp();
+            } else {
+                console.log('❌ No user session, showing auth');
+                document.getElementById('auth-container').style.display = 'flex';
+            }
+        }
+    }).catch(error => {
+        console.error('Auto-login error:', error);
+        document.getElementById('auth-container').style.display = 'flex';
+    });
+});
 
 // Add click handler for images to open zoom
 document.addEventListener('click', function (e) {
@@ -9354,12 +9375,7 @@ document.addEventListener('click', function (e) {
         openZoom(e.target.src);
     }
 });
-        // ===== YOUR COMPLETE JAVASCRIPT CODE GOES HERE =====
-        // This should include all the JavaScript code I provided in the previous response
-        // including the posts functionality and all your existing code
-        
-        // For brevity, I'm not repeating the entire JavaScript code here
-        // but make sure to include the complete JavaScript from the previous response
-    </script>
+
+  </script>
 </body>
 </html>
