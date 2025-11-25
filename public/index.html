@@ -5293,6 +5293,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+// --- CUT HERE ---
 // ===== YOUR EXISTING VARIABLES AND FUNCTIONS =====
 
 let isLogin = true;
@@ -8196,30 +8197,27 @@ function initSocket() {
 
 // ===== FIXED: LOAD MESSAGES WITH CORRECT ORDER =====
 async function loadMessages() {
-    try {
-        console.log('📥 Loading messages...');
-        const token = localStorage.getItem('auth_token');
-        const response = await fetch('/api/messages', {
-            headers: {
-                'Authorization': token ? `Bearer ${token}` : ''
-            }
-        });
-        if (!response.ok) throw new Error('Failed to load messages');
-        const data = await response.json();
-
-        // Check for new messages to show notification
-        if (data.length > 0) {
-            const latestMessage = data[data.length - 1];
-            if (latestMessage.id !== lastMessageId && 
-                latestMessage.username !== currentUserSession?.username && 
-                document.visibilityState !== 'visible') {
-                showNotification(latestMessage.username, latestMessage.content);
-            }
-            lastMessageId = latestMessage.id;
-        }
-        
-        renderMessages(data);
-    } catch (error) {
+  try {
+    const response = await fetch('/api/messages');
+    if (!response.ok) throw new Error('Failed to load messages');
+    const data = await response.json();
+    
+    // Check for new messages to show notification
+    if (data.length > 0) {
+      const latestMessage = data[0];
+      if (latestMessage.id !== lastMessageId && 
+          latestMessage.username !== currentUsername &&
+          document.visibilityState !== 'visible') {
+        showNotification(latestMessage.username, latestMessage.content);
+      }
+      lastMessageId = latestMessage.id;
+    }
+    
+    renderMessages(data);
+  } catch (error) {
+    showError(error.message);
+  }
+}
         console.error('❌ Error loading messages:', error);
         showError('Failed to load messages. Using real-time updates only.');
         // If HTTP fails, rely on socket for real-time messages
