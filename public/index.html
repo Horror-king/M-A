@@ -5293,6 +5293,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+// --- CUT HERE ---
 // ===== YOUR EXISTING VARIABLES AND FUNCTIONS =====
 
 let isLogin = true;
@@ -9325,12 +9326,57 @@ document.addEventListener('click', function (e) {
         openZoom(e.target.src);
     }
 });
-        // ===== YOUR COMPLETE JAVASCRIPT CODE GOES HERE =====
-        // This should include all the JavaScript code I provided in the previous response
-        // including the posts functionality and all your existing code
-        
-        // For brevity, I'm not repeating the entire JavaScript code here
-        // but make sure to include the complete JavaScript from the previous response
+
+// ===== FIXED: MAIN APP INITIALIZATION FUNCTION =====
+function initializeMainApp() {
+    console.log('🚀 Initializing main application...');
+    
+    // Initialize buttons and scroll functionality
+    initializeButtons();
+    
+    // Initialize chat functionality
+    initializeChat();
+    
+    // Initialize online panel toggle
+    initializeOnlinePanelToggle();
+    
+    // Load user panel preference
+    loadUserPanelPreference();
+    
+    // Update profile section in dropdown
+    updateProfileSection();
+    
+    // Load profile data
+    loadProfile();
+    
+    // Show the main interface
+    document.querySelector('.menu').style.display = 'flex';
+    
+    // Show the main chat container by default
+    showContainer('chat');
+    
+    console.log('✅ Main application initialized successfully');
+}
+
+// ===== ADDED: Initialize the app when DOM is loaded =====
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('📄 DOM loaded, checking for auto-login...');
+    
+    // Attempt auto-login first
+    attemptAutoLogin().then(success => {
+        if (success) {
+            console.log('✅ Auto-login successful, initializing main app...');
+            document.getElementById('auth-container').style.display = 'none';
+            initializeMainApp();
+        } else {
+            console.log('❌ No auto-login session found, showing auth form...');
+            document.getElementById('auth-container').style.display = 'flex';
+        }
+    }).catch(error => {
+        console.error('Auto-login error:', error);
+        document.getElementById('auth-container').style.display = 'flex';
+    });
+});
     </script>
 </body>
 </html>
