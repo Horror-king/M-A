@@ -6070,7 +6070,7 @@ async function sendPrivateMessage() {
     }, 1000);
 }
 
-// ===== MESSAGE DISPLAY FUNCTIONS =====
+// ===== FIXED: MESSAGE DISPLAY FUNCTIONS - PROPER ORDER =====
 function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
     if (!elements.chatContainer) return;
     
@@ -6177,7 +6177,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
         messageDiv.appendChild(contentDiv);
     }
     
-    // FIXED: Always append new messages to the bottom
+    // FIXED: Always append new messages to the bottom - NO REVERSAL
     elements.chatContainer.appendChild(messageDiv);
     
     messageDiv.addEventListener('touchstart', handleTouchStart);
@@ -9293,14 +9293,18 @@ function setupPrivateMessageInputHandlers() {
     }
 }
 
-// Initialize if user is logged in
-const currentUser = currentUserSession?.username;
-if (currentUser) {
+// ===== FIXED: INITIALIZE MAIN APP FUNCTION =====
+function initializeMainApp() {
+    console.log('🚀 Initializing main application...');
+    
+    // Show main chat interface
     showContainer('chat');
     
+    // Show chat input
     const chatInput = document.querySelector('.chat-input');
     if (chatInput) chatInput.style.display = 'flex';
     
+    // Update profile section in dropdown
     updateProfileSection();
     
     // Initialize real-time features
@@ -9308,6 +9312,15 @@ if (currentUser) {
     setupTypingHandlers();
     setupTypingDetection();
     setupTypingSocketEvents();
+    
+    // Initialize buttons and scroll functionality
+    initializeButtons();
+    
+    // Load user panel preference
+    loadUserPanelPreference();
+    
+    // Initialize online panel toggle
+    initializeOnlinePanelToggle();
     
     // Add page event listeners
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -9318,64 +9331,34 @@ if (currentUser) {
     if (hasVerifiedCode()) {
         enableSQLEditorAccess();
     }
+    
+    // Initialize chat functionality
+    initializeChat();
+    
+    console.log('✅ Main application initialized successfully');
 }
+
+// Initialize if user is logged in
+document.addEventListener('DOMContentLoaded', async function() {
+    console.log('📄 DOM Content Loaded');
+    
+    // Try auto-login first
+    const autoLoggedIn = await attemptAutoLogin();
+    
+    if (autoLoggedIn || checkUserSession()) {
+        console.log('✅ User session found, initializing app...');
+        initializeMainApp();
+    } else {
+        console.log('❌ No user session, showing auth...');
+        document.getElementById('auth-container').style.display = 'flex';
+    }
+});
 
 // Add click handler for images to open zoom
 document.addEventListener('click', function (e) {
     if (e.target.tagName === 'IMG' && e.target.closest('.message')) {
         openZoom(e.target.src);
     }
-});
-
-// ===== FIXED: MAIN APP INITIALIZATION FUNCTION =====
-function initializeMainApp() {
-    console.log('🚀 Initializing main application...');
-    
-    // Initialize buttons and scroll functionality
-    initializeButtons();
-    
-    // Initialize chat functionality
-    initializeChat();
-    
-    // Initialize online panel toggle
-    initializeOnlinePanelToggle();
-    
-    // Load user panel preference
-    loadUserPanelPreference();
-    
-    // Update profile section in dropdown
-    updateProfileSection();
-    
-    // Load profile data
-    loadProfile();
-    
-    // Show the main interface
-    document.querySelector('.menu').style.display = 'flex';
-    
-    // Show the main chat container by default
-    showContainer('chat');
-    
-    console.log('✅ Main application initialized successfully');
-}
-
-// ===== ADDED: Initialize the app when DOM is loaded =====
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('📄 DOM loaded, checking for auto-login...');
-    
-    // Attempt auto-login first
-    attemptAutoLogin().then(success => {
-        if (success) {
-            console.log('✅ Auto-login successful, initializing main app...');
-            document.getElementById('auth-container').style.display = 'none';
-            initializeMainApp();
-        } else {
-            console.log('❌ No auto-login session found, showing auth form...');
-            document.getElementById('auth-container').style.display = 'flex';
-        }
-    }).catch(error => {
-        console.error('Auto-login error:', error);
-        document.getElementById('auth-container').style.display = 'flex';
-    });
 });
     </script>
 </body>
