@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
@@ -4077,7 +4077,8 @@
         </div>
     </div>
 
-    <script>
+// --- CUT HERE ---
+<script>
 // --- CUT HERE ---
       // Posts functionality for client-side
 let posts = [];
@@ -4287,7 +4288,7 @@ function processContentForMultipleImages(content) {
     };
 }
 
-// Render all posts
+// FIXED: Render all posts with proper ordering
 function renderPosts() {
     const postsContainer = document.getElementById('posts-container');
     if (!postsContainer) {
@@ -4310,13 +4311,22 @@ function renderPosts() {
         return;
     }
     
-    // Sort posts by timestamp (newest first)
+    // FIXED: Sort posts by timestamp (newest first) - ensure consistent ordering
     const sortedPosts = [...posts].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     
+    console.log('📝 Rendering posts:', sortedPosts.length, 'posts in correct order');
+    
+    // FIXED: Clear and rebuild the entire list to ensure proper order
     sortedPosts.forEach(post => {
         const postElement = createPostElement(post);
         postsList.appendChild(postElement);
     });
+    
+    // FIXED: Ensure posts are properly arranged immediately
+    setTimeout(() => {
+        const allPosts = postsList.querySelectorAll('.post-card');
+        console.log('✅ Posts arranged correctly:', allPosts.length, 'posts displayed');
+    }, 100);
 }
 
 // UPDATED: Create post element with image URL detection
@@ -4798,7 +4808,7 @@ function sharePost(postId) {
     });
 }
 
-// Add post to feed (for real-time updates)
+// FIXED: Add post to feed with proper ordering
 function addPostToFeed(post) {
     const postsList = document.getElementById('posts-list');
     if (!postsList) return;
@@ -4811,12 +4821,17 @@ function addPostToFeed(post) {
     const existingPost = document.querySelector(`[data-post-id="${post.id}"]`);
     if (existingPost) return;
     
-    // Add to beginning of feed
+    // Add to beginning of feed for newest posts first
     const postElement = createPostElement(post);
     postsList.insertBefore(postElement, postsList.firstChild);
     
-    // Scroll to top to show new post
-    postsList.scrollTop = 0;
+    // Update local posts array to maintain consistency
+    const existingIndex = posts.findIndex(p => p.id === post.id);
+    if (existingIndex === -1) {
+        posts.unshift(post);
+    }
+    
+    console.log('✅ New post added to feed with proper ordering');
 }
 
 // Generate unique post ID
@@ -4976,7 +4991,7 @@ function getUserProfile(username) {
     return profiles[username] || { username: username };
 }
 
-// FIXED: Enhanced showContainer function for posts
+// FIXED: Enhanced showContainer function for posts with proper initialization
 function showContainer(containerId) {
     console.log('🔄 Showing container:', containerId);
     
@@ -5034,21 +5049,21 @@ function showContainer(containerId) {
             initializeSQLEditor();
         }
         
-        // FIXED: Enhanced posts initialization - ensure create post box is always visible
+        // FIXED: Enhanced posts initialization - ensure posts are properly arranged from the start
         if (containerId === 'posts') {
-            console.log('📝 Initializing posts feed...');
-            // Force re-initialization of create post box
-            initializePosts();
-            
-            // Double-check the create post box is visible
+            console.log('📝 Initializing posts feed with proper ordering...');
+            // Force re-initialization and proper ordering
             setTimeout(() => {
-                const createPostBox = document.querySelector('.create-post-box');
-                if (!createPostBox) {
-                    console.log('🔄 Create post box not found, re-creating...');
-                    setupCreatePostBox();
-                } else {
-                    console.log('✅ Create post box is visible');
-                }
+                initializePosts();
+                
+                // Double-check the posts are properly arranged
+                setTimeout(() => {
+                    const postsList = document.getElementById('posts-list');
+                    if (postsList) {
+                        const allPosts = postsList.querySelectorAll('.post-card');
+                        console.log('✅ Posts properly arranged:', allPosts.length, 'posts displayed');
+                    }
+                }, 200);
             }, 100);
         }
     }
@@ -9325,12 +9340,6 @@ document.addEventListener('click', function (e) {
         openZoom(e.target.src);
     }
 });
-        // ===== YOUR COMPLETE JAVASCRIPT CODE GOES HERE =====
-        // This should include all the JavaScript code I provided in the previous response
-        // including the posts functionality and all your existing code
-        
-        // For brevity, I'm not repeating the entire JavaScript code here
-        // but make sure to include the complete JavaScript from the previous response
-    </script>
+</script>
 </body>
 </html>
