@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
@@ -4076,9 +4076,7 @@
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
-
-// --- CUT HERE ---
-<script>
+    <script>
 // --- CUT HERE ---
       // Posts functionality for client-side
 let posts = [];
@@ -4288,7 +4286,7 @@ function processContentForMultipleImages(content) {
     };
 }
 
-// FIXED: Render all posts with proper ordering
+// Render all posts
 function renderPosts() {
     const postsContainer = document.getElementById('posts-container');
     if (!postsContainer) {
@@ -4311,22 +4309,13 @@ function renderPosts() {
         return;
     }
     
-    // FIXED: Sort posts by timestamp (newest first) - ensure consistent ordering
+    // Sort posts by timestamp (newest first)
     const sortedPosts = [...posts].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     
-    console.log('📝 Rendering posts:', sortedPosts.length, 'posts in correct order');
-    
-    // FIXED: Clear and rebuild the entire list to ensure proper order
     sortedPosts.forEach(post => {
         const postElement = createPostElement(post);
         postsList.appendChild(postElement);
     });
-    
-    // FIXED: Ensure posts are properly arranged immediately
-    setTimeout(() => {
-        const allPosts = postsList.querySelectorAll('.post-card');
-        console.log('✅ Posts arranged correctly:', allPosts.length, 'posts displayed');
-    }, 100);
 }
 
 // UPDATED: Create post element with image URL detection
@@ -4808,7 +4797,7 @@ function sharePost(postId) {
     });
 }
 
-// FIXED: Add post to feed with proper ordering
+// Add post to feed (for real-time updates)
 function addPostToFeed(post) {
     const postsList = document.getElementById('posts-list');
     if (!postsList) return;
@@ -4821,17 +4810,12 @@ function addPostToFeed(post) {
     const existingPost = document.querySelector(`[data-post-id="${post.id}"]`);
     if (existingPost) return;
     
-    // Add to beginning of feed for newest posts first
+    // Add to beginning of feed
     const postElement = createPostElement(post);
     postsList.insertBefore(postElement, postsList.firstChild);
     
-    // Update local posts array to maintain consistency
-    const existingIndex = posts.findIndex(p => p.id === post.id);
-    if (existingIndex === -1) {
-        posts.unshift(post);
-    }
-    
-    console.log('✅ New post added to feed with proper ordering');
+    // Scroll to top to show new post
+    postsList.scrollTop = 0;
 }
 
 // Generate unique post ID
@@ -4991,7 +4975,7 @@ function getUserProfile(username) {
     return profiles[username] || { username: username };
 }
 
-// FIXED: Enhanced showContainer function for posts with proper initialization
+// FIXED: Enhanced showContainer function for posts
 function showContainer(containerId) {
     console.log('🔄 Showing container:', containerId);
     
@@ -5049,21 +5033,21 @@ function showContainer(containerId) {
             initializeSQLEditor();
         }
         
-        // FIXED: Enhanced posts initialization - ensure posts are properly arranged from the start
+        // FIXED: Enhanced posts initialization - ensure create post box is always visible
         if (containerId === 'posts') {
-            console.log('📝 Initializing posts feed with proper ordering...');
-            // Force re-initialization and proper ordering
+            console.log('📝 Initializing posts feed...');
+            // Force re-initialization of create post box
+            initializePosts();
+            
+            // Double-check the create post box is visible
             setTimeout(() => {
-                initializePosts();
-                
-                // Double-check the posts are properly arranged
-                setTimeout(() => {
-                    const postsList = document.getElementById('posts-list');
-                    if (postsList) {
-                        const allPosts = postsList.querySelectorAll('.post-card');
-                        console.log('✅ Posts properly arranged:', allPosts.length, 'posts displayed');
-                    }
-                }, 200);
+                const createPostBox = document.querySelector('.create-post-box');
+                if (!createPostBox) {
+                    console.log('🔄 Create post box not found, re-creating...');
+                    setupCreatePostBox();
+                } else {
+                    console.log('✅ Create post box is visible');
+                }
             }, 100);
         }
     }
@@ -5202,6 +5186,7 @@ function animateWelcomeText() {
     }, 2500); // Total animation time: 2.5 seconds
 }
 
+// --- CUT HERE ---
 // ... THE REST OF YOUR CODE REMAINS EXACTLY THE SAME ...
 // --- CUT HERE ---
 
@@ -6084,7 +6069,7 @@ async function sendPrivateMessage() {
     }, 1000);
 }
 
-// ===== MESSAGE DISPLAY FUNCTIONS =====
+// ===== FIXED: MESSAGE DISPLAY FUNCTIONS WITH PROPER ORDERING =====
 function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
     if (!elements.chatContainer) return;
     
@@ -6100,6 +6085,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
     if (messageId) messageDiv.dataset.id = messageId;
     messageDiv.dataset.content = text;
     messageDiv.dataset.username = username;
+    messageDiv.dataset.timestamp = Date.now(); // Add timestamp for ordering
 
     // Only create avatar for received messages
     if (sender === 'received') {
@@ -6191,8 +6177,37 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
         messageDiv.appendChild(contentDiv);
     }
     
-    // FIXED: Always append new messages to the bottom
-    elements.chatContainer.appendChild(messageDiv);
+    // FIXED: Always append new messages to the bottom with proper ordering
+    const existingMessages = elements.chatContainer.querySelectorAll('.message');
+    let inserted = false;
+    
+    // If no messages yet or this is a new message, just append to bottom
+    if (existingMessages.length === 0 || isNew) {
+        elements.chatContainer.appendChild(messageDiv);
+    } else {
+        // For historical messages, insert in chronological order
+        const newTimestamp = messageDiv.dataset.timestamp;
+        
+        for (let i = existingMessages.length - 1; i >= 0; i--) {
+            const existingMessage = existingMessages[i];
+            const existingTimestamp = existingMessage.dataset.timestamp;
+            
+            if (parseInt(newTimestamp) >= parseInt(existingTimestamp)) {
+                if (i === existingMessages.length - 1) {
+                    elements.chatContainer.appendChild(messageDiv);
+                } else {
+                    existingMessages[i].after(messageDiv);
+                }
+                inserted = true;
+                break;
+            }
+        }
+        
+        // If not inserted (should be oldest), prepend at beginning
+        if (!inserted) {
+            elements.chatContainer.prepend(messageDiv);
+        }
+    }
     
     messageDiv.addEventListener('touchstart', handleTouchStart);
     messageDiv.addEventListener('touchend', handleTouchEnd);
@@ -6226,6 +6241,7 @@ function displayPrivateMessage(text, sender, repliedTo = null, username = 'Priva
     messageDiv.className = `message ${sender}`;
     messageDiv.dataset.content = text;
     messageDiv.dataset.username = username;
+    messageDiv.dataset.timestamp = Date.now();
 
     // Only create avatar for received messages
     if (sender === 'received') {
@@ -6398,7 +6414,7 @@ function updateScrollState() {
     isAtBottom = isAtBottomNow;
 }
 
-// ===== TOUCH AND CONTEXT MENU FUNCTIONS =====
+// ===== FIXED: TOUCH AND CONTEXT MENU FUNCTIONS =====
 function handleTouchStart(e) {
     isLongPress = false;
     e.currentTarget.classList.add('no-select');
@@ -8251,8 +8267,17 @@ function renderMessages(messages) {
     // FIXED: Clear container but maintain scroll position
     elements.chatContainer.innerHTML = '';
     
+    // FIXED: Sort messages by timestamp or ID in ascending order (oldest first)
+    const sortedMessages = messages.sort((a, b) => {
+        // Use timestamp if available, otherwise use ID
+        if (a.created_at && b.created_at) {
+            return new Date(a.created_at) - new Date(b.created_at);
+        }
+        return a.id - b.id;
+    });
+    
     // FIXED: Display messages in correct chronological order (oldest to newest)
-    messages.forEach(msg => {
+    sortedMessages.forEach(msg => {
         const isOwn = msg.username?.trim().toLowerCase() === currentUserSession?.username?.trim().toLowerCase();
         displayMessage(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id, false);
     });
@@ -9340,6 +9365,6 @@ document.addEventListener('click', function (e) {
         openZoom(e.target.src);
     }
 });
-</script>
+ </script>
 </body>
 </html>
