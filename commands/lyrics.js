@@ -1,38 +1,73 @@
-const fetch = require("node-fetch");
+const axios = require("axios");
+
+const LYRICS_API = "https://shizuapi.onrender.com/api/lyricsv2?query=";
 
 module.exports = {
-  name: "lyrics",
-  execute: async (message, args, io, client, supabase, saveChatToSupabase) => {
+  config: {
+    name: "lyrics",
+    version: "1.0",
+    author: "Hassan",
+    countDown: 5,
+    role: 0,
+    shortDescription: { en: "Get song lyrics" },
+    longDescription: {
+      en: "Fetch song lyrics based on a song name or artist using Shizu Lyrics API."
+    },
+    category: "music",
+    guide: {
+      en:
+        `Usage:\n` +
+        `{pn} <song name>\n\n` +
+        `Example:\n` +
+        `{pn} shape of you`
+    }
+  },
+
+  onStart: async function ({ api, event, args }) {
     try {
-      const query = args.join(" ");
+      const query = args.join(" ").trim();
+
       if (!query) {
-        message.channel.send("Please provide the song name or artist.");
-        return;
+        return api.sendMessage(
+          "❌ Please provide a song name.\n\nExample:\n!lyrics shape of you",
+          event.threadID,
+          event.messageID
+        );
       }
 
-      const apiUrl = `https://shizuapi.onrender.com/api/lyricsv2?query=${encodeURIComponent(query)}`;
+      await api.sendMessage("🎵Lyrics.", event.threadID, event.messageID);
 
-      const response = await fetch(apiUrl);
-      const data = await response.json();
+      const apiUrl = `${LYRICS_API}${encodeURIComponent(query)}`;
+      const response = await axios.get(apiUrl, { responseType: "json", timeout: 60000 });
 
-      if (!data || !data.result) {
-        message.channel.send("Lyrics not found. Try another song.");
-        return;
+      if (!response.data || !response.data.result) {
+        throw new Error("Lyrics not found or invalid API response.");
       }
 
-      const title = data.result.title || query;
-      const artist = data.result.artist || "";
-      const lyrics = data.result.lyrics || "No lyrics found.";
+      const result = response.data.result;
+      const title = result.title || query;
+      const artist = result.artist || "Unknown Artist";
+      const lyrics = result.lyrics || "No lyrics found.";
 
-      const fullMessage = `🎵 *${title}* - *${artist}*\n\n${lyrics}`;
+      const fullMessage =
+        `🎵 *${title}* - *${artist}*\n\n` +
+        `${lyrics}`;
 
-      message.channel.send(fullMessage);
+      await api.sendMessage(fullMessage, event.threadID, event.messageID);
 
-      await saveChatToSupabase(message.channel.id, "Bot", fullMessage, "text");
+    } catch (error) {
+      console.error("❌ Lyrics command error:", error);
+      let errorMessage = "❌ Failed to fetch lyrics. ";
 
-    } catch (err) {
-      console.error("Lyrics cmd error:", err);
-      message.channel.send("There was an error fetching lyrics.");
+      if (error.code === "ECONNABORTED" || error.message.includes("timeout")) {
+        errorMessage += "The request timed out. Please try again.";
+      } else if (error.response) {
+        errorMessage += `API error: ${error.response.status}`;
+      } else {
+        errorMessage += error.message;
+      }
+
+      await api.sendMessage(errorMessage, event.threadID, event.messageID);
     }
   }
 };
