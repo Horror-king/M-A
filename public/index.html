@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width,1 initial-scale=1.0" />
     <title>MessageMate</title>
     <meta property="og:image" content="https://i.ibb.co/p6LrrNRK/1746227326721.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
@@ -4076,7 +4076,8 @@
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
-    <script>
+// --- CUT HERE ---
+<script>
 // --- CUT HERE ---
       // Posts functionality for client-side
 let posts = [];
@@ -4975,7 +4976,196 @@ function getUserProfile(username) {
     return profiles[username] || { username: username };
 }
 
-// FIXED: Enhanced showContainer function for posts
+// ===== NEW: IMMEDIATE ONLINE USERS FETCH FUNCTION =====
+async function fetchOnlineUsersImmediately() {
+    try {
+        console.log('🔄 Fetching online users immediately...');
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch('/api/users/online', {
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.onlineUsers) {
+                onlineUsers = data.onlineUsers;
+                updateOnlineUsersList(onlineUsers);
+                console.log('✅ Online users loaded immediately:', onlineUsers);
+            }
+        } else {
+            console.warn('⚠️ Could not fetch online users, will rely on socket events');
+        }
+    } catch (error) {
+        console.error('❌ Error fetching online users:', error);
+    }
+}
+
+// ===== NEW: Function to refresh online users UI =====
+function refreshOnlineUsersUI() {
+    // Update both online users panels
+    updateSingleOnlineList('online-users-list', 'online-count', onlineUsers);
+    updateSingleOnlineList('private-online-users-list', 'private-online-count', onlineUsers);
+    
+    // Update any user status indicators in messages
+    onlineUsers.forEach(user => {
+        updateUserStatusIndicator(user, 'online');
+    });
+    
+    console.log('✅ Online users UI refreshed:', onlineUsers);
+}
+
+// ===== MODIFIED: Enhanced initSocket function with immediate online users =====
+function initSocket() {
+    console.log('🔌 Initializing socket connection...');
+    socket = io();
+    
+    socket.on('connect', () => {
+        console.log('✅ Socket connected');
+        const username = currentUserSession?.username;
+        if (username) {
+            socket.emit('user-online', username);
+            // Request existing messages when connecting
+            socket.emit('request-messages');
+            
+            // NEW: Fetch online users immediately after connection
+            setTimeout(() => {
+                fetchOnlineUsersImmediately();
+            }, 500);
+        }
+    });
+
+    // Listen for new messages in real-time
+    socket.on('new-message', (message) => {
+        console.log('💬 New message received via socket:', message);
+        
+        // Only display if message is from another user or if it's an AI/bot response
+        const isOwnMessage = message.username === currentUserSession?.username;
+        const isAIResponse = message.username === 'AI' || message.username === 'Bot';
+        
+        if (!isOwnMessage || isAIResponse) {
+            // Check if message already exists to prevent duplicates
+            const existingMessage = document.querySelector(`[data-id="${message.id}"]`);
+            if (!existingMessage) {
+                // Display message immediately
+                displayMessage(
+                    message.content, 
+                    isOwnMessage ? 'sent' : 'received', 
+                    message.reply_to, 
+                    message.username, 
+                    message.id, 
+                    true
+                );
+                
+                // Show notification if page is not focused
+                if (document.visibilityState !== 'visible' && !isOwnMessage) {
+                    showNotification(message.username, message.content);
+                }
+            }
+        }
+    });
+
+    // Listen for message history when first connecting
+    socket.on('chat-messages', (messages) => {
+        console.log('📨 Received message history:', messages.length, 'messages');
+        renderMessages(messages);
+    });
+
+    // User status updates - MODIFIED: Ensure immediate UI update
+    socket.on('user-status-change', (data) => {
+        console.log('👤 User status change:', data);
+        onlineUsers = data.onlineUsers || [];
+        updateOnlineUsersList(onlineUsers);
+        updateUserStatusIndicator(data.username, data.status);
+        
+        // NEW: Force UI refresh for online users
+        refreshOnlineUsersUI();
+    });
+
+    // NEW: Listen for initial online users data
+    socket.on('current-online-users', (data) => {
+        console.log('👥 Current online users received:', data.users);
+        onlineUsers = data.users || [];
+        updateOnlineUsersList(onlineUsers);
+        refreshOnlineUsersUI();
+    });
+
+    // ADDED: Typing events
+    socket.on('user-typing-start', (data) => {
+        console.log('⌨️ User started typing:', data.username);
+        showTypingIndicator(data.username);
+    });
+
+    socket.on('user-typing-stop', (data) => {
+        console.log('💤 User stopped typing:', data.username);
+        hideTypingIndicator(data.username);
+    });
+
+    socket.on('disconnect', (reason) => {
+        console.log('🔌 Socket disconnected:', reason);
+    });
+
+    // Send heartbeat every 2 minutes to stay online
+    const heartbeatInterval = setInterval(() => {
+        const username = currentUserSession?.username;
+        if (username && socket.connected) {
+            socket.emit('user-online', username);
+            console.log('💓 Heartbeat sent - keeping user online');
+        }
+    }, 120000); // 2 minutes
+
+    // Cleanup interval on page unload
+    window.addEventListener('beforeunload', () => {
+        clearInterval(heartbeatInterval);
+    });
+}
+
+// ===== MODIFIED: Enhanced initializeMainApp with immediate online users =====
+function initializeMainApp() {
+    console.log('🚀 Initializing main application for logged-in user...');
+    
+    // Show main interface elements
+    document.querySelector('.menu').style.display = 'flex';
+    document.querySelector('.news-toggle').style.display = 'block';
+    
+    initializeButtons();
+    showContainer('chat');
+    
+    // IMPORTANT: Create profile section and load profile data
+    updateProfileSection(); // Create the profile section first
+    loadProfile(); // Then load the actual profile data
+    
+    initializeChat();
+
+    initSocket();
+    setupTypingHandlers();
+    setupTypingDetection();
+    setupTypingSocketEvents();
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
+    
+    if (hasVerifiedCode()) {
+        enableSQLEditorAccess();
+    }
+    
+    // NEW: Fetch online users immediately after app initialization
+    setTimeout(() => {
+        if (!onlineUsers || onlineUsers.length === 0) {
+            fetchOnlineUsersImmediately();
+        }
+    }, 1000);
+    
+    // Show welcome message instead of login prompt
+    showSuccess(`Welcome back, ${currentUserSession?.username || 'User'}!`);
+    
+    console.log('✅ Main application initialized successfully');
+}
+
+// ===== MODIFIED: Enhanced showContainer function with immediate online users =====
 function showContainer(containerId) {
     console.log('🔄 Showing container:', containerId);
     
@@ -5048,6 +5238,13 @@ function showContainer(containerId) {
                 } else {
                     console.log('✅ Create post box is visible');
                 }
+            }, 100);
+        }
+        
+        // NEW: Refresh online users when switching to any container that shows online users
+        if (containerId === 'chat' || containerId === 'private-ai' || containerId === 'private-messages') {
+            setTimeout(() => {
+                refreshOnlineUsersUI();
             }, 100);
         }
     }
@@ -5186,7 +5383,6 @@ function animateWelcomeText() {
     }, 2500); // Total animation time: 2.5 seconds
 }
 
-// --- CUT HERE ---
 // ... THE REST OF YOUR CODE REMAINS EXACTLY THE SAME ...
 // --- CUT HERE ---
 
@@ -6808,7 +7004,7 @@ function logout() {
     // Hide all chat inputs
     document.querySelectorAll('.chat-input').forEach(input => {
         input.style.display = 'none';
-    });
+    }
     
     // Hide news container and toggle
     const newsContainer = document.querySelector('.news-container');
