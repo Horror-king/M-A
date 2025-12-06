@@ -14,12 +14,17 @@ const app = express();
 const server = http.createServer(app);
 const port = process.env.PORT || 3000;
 
-// Initialize Socket.io
+// ===== FIXED SOCKET.IO CONFIGURATION FOR OPERA =====
+// Force polling for Opera and mobile data compatibility
 const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
+  cors: { 
+    origin: "*" 
+  },
+  transports: ['polling', 'websocket'], // Polling first, then websocket
+  allowUpgrades: true,
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  cookie: false
 });
 
 // Track online users - 3 MINUTE TIMEOUT
@@ -3550,12 +3555,14 @@ server.listen(port, () => {
   console.log(`🚫 DUPLICATE FIX: GUARANTEED no double responses!`);
   console.log(`🎯 PREFIX-FREE AI: ENABLED for private AI (auto-adds !ai prefix)`);
   console.log(`💬 Real-time messaging: ENABLED via Socket.io`);
+  console.log(`🔌 Socket.io configuration: POLLING FIRST for Opera/mobile data compatibility`);
   console.log(`🔌 Socket.io events: new-message, message-deleted, user-status-change`);
   console.log(`🤫 PRIVATE MESSAGING: ENABLED via Supabase`);
   console.log(`🔒 Private endpoints: /private-messages/*`);
   console.log(`🔐 USER AUTHENTICATION: ENABLED (Server-side, no localStorage)`);
   console.log(`🔐 Password hashing: SIMPLE HASH (basic implementation)`);
   console.log(`🌐 Cross-browser compatibility: ENABLED`);
+  console.log(`📱 OPERA FIX: Using polling transport for real-time updates with limited data`);
   
   // NEW: Added missing endpoints
   console.log(`🤖 NEW: POST /api/ai/private - Private AI endpoint`);
