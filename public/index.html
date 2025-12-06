@@ -4076,7 +4076,6 @@
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
-// --- CUT HERE ---
 <script>
 // Client-side Socket.io configuration with Opera Mini optimizations
 const socket = io({
@@ -7475,9 +7474,9 @@ async function loadPrivateUsers() {
         });
         
         if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(errorData.error || `Failed to load conversations: ${response.status}`);
-    }
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(errorData.error || `Failed to load conversations: ${response.status}`);
+        });
         
         const conversations = await response.json();
         
