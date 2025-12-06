@@ -7475,9 +7475,9 @@ async function loadPrivateUsers() {
         });
         
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-            throw new Error(errorData.error || `Failed to load conversations: ${response.status}`);
-        });
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(errorData.error || `Failed to load conversations: ${response.status}`);
+    }
         
         const conversations = await response.json();
         
