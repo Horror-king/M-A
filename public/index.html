@@ -4076,7 +4076,7 @@
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
-    <script>
+<script>
 // --- CUT HERE ---
       // Posts functionality for client-side
 let posts = [];
@@ -8139,7 +8139,18 @@ function messageUser() {
 // Initialize socket connection for real-time messaging
 function initSocket() {
     console.log('🔌 Initializing socket connection...');
-    socket = io();
+    
+    // FIXED: Added polling-only configuration for Opera 50MB data issue
+    socket = io({
+        transports: ['polling', 'websocket'], // Try both, but prefer polling
+        upgrade: false,
+        forceNew: true,
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 20000
+    });
     
     socket.on('connect', () => {
         console.log('✅ Socket connected');
@@ -8210,6 +8221,17 @@ function initSocket() {
         console.log('🔌 Socket disconnected:', reason);
     });
 
+    socket.on('connect_error', (error) => {
+        console.error('❌ Socket connection error:', error);
+        // Fallback to HTTP polling if Socket.IO fails
+        if (!window.socketFallback) {
+            window.socketFallback = setInterval(() => {
+                loadMessages();
+            }, 3000);
+            console.log('🔄 Using HTTP polling fallback');
+        }
+    });
+
     // Send heartbeat every 2 minutes to stay online
     const heartbeatInterval = setInterval(() => {
         const username = currentUserSession?.username;
@@ -8222,6 +8244,9 @@ function initSocket() {
     // Cleanup interval on page unload
     window.addEventListener('beforeunload', () => {
         clearInterval(heartbeatInterval);
+        if (window.socketFallback) {
+            clearInterval(window.socketFallback);
+        }
     });
 }
 
