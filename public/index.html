@@ -4076,350 +4076,12 @@
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
-<script>
-// Client-side Socket.io configuration with Opera Mini optimizations
-const socket = io({
-  transports: ['polling', 'websocket'],
-  upgrade: true,
-  forceNew: true,
-  reconnection: true,
-  reconnectionAttempts: 10,
-  reconnectionDelay: 1000,
-  reconnectionDelayMax: 5000,
-  timeout: 20000,
-  // Opera Mini specific optimizations
-  rememberUpgrade: true,
-  forceBase64: true, // Force base64 encoding for Opera Mini compatibility
-  jsonp: false,
-  agent: false,
-  enablesXDR: true, // Enable cross-domain requests for Opera Mini
-  withCredentials: false,
-  // Reduce timeout for faster fallback in Opera Mini
-  pingTimeout: 8000,
-  pingInterval: 10000,
-  // Force long-polling if browser is Opera Mini
-  ...(navigator.userAgent.indexOf('Opera Mini') > -1 ? {
-    transports: ['polling'],
-    upgrade: false,
-    forceBase64: true,
-    rememberUpgrade: false
-  } : {})
-});
-
-// Detect Opera Mini and apply specific optimizations
-const isOperaMini = navigator.userAgent.indexOf('Opera Mini') > -1;
-console.log('🌐 Browser detected:', isOperaMini ? 'Opera Mini' : 'Standard browser');
-console.log('🔧 Socket.io configuration:', isOperaMini ? 'Polling only mode' : 'WebSocket + Polling');
-
-// Enhanced Opera Mini polling intervals
-const POLL_INTERVAL = isOperaMini ? 3000 : 5000; // Faster polling for Opera Mini
-const MESSAGE_POLL_INTERVAL = isOperaMini ? 2000 : 5000; // Even faster for messages
-
-// Fallback polling when Socket.io fails
-let fallbackPollingActive = false;
-let messagePollingInterval = null;
-let postPollingInterval = null;
-
-// Initialize enhanced polling for Opera Mini
-function initializeEnhancedPolling() {
-  if (isOperaMini) {
-    console.log('🚀 Enabling enhanced polling for Opera Mini');
-    
-    // Clear any existing intervals
-    if (messagePollingInterval) clearInterval(messagePollingInterval);
-    if (postPollingInterval) clearInterval(postPollingInterval);
-    
-    // Start message polling
-    messagePollingInterval = setInterval(pollForNewMessages, MESSAGE_POLL_INTERVAL);
-    
-    // Start post polling
-    postPollingInterval = setInterval(pollForPostUpdates, POLL_INTERVAL);
-    
-    // Also check socket connection status frequently
-    setInterval(checkSocketConnection, 10000);
-  }
-}
-
-// Check Socket.io connection and fallback if needed
-function checkSocketConnection() {
-  if (!socket.connected) {
-    console.log('⚠️ Socket.io disconnected, enabling fallback polling');
-    fallbackPollingActive = true;
-    
-    if (!isOperaMini) {
-      // For non-Opera Mini browsers, enable fallback polling
-      if (!messagePollingInterval) {
-        messagePollingInterval = setInterval(pollForNewMessages, MESSAGE_POLL_INTERVAL);
-      }
-      if (!postPollingInterval) {
-        postPollingInterval = setInterval(pollForPostUpdates, POLL_INTERVAL);
-      }
-    }
-  } else if (fallbackPollingActive) {
-    console.log('✅ Socket.io reconnected, reducing polling');
-    fallbackPollingActive = false;
-    
-    if (!isOperaMini) {
-      // Keep intervals but increase interval for non-Opera Mini
-      if (messagePollingInterval) {
-        clearInterval(messagePollingInterval);
-        messagePollingInterval = setInterval(pollForNewMessages, 10000);
-      }
-      if (postPollingInterval) {
-        clearInterval(postPollingInterval);
-        postPollingInterval = setInterval(pollForPostUpdates, 10000);
-      }
-    }
-  }
-}
-
-// Enhanced function to poll for new messages
-async function pollForNewMessages() {
-  if (!currentUserSession?.username) return;
-  
-  try {
-    const token = localStorage.getItem('auth_token');
-    const response = await fetch(`/api/messages/poll?username=${currentUserSession.username}&lastUpdate=${lastMessageUpdate || Date.now() - 30000}`, {
-      headers: {
-        'Authorization': token ? `Bearer ${token}` : '',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      }
-    });
-    
-    if (response.ok) {
-      const newMessages = await response.json();
-      if (newMessages && newMessages.length > 0) {
-        console.log(`📨 Polled ${newMessages.length} new messages`);
-        newMessages.forEach(message => {
-          // Check if message already exists to prevent duplicates
-          const existingMessage = document.querySelector(`[data-id="${message.id}"]`);
-          if (!existingMessage) {
-            const isOwn = message.username === currentUserSession.username;
-            displayMessage(
-              message.content, 
-              isOwn ? 'sent' : 'received', 
-              message.reply_to, 
-              message.username, 
-              message.id, 
-              true
-            );
-          }
-        });
-        lastMessageUpdate = Date.now();
-      }
-    }
-  } catch (error) {
-    console.log('Polling error (may be expected in Opera Mini):', error.message);
-  }
-}
-
-// Enhanced pollForPostUpdates function for Opera Mini
-async function pollForPostUpdates() {
-  try {
-    const currentUser = currentUserSession?.username;
-    if (!currentUser) return;
-    
-    const response = await fetch(`/api/posts/updates?lastUpdate=${lastUpdateTimestamp || new Date(Date.now() - 30000).toISOString()}&username=${currentUser}`, {
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache'
-      }
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      if (data.success && data.posts.length > 0) {
-        console.log(`📝 Polled ${data.posts.length} post updates`);
-        
-        // Process updates
-        let hasNewPosts = false;
-        data.posts.forEach(updatedPost => {
-          const existingIndex = posts.findIndex(p => p.id === updatedPost.id);
-          if (existingIndex >= 0) {
-            // Check if post actually changed
-            if (JSON.stringify(posts[existingIndex]) !== JSON.stringify(updatedPost)) {
-              posts[existingIndex] = updatedPost;
-              hasNewPosts = true;
-            }
-          } else {
-            // Add new post to beginning
-            posts.unshift(updatedPost);
-            hasNewPosts = true;
-          }
-        });
-        
-        if (hasNewPosts) {
-          renderPosts();
-          lastUpdateTimestamp = data.timestamp;
-          
-          // Show notification for new posts in Opera Mini
-          if (isOperaMini && data.posts.length > 0 && document.visibilityState === 'visible') {
-            showInfo(`📝 ${data.posts.length} new post${data.posts.length > 1 ? 's' : ''}`);
-          }
-        }
-      }
-    }
-  } catch (error) {
-    console.log('Post polling error:', error.message);
-  }
-}
-
-// Enhanced Socket.io event listeners with Opera Mini fallbacks
-socket.on('connect', () => {
-  console.log('✅ Socket.io connected');
-  fallbackPollingActive = false;
-  
-  if (isOperaMini) {
-    // Opera Mini: still keep polling but less frequently
-    console.log('🔄 Opera Mini: Maintaining polling alongside Socket.io');
-  }
-});
-
-socket.on('disconnect', (reason) => {
-  console.log('❌ Socket.io disconnected:', reason);
-  
-  if (isOperaMini || reason === 'transport error' || reason === 'ping timeout') {
-    fallbackPollingActive = true;
-    console.log('🔄 Enabling aggressive polling due to disconnect');
-    
-    // Increase polling frequency on disconnect
-    if (messagePollingInterval) clearInterval(messagePollingInterval);
-    if (postPollingInterval) clearInterval(postPollingInterval);
-    
-    messagePollingInterval = setInterval(pollForNewMessages, isOperaMini ? 2000 : 3000);
-    postPollingInterval = setInterval(pollForPostUpdates, isOperaMini ? 2500 : 4000);
-  }
-});
-
-socket.on('reconnect', () => {
-  console.log('♻️ Socket.io reconnected');
-  fallbackPollingActive = false;
-});
-
-// Override the existing pollForPostUpdates function with our enhanced version
-// This will replace the existing function in your code
-
-// Modify the initializePosts function to use our enhanced polling
-const originalInitializePosts = window.initializePosts || function() {};
-window.initializePosts = function() {
-  originalInitializePosts();
-  
-  // Start enhanced polling
-  initializeEnhancedPolling();
-  
-  // Also set up message polling if not already
-  if (isOperaMini && !messagePollingInterval) {
-    messagePollingInterval = setInterval(pollForNewMessages, MESSAGE_POLL_INTERVAL);
-  }
-};
-
-// Add this to your existing initialization
-document.addEventListener('DOMContentLoaded', function() {
-  // Initialize enhanced polling for Opera Mini
-  if (isOperaMini) {
-    console.log('🎯 Initializing Opera Mini optimizations');
-    initializeEnhancedPolling();
-    
-    // Add a manual refresh button for Opera Mini
-    addOperaMiniRefreshButton();
-  }
-  
-  // Override sendMessage to force immediate updates in Opera Mini
-  if (isOperaMini) {
-    const originalSendMessage = window.sendMessage;
-    window.sendMessage = async function() {
-      await originalSendMessage();
-      // Force immediate poll after sending message in Opera Mini
-      setTimeout(pollForNewMessages, 500);
-    };
-  }
-});
-
-// Add manual refresh button for Opera Mini
-function addOperaMiniRefreshButton() {
-  const chatContainer = document.getElementById('chat-container');
-  if (!chatContainer) return;
-  
-  const refreshBtn = document.createElement('button');
-  refreshBtn.id = 'opera-mini-refresh';
-  refreshBtn.innerHTML = '🔄 Refresh Messages';
-  refreshBtn.style.cssText = `
-    position: fixed;
-    bottom: 120px;
-    right: 20px;
-    background: #007bff;
-    color: white;
-    border: none;
-    border-radius: 20px;
-    padding: 10px 15px;
-    font-size: 12px;
-    cursor: pointer;
-    z-index: 1001;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-  `;
-  
-  refreshBtn.onclick = function() {
-    // Force refresh of messages and posts
-    pollForNewMessages();
-    pollForPostUpdates();
-    showInfo('Refreshing messages...');
-  };
-  
-  document.body.appendChild(refreshBtn);
-  
-  // Also add to posts container if exists
-  const postsContainer = document.getElementById('posts-container');
-  if (postsContainer) {
-    const postsRefreshBtn = refreshBtn.cloneNode(true);
-    postsRefreshBtn.id = 'opera-mini-posts-refresh';
-    postsRefreshBtn.innerHTML = '🔄 Refresh Posts';
-    postsRefreshBtn.onclick = function() {
-      loadPosts();
-      showInfo('Refreshing posts...');
-    };
-    postsContainer.appendChild(postsRefreshBtn);
-  }
-}
-
-// Enhanced showInfo function
-function showInfo(message) {
-  // Create or update info notification
-  let infoDiv = document.getElementById('opera-mini-info');
-  if (!infoDiv) {
-    infoDiv = document.createElement('div');
-    infoDiv.id = 'opera-mini-info';
-    infoDiv.style.cssText = `
-      position: fixed;
-      top: 60px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #17a2b8;
-      color: white;
-      padding: 10px 20px;
-      border-radius: 5px;
-      z-index: 10000;
-      font-size: 14px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-      display: none;
-    `;
-    document.body.appendChild(infoDiv);
-  }
-  
-  infoDiv.textContent = message;
-  infoDiv.style.display = 'block';
-  
-  setTimeout(() => {
-    infoDiv.style.display = 'none';
-  }, 3000);
-}
-
-// Posts functionality for client-side
+    <script>
+// --- CUT HERE ---
+      // Posts functionality for client-side
 let posts = [];
 let lastUpdateTimestamp = null;
 let currentPostMedia = [];
-let lastMessageUpdate = null;
 
 // Initialize posts functionality
 function initializePosts() {
@@ -4427,50 +4089,37 @@ function initializePosts() {
     setupPostInputHandlers();
     setupCreatePostBox();
     
-    // Start polling for updates (interval set globally based on browser)
-    postPollingInterval = setInterval(pollForPostUpdates, POLL_INTERVAL);
+    // Start polling for updates every 5 seconds
+    setInterval(pollForPostUpdates, 5000);
     
-    // Listen for real-time post updates (with Opera Mini fallback)
+    // Listen for real-time post updates
     if (typeof socket !== 'undefined' && socket) {
         socket.on('new-post', (post) => {
             addPostToFeed(post);
-            
-            // In Opera Mini, also update via polling to ensure delivery
-            if (isOperaMini) {
-                setTimeout(pollForPostUpdates, 1000);
-            }
         });
     }
 }
 
-// Load posts from server with Opera Mini optimizations
+// Load posts from server
 async function loadPosts() {
-  try {
-    const currentUser = currentUserSession?.username;
-    const response = await fetch(`/api/posts?username=${currentUser}&_t=${Date.now()}`, {
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache'
-      }
-    });
-    
-    if (response.ok) {
-      posts = await response.json();
-      renderPosts();
-      lastUpdateTimestamp = new Date().toISOString();
-      
-      // In Opera Mini, force a re-check after a short delay
-      if (isOperaMini) {
-        setTimeout(pollForPostUpdates, 2000);
-      }
-    } else {
-      console.error('Failed to load posts');
-      loadPostsFromLocalStorage();
+    try {
+        const currentUser = currentUserSession?.username;
+        const response = await fetch(`/api/posts?username=${currentUser}`);
+        
+        if (response.ok) {
+            posts = await response.json();
+            renderPosts();
+            lastUpdateTimestamp = new Date().toISOString();
+        } else {
+            console.error('Failed to load posts');
+            // Fallback to localStorage if server fails
+            loadPostsFromLocalStorage();
+        }
+    } catch (error) {
+        console.error('Error loading posts:', error);
+        // Fallback to localStorage if server fails
+        loadPostsFromLocalStorage();
     }
-  } catch (error) {
-    console.error('Error loading posts:', error);
-    loadPostsFromLocalStorage();
-  }
 }
 
 // Fallback: Load posts from localStorage
@@ -4483,7 +4132,36 @@ function loadPostsFromLocalStorage() {
     }
 }
 
-// Create Facebook-style create post box - FIXED: Ensure it's always visible
+// Poll for new posts and updates
+async function pollForPostUpdates() {
+    try {
+        const response = await fetch(`/api/posts/updates?lastUpdate=${lastUpdateTimestamp}`);
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.posts.length > 0) {
+                // Update existing posts or add new ones
+                data.posts.forEach(updatedPost => {
+                    const existingIndex = posts.findIndex(p => p.id === updatedPost.id);
+                    if (existingIndex >= 0) {
+                        // Update existing post
+                        posts[existingIndex] = updatedPost;
+                    } else {
+                        // Add new post to beginning
+                        posts.unshift(updatedPost);
+                    }
+                });
+                
+                renderPosts();
+                lastUpdateTimestamp = data.timestamp;
+            }
+        }
+    } catch (error) {
+        console.error('Error polling for updates:', error);
+    }
+}
+
+// Setup Facebook-style create post box - FIXED: Ensure it's always visible
 function setupCreatePostBox() {
     const postsContainer = document.getElementById('posts-container');
     if (!postsContainer) {
@@ -4779,11 +4457,6 @@ async function createPost() {
             // Close modal and reset form
             closeCreatePostModal();
             showSuccess('Post published successfully!');
-            
-            // In Opera Mini, force immediate update
-            if (isOperaMini) {
-                setTimeout(pollForPostUpdates, 1000);
-            }
         } else {
             const error = await response.json();
             showError(error.error || 'Failed to create post');
@@ -5143,11 +4816,6 @@ function addPostToFeed(post) {
     
     // Scroll to top to show new post
     postsList.scrollTop = 0;
-    
-    // Show notification for new post
-    if (isOperaMini) {
-        showInfo(`New post from ${post.author}`);
-    }
 }
 
 // Generate unique post ID
@@ -5381,14 +5049,6 @@ function showContainer(containerId) {
                     console.log('✅ Create post box is visible');
                 }
             }, 100);
-            
-            // In Opera Mini, force immediate update
-            if (isOperaMini) {
-                setTimeout(() => {
-                    loadPosts();
-                    pollForPostUpdates();
-                }, 500);
-            }
         }
     }
     
@@ -5481,6 +5141,9 @@ function showContainer(containerId) {
     if (kebabDropdown) kebabDropdown.classList.remove('active');
 }
 
+// ... REST OF YOUR EXISTING CODE CONTINUES EXACTLY AS BEFORE ...
+// ===== YOUR EXISTING CODE CONTINUES BELOW =====
+
 // NEW: Welcome screen animation function
 function animateWelcomeText() {
     const text = "MessageMate";
@@ -5543,10 +5206,8 @@ function initializeMainApp() {
     loadProfile(); // Then load the actual profile data
     
     initializeChat();
-    
-    // Initialize socket connection for real-time features
+
     initSocket();
-    
     setupTypingHandlers();
     setupTypingDetection();
     setupTypingSocketEvents();
@@ -5557,12 +5218,6 @@ function initializeMainApp() {
     
     if (hasVerifiedCode()) {
         enableSQLEditorAccess();
-    }
-    
-    // Initialize Opera Mini optimizations if needed
-    if (isOperaMini) {
-        initializeEnhancedPolling();
-        console.log('🎯 Opera Mini optimizations initialized');
     }
     
     // Show welcome message instead of login prompt
@@ -5676,7 +5331,8 @@ let newMessagesCount = 0;
 let scrollToBottomBtn;
 let newMessagesCountEl = document.getElementById('newMessagesCount');
 
-// Real-time active status variables (socket is already declared at the top)
+// Real-time active status variables
+let socket;
 let isTyping = false;
 let typingTimer;
 
@@ -6085,6 +5741,7 @@ function autoResize(textarea) {
     }
 }
 
+// --- CUT HERE ---
 // Helper function to escape HTML
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -6092,96 +5749,178 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// FIXED: Enhanced initSocket function to use the existing socket
-function initSocket() {
-    console.log('🔌 Initializing socket connection...');
+// ===== MODIFIED: Update showContainer function to initialize posts =====
+function showContainer(containerId) {
+    console.log('🔄 Showing container:', containerId);
     
-    // Use the existing socket instance with Opera Mini optimizations
+    // Hide all containers
+    document.querySelectorAll('.main-chat-interface').forEach(container => {
+        container.style.display = 'none';
+    });
     
-    // Add user-specific event listeners
-    socket.on('new-message', (message) => {
-        console.log('💬 New message received via socket:', message);
+    // Hide all info containers (INCLUDING PROFILE CONTAINER)
+    document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container, .profile-container').forEach(container => {
+        container.style.display = 'none';
+    });
+    
+    // Hide all chat inputs
+    document.querySelectorAll('.chat-input').forEach(input => {
+        input.style.display = 'none';
+    });
+    
+    // Show the selected container
+    const container = document.getElementById(containerId);
+    if (container) {
+        container.style.display = 'block';
         
-        // Only display if message is from another user or if it's an AI/bot response
-        const isOwnMessage = message.username === currentUserSession?.username;
-        const isAIResponse = message.username === 'AI' || message.username === 'Bot';
+        // Show the appropriate chat input
+        if (containerId === 'chat' || containerId === 'private-ai') {
+            const chatInput = container.querySelector('.chat-input');
+            if (chatInput) chatInput.style.display = 'flex';
+        }
         
-        if (!isOwnMessage || isAIResponse) {
-            // Check if message already exists to prevent duplicates
-            const existingMessage = document.querySelector(`[data-id="${message.id}"]`);
-            if (!existingMessage) {
-                // Display message immediately
-                displayMessage(
-                    message.content, 
-                    isOwnMessage ? 'sent' : 'received', 
-                    message.reply_to, 
-                    message.username, 
-                    message.id, 
-                    true
-                );
-                
-                // Show notification if page is not focused
-                if (document.visibilityState !== 'visible' && !isOwnMessage) {
-                    showNotification(message.username, message.content);
-                }
+        // For private messages, only show users panel initially
+        if (containerId === 'private-messages') {
+            showUsersPanel();
+            initializePrivateMessaging();
+        }
+        
+        // Load profile data when showing profile container
+        if (containerId === 'profile') {
+            loadProfile();
+        }
+        
+        // Initialize secret code if showing that container
+        if (containerId === 'secret-code') {
+            resetSecretCodeForm();
+            initializeSecretCodeVerification();
+        }
+        
+        // Initialize SQL editor if showing that container
+        if (containerId === 'sql-editor-container') {
+            // Check if user has verified the secret code
+            if (!hasVerifiedCode()) {
+                showError('Access denied. Please verify the secret code first.');
+                showContainer('secret-code');
+                return;
             }
+            initializeSQLEditor();
         }
-    });
-
-    // Listen for message history when first connecting
-    socket.on('chat-messages', (messages) => {
-        console.log('📨 Received message history:', messages.length, 'messages');
-        renderMessages(messages);
-    });
-
-    // User status updates
-    socket.on('user-status-change', (data) => {
-        console.log('👤 User status change:', data);
-        onlineUsers = data.onlineUsers || [];
-        updateOnlineUsersList(onlineUsers);
-        updateUserStatusIndicator(data.username, data.status);
-    });
-
-    // ADDED: Typing events
-    socket.on('user-typing-start', (data) => {
-        console.log('⌨️ User started typing:', data.username);
-        showTypingIndicator(data.username);
-    });
-
-    socket.on('user-typing-stop', (data) => {
-        console.log('💤 User stopped typing:', data.username);
-        hideTypingIndicator(data.username);
-    });
-
-    // Send heartbeat every 2 minutes to stay online
-    const heartbeatInterval = setInterval(() => {
-        const username = currentUserSession?.username;
-        if (username && socket.connected) {
-            socket.emit('user-online', username);
-            console.log('💓 Heartbeat sent - keeping user online');
-        }
-    }, 120000); // 2 minutes
-
-    // Cleanup interval on page unload
-    window.addEventListener('beforeunload', () => {
-        clearInterval(heartbeatInterval);
-    });
-    
-    // Emit user online when socket connects
-    const username = currentUserSession?.username;
-    if (username) {
-        // Check if already connected
-        if (socket.connected) {
-            socket.emit('user-online', username);
-            socket.emit('request-messages');
-        } else {
-            // Wait for connection
-            socket.once('connect', () => {
-                socket.emit('user-online', username);
-                socket.emit('request-messages');
-            });
+        
+        // MODIFIED: Initialize posts if showing that container
+        if (containerId === 'posts') {
+            initializePosts();
         }
     }
+    
+    // Show overlay for non-chat containers
+    const overlay = document.getElementById('overlay');
+    if (overlay) {
+        if (containerId === 'chat' || containerId === 'private-ai' || containerId === 'private-messages' || containerId === 'posts') {
+            overlay.style.display = 'none';
+        } else {
+            overlay.style.display = 'block';
+        }
+    }
+    
+    // Handle button visibility based on container
+    if (containerId === 'chat') {
+        console.log('Showing main chat container');
+        // Re-initialize scroll button for main chat
+        setTimeout(() => {
+            initializeButtons();
+            // FIXED: Force scroll to bottom when switching to chat
+            setTimeout(() => {
+                forceScrollToBottom('chat-container');
+                updateScrollState();
+            }, 200);
+        }, 100);
+        
+        // Show main chat scroll button, hide private AI button
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'flex';
+            updateScrollState();
+        }
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.classList.remove('visible');
+        }
+    } else if (containerId === 'private-ai') {
+        // Show private AI button, hide main chat scroll button
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'flex';
+            handlePrivateScroll();
+        }
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'none';
+            scrollToBottomBtn.classList.remove('visible');
+        }
+        // Attach scroll event for private container
+        if (privateContainer) {
+            privateContainer.addEventListener('scroll', handlePrivateScroll);
+            setTimeout(handlePrivateScroll, 100);
+            // FIXED: Scroll to bottom when switching to private AI
+            setTimeout(() => forceScrollToBottom('private-ai-container'), 200);
+        }
+    } else if (containerId === 'private-messages') {
+        // Hide both buttons for private messages
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'none';
+            scrollToBottomBtn.classList.remove('visible');
+        }
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.classList.remove('visible');
+        }
+    } else if (containerId === 'posts') {
+        // Hide both buttons for posts feed
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'none';
+            scrollToBottomBtn.classList.remove('visible');
+        }
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.classList.remove('visible');
+        }
+    } else {
+        // For other containers, hide both buttons
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'none';
+            scrollToBottomBtn.classList.remove('visible');
+        }
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.classList.remove('visible');
+        }
+    }
+
+    // Close dropdown menu when switching containers
+    const dropdown = document.getElementById('dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    
+    const kebabDropdown = document.querySelector('.kebab-dropdown');
+    if (kebabDropdown) kebabDropdown.classList.remove('active');
+}
+
+// --- CUT HERE ---
+
+function hideContainer(containerId) {
+    console.log('🔄 Hiding container:', containerId);
+    const container = document.getElementById(containerId);
+    if (container) container.style.display = 'none';
+    
+    const overlay = document.getElementById('overlay');
+    if (overlay) overlay.style.display = 'none';
+    
+    // Close all menus when hiding any container
+    const dropdown = document.getElementById('dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    
+    const kebabDropdown = document.querySelector('.kebab-dropdown');
+    if (kebabDropdown) kebabDropdown.classList.remove('active');
+    
+    // Show chat container and input after closing any section
+    showContainer('chat');
 }
 
 // ===== MESSAGE FUNCTIONS =====
@@ -6281,11 +6020,6 @@ async function sendMessage() {
         const PREFIX = '!';
         if (!content.startsWith(PREFIX)) {
             fetchChatResponse(content);
-        }
-        
-        // Force immediate poll in Opera Mini
-        if (isOperaMini) {
-            setTimeout(pollForNewMessages, 500);
         }
         
     } catch (error) {
@@ -7129,10 +6863,6 @@ function logout() {
         sqlEditorMenuItem.style.display = 'none';
     }
     
-    // Clear polling intervals
-    if (messagePollingInterval) clearInterval(messagePollingInterval);
-    if (postPollingInterval) clearInterval(postPollingInterval);
-    
     console.log('✅ User logged out successfully');
 }
 
@@ -7241,7 +6971,7 @@ async function fetchPrivateAIResponse(userInput) {
         console.error("Error fetching Private AI response:", error);
         displayPrivateMessage("Sorry, I encountered an error processing your message. Please try again.", 'received');
     }
-}
+    }
 
 // ===== IMAGE HANDLING FUNCTIONS =====
 function displayImageImmediately(imgUrl, container) {
@@ -7476,7 +7206,7 @@ async function loadPrivateUsers() {
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
             throw new Error(errorData.error || `Failed to load conversations: ${response.status}`);
-        });
+        }
         
         const conversations = await response.json();
         
@@ -8404,6 +8134,97 @@ function messageUser() {
     // The actual implementation is in showUserProfile function
 }
 
+// ===== FIXED: MESSAGE ORDER AND SECTION MANAGEMENT =====
+
+// Initialize socket connection for real-time messaging
+function initSocket() {
+    console.log('🔌 Initializing socket connection...');
+    socket = io();
+    
+    socket.on('connect', () => {
+        console.log('✅ Socket connected');
+        const username = currentUserSession?.username;
+        if (username) {
+            socket.emit('user-online', username);
+            // Request existing messages when connecting
+            socket.emit('request-messages');
+        }
+    });
+
+    // Listen for new messages in real-time
+    socket.on('new-message', (message) => {
+        console.log('💬 New message received via socket:', message);
+        
+        // Only display if message is from another user or if it's an AI/bot response
+        const isOwnMessage = message.username === currentUserSession?.username;
+        const isAIResponse = message.username === 'AI' || message.username === 'Bot';
+        
+        if (!isOwnMessage || isAIResponse) {
+            // Check if message already exists to prevent duplicates
+            const existingMessage = document.querySelector(`[data-id="${message.id}"]`);
+            if (!existingMessage) {
+                // Display message immediately
+                displayMessage(
+                    message.content, 
+                    isOwnMessage ? 'sent' : 'received', 
+                    message.reply_to, 
+                    message.username, 
+                    message.id, 
+                    true
+                );
+                
+                // Show notification if page is not focused
+                if (document.visibilityState !== 'visible' && !isOwnMessage) {
+                    showNotification(message.username, message.content);
+                }
+            }
+        }
+    });
+
+    // Listen for message history when first connecting
+    socket.on('chat-messages', (messages) => {
+        console.log('📨 Received message history:', messages.length, 'messages');
+        renderMessages(messages);
+    });
+
+    // User status updates
+    socket.on('user-status-change', (data) => {
+        console.log('👤 User status change:', data);
+        onlineUsers = data.onlineUsers || [];
+        updateOnlineUsersList(onlineUsers);
+        updateUserStatusIndicator(data.username, data.status);
+    });
+
+    // ADDED: Typing events
+    socket.on('user-typing-start', (data) => {
+        console.log('⌨️ User started typing:', data.username);
+        showTypingIndicator(data.username);
+    });
+
+    socket.on('user-typing-stop', (data) => {
+        console.log('💤 User stopped typing:', data.username);
+        hideTypingIndicator(data.username);
+    });
+
+    socket.on('disconnect', (reason) => {
+        console.log('🔌 Socket disconnected:', reason);
+    });
+
+    // Send heartbeat every 2 minutes to stay online
+    const heartbeatInterval = setInterval(() => {
+        const username = currentUserSession?.username;
+        if (username && socket.connected) {
+            socket.emit('user-online', username);
+            console.log('💓 Heartbeat sent - keeping user online');
+        }
+    }, 120000); // 2 minutes
+
+    // Cleanup interval on page unload
+    window.addEventListener('beforeunload', () => {
+        clearInterval(heartbeatInterval);
+    });
+}
+
 // ===== FIXED: LOAD MESSAGES WITH CORRECT ORDER =====
 async function loadMessages() {
     try {
@@ -8607,6 +8428,7 @@ function checkIfAtBottom(container) {
 }
 
 // Private AI Go to Top button functions
+let privateGoTopBtn;
 let privateContainer;
 function handlePrivateScroll() {
     if (!privateContainer || !privateGoTopBtn) return;
@@ -9543,6 +9365,6 @@ document.addEventListener('click', function (e) {
         openZoom(e.target.src);
     }
 });
-</script>
+ </script>
 </body>
 </html>
