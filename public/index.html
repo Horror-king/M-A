@@ -4232,7 +4232,7 @@ async function pollForPostUpdates() {
     if (response.ok) {
       const data = await response.json();
       if (data.success && data.posts.length > 0) {
-        console.log(`📝 Polled ${data.posts.length} post updates');
+        console.log(`📝 Polled ${data.posts.length} post updates`);
         
         // Process updates
         let hasNewPosts = false;
