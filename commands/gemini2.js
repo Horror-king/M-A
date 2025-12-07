@@ -61,7 +61,7 @@ module.exports = {
 
       // Initialize Gemini client with YOUR KEY
       const ai = new GoogleGenAI({
-        apiKey: process.env.GOOGLE_API_KEY || "YOUR_API_KEY"
+        apiKey: process.env.GOOGLE_API_KEY || "AIzaSyBo3FUHrfO63qyjv4R46bDE7Ac74jUTSj4"
       });
 
       let contents = [];
