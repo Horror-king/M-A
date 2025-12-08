@@ -1,10 +1,9 @@
 const fs = require("fs");
 const path = require("path");
 const FormData = require("form-data");
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 const IMGUR_CLIENT_ID = "225899c9a3312bd";
-const CLIPDROP_API_KEY = "91c943b1448de009eba2ada63b39c50dc5ded3db61dbd14e2d4970a7edc9e73c04b0e11a0520e04f37ee07fd6dc140e9"; // weka API key yako hapa
+const CLIPDROP_API_KEY = "91c943b1448de009eba2ada63b39c50dc5ded3db61dbd14e2d4970a7edc9e73c04b0e11a0520e04f37ee07fd6dc140e9"; // weka key yako hapa
 
 // helper: temporary file path
 function tmpFile(name = "crip") {
@@ -14,19 +13,15 @@ function tmpFile(name = "crip") {
 
 module.exports = {
   config: {
-    name: "crip2",
+    name: "crip",
     version: "1.0",
     author: "Hassan",
     countDown: 10,
     role: 0,
     shortDescription: { en: "Generate or edit images with Crip AI" },
-    longDescription: {
-      en: "Use Crip AI to create images from prompts.\n\nUsage:\n!crip <prompt>"
-    },
+    longDescription: { en: "Use Crip AI to create images from prompts.\n!crip <prompt>" },
     category: "image",
-    guide: {
-      en: "Example:\n!crip vaporwave fashion dog in miami"
-    }
+    guide: { en: "Example:\n!crip vaporwave fashion dog in miami" }
   },
 
   onStart: async function ({ api, event, args }) {
@@ -42,7 +37,7 @@ module.exports = {
       const prompt = args.join(" ").trim();
       await api.sendMessage("⏳ Generating image, please wait...", event.threadID, event.messageID);
 
-      // --- 1️⃣ Generate image via ClipDrop ---
+      // --- Generate image via ClipDrop ---
       const form = new FormData();
       form.append("prompt", prompt);
 
@@ -63,25 +58,21 @@ module.exports = {
       const localPath = tmpFile();
       fs.writeFileSync(localPath, buffer);
 
-      // --- 2️⃣ Upload image to Imgur ---
+      // --- Upload image to Imgur ---
       const imgurForm = new FormData();
       imgurForm.append("image", fs.createReadStream(localPath));
 
       const imgurResp = await fetch("https://api.imgur.com/3/image", {
         method: "POST",
-        headers: {
-          Authorization: `Client-ID ${IMGUR_CLIENT_ID}`
-        },
+        headers: { Authorization: `Client-ID ${IMGUR_CLIENT_ID}` },
         body: imgurForm
       });
 
       const imgurData = await imgurResp.json();
       if (!imgurData.success) throw new Error("Imgur upload failed");
 
-      // delete local temp file
       fs.unlinkSync(localPath);
 
-      // send message with Imgur link
       await api.sendMessage(
         {
           body: `✅ Image generated successfully!\n📝 Prompt: ${prompt}\n🌐 Link: ${imgurData.data.link}`,
