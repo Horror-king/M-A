@@ -1,10 +1,10 @@
 const fs = require("fs");
 const path = require("path");
 const fetch = require("node-fetch");
-const FormData = require("form-data");
 
-const IMGUR_CLIENT_ID = "225899c9a3312bd";
-const CLIPDROP_API_KEY = "91c943b1448de009eba2ada63b39c50dc5ded3db61dbd14e2d4970a7edc9e73c04b0e11a0520e04f37ee07fd6dc140e9"; // weka key yako hapa
+// You MUST replace these with your actual API keys
+const IMGUR_CLIENT_ID = "225899c9a3312bd"; // Get from imgur.com
+const CLIPDROP_API_KEY = "91c943b1448de009eba2ada63b39c50dc5ded3db61dbd14e2d4970a7edc9e73c04b0e11a0520e04f37ee07fd6dc140e9"; // Get from clipdrop.co
 
 function tmpFile(name = "crip") {
   const id = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -16,75 +16,123 @@ module.exports = {
     name: "crip2",
     version: "1.0",
     author: "Hassan",
-    countDown: 10,
+    countDown: 30, // Increased timeout for image generation
     role: 0,
-    shortDescription: { en: "Generate or edit images with Crip AI" },
-    longDescription: { en: "Use Crip AI to create images from prompts.\n!crip <prompt>" },
+    shortDescription: { en: "Generate AI images" },
+    longDescription: { 
+      en: "Create AI-generated images from text prompts using ClipDrop API" 
+    },
     category: "image",
-    guide: { en: "Example:\n!crip vaporwave fashion dog in miami" }
+    guide: { en: "!crip <prompt>" }
   },
 
   onStart: async function ({ api, event, args }) {
     try {
+      // Check if user provided prompt
       if (!args.length) {
         return api.sendMessage(
-          "❌ Usage:\n!crip <prompt>",
+          `📸 Crip AI Image Generator\n\nUsage: !crip <prompt>\nExample: !crip beautiful sunset over mountains\n\n🔑 Required: ClipDrop API key at https://clipdrop.co/`,
+          event.threadID,
+          event.messageID
+        );
+      }
+
+      // Check if API keys are set
+      if (CLIPDROP_API_KEY === "91c943b1448de009eba2ada63b39c50dc5ded3db61dbd14e2d4970a7edc9e73c04b0e11a0520e04f37ee07fd6dc140e9") {
+        return api.sendMessage(
+          "❌ Please configure ClipDrop API key first.\nGet free credits: https://clipdrop.co/",
           event.threadID,
           event.messageID
         );
       }
 
       const prompt = args.join(" ").trim();
-      await api.sendMessage("⏳ Generating image, please wait...", event.threadID, event.messageID);
+      
+      // Send initial processing message
+      const processingMsg = await api.sendMessage(
+        `🔄 Generating image: "${prompt.substring(0, 50)}${prompt.length > 50 ? '...' : ''}"\n⏳ Please wait...`,
+        event.threadID,
+        event.messageID
+      );
 
-      // --- Generate image via ClipDrop ---
+      console.log(`[Crip AI] Generating image for: ${prompt}`);
+      
+      // --- Generate image via ClipDrop API ---
       const clipdropResp = await fetch("https://clipdrop-api.co/text-to-image/v1", {
         method: "POST",
         headers: {
           "x-api-key": CLIPDROP_API_KEY,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ prompt })
+        body: JSON.stringify({ prompt }),
+        timeout: 30000 // 30 second timeout
       });
 
       if (!clipdropResp.ok) {
-        const errText = await clipdropResp.text();
-        throw new Error("ClipDrop API error: " + errText);
+        const errorText = await clipdropResp.text();
+        console.error("[Crip AI] ClipDrop Error:", errorText);
+        throw new Error(`ClipDrop API error: ${clipdropResp.status}`);
       }
 
-      const arrayBuffer = await clipdropResp.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      const localPath = tmpFile();
-      fs.writeFileSync(localPath, buffer);
+      // Get image buffer
+      const imageBuffer = await clipdropResp.buffer();
+      
+      // Check if image is valid
+      if (!imageBuffer || imageBuffer.length < 100) {
+        throw new Error("Invalid image received from API");
+      }
 
-      // --- Upload image to Imgur ---
-      const form = new FormData();
-      form.append("image", fs.createReadStream(localPath));
+      // Save temporarily
+      const tempFilePath = tmpFile();
+      fs.writeFileSync(tempFilePath, imageBuffer);
+      console.log(`[Crip AI] Image saved: ${tempFilePath} (${Math.round(imageBuffer.length / 1024)}KB)`);
 
-      const imgurResp = await fetch("https://api.imgur.com/3/image", {
-        method: "POST",
-        headers: { Authorization: `Client-ID ${IMGUR_CLIENT_ID}` },
-        body: form
-      });
+      // --- METHOD 1: Send directly as attachment (no Imgur needed) ---
+      // Delete processing message
+      if (processingMsg && processingMsg.messageID) {
+        await api.unsendMessage(processingMsg.messageID);
+      }
 
-      const imgurData = await imgurResp.json();
-      console.log("Imgur response:", imgurData); // **DEBUG**
-
-      if (!imgurData.success) throw new Error("Imgur upload failed: " + JSON.stringify(imgurData));
-
-      fs.unlinkSync(localPath);
-
-      await api.sendMessage(
+      // Send the image directly
+      return api.sendMessage(
         {
-          body: `✅ Image generated successfully!\n📝 Prompt: ${prompt}\n🌐 Link: ${imgurData.data.link}`,
+          body: `✅ Image Generated!\n\n📝 Prompt: "${prompt}"\n🖼️ AI Generated by ClipDrop`,
+          attachment: fs.createReadStream(tempFilePath)
         },
+        event.threadID,
+        event.messageID,
+        async () => {
+          // Clean up temp file after sending
+          try {
+            fs.unlinkSync(tempFilePath);
+            console.log(`[Crip AI] Cleaned up: ${tempFilePath}`);
+          } catch (cleanupError) {
+            console.error("[Crip AI] Cleanup error:", cleanupError);
+          }
+        }
+      );
+
+    } catch (error) {
+      console.error("[Crip AI] Error:", error);
+      
+      // Clean up any temp files
+      try {
+        const tempFiles = fs.readdirSync(process.cwd())
+          .filter(file => file.startsWith("crip_") && file.endsWith(".png"));
+        
+        tempFiles.forEach(file => {
+          try { 
+            fs.unlinkSync(path.join(process.cwd(), file)); 
+            console.log(`[Crip AI] Cleaned orphaned file: ${file}`);
+          } catch {}
+        });
+      } catch {}
+      
+      return api.sendMessage(
+        `❌ Image generation failed.\n\nError: ${error.message}\n\nPossible fixes:\n1. Check your ClipDrop API key\n2. Try a different prompt\n3. Ensure you have API credits\n4. Wait a few minutes and try again`,
         event.threadID,
         event.messageID
       );
-
-    } catch (err) {
-      console.error(err);
-      await api.sendMessage(`❌ Failed to generate image.\nError: ${err.message}`, event.threadID, event.messageID);
     }
   }
 };
