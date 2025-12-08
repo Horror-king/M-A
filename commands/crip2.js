@@ -1,5 +1,7 @@
 const fs = require("fs");
 const path = require("path");
+const fetch = require("node-fetch");
+const FormData = require("form-data");
 
 const IMGUR_CLIENT_ID = "225899c9a3312bd";
 const CLIPDROP_API_KEY = "91c943b1448de009eba2ada63b39c50dc5ded3db61dbd14e2d4970a7edc9e73c04b0e11a0520e04f37ee07fd6dc140e9"; // weka key yako hapa
@@ -35,14 +37,14 @@ module.exports = {
       const prompt = args.join(" ").trim();
       await api.sendMessage("⏳ Generating image, please wait...", event.threadID, event.messageID);
 
-      // --- Generate image via ClipDrop (JSON body) ---
+      // --- Generate image via ClipDrop ---
       const clipdropResp = await fetch("https://clipdrop-api.co/text-to-image/v1", {
         method: "POST",
         headers: {
           "x-api-key": CLIPDROP_API_KEY,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ prompt }) // **must be JSON**
+        body: JSON.stringify({ prompt })
       });
 
       if (!clipdropResp.ok) {
@@ -56,7 +58,7 @@ module.exports = {
       fs.writeFileSync(localPath, buffer);
 
       // --- Upload image to Imgur ---
-      const form = new (require("form-data"))();
+      const form = new FormData();
       form.append("image", fs.createReadStream(localPath));
 
       const imgurResp = await fetch("https://api.imgur.com/3/image", {
@@ -66,7 +68,9 @@ module.exports = {
       });
 
       const imgurData = await imgurResp.json();
-      if (!imgurData.success) throw new Error("Imgur upload failed");
+      console.log("Imgur response:", imgurData); // **DEBUG**
+
+      if (!imgurData.success) throw new Error("Imgur upload failed: " + JSON.stringify(imgurData));
 
       fs.unlinkSync(localPath);
 
