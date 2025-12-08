@@ -13,7 +13,7 @@ function tmpFile(name = "crip") {
 
 module.exports = {
   config: {
-    name: "crip",
+    name: "crip2",
     version: "1.0",
     author: "Hassan",
     countDown: 10,
