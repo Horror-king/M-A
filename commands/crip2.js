@@ -4,7 +4,7 @@ const fetch = require("node-fetch");
 
 // You MUST replace these with your actual API keys
 const IMGUR_CLIENT_ID = "225899c9a3312bd"; // Get from imgur.com
-const CLIPDROP_API_KEY = "91c943b1448de009eba2ada63b39c50dc5ded3db61dbd14e2d4970a7edc9e73c04b0e11a0520e04f37ee07fd6dc140e9"; // Get from clipdrop.co
+const CLIPDROP_API_KEY = "0191d129d8d32d9587cd5a6d745a9e4221fbbe340b955a100b13d0e4bb404df99f861a86469516314f76a540723ca216"; // Get from clipdrop.co
 
 function tmpFile(name = "crip") {
   const id = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -38,7 +38,7 @@ module.exports = {
       }
 
       // Check if API keys are set
-      if (CLIPDROP_API_KEY === "91c943b1448de009eba2ada63b39c50dc5ded3db61dbd14e2d4970a7edc9e73c04b0e11a0520e04f37ee07fd6dc140e9") {
+      if (CLIPDROP_API_KEY === "0191d129d8d32d9587cd5a6d745a9e4221fbbe340b955a100b13d0e4bb404df99f861a86469516314f76a540723ca216") {
         return api.sendMessage(
           "❌ Please configure ClipDrop API key first.\nGet free credits: https://clipdrop.co/",
           event.threadID,
