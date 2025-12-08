@@ -1,11 +1,9 @@
 const fs = require("fs");
 const path = require("path");
-const FormData = require("form-data");
 
 const IMGUR_CLIENT_ID = "225899c9a3312bd";
 const CLIPDROP_API_KEY = "91c943b1448de009eba2ada63b39c50dc5ded3db61dbd14e2d4970a7edc9e73c04b0e11a0520e04f37ee07fd6dc140e9"; // weka key yako hapa
 
-// helper: temporary file path
 function tmpFile(name = "crip") {
   const id = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   return path.join(process.cwd(), `${name}_${id}.png`);
@@ -37,16 +35,14 @@ module.exports = {
       const prompt = args.join(" ").trim();
       await api.sendMessage("⏳ Generating image, please wait...", event.threadID, event.messageID);
 
-      // --- Generate image via ClipDrop ---
-      const form = new FormData();
-      form.append("prompt", prompt);
-
+      // --- Generate image via ClipDrop (JSON body) ---
       const clipdropResp = await fetch("https://clipdrop-api.co/text-to-image/v1", {
         method: "POST",
         headers: {
-          "x-api-key": CLIPDROP_API_KEY
+          "x-api-key": CLIPDROP_API_KEY,
+          "Content-Type": "application/json"
         },
-        body: form
+        body: JSON.stringify({ prompt }) // **must be JSON**
       });
 
       if (!clipdropResp.ok) {
@@ -54,18 +50,19 @@ module.exports = {
         throw new Error("ClipDrop API error: " + errText);
       }
 
-      const buffer = Buffer.from(await clipdropResp.arrayBuffer());
+      const arrayBuffer = await clipdropResp.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
       const localPath = tmpFile();
       fs.writeFileSync(localPath, buffer);
 
       // --- Upload image to Imgur ---
-      const imgurForm = new FormData();
-      imgurForm.append("image", fs.createReadStream(localPath));
+      const form = new (require("form-data"))();
+      form.append("image", fs.createReadStream(localPath));
 
       const imgurResp = await fetch("https://api.imgur.com/3/image", {
         method: "POST",
         headers: { Authorization: `Client-ID ${IMGUR_CLIENT_ID}` },
-        body: imgurForm
+        body: form
       });
 
       const imgurData = await imgurResp.json();
