@@ -3155,7 +3155,7 @@ app.post("/api/command", async (req, res) => {
       
       try {
         const response = await axios.get(
-          `https://yau-ai-runing-station.vercel.app/ai?prompt=${encodeURIComponent(cmd.text)}&cb=${Date.now()}`,
+          `https://yau-cener-gpt4-api.vercel.app/ai?prompt=${encodeURIComponent(cmd.text)}&cb=${Date.now()}`,
           { 
             headers: { 
               Accept: "application/json",
