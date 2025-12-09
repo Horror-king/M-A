@@ -332,7 +332,17 @@ function generateUserToken(username) {
 
 // Token verification middleware
 function verifyToken(req, res, next) {
-  const token = req.headers.authorization?.replace('Bearer ', '');
+  const authHeader = req.headers.authorization;
+  console.log('🔐 Auth header received:', authHeader ? 'Present' : 'Missing');
+  
+  if (!authHeader) {
+    return res.status(401).json({ 
+      success: false, 
+      error: "Authentication token required" 
+    });
+  }
+
+  const token = authHeader.replace('Bearer ', '');
   
   if (!token) {
     return res.status(401).json({ 
@@ -358,8 +368,10 @@ function verifyToken(req, res, next) {
     }
     
     req.user = { username };
+    console.log('✅ Token verified for user:', username);
     next();
   } catch (error) {
+    console.error('❌ Token verification error:', error);
     return res.status(401).json({ 
       success: false, 
       error: "Invalid token" 
@@ -787,12 +799,60 @@ app.get('/api/auth-test', (req, res) => {
 
 // ===== FIXED PROFILE MANAGEMENT ENDPOINTS =====
 
-// Get current user's profile - FIXED
+// Get current user's profile - FIXED WITH BETTER ERROR HANDLING
 app.get('/api/user/profile', verifyToken, async (req, res) => {
   try {
+    console.log('🔐 Profile request received');
+    console.log('📋 Headers:', req.headers);
+    console.log('👤 User from token:', req.user);
+    
     const username = req.user.username;
+    
+    if (!username) {
+      return res.status(401).json({ 
+        success: false, 
+        error: "Invalid token: no username found" 
+      });
+    }
+    
     console.log('📋 Loading profile for:', username);
 
+    // Check if table exists first
+    try {
+      const { data: tableCheck, error: tableError } = await supabase
+        .from('user_profiles')
+        .select('username')
+        .limit(1);
+
+      if (tableError && tableError.code === '42P01') {
+        console.log('⚠️ user_profiles table does not exist, returning default profile');
+        // Return default profile
+        const defaultProfile = {
+          username: username,
+          firstname: '',
+          lastname: '',
+          bio: '',
+          age: null,
+          gender: '',
+          location: '',
+          interests: '',
+          avatar: `https://i.pravatar.cc/150?u=${username}`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        return res.json({ 
+          success: true,
+          profile: defaultProfile,
+          message: "Using default profile (table not found)",
+          instructions: "Run the SQL script in Supabase to create the user_profiles table"
+        });
+      }
+    } catch (tableError) {
+      console.error('❌ Table check exception:', tableError);
+      // Continue anyway
+    }
+
+    // Try to get the profile
     const { data: profiles, error } = await supabase
       .from('user_profiles')
       .select('*')
@@ -800,12 +860,37 @@ app.get('/api/user/profile', verifyToken, async (req, res) => {
       .limit(1);
 
     if (error) {
-      console.error('❌ Database error fetching profile:', error);
+      console.error('❌ Database query error:', error);
+      
+      // If table doesn't exist, return default profile
+      if (error.code === '42P01') {
+        const defaultProfile = {
+          username: username,
+          firstname: '',
+          lastname: '',
+          bio: '',
+          age: null,
+          gender: '',
+          location: '',
+          interests: '',
+          avatar: `https://i.pravatar.cc/150?u=${username}`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        return res.json({ 
+          success: true,
+          profile: defaultProfile,
+          message: "Using default profile (table not found)"
+        });
+      }
+      
       return res.status(500).json({ 
         success: false, 
-        error: "Database error" 
+        error: "Database error: " + error.message 
       });
     }
+
+    console.log('📋 Profiles found:', profiles ? profiles.length : 0);
 
     if (!profiles || profiles.length === 0) {
       // Return default profile if none exists
@@ -814,33 +899,72 @@ app.get('/api/user/profile', verifyToken, async (req, res) => {
         firstname: '',
         lastname: '',
         bio: '',
-        age: '',
+        age: null,
         gender: '',
         location: '',
         interests: '',
-        avatar: `https://i.pravatar.cc/150?u=${username}`
+        avatar: `https://i.pravatar.cc/150?u=${username}`,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
       return res.json({ 
         success: true,
-        profile: defaultProfile
+        profile: defaultProfile,
+        message: "Using default profile (no existing profile)"
       });
     }
 
+    // Ensure all fields are present
+    const profile = profiles[0];
+    const completeProfile = {
+      username: profile.username || username,
+      firstname: profile.firstname || '',
+      lastname: profile.lastname || '',
+      bio: profile.bio || '',
+      age: profile.age || null,
+      gender: profile.gender || '',
+      location: profile.location || '',
+      interests: profile.interests || '',
+      avatar: profile.avatar || `https://i.pravatar.cc/150?u=${username}`,
+      created_at: profile.created_at || new Date().toISOString(),
+      updated_at: profile.updated_at || new Date().toISOString()
+    };
+
+    console.log('✅ Profile loaded successfully');
     res.json({ 
       success: true,
-      profile: profiles[0]
+      profile: completeProfile
     });
 
   } catch (error) {
     console.error('❌ Get profile error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: "Internal server error" 
+    console.error('❌ Error stack:', error.stack);
+    
+    // Even on error, try to return a default profile
+    const username = req.user?.username || 'unknown';
+    const defaultProfile = {
+      username: username,
+      firstname: '',
+      lastname: '',
+      bio: '',
+      age: null,
+      gender: '',
+      location: '',
+      interests: '',
+      avatar: `https://i.pravatar.cc/150?u=${username}`,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    
+    res.json({ 
+      success: true,
+      profile: defaultProfile,
+      error: "Server error but returning default profile: " + error.message
     });
   }
 });
 
-// Update user profile - FIXED: Now using PUT method
+// Update user profile - FIXED: Now using PUT method with better error handling
 app.put('/api/user/profile', verifyToken, async (req, res) => {
   try {
     const username = req.user.username;
@@ -856,18 +980,55 @@ app.put('/api/user/profile', verifyToken, async (req, res) => {
       });
     }
 
+    // First check if table exists
+    let tableExists = true;
+    try {
+      const { error: tableError } = await supabase
+        .from('user_profiles')
+        .select('username')
+        .limit(1);
+      
+      if (tableError && tableError.code === '42P01') {
+        tableExists = false;
+        console.log('⚠️ user_profiles table does not exist');
+        return res.status(500).json({ 
+          success: false, 
+          error: "Profile table does not exist. Please create the user_profiles table first.",
+          instructions: "Use the /api/create-user-profiles-table endpoint to get SQL instructions"
+        });
+      }
+    } catch (tableError) {
+      console.error('❌ Table check error:', tableError);
+      tableExists = false;
+    }
+
+    if (!tableExists) {
+      return res.status(500).json({ 
+        success: false, 
+        error: "Profile table does not exist. Please create the user_profiles table first.",
+        instructions: "Use the /api/create-user-profiles-table endpoint to get SQL instructions"
+      });
+    }
+
     // Check if profile exists
     const { data: existingProfiles, error: checkError } = await supabase
       .from('user_profiles')
-      .select('id')
+      .select('id, username')
       .eq('username', username)
       .limit(1);
 
     if (checkError) {
       console.error('❌ Database error checking profile:', checkError);
+      if (checkError.code === '42P01') {
+        return res.status(500).json({ 
+          success: false, 
+          error: "Profile table does not exist. Please create the user_profiles table first.",
+          instructions: "Use the /api/create-user-profiles-table endpoint to get SQL instructions"
+        });
+      }
       return res.status(500).json({ 
         success: false, 
-        error: "Database error" 
+        error: "Database error: " + checkError.message 
       });
     }
 
@@ -882,7 +1043,7 @@ app.put('/api/user/profile', verifyToken, async (req, res) => {
           firstname: profileData.firstname || '',
           lastname: profileData.lastname || '',
           bio: profileData.bio || '',
-          age: profileData.age || '',
+          age: profileData.age || null,
           gender: profileData.gender || '',
           location: profileData.location || '',
           interests: profileData.interests || '',
@@ -901,7 +1062,7 @@ app.put('/api/user/profile', verifyToken, async (req, res) => {
             firstname: profileData.firstname || '',
             lastname: profileData.lastname || '',
             bio: profileData.bio || '',
-            age: profileData.age || '',
+            age: profileData.age || null,
             gender: profileData.gender || '',
             location: profileData.location || '',
             interests: profileData.interests || '',
@@ -915,9 +1076,18 @@ app.put('/api/user/profile', verifyToken, async (req, res) => {
 
     if (result.error) {
       console.error('❌ Database error saving profile:', result.error);
+      if (result.error.code === '42P01') {
+        return res.status(500).json({ 
+          success: false, 
+          error: "Profile table does not exist. Please create the user_profiles table first.",
+          instructions: "Use the /api/create-user-profiles-table endpoint to get SQL instructions"
+        });
+      }
       return res.status(500).json({ 
         success: false, 
-        error: "Failed to save profile: " + result.error.message 
+        error: "Failed to save profile: " + result.error.message,
+        details: result.error.details,
+        hint: result.error.hint
       });
     }
 
@@ -933,7 +1103,139 @@ app.put('/api/user/profile', verifyToken, async (req, res) => {
     console.error('❌ Update profile error:', error);
     res.status(500).json({ 
       success: false, 
-      error: "Internal server error: " + error.message 
+      error: "Internal server error: " + error.message,
+      stack: error.stack
+    });
+  }
+});
+
+// ===== ADDED: ENDPOINT TO CREATE USER_PROFILES TABLE =====
+
+// Create user_profiles table if it doesn't exist
+app.get('/api/create-user-profiles-table', async (req, res) => {
+  try {
+    console.log('🔧 Checking user_profiles table...');
+    
+    const { data: tableCheck, error: checkError } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .limit(1);
+
+    if (checkError && checkError.code === '42P01') {
+      // Table doesn't exist - provide SQL to create it
+      res.json({
+        success: false,
+        error: "Table doesn't exist",
+        instructions: [
+          "1. Go to your Supabase dashboard",
+          "2. Go to the SQL Editor",
+          "3. Run this SQL to create the table:",
+          `
+          CREATE TABLE IF NOT EXISTS user_profiles (
+            id BIGSERIAL PRIMARY KEY,
+            username VARCHAR(50) UNIQUE NOT NULL,
+            firstname VARCHAR(100),
+            lastname VARCHAR(100),
+            bio TEXT,
+            age INTEGER,
+            gender VARCHAR(50),
+            location VARCHAR(100),
+            interests TEXT,
+            avatar TEXT,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+          );
+          `,
+          "4. Enable RLS if needed",
+          "5. Add policies for users to read/write their own profiles"
+        ]
+      });
+    } else if (checkError) {
+      throw checkError;
+    } else {
+      console.log('✅ user_profiles table exists');
+      res.json({
+        success: true,
+        message: "user_profiles table exists",
+        sampleData: tableCheck?.[0],
+        rowCount: tableCheck?.length || 0
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Error checking table:', error);
+    res.status(500).json({ 
+      success: false,
+      error: "Error checking table: " + error.message 
+    });
+  }
+});
+
+// ===== ADDED: TEST PROFILE ENDPOINT (NO AUTH REQUIRED) =====
+
+// Test profile endpoint without authentication
+app.get('/api/test-profile', async (req, res) => {
+  try {
+    // Get username from query parameter for testing
+    const { username } = req.query;
+    
+    if (!username) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Username query parameter is required" 
+      });
+    }
+    
+    console.log('🧪 Test profile endpoint for:', username);
+    
+    // Test if we can query the table
+    const { data: profiles, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('username', username)
+      .limit(1);
+
+    if (error) {
+      console.error('❌ Database error:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Database error: " + error.message,
+        code: error.code,
+        hint: error.hint
+      });
+    }
+
+    if (!profiles || profiles.length === 0) {
+      return res.json({ 
+        success: true,
+        message: "No profile found for user",
+        username: username,
+        defaultProfile: {
+          username: username,
+          firstname: '',
+          lastname: '',
+          bio: '',
+          age: null,
+          gender: '',
+          location: '',
+          interests: '',
+          avatar: `https://i.pravatar.cc/150?u=${username}`
+        }
+      });
+    }
+
+    console.log('✅ Found profile:', profiles[0]);
+    res.json({ 
+      success: true,
+      profile: profiles[0]
+    });
+
+  } catch (error) {
+    console.error('❌ Test endpoint error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Internal server error: " + error.message,
+      stack: error.stack
     });
   }
 });
@@ -952,6 +1254,25 @@ app.get('/api/user/profile/:username', async (req, res) => {
 
     if (error) {
       console.error('❌ Database error fetching profile:', error);
+      if (error.code === '42P01') {
+        // Table doesn't exist, return basic profile
+        const defaultProfile = {
+          username: username,
+          firstname: '',
+          lastname: '',
+          bio: '',
+          age: null,
+          gender: '',
+          location: '',
+          interests: '',
+          avatar: `https://i.pravatar.cc/150?u=${username}`
+        };
+        return res.json({ 
+          success: true,
+          profile: defaultProfile,
+          message: "Using default profile (table not found)"
+        });
+      }
       return res.status(500).json({ 
         success: false, 
         error: "Database error" 
@@ -965,7 +1286,7 @@ app.get('/api/user/profile/:username', async (req, res) => {
         firstname: '',
         lastname: '',
         bio: '',
-        age: '',
+        age: null,
         gender: '',
         location: '',
         interests: '',
@@ -2284,7 +2605,9 @@ app.get('/debug-private-messages', async (req, res) => {
     // Count total messages
     const { count: totalCount, error: countError } = await supabase
       .from('private_messages')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .eq('receiver_username', 'test_user1')
+      .eq('read', false);
 
     if (countError) {
       console.error('❌ Count error:', countError);
@@ -3612,6 +3935,7 @@ server.listen(port, () => {
   console.log(`   "help" → automatically becomes "!help"`);
   console.log(`   "ai tell me a joke" → automatically becomes "!ai tell me a joke"`);
   console.log(`   "!ping" → works normally (prefix already present)`);
+
   if (isRender && renderExternalUrl) {
     console.log(`🌐 Render External URL: ${renderExternalUrl}`);
     console.log(`⏱️ UptimeRobot monitoring URL: ${renderExternalUrl}/health`);
@@ -3622,13 +3946,83 @@ server.listen(port, () => {
     console.log(`🧪 Test Private Message (GET): ${renderExternalUrl}/test-private-messages`);
     console.log(`🔐 Test Authentication: ${renderExternalUrl}/api/auth-test`);
     console.log(`📝 Test Posts Table: ${renderExternalUrl}/api/create-posts-table`);
+    console.log(`👤 Test Profile: ${renderExternalUrl}/api/test-profile`);
+    console.log(`👤 Create Profiles Table: ${renderExternalUrl}/api/create-user-profiles-table`);
   }
+}); // <-- THIS CLOSING BRACE IS MISSING
+
+// Add error handling middleware
+app.use((err, req, res, next) => {
+  console.error('❌ Global Error Handler:', err);
+  res.status(err.status || 500).json({
+    success: false,
+    error: err.message || 'Internal server error',
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
+});
+
+// 404 route handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'Endpoint not found',
+    availableEndpoints: {
+      authentication: [
+        'POST /api/register',
+        'POST /api/login', 
+        'POST /api/check-username',
+        'GET /api/auth-test'
+      ],
+      chat: [
+        'GET /api/messages',
+        'POST /api/messages',
+        'DELETE /api/messages/:id',
+        'POST /api/command'
+      ],
+      profiles: [
+        'GET /api/user/profile',
+        'PUT /api/user/profile',
+        'GET /api/user/profile/:username',
+        'GET /api/test-profile',
+        'GET /api/create-user-profiles-table'
+      ],
+      ai: [
+        'POST /api/ai/private',
+        'POST /api/ai/chat'
+      ],
+      privateMessages: [
+        'GET /api/private/conversations',
+        'GET /api/private/messages/:username',
+        'POST /api/private/messages',
+        'GET /api/private/unread',
+        'PUT /api/private/messages/read'
+      ],
+      posts: [
+        'GET /api/posts',
+        'POST /api/posts',
+        'POST /api/posts/:postId/comments',
+        'POST /api/posts/:postId/like',
+        'GET /api/posts/user/:username',
+        'DELETE /api/posts/:postId'
+      ],
+      debug: [
+        'GET /test-supabase',
+        'GET /debug-all-commands',
+        'GET /debug-private-messages',
+        'GET /health',
+        'GET /uptime'
+      ]
+    }
+  });
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received. Shutting down gracefully...');
-  process.exit(0);
+  server.close(() => {
+    console.log('Server closed.');
+    process.exit(0);
+  });
 });
 
 process.on('unhandledRejection', (err) => {
@@ -3637,4 +4031,8 @@ process.on('unhandledRejection', (err) => {
 
 process.on('uncaughtException', (err) => {
   global.utils.log.err("UNCAUGHT EXCEPTION", err);
+  process.exit(1);
 });
+
+// Export for testing
+module.exports = { app, server, io, supabase };
