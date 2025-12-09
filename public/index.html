@@ -5294,6 +5294,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // --- CUT HERE ---
+// --- CUT HERE ---
 // ===== YOUR EXISTING VARIABLES AND FUNCTIONS =====
 
 let isLogin = true;
@@ -5376,376 +5377,6 @@ const elements = {
 };
 
 let replyToText = null;
-
-// ===== ENHANCED USER SESSION MANAGEMENT =====
-function checkUserSession() {
-    const savedSession = localStorage.getItem('userSession');
-    const savedToken = localStorage.getItem('auth_token');
-    
-    if (savedSession && savedToken) {
-        try {
-            currentUserSession = JSON.parse(savedSession);
-            return true;
-        } catch (e) {
-            console.error('Error parsing saved session:', e);
-            clearUserSession();
-        }
-    }
-    
-    const sessionData = sessionStorage.getItem('currentUserSession');
-    if (sessionData) {
-        currentUserSession = JSON.parse(sessionData);
-        return true;
-    }
-    return false;
-}
-
-function saveUserSession(userData) {
-    currentUserSession = userData;
-    
-    sessionStorage.setItem('currentUserSession', JSON.stringify(userData));
-    localStorage.setItem('userSession', JSON.stringify(userData));
-    
-    if (userData.token) {
-        localStorage.setItem('auth_token', userData.token);
-        console.log('✅ Token saved to localStorage');
-    }
-    
-    console.log('✅ User session saved for persistent login');
-}
-
-function clearUserSession() {
-    currentUserSession = null;
-    sessionStorage.removeItem('currentUserSession');
-    localStorage.removeItem('userSession');
-    localStorage.removeItem('auth_token');
-    console.log('✅ User session cleared');
-}
-
-// ===== COMPLETELY FIXED PROFILE FUNCTIONS =====
-function loadProfile() {
-    const username = currentUserSession?.username;
-    if (!username) {
-        console.error('No username in session');
-        showError('Please login first');
-        return;
-    }
-    
-    // FIXED: Get token from the right place
-    const token = currentUserSession?.token || localStorage.getItem('auth_token');
-    
-    if (!token) {
-        console.error('No authentication token found');
-        showError('Please login again');
-        return;
-    }
-    
-    console.log('🔐 Loading profile for:', username);
-    console.log('📋 Using token:', token.substring(0, 20) + '...');
-    
-    // FIXED: Proper fetch with Authorization header
-    fetch('/api/user/profile', {
-        method: 'GET',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(response => {
-        console.log('📋 Profile response status:', response.status);
-        
-        if (response.status === 401) {
-            // Token is invalid or expired
-            throw new Error('Session expired. Please login again.');
-        }
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        return response.json();
-    })
-    .then(data => {
-        console.log('📋 Profile data received:', data);
-        
-        let profile;
-        if (data.success && data.profile) {
-            profile = data.profile;
-        } else if (data.firstname !== undefined || data.username !== undefined) {
-            // If the data itself is the profile object
-            profile = data;
-        } else {
-            throw new Error(data.error || 'Failed to load profile');
-        }
-        
-        // Populate form fields
-        document.getElementById('profile-firstname').value = profile.firstname || '';
-        document.getElementById('profile-lastname').value = profile.lastname || '';
-        document.getElementById('profile-username').value = profile.username || '';
-        document.getElementById('profile-bio').value = profile.bio || '';
-        document.getElementById('profile-age').value = profile.age || '';
-        document.getElementById('profile-gender').value = profile.gender || '';
-        document.getElementById('profile-location').value = profile.location || '';
-        document.getElementById('profile-interests').value = profile.interests || '';
-        document.getElementById('profile-avatar-img').src = profile.avatar || `https://i.pravatar.cc/150?u=${username}`;
-        
-        // Update display section
-        updateProfileDisplay(profile);
-        
-        console.log('✅ Profile loaded successfully');
-    })
-    .catch(error => {
-        console.error('❌ Error loading profile:', error);
-        showError('Cannot load profile. Please try again.');
-    });
-}
-
-function saveProfile() {
-    const username = currentUserSession?.username;
-    if (!username) {
-        showError('You must be logged in to save profile');
-        return;
-    }
-    
-    // FIXED: Get token properly
-    const token = currentUserSession?.token || localStorage.getItem('auth_token');
-    
-    if (!token) {
-        showError('No authentication token found');
-        return;
-    }
-    
-    const profileData = {
-        firstname: document.getElementById('profile-firstname').value,
-        lastname: document.getElementById('profile-lastname').value,
-        username: document.getElementById('profile-username').value || username,
-        bio: document.getElementById('profile-bio').value,
-        age: document.getElementById('profile-age').value,
-        gender: document.getElementById('profile-gender').value,
-        location: document.getElementById('profile-location').value,
-        interests: document.getElementById('profile-interests').value,
-        avatar: document.getElementById('profile-avatar-img').src
-    };
-    
-    console.log('💾 Saving profile for:', username);
-    console.log('📝 Profile data:', profileData);
-    console.log('🔐 Using token:', token.substring(0, 20) + '...');
-    
-    fetch('/api/user/profile', {
-        method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(profileData)
-    })
-    .then(response => {
-        console.log('💾 Save response status:', response.status);
-        
-        if (response.status === 401) {
-            throw new Error('Session expired. Please login again.');
-        }
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        return response.json();
-    })
-    .then(data => {
-        console.log('💾 Save response data:', data);
-        
-        let updatedProfile;
-        if (data.success) {
-            updatedProfile = data.profile || profileData;
-        } else if (data.firstname !== undefined || data.username !== undefined) {
-            updatedProfile = data;
-        } else {
-            throw new Error(data.error || 'Failed to update profile');
-        }
-        
-        // Update display section with the returned profile data
-        updateProfileDisplay(updatedProfile);
-        showSuccess('Profile updated successfully!');
-        
-        // Close profile editor after a short delay
-        setTimeout(() => {
-            hideContainer('profile');
-        }, 1500);
-    })
-    .catch(error => {
-        console.error('❌ Error saving profile:', error);
-        showError(`Save failed: ${error.message}`);
-    });
-}
-
-// FIXED: Profile display function
-function updateProfileDisplay(profile) {
-    const displayUsername = document.getElementById('display-username');
-    const displayBio = document.getElementById('display-bio');
-    const displayAvatar = document.getElementById('display-avatar');
-    
-    if (displayUsername) {
-        if (profile.firstname && profile.lastname) {
-            displayUsername.textContent = `${profile.firstname} ${profile.lastname}`;
-        } else if (profile.firstname) {
-            displayUsername.textContent = profile.firstname;
-        } else if (profile.lastname) {
-            displayUsername.textContent = profile.lastname;
-        } else {
-            displayUsername.textContent = profile.username || currentUserSession?.username || 'User';
-        }
-    }
-    
-    if (displayBio) {
-        displayBio.textContent = profile.bio || 'No bio yet';
-    }
-    
-    if (displayAvatar) {
-        displayAvatar.src = profile.avatar || `https://i.pravatar.cc/50?u=${profile.username || currentUserSession?.username || 'default'}`;
-    }
-    
-    // Update profile picture in messages if needed
-    updateMessageAvatars(profile.avatar);
-    
-    console.log('✅ Profile display updated');
-}
-
-function updateMessageAvatars(avatarUrl) {
-    // Update all message avatars for the current user
-    const userMessages = document.querySelectorAll('.message.sent .avatar img');
-    userMessages.forEach(img => {
-        img.src = avatarUrl;
-    });
-}
-
-// ===== FIXED AUTHENTICATION FUNCTIONS =====
-async function handleAuth() {
-    const username = document.getElementById('auth-username').value.trim();
-    const password = document.getElementById('auth-password').value;
-    const loader = document.getElementById('loader');
-    
-    elements.errorDisplay.style.display = 'none';
-    elements.successDisplay.style.display = 'none';
-    
-    if (!username || !password) {
-        showError('Please enter both username and password');
-        return;
-    }
-    
-    if (username.length < 3 || username.length > 20) {
-        showError('Username must be between 3-20 characters');
-        return;
-    }
-    
-    if (password.length < 4 || password.length > 20) {
-        showError('Password must be between 4-20 characters');
-        return;
-    }
-    
-    // Validate username format
-    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-        showError('Username can only contain letters, numbers, and underscores');
-        return;
-    }
-    
-    loader.style.display = 'flex';
-    
-    try {
-        if (isLogin) {
-            // Login
-            const response = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ username, password })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                showSuccess('Login successful!');
-                
-                // Save user session with token for persistent login
-                saveUserSession({
-                    username: data.username,
-                    user_id: data.user_id,
-                    token: data.token
-                });
-                
-                setTimeout(() => {
-                    loader.style.display = 'none';
-                    document.getElementById('auth-container').style.display = 'none';
-                    
-                    // Initialize main app
-                    showContainer('chat');
-                    updateProfileSection();
-                    
-                    // Load profile data
-                    setTimeout(() => {
-                        loadProfile();
-                    }, 500);
-                    
-                }, 500);
-            } else {
-                throw new Error(data.error || 'Login failed');
-            }
-        } else {
-            // Signup
-            const response = await fetch('/api/auth/register', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ username, password })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                showSuccess('Account created successfully! Please login.');
-                setTimeout(() => {
-                    loader.style.display = 'none';
-                    toggleAuth();
-                }, 1000);
-            } else {
-                throw new Error(data.error || 'Registration failed');
-            }
-        }
-    } catch (error) {
-        loader.style.display = 'none';
-        showError(error.message);
-    }
-}
-
-function toggleAuth() {
-    isLogin = !isLogin;
-    const authTitle = document.getElementById('auth-title');
-    const authButton = document.querySelector('.auth-box button');
-    const toggleText = document.getElementById('toggle-text');
-    const toggleLink = document.getElementById('toggle-link');
-    elements.errorDisplay.style.display = 'none';
-    elements.successDisplay.style.display = 'none';
-    
-    if (isLogin) {
-        authTitle.textContent = 'Login';
-        authButton.textContent = 'Login';
-        toggleText.textContent = "Don't have an account? ";
-        toggleLink.textContent = 'Sign Up';
-    } else {
-        authTitle.textContent = 'Sign Up';
-        authButton.textContent = 'Sign Up';
-        toggleText.textContent = 'Already have an account? ';
-        toggleLink.textContent = 'Login';
-    }
-    
-    // Reset username validation
-    const usernameInput = document.getElementById('auth-username');
-    if (usernameInput) {
-        usernameInput.classList.remove('username-valid', 'username-invalid');
-    }
-}
 
 // ===== TYPING INDICATOR FUNCTIONS =====
 function showTypingIndicator(username) {
@@ -5875,27 +5506,234 @@ function setupTypingSocketEvents() {
     });
 }
 
-// ===== UTILITY FUNCTIONS =====
-function showSuccess(message) {
-    const successDisplay = document.getElementById('success-message');
-    if (successDisplay) {
-        successDisplay.textContent = message;
-        successDisplay.style.display = 'block';
-        setTimeout(() => {
-            successDisplay.style.display = 'none';
-        }, 3000);
+// ===== AUTHENTICATION FUNCTIONS =====
+async function handleAuth() {
+    const username = document.getElementById('auth-username').value.trim();
+    const password = document.getElementById('auth-password').value;
+    const loader = document.getElementById('loader');
+    
+    elements.errorDisplay.style.display = 'none';
+    elements.successDisplay.style.display = 'none';
+    
+    if (!username || !password) {
+        showError('Please enter both username and password');
+        return;
+    }
+    
+    if (username.length < 3 || username.length > 20) {
+        showError('Username must be between 3-20 characters');
+        return;
+    }
+    
+    if (password.length < 4 || password.length > 20) {
+        showError('Password must be between 4-20 characters');
+        return;
+    }
+    
+    // Validate username format
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+        showError('Username can only contain letters, numbers, and underscores');
+        return;
+    }
+    
+    loader.style.display = 'flex';
+    
+    try {
+        if (isLogin) {
+            // Login - USING UPDATED ENDPOINT
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, password })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showSuccess('Login successful!');
+                
+                // Save user session with token for persistent login
+                saveUserSession({
+                    username: data.username,
+                    user_id: data.user_id,
+                    token: data.token
+                });
+                
+                setTimeout(() => {
+                    loader.style.display = 'none';
+                    document.getElementById('auth-container').style.display = 'none';
+                    
+                    // Use the new initializeMainApp function
+                    initializeMainApp();
+                }, 500);
+            } else {
+                throw new Error(data.error || 'Login failed');
+            }
+        } else {
+            // Signup - USING UPDATED ENDPOINT
+            const response = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, password })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showSuccess('Account created successfully! Please login.');
+                setTimeout(() => {
+                    loader.style.display = 'none';
+                    toggleAuth();
+                }, 1000);
+            } else {
+                throw new Error(data.error || 'Registration failed');
+            }
+        }
+    } catch (error) {
+        loader.style.display = 'none';
+        showError(error.message);
     }
 }
 
-function showError(message) {
-    const errorDisplay = document.getElementById('error-message');
-    if (errorDisplay) {
-        errorDisplay.textContent = message;
-        errorDisplay.style.display = 'block';
-        setTimeout(() => {
-            errorDisplay.style.display = 'none';
-        }, 3000);
+function toggleAuth() {
+    isLogin = !isLogin;
+    const authTitle = document.getElementById('auth-title');
+    const authButton = document.querySelector('.auth-box button');
+    const toggleText = document.getElementById('toggle-text');
+    const toggleLink = document.getElementById('toggle-link');
+    elements.errorDisplay.style.display = 'none';
+    elements.successDisplay.style.display = 'none';
+    
+    if (isLogin) {
+        authTitle.textContent = 'Login';
+        authButton.textContent = 'Login';
+        toggleText.textContent = "Don't have an account? ";
+        toggleLink.textContent = 'Sign Up';
+    } else {
+        authTitle.textContent = 'Sign Up';
+        authButton.textContent = 'Sign Up';
+        toggleText.textContent = 'Already have an account? ';
+        toggleLink.textContent = 'Login';
     }
+    
+    // Reset username validation
+    const usernameInput = document.getElementById('auth-username');
+    if (usernameInput) {
+        usernameInput.classList.remove('username-valid', 'username-invalid');
+    }
+}
+
+// ===== ENHANCED USER SESSION MANAGEMENT =====
+function checkUserSession() {
+    // Check localStorage first for persistent login
+    const savedSession = localStorage.getItem('userSession');
+    const savedToken = localStorage.getItem('auth_token');
+    
+    if (savedSession && savedToken) {
+        try {
+            currentUserSession = JSON.parse(savedSession);
+            return true;
+        } catch (e) {
+            console.error('Error parsing saved session:', e);
+            clearUserSession();
+        }
+    }
+    
+    // Fallback to sessionStorage
+    const sessionData = sessionStorage.getItem('currentUserSession');
+    if (sessionData) {
+        currentUserSession = JSON.parse(sessionData);
+        return true;
+    }
+    return false;
+}
+
+function saveUserSession(userData) {
+    currentUserSession = userData;
+    
+    // Save to both sessionStorage (for current session) and localStorage (for persistence)
+    sessionStorage.setItem('currentUserSession', JSON.stringify(userData));
+    localStorage.setItem('userSession', JSON.stringify(userData));
+    
+    // Also store token for API calls
+    if (userData.token) {
+        localStorage.setItem('auth_token', userData.token);
+    }
+    
+    console.log('✅ User session saved for persistent login');
+}
+
+function clearUserSession() {
+    currentUserSession = null;
+    sessionStorage.removeItem('currentUserSession');
+    localStorage.removeItem('userSession');
+    localStorage.removeItem('auth_token');
+    console.log('✅ User session cleared');
+}
+
+// ===== AUTO-LOGIN FUNCTIONALITY =====
+async function attemptAutoLogin() {
+    const savedSession = localStorage.getItem('userSession');
+    const savedToken = localStorage.getItem('auth_token');
+    
+    if (!savedSession || !savedToken) {
+        return false;
+    }
+    
+    try {
+        const userData = JSON.parse(savedSession);
+        const response = await fetch('/api/auth/auto-login', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${savedToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            console.log('✅ Auto-login successful for:', data.username);
+            
+            // Update session with fresh data
+            saveUserSession({
+                ...userData,
+                username: data.username,
+                user_id: data.user_id
+            });
+            
+            return true;
+        } else {
+            // Auto-login failed, clear invalid session
+            clearUserSession();
+            return false;
+        }
+    } catch (error) {
+        console.error('Auto-login error:', error);
+        clearUserSession();
+        return false;
+    }
+}
+
+// ===== UTILITY FUNCTIONS =====
+function showSuccess(message) {
+    elements.successDisplay.textContent = message;
+    elements.successDisplay.style.display = 'block';
+    setTimeout(() => {
+        elements.successDisplay.style.display = 'none';
+    }, 3000);
+}
+
+function showError(message) {
+    elements.errorDisplay.textContent = message;
+    elements.errorDisplay.style.display = 'block';
+    setTimeout(() => {
+        elements.errorDisplay.style.display = 'none';
+    }, 3000);
 }
 
 function autoResize(textarea) {
@@ -5905,6 +5743,7 @@ function autoResize(textarea) {
     }
 }
 
+// --- CUT HERE ---
 // Helper function to escape HTML
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -6064,6 +5903,8 @@ function showContainer(containerId) {
     const kebabDropdown = document.querySelector('.kebab-dropdown');
     if (kebabDropdown) kebabDropdown.classList.remove('active');
 }
+
+// --- CUT HERE ---
 
 function hideContainer(containerId) {
     console.log('🔄 Hiding container:', containerId);
@@ -7970,7 +7811,149 @@ function clearOldMessageTracking() {
 // Run cleanup every 30 seconds
 setInterval(clearOldMessageTracking, 30000);
 
-// ===== ADDED: Profile functions =====
+// ===== PROFILE MANAGEMENT FUNCTIONS =====
+function loadProfile() {
+    const username = currentUserSession?.username;
+    if (!username) return;
+    
+    // Load profile from API
+    const token = localStorage.getItem('auth_token');
+    fetch('/api/user/profile', {
+        headers: {
+            'Authorization': token ? `Bearer ${token}` : ''
+        }
+    })
+    .then(response => response.json())
+    .then(profile => {
+        // Populate form fields
+        document.getElementById('profile-firstname').value = profile.firstname || '';
+        document.getElementById('profile-lastname').value = profile.lastname || '';
+        document.getElementById('profile-username').value = profile.username || '';
+        document.getElementById('profile-bio').value = profile.bio || '';
+        document.getElementById('profile-age').value = profile.age || '';
+        document.getElementById('profile-gender').value = profile.gender || '';
+        document.getElementById('profile-location').value = profile.location || '';
+        document.getElementById('profile-interests').value = profile.interests || '';
+        document.getElementById('profile-avatar-img').src = profile.avatar || `https://i.pravatar.cc/150?u=${username}`;
+        
+        // Update display section
+        updateProfileDisplay(profile);
+        
+        // MODIFIED: Also update userProfiles in localStorage for posts functionality
+        const userProfiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
+        userProfiles[username] = profile;
+        localStorage.setItem('userProfiles', JSON.stringify(userProfiles));
+    })
+    .catch(error => {
+        console.error('Error loading profile:', error);
+        // If profile doesn't exist yet, create a default one
+        const defaultProfile = {
+            username: username,
+            firstname: '',
+            lastname: '',
+            bio: '',
+            age: '',
+            gender: '',
+            location: '',
+            interests: '',
+            avatar: `https://i.pravatar.cc/150?u=${username}`
+        };
+        updateProfileDisplay(defaultProfile);
+    });
+}
+
+function saveProfile() {
+    const username = currentUserSession?.username;
+    if (!username) {
+        showError('You must be logged in to save profile');
+        return;
+    }
+    
+    const profileData = {
+        firstname: document.getElementById('profile-firstname').value,
+        lastname: document.getElementById('profile-lastname').value,
+        username: document.getElementById('profile-username').value,
+        bio: document.getElementById('profile-bio').value,
+        age: document.getElementById('profile-age').value,
+        gender: document.getElementById('profile-gender').value,
+        location: document.getElementById('profile-location').value,
+        interests: document.getElementById('profile-interests').value,
+        avatar: document.getElementById('profile-avatar-img').src
+    };
+    
+    const token = localStorage.getItem('auth_token');
+    fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : ''
+        },
+        body: JSON.stringify(profileData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update display section with the returned profile data
+            updateProfileDisplay(data.profile || profileData);
+            
+            // MODIFIED: Update localStorage for userProfiles (for posts functionality)
+            const userProfiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
+            userProfiles[username] = data.profile || profileData;
+            localStorage.setItem('userProfiles', JSON.stringify(userProfiles));
+            
+            // Show success message
+            showSuccess('Profile updated successfully!');
+            
+            // Close profile editor after a short delay
+            setTimeout(() => {
+                hideContainer('profile');
+            }, 1500);
+        } else {
+            throw new Error(data.error || 'Failed to update profile');
+        }
+    })
+    .catch(error => {
+        showError(error.message);
+    });
+}
+
+// FIXED: Profile display function - properly updates the dropdown
+function updateProfileDisplay(profile) {
+    // Update display section in dropdown
+    const displayUsername = document.getElementById('display-username');
+    const displayBio = document.getElementById('display-bio');
+    const displayAvatar = document.getElementById('display-avatar');
+    
+    if (displayUsername) {
+        if (profile.firstname && profile.lastname) {
+            displayUsername.textContent = `${profile.firstname} ${profile.lastname}`;
+        } else if (profile.firstname) {
+            displayUsername.textContent = profile.firstname;
+        } else if (profile.lastname) {
+            displayUsername.textContent = profile.lastname;
+        } else {
+            // Use username if no first/last name
+            displayUsername.textContent = profile.username || currentUserSession?.username || 'User';
+        }
+    }
+    
+    if (displayBio) {
+        displayBio.textContent = profile.bio || 'No bio yet';
+    }
+    
+    if (displayAvatar) {
+        displayAvatar.src = profile.avatar || `https://i.pravatar.cc/50?u=${profile.username || currentUserSession?.username || 'default'}`;
+    }
+    
+    // Update profile picture in messages if needed
+    updateMessageAvatars(profile.avatar);
+    
+    console.log('✅ Profile display updated:', {
+        username: displayUsername?.textContent,
+        bio: displayBio?.textContent
+    });
+}
+
 function changeAvatar() {
     const avatarUrl = prompt('Enter the URL for your new profile picture:');
     if (avatarUrl) {
@@ -7981,6 +7964,14 @@ function changeAvatar() {
             showError('Please enter a valid URL starting with http:// or https://');
         }
     }
+}
+
+function updateMessageAvatars(avatarUrl) {
+    // Update all message avatars for the current user
+    const userMessages = document.querySelectorAll('.message.sent .avatar img');
+    userMessages.forEach(img => {
+        img.src = avatarUrl;
+    });
 }
 
 // FIXED: Profile section creation function
@@ -9368,107 +9359,32 @@ function setupPrivateMessageInputHandlers() {
     }
 }
 
-
-// ===== AUTO-LOGIN FUNCTIONALITY =====
-async function attemptAutoLogin() {
-    const savedSession = localStorage.getItem('userSession');
-    const savedToken = localStorage.getItem('auth_token');
+// Initialize if user is logged in
+const currentUser = currentUserSession?.username;
+if (currentUser) {
+    showContainer('chat');
     
-    if (!savedSession || !savedToken) {
-        return false;
-    }
+    const chatInput = document.querySelector('.chat-input');
+    if (chatInput) chatInput.style.display = 'flex';
     
-    try {
-        const userData = JSON.parse(savedSession);
-        const response = await fetch('/api/auth/auto-login', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${savedToken}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            console.log('✅ Auto-login successful for:', data.username);
-            
-            // Update session with fresh data
-            saveUserSession({
-                ...userData,
-                username: data.username,
-                user_id: data.user_id
-            });
-            
-            return true;
-        } else {
-            // Auto-login failed, clear invalid session
-            clearUserSession();
-            return false;
-        }
-    } catch (error) {
-        console.error('Auto-login error:', error);
-        clearUserSession();
-        return false;
+    updateProfileSection();
+    
+    // Initialize real-time features
+    initSocket();
+    setupTypingHandlers();
+    setupTypingDetection();
+    setupTypingSocketEvents();
+    
+    // Add page event listeners
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
+    
+    // Enable SQL Editor access if already verified
+    if (hasVerifiedCode()) {
+        enableSQLEditorAccess();
     }
 }
-
-// ===== INITIALIZATION =====
-document.addEventListener('DOMContentLoaded', function() {
-    // Attempt auto-login first
-    attemptAutoLogin().then(success => {
-        if (success || checkUserSession()) {
-            document.getElementById('auth-container').style.display = 'none';
-            showContainer('chat');
-            updateProfileSection();
-            
-            // Load profile data
-            setTimeout(() => {
-                loadProfile();
-            }, 500);
-            
-            // Initialize real-time features
-            initSocket();
-            setupTypingHandlers();
-            setupTypingDetection();
-            setupTypingSocketEvents();
-            
-            // Add page event listeners
-            document.addEventListener('visibilitychange', handleVisibilityChange);
-            window.addEventListener('beforeunload', handleBeforeUnload);
-            window.addEventListener('pagehide', handlePageHide);
-            
-            // Enable SQL Editor access if already verified
-            if (hasVerifiedCode()) {
-                enableSQLEditorAccess();
-            }
-        } else {
-            document.getElementById('auth-container').style.display = 'flex';
-        }
-    });
-    
-    // Setup event listeners
-    const authButton = document.querySelector('.auth-box button');
-    if (authButton) {
-        authButton.addEventListener('click', handleAuth);
-    }
-    
-    const toggleLink = document.getElementById('toggle-link');
-    if (toggleLink) {
-        toggleLink.addEventListener('click', toggleAuth);
-    }
-    
-    // Setup profile form
-    const saveProfileButton = document.getElementById('save-profile-button');
-    if (saveProfileButton) {
-        saveProfileButton.addEventListener('click', saveProfile);
-    }
-    
-    const changeAvatarButton = document.getElementById('change-avatar-button');
-    if (changeAvatarButton) {
-        changeAvatarButton.addEventListener('click', changeAvatar);
-    }
-});
 
 // Add click handler for images to open zoom
 document.addEventListener('click', function (e) {
@@ -9476,6 +9392,6 @@ document.addEventListener('click', function (e) {
         openZoom(e.target.src);
     }
 });
-</script>
+ </script>
 </body>
 </html>
