@@ -1625,7 +1625,7 @@ app.get('/api/private/conversations', async (req, res) => {
   }
 });
 
-// Get messages between two users - FIXED
+// Get messages between two users - FIXED (Fixed the quote issue here)
 app.get('/api/private/messages/:username', async (req, res) => {
   try {
     const { username } = req.params;
@@ -1647,7 +1647,7 @@ app.get('/api/private/messages/:username', async (req, res) => {
 
     if (error) {
       console.error('❌ Database error fetching messages:', error);
-      return res.status(500).json({ error: 'Database error: " + error.message });
+      return res.status(500).json({ error: 'Database error: ' + error.message });
     }
 
     // Filter to get only messages between these two users
@@ -1820,7 +1820,7 @@ app.post('/api/create-posts-table', async (req, res) => {
         error: "Table doesn't exist",
         instructions: [
           "1. Go to your Supabase dashboard",
-          "2. Go to the SQL Editor", 
+          "2. Go to the SQL Editor",
           "3. Run this SQL to create the table:",
           `
           CREATE TABLE IF NOT EXISTS posts (
