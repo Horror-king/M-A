@@ -9369,6 +9369,50 @@ function setupPrivateMessageInputHandlers() {
 }
 
 
+// ===== AUTO-LOGIN FUNCTIONALITY =====
+async function attemptAutoLogin() {
+    const savedSession = localStorage.getItem('userSession');
+    const savedToken = localStorage.getItem('auth_token');
+    
+    if (!savedSession || !savedToken) {
+        return false;
+    }
+    
+    try {
+        const userData = JSON.parse(savedSession);
+        const response = await fetch('/api/auth/auto-login', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${savedToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            console.log('✅ Auto-login successful for:', data.username);
+            
+            // Update session with fresh data
+            saveUserSession({
+                ...userData,
+                username: data.username,
+                user_id: data.user_id
+            });
+            
+            return true;
+        } else {
+            // Auto-login failed, clear invalid session
+            clearUserSession();
+            return false;
+        }
+    } catch (error) {
+        console.error('Auto-login error:', error);
+        clearUserSession();
+        return false;
+    }
+}
+
 // ===== INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', function() {
     // Attempt auto-login first
