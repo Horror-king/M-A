@@ -9368,37 +9368,40 @@ function setupPrivateMessageInputHandlers() {
     }
 }
 
+
 // ===== INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', function() {
-    // Check if user is already logged in
-    if (checkUserSession()) {
-        document.getElementById('auth-container').style.display = 'none';
-        showContainer('chat');
-        updateProfileSection();
-        
-        // Load profile data
-        setTimeout(() => {
-            loadProfile();
-        }, 500);
-        
-        // Initialize real-time features
-        initSocket();
-        setupTypingHandlers();
-        setupTypingDetection();
-        setupTypingSocketEvents();
-        
-        // Add page event listeners
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        window.addEventListener('pagehide', handlePageHide);
-        
-        // Enable SQL Editor access if already verified
-        if (hasVerifiedCode()) {
-            enableSQLEditorAccess();
+    // Attempt auto-login first
+    attemptAutoLogin().then(success => {
+        if (success || checkUserSession()) {
+            document.getElementById('auth-container').style.display = 'none';
+            showContainer('chat');
+            updateProfileSection();
+            
+            // Load profile data
+            setTimeout(() => {
+                loadProfile();
+            }, 500);
+            
+            // Initialize real-time features
+            initSocket();
+            setupTypingHandlers();
+            setupTypingDetection();
+            setupTypingSocketEvents();
+            
+            // Add page event listeners
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+            window.addEventListener('beforeunload', handleBeforeUnload);
+            window.addEventListener('pagehide', handlePageHide);
+            
+            // Enable SQL Editor access if already verified
+            if (hasVerifiedCode()) {
+                enableSQLEditorAccess();
+            }
+        } else {
+            document.getElementById('auth-container').style.display = 'flex';
         }
-    } else {
-        document.getElementById('auth-container').style.display = 'flex';
-    }
+    });
     
     // Setup event listeners
     const authButton = document.querySelector('.auth-box button');
