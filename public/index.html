@@ -5295,7 +5295,6 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // --- CUT HERE ---
-// --- CUT HERE ---
 // ===== YOUR EXISTING VARIABLES AND FUNCTIONS =====
 
 let isLogin = true;
@@ -7813,6 +7812,7 @@ function clearOldMessageTracking() {
 setInterval(clearOldMessageTracking, 30000);
 
 // ===== FIXED: PROFILE MANAGEMENT FUNCTIONS =====
+// MODIFIED: Load profile from server instead of localStorage
 function loadProfile() {
     const username = currentUserSession?.username;
     if (!username) {
@@ -7860,7 +7860,7 @@ function loadProfile() {
             userProfiles[username] = profile;
             localStorage.setItem('userProfiles', JSON.stringify(userProfiles));
             
-            console.log('✅ Profile loaded successfully');
+            console.log('✅ Profile loaded successfully from server');
         } else {
             console.error('Profile load failed:', data.error);
         }
@@ -7883,7 +7883,7 @@ function loadProfile() {
     });
 }
 
-// FIXED: Enhanced saveProfile function
+// MODIFIED: Save profile to server instead of localStorage
 function saveProfile() {
     const username = currentUserSession?.username;
     if (!username) {
@@ -7910,9 +7910,9 @@ function saveProfile() {
     const token = localStorage.getItem('auth_token');
     console.log('Using token:', token ? 'Token present' : 'No token');
     
-    // Use POST method instead of PUT for better compatibility
+    // Use POST method to save to server
     fetch('/api/user/profile', {
-        method: 'POST', // Changed from PUT to POST
+        method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Authorization': token ? `Bearer ${token}` : ''
@@ -7949,7 +7949,7 @@ function saveProfile() {
             }
             
             // Show success message
-            showSuccess('Profile updated successfully!');
+            showSuccess('Profile updated successfully and saved to server!');
             
             // Close profile editor after a short delay
             setTimeout(() => {
@@ -7962,6 +7962,108 @@ function saveProfile() {
     .catch(error => {
         console.error('Profile save error:', error);
         showError(error.message);
+    });
+}
+
+// MODIFIED: Get user profile from server for popups
+function showUserProfile(username) {
+    const popup = document.getElementById('user-profile-popup');
+    if (!popup) return;
+    
+    // Get user profile data from API (no auth needed for public profiles)
+    fetch(`/api/user/profile/${username}`)
+    .then(response => response.json())
+    .then(data => {
+        // Set default values
+        const defaultProfile = {
+            firstname: '',
+            lastname: '',
+            username: username,
+            bio: '',
+            age: '',
+            gender: '',
+            location: '',
+            interests: '',
+            avatar: `https://i.pravatar.cc/150?u=${username}`
+        };
+        
+        const userProfile = data.success ? data.profile : defaultProfile;
+        
+        // Update popup content
+        document.getElementById('popup-avatar').src = userProfile.avatar;
+        
+        // Set display name
+        let displayName = username;
+        if (userProfile.firstname && userProfile.lastname) {
+            displayName = `${userProfile.firstname} ${userProfile.lastname}`;
+        } else if (userProfile.firstname) {
+            displayName = userProfile.firstname;
+        } else if (userProfile.lastname) {
+            displayName = userProfile.lastname;
+        }
+        document.getElementById('popup-username').textContent = displayName;
+        
+        // Set status (check if user is online)
+        const statusDot = document.getElementById('popup-status-dot');
+        const statusText = document.getElementById('popup-status-text');
+        const isOnline = onlineUsers.includes(username);
+        
+        statusDot.className = `user-status-indicator ${isOnline ? 'online' : 'offline'}`;
+        statusText.textContent = isOnline ? 'Online' : 'Offline';
+        
+        // Set bio
+        document.getElementById('popup-bio').textContent = userProfile.bio || 'No bio available';
+        
+        // Set details
+        document.getElementById('popup-age').textContent = userProfile.age || 'Not specified';
+        document.getElementById('popup-gender').textContent = userProfile.gender ? 
+            userProfile.gender.charAt(0).toUpperCase() + userProfile.gender.slice(1) : 'Not specified';
+        document.getElementById('popup-location').textContent = userProfile.location || 'Not specified';
+        document.getElementById('popup-interests').textContent = userProfile.interests || 'Not specified';
+        
+        // Update message button
+        const messageBtn = document.getElementById('popup-message-btn');
+        const currentUser = currentUserSession?.username;
+        if (username === currentUser) {
+            messageBtn.style.display = 'none';
+        } else {
+            messageBtn.style.display = 'block';
+            messageBtn.onclick = () => {
+                hideUserProfile();
+                // Switch to private messages and open chat with this user
+                showContainer('private-messages');
+                setTimeout(() => {
+                    openPrivateChat(username);
+                }, 100);
+            };
+        }
+        
+        // Show popup
+        popup.style.display = 'flex';
+    })
+    .catch(error => {
+        console.error('Error loading user profile:', error);
+        // Fallback to basic profile display
+        const popup = document.getElementById('user-profile-popup');
+        if (popup) {
+            document.getElementById('popup-avatar').src = `https://i.pravatar.cc/150?u=${username}`;
+            document.getElementById('popup-username').textContent = username;
+            document.getElementById('popup-bio').textContent = 'No bio available';
+            document.getElementById('popup-age').textContent = 'Not specified';
+            document.getElementById('popup-gender').textContent = 'Not specified';
+            document.getElementById('popup-location').textContent = 'Not specified';
+            document.getElementById('popup-interests').textContent = 'Not specified';
+            
+            const messageBtn = document.getElementById('popup-message-btn');
+            const currentUser = currentUserSession?.username;
+            if (username === currentUser) {
+                messageBtn.style.display = 'none';
+            } else {
+                messageBtn.style.display = 'block';
+            }
+            
+            popup.style.display = 'flex';
+        }
     });
 }
 
@@ -8066,113 +8168,6 @@ function updateProfileSection() {
         
         console.log('✅ Profile section created for user:', currentUsername);
     }
-}
-
-// ===== ADDED: USER PROFILE POPUP FUNCTIONS =====
-function showUserProfile(username) {
-    const popup = document.getElementById('user-profile-popup');
-    if (!popup) return;
-    
-    // Get user profile data from API
-    const token = localStorage.getItem('auth_token');
-    fetch(`/api/user/profile/${username}`, {
-        headers: {
-            'Authorization': token ? `Bearer ${token}` : ''
-        }
-    })
-    .then(response => response.json())
-    .then(profile => {
-        // Set default values
-        const defaultProfile = {
-            firstname: '',
-            lastname: '',
-            username: username,
-            bio: '',
-            age: '',
-            gender: '',
-            location: '',
-            interests: '',
-            avatar: `https://i.pravatar.cc/150?u=${username}`
-        };
-        
-        const userProfile = { ...defaultProfile, ...profile };
-        
-        // Update popup content
-        document.getElementById('popup-avatar').src = userProfile.avatar;
-        
-        // Set display name
-        let displayName = username;
-        if (userProfile.firstname && userProfile.lastname) {
-            displayName = `${userProfile.firstname} ${userProfile.lastname}`;
-        } else if (userProfile.firstname) {
-            displayName = userProfile.firstname;
-        } else if (userProfile.lastname) {
-            displayName = userProfile.lastname;
-        }
-        document.getElementById('popup-username').textContent = displayName;
-        
-        // Set status (check if user is online)
-        const statusDot = document.getElementById('popup-status-dot');
-        const statusText = document.getElementById('popup-status-text');
-        const isOnline = onlineUsers.includes(username);
-        
-        statusDot.className = `user-status-indicator ${isOnline ? 'online' : 'offline'}`;
-        statusText.textContent = isOnline ? 'Online' : 'Offline';
-        
-        // Set bio
-        document.getElementById('popup-bio').textContent = userProfile.bio || 'No bio available';
-        
-        // Set details
-        document.getElementById('popup-age').textContent = userProfile.age || 'Not specified';
-        document.getElementById('popup-gender').textContent = userProfile.gender ? 
-            userProfile.gender.charAt(0).toUpperCase() + userProfile.gender.slice(1) : 'Not specified';
-        document.getElementById('popup-location').textContent = userProfile.location || 'Not specified';
-        document.getElementById('popup-interests').textContent = userProfile.interests || 'Not specified';
-        
-        // Update message button
-        const messageBtn = document.getElementById('popup-message-btn');
-        const currentUser = currentUserSession?.username;
-        if (username === currentUser) {
-            messageBtn.style.display = 'none';
-        } else {
-            messageBtn.style.display = 'block';
-            messageBtn.onclick = () => {
-                hideUserProfile();
-                // Switch to private messages and open chat with this user
-                showContainer('private-messages');
-                setTimeout(() => {
-                    openPrivateChat(username);
-                }, 100);
-            };
-        }
-        
-        // Show popup
-        popup.style.display = 'flex';
-    })
-    .catch(error => {
-        console.error('Error loading user profile:', error);
-        // Fallback to basic profile display
-        const popup = document.getElementById('user-profile-popup');
-        if (popup) {
-            document.getElementById('popup-avatar').src = `https://i.pravatar.cc/150?u=${username}`;
-            document.getElementById('popup-username').textContent = username;
-            document.getElementById('popup-bio').textContent = 'No bio available';
-            document.getElementById('popup-age').textContent = 'Not specified';
-            document.getElementById('popup-gender').textContent = 'Not specified';
-            document.getElementById('popup-location').textContent = 'Not specified';
-            document.getElementById('popup-interests').textContent = 'Not specified';
-            
-            const messageBtn = document.getElementById('popup-message-btn');
-            const currentUser = currentUserSession?.username;
-            if (username === currentUser) {
-                messageBtn.style.display = 'none';
-            } else {
-                messageBtn.style.display = 'block';
-            }
-            
-            popup.style.display = 'flex';
-        }
-    });
 }
 
 function hideUserProfile() {
