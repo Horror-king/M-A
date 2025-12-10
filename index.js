@@ -110,11 +110,26 @@ async function initializeUsersTable() {
       console.log('📋 SQL to create users table:');
       console.log(`
         CREATE TABLE IF NOT EXISTS users (
-          id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+          id BIGSERIAL PRIMARY KEY,
           username VARCHAR(50) UNIQUE NOT NULL,
           password_hash VARCHAR(255) NOT NULL,
           created_at TIMESTAMPTZ DEFAULT NOW(),
           last_login TIMESTAMPTZ DEFAULT NOW()
+        );
+        
+        CREATE TABLE IF NOT EXISTS user_profiles (
+          id BIGSERIAL PRIMARY KEY,
+          username VARCHAR(50) UNIQUE NOT NULL,
+          firstname VARCHAR(100),
+          lastname VARCHAR(100),
+          bio TEXT,
+          age INTEGER,
+          gender VARCHAR(50),
+          location VARCHAR(100),
+          interests TEXT,
+          avatar TEXT,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
         );
       `);
     } else if (!error) {
@@ -216,36 +231,6 @@ app.post('/api/register', async (req, res) => {
     // Generate a simple token for persistent login
     const userToken = generateUserToken(username);
     
-    // Create user profile automatically
-    try {
-      await supabase
-        .from('user_profiles')
-        .insert([
-          {
-            user_id: newUser[0].id,
-            username: username.trim(),
-            display_name: username.trim(),
-            avatar_url: `https://i.pravatar.cc/150?u=${username}`,
-            bio: '',
-            location: '',
-            website: null,
-            social_links: {},
-            preferences: {
-              theme: 'light',
-              privacy: 'public',
-              language: 'en',
-              soundEnabled: true,
-              notifications: true
-            },
-            message_count: 0,
-            last_active: new Date().toISOString(),
-            status: 'online'
-          }
-        ]);
-    } catch (profileError) {
-      console.log('⚠️ Could not create user profile, but user was created:', profileError.message);
-    }
-    
     res.status(201).json({ 
       success: true, 
       message: "User registered successfully",
@@ -316,15 +301,6 @@ app.post('/api/login', async (req, res) => {
       .from('users')
       .update({ last_login: new Date().toISOString() })
       .eq('id', user.id);
-
-    // Update user profile last_active
-    await supabase
-      .from('user_profiles')
-      .update({ 
-        last_active: new Date().toISOString(),
-        status: 'online'
-      })
-      .eq('username', username);
 
     console.log('✅ User logged in successfully:', username);
 
@@ -546,36 +522,6 @@ app.post('/api/auth/register', async (req, res) => {
     // Generate token for persistent login
     const userToken = generateUserToken(username);
     
-    // Create user profile automatically
-    try {
-      await supabase
-        .from('user_profiles')
-        .insert([
-          {
-            user_id: newUser[0].id,
-            username: username.trim(),
-            display_name: username.trim(),
-            avatar_url: `https://i.pravatar.cc/150?u=${username}`,
-            bio: '',
-            location: '',
-            website: null,
-            social_links: {},
-            preferences: {
-              theme: 'light',
-              privacy: 'public',
-              language: 'en',
-              soundEnabled: true,
-              notifications: true
-            },
-            message_count: 0,
-            last_active: new Date().toISOString(),
-            status: 'online'
-          }
-        ]);
-    } catch (profileError) {
-      console.log('⚠️ Could not create user profile, but user was created:', profileError.message);
-    }
-    
     res.status(201).json({ 
       success: true, 
       message: "User registered successfully",
@@ -646,15 +592,6 @@ app.post('/api/auth/login', async (req, res) => {
       .from('users')
       .update({ last_login: new Date().toISOString() })
       .eq('id', user.id);
-
-    // Update user profile last_active
-    await supabase
-      .from('user_profiles')
-      .update({ 
-        last_active: new Date().toISOString(),
-        status: 'online'
-      })
-      .eq('username', username);
 
     console.log('✅ User logged in successfully via auth endpoint:', username);
 
@@ -746,15 +683,6 @@ app.post('/api/auth/auto-login', verifyToken, async (req, res) => {
       .from('users')
       .update({ last_login: new Date().toISOString() })
       .eq('id', user.id);
-
-    // Update user profile last_active
-    await supabase
-      .from('user_profiles')
-      .update({ 
-        last_active: new Date().toISOString(),
-        status: 'online'
-      })
-      .eq('username', username);
 
     console.log('✅ Auto-login successful for:', username);
 
@@ -885,9 +813,8 @@ app.get('/api/auth-test', (req, res) => {
 });
 
 // ===== FIXED PROFILE MANAGEMENT ENDPOINTS =====
-// FIXED: Now using the correct table structure that matches your database
 
-// Get current user's profile - COMPLETELY FIXED
+// Get current user's profile - FIXED WITH BETTER ERROR HANDLING
 app.get('/api/user/profile', verifyToken, async (req, res) => {
   try {
     console.log('🔐 Profile request received');
@@ -905,6 +832,41 @@ app.get('/api/user/profile', verifyToken, async (req, res) => {
     
     console.log('📋 Loading profile for:', username);
 
+    // Check if table exists first
+    try {
+      const { data: tableCheck, error: tableError } = await supabase
+        .from('user_profiles')
+        .select('username')
+        .limit(1);
+
+      if (tableError && tableError.code === '42P01') {
+        console.log('⚠️ user_profiles table does not exist, returning default profile');
+        // Return default profile
+        const defaultProfile = {
+          username: username,
+          firstname: '',
+          lastname: '',
+          bio: '',
+          age: null,
+          gender: '',
+          location: '',
+          interests: '',
+          avatar: `https://i.pravatar.cc/150?u=${username}`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        return res.json({ 
+          success: true,
+          profile: defaultProfile,
+          message: "Using default profile (table not found)",
+          instructions: "Run the SQL script in Supabase to create the user_profiles table"
+        });
+      }
+    } catch (tableError) {
+      console.error('❌ Table check exception:', tableError);
+      // Continue anyway
+    }
+
     // Try to get the profile
     const { data: profiles, error } = await supabase
       .from('user_profiles')
@@ -919,22 +881,14 @@ app.get('/api/user/profile', verifyToken, async (req, res) => {
       if (error.code === '42P01') {
         const defaultProfile = {
           username: username,
-          display_name: username,
-          avatar_url: `https://i.pravatar.cc/150?u=${username}`,
+          firstname: '',
+          lastname: '',
           bio: '',
+          age: null,
+          gender: '',
           location: '',
-          website: null,
-          social_links: {},
-          preferences: {
-            theme: 'light',
-            privacy: 'public',
-            language: 'en',
-            soundEnabled: true,
-            notifications: true
-          },
-          message_count: 0,
-          last_active: new Date().toISOString(),
-          status: 'online',
+          interests: '',
+          avatar: `https://i.pravatar.cc/150?u=${username}`,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
@@ -957,65 +911,17 @@ app.get('/api/user/profile', verifyToken, async (req, res) => {
       // Return default profile if none exists
       const defaultProfile = {
         username: username,
-        display_name: username,
-        avatar_url: `https://i.pravatar.cc/150?u=${username}`,
+        firstname: '',
+        lastname: '',
         bio: '',
+        age: null,
+        gender: '',
         location: '',
-        website: null,
-        social_links: {},
-        preferences: {
-          theme: 'light',
-          privacy: 'public',
-          language: 'en',
-          soundEnabled: true,
-          notifications: true
-        },
-        message_count: 0,
-        last_active: new Date().toISOString(),
-        status: 'online',
+        interests: '',
+        avatar: `https://i.pravatar.cc/150?u=${username}`,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
-      
-      // Try to create profile if it doesn't exist
-      try {
-        // Get user id first
-        const { data: userData } = await supabase
-          .from('users')
-          .select('id')
-          .eq('username', username)
-          .single();
-          
-        if (userData) {
-          await supabase
-            .from('user_profiles')
-            .insert([
-              {
-                user_id: userData.id,
-                username: username,
-                display_name: username,
-                avatar_url: `https://i.pravatar.cc/150?u=${username}`,
-                bio: '',
-                location: '',
-                website: null,
-                social_links: {},
-                preferences: {
-                  theme: 'light',
-                  privacy: 'public',
-                  language: 'en',
-                  soundEnabled: true,
-                  notifications: true
-                },
-                message_count: 0,
-                last_active: new Date().toISOString(),
-                status: 'online'
-              }
-            ]);
-        }
-      } catch (createError) {
-        console.log('⚠️ Could not create profile:', createError.message);
-      }
-      
       return res.json({ 
         success: true,
         profile: defaultProfile,
@@ -1026,25 +932,15 @@ app.get('/api/user/profile', verifyToken, async (req, res) => {
     // Ensure all fields are present
     const profile = profiles[0];
     const completeProfile = {
-      id: profile.id || '',
-      user_id: profile.user_id || '',
       username: profile.username || username,
-      display_name: profile.display_name || username,
-      avatar_url: profile.avatar_url || `https://i.pravatar.cc/150?u=${username}`,
+      firstname: profile.firstname || '',
+      lastname: profile.lastname || '',
       bio: profile.bio || '',
+      age: profile.age || null,
+      gender: profile.gender || '',
       location: profile.location || '',
-      website: profile.website || null,
-      social_links: profile.social_links || {},
-      preferences: profile.preferences || {
-        theme: 'light',
-        privacy: 'public',
-        language: 'en',
-        soundEnabled: true,
-        notifications: true
-      },
-      message_count: profile.message_count || 0,
-      last_active: profile.last_active || new Date().toISOString(),
-      status: profile.status || 'online',
+      interests: profile.interests || '',
+      avatar: profile.avatar || `https://i.pravatar.cc/150?u=${username}`,
       created_at: profile.created_at || new Date().toISOString(),
       updated_at: profile.updated_at || new Date().toISOString()
     };
@@ -1063,22 +959,14 @@ app.get('/api/user/profile', verifyToken, async (req, res) => {
     const username = req.user?.username || 'unknown';
     const defaultProfile = {
       username: username,
-      display_name: username,
-      avatar_url: `https://i.pravatar.cc/150?u=${username}`,
+      firstname: '',
+      lastname: '',
       bio: '',
+      age: null,
+      gender: '',
       location: '',
-      website: null,
-      social_links: {},
-      preferences: {
-        theme: 'light',
-        privacy: 'public',
-        language: 'en',
-        soundEnabled: true,
-        notifications: true
-      },
-      message_count: 0,
-      last_active: new Date().toISOString(),
-      status: 'online',
+      interests: '',
+      avatar: `https://i.pravatar.cc/150?u=${username}`,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -1091,7 +979,7 @@ app.get('/api/user/profile', verifyToken, async (req, res) => {
   }
 });
 
-// Update user profile - COMPLETELY FIXED: Using correct table structure
+// Update user profile - FIXED: Now accepts both PUT and POST methods
 app.put('/api/user/profile', verifyToken, async (req, res) => {
   await updateProfileHandler(req, res);
 });
@@ -1101,14 +989,14 @@ app.post('/api/user/profile', verifyToken, async (req, res) => {
   await updateProfileHandler(req, res);
 });
 
-// Profile update handler function - COMPLETELY REWRITTEN
+// Profile update handler function
 async function updateProfileHandler(req, res) {
   try {
     const username = req.user.username;
     const profileData = req.body;
 
     console.log('💾 Saving profile for:', username);
-    console.log('📝 Profile data received:', JSON.stringify(profileData, null, 2));
+    console.log('📝 Profile data:', JSON.stringify(profileData, null, 2));
     console.log('🔐 Using token from user:', req.user);
 
     if (!username) {
@@ -1119,6 +1007,7 @@ async function updateProfileHandler(req, res) {
     }
 
     // First check if table exists
+    let tableExists = true;
     try {
       const { error: tableError } = await supabase
         .from('user_profiles')
@@ -1126,6 +1015,7 @@ async function updateProfileHandler(req, res) {
         .limit(1);
       
       if (tableError && tableError.code === '42P01') {
+        tableExists = false;
         console.log('⚠️ user_profiles table does not exist');
         return res.status(500).json({ 
           success: false, 
@@ -1135,20 +1025,14 @@ async function updateProfileHandler(req, res) {
       }
     } catch (tableError) {
       console.error('❌ Table check error:', tableError);
+      tableExists = false;
     }
 
-    // Get user id first
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('username', username)
-      .single();
-
-    if (userError || !userData) {
-      console.error('❌ User not found:', userError);
-      return res.status(404).json({ 
+    if (!tableExists) {
+      return res.status(500).json({ 
         success: false, 
-        error: "User not found" 
+        error: "Profile table does not exist. Please create the user_profiles table first.",
+        instructions: "Use the /api/create-user-profiles-table endpoint to get SQL instructions"
       });
     }
 
@@ -1159,8 +1043,15 @@ async function updateProfileHandler(req, res) {
       .eq('username', username)
       .limit(1);
 
-    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+    if (checkError) {
       console.error('❌ Database error checking profile:', checkError);
+      if (checkError.code === '42P01') {
+        return res.status(500).json({ 
+          success: false, 
+          error: "Profile table does not exist. Please create the user_profiles table first.",
+          instructions: "Use the /api/create-user-profiles-table endpoint to get SQL instructions"
+        });
+      }
       return res.status(500).json({ 
         success: false, 
         error: "Database error: " + checkError.message 
@@ -1170,127 +1061,68 @@ async function updateProfileHandler(req, res) {
     let result;
     const now = new Date().toISOString();
     
-    // Prepare update data based on your actual table structure
-    const updateData = {
-      updated_at: now,
-      last_active: now,
-      status: 'online'
-    };
-
-    // Map client data to actual table columns
-    // Convert firstname + lastname to display_name
-    if (profileData.firstname || profileData.lastname) {
-      const firstName = profileData.firstname || '';
-      const lastName = profileData.lastname || '';
-      updateData.display_name = `${firstName} ${lastName}`.trim();
-    } else if (profileData.display_name) {
-      updateData.display_name = profileData.display_name;
-    }
-
-    // Map avatar to avatar_url
-    if (profileData.avatar) {
-      updateData.avatar_url = profileData.avatar;
-    } else if (profileData.avatar_url) {
-      updateData.avatar_url = profileData.avatar_url;
-    }
-
-    // Map other fields
-    if (profileData.bio !== undefined) updateData.bio = profileData.bio;
-    if (profileData.location !== undefined) updateData.location = profileData.location;
-    if (profileData.website !== undefined) updateData.website = profileData.website;
-    
-    // Handle social_links
-    if (profileData.social_links) {
-      updateData.social_links = profileData.social_links;
-    }
-    
-    // Handle preferences
-    if (profileData.preferences) {
-      updateData.preferences = profileData.preferences;
-    }
-
     if (existingProfiles && existingProfiles.length > 0) {
       // Update existing profile
-      console.log('📝 Updating existing profile with data:', updateData);
-      
       result = await supabase
         .from('user_profiles')
-        .update(updateData)
+        .update({
+          firstname: profileData.firstname || '',
+          lastname: profileData.lastname || '',
+          bio: profileData.bio || '',
+          age: profileData.age || null,
+          gender: profileData.gender || '',
+          location: profileData.location || '',
+          interests: profileData.interests || '',
+          avatar: profileData.avatar || `https://i.pravatar.cc/150?u=${username}`,
+          updated_at: now
+        })
         .eq('username', username)
         .select();
-
-      if (result.error) {
-        console.error('❌ Database error updating profile:', result.error);
-        return res.status(500).json({ 
-          success: false, 
-          error: "Failed to update profile: " + result.error.message,
-          details: result.error.details,
-          hint: result.error.hint
-        });
-      }
-
-      console.log('✅ Profile updated successfully for:', username);
     } else {
       // Create new profile
-      console.log('📝 Creating new profile');
-      
-      const insertData = {
-        user_id: userData.id,
-        username: username,
-        display_name: updateData.display_name || username,
-        avatar_url: updateData.avatar_url || `https://i.pravatar.cc/150?u=${username}`,
-        bio: updateData.bio || '',
-        location: updateData.location || '',
-        website: updateData.website || null,
-        social_links: updateData.social_links || {},
-        preferences: updateData.preferences || {
-          theme: 'light',
-          privacy: 'public',
-          language: 'en',
-          soundEnabled: true,
-          notifications: true
-        },
-        message_count: 0,
-        last_active: now,
-        status: 'online',
-        created_at: now,
-        updated_at: now
-      };
-
       result = await supabase
         .from('user_profiles')
-        .insert([insertData])
+        .insert([
+          {
+            username: username,
+            firstname: profileData.firstname || '',
+            lastname: profileData.lastname || '',
+            bio: profileData.bio || '',
+            age: profileData.age || null,
+            gender: profileData.gender || '',
+            location: profileData.location || '',
+            interests: profileData.interests || '',
+            avatar: profileData.avatar || `https://i.pravatar.cc/150?u=${username}`,
+            created_at: now,
+            updated_at: now
+          }
+        ])
         .select();
-
-      if (result.error) {
-        console.error('❌ Database error creating profile:', result.error);
-        return res.status(500).json({ 
-          success: false, 
-          error: "Failed to create profile: " + result.error.message,
-          details: result.error.details,
-          hint: result.error.hint
-        });
-      }
-
-      console.log('✅ Profile created successfully for:', username);
     }
 
-    // Return the updated/created profile
-    const finalProfile = result.data[0];
-    
-    // Transform to match client expectations if needed
-    const clientProfile = {
-      ...finalProfile,
-      // For backward compatibility
-      avatar: finalProfile.avatar_url,
-      firstname: finalProfile.display_name ? finalProfile.display_name.split(' ')[0] : '',
-      lastname: finalProfile.display_name ? finalProfile.display_name.split(' ').slice(1).join(' ') : ''
-    };
+    if (result.error) {
+      console.error('❌ Database error saving profile:', result.error);
+      if (result.error.code === '42P01') {
+        return res.status(500).json({ 
+          success: false, 
+          error: "Profile table does not exist. Please create the user_profiles table first.",
+          instructions: "Use the /api/create-user-profiles-table endpoint to get SQL instructions"
+        });
+      }
+      return res.status(500).json({ 
+        success: false, 
+        error: "Failed to save profile: " + result.error.message,
+        details: result.error.details,
+        hint: result.error.hint
+      });
+    }
+
+    console.log('✅ Profile saved successfully for:', username);
     
     res.json({ 
       success: true, 
-      message: "Profile saved successfully",
-      profile: clientProfile
+      message: "Profile updated successfully",
+      profile: result.data[0]
     });
 
   } catch (error) {
@@ -1325,21 +1157,17 @@ app.get('/api/create-user-profiles-table', async (req, res) => {
           "2. Go to the SQL Editor",
           "3. Run this SQL to create the table:",
           `
-          -- Create user_profiles table matching your existing structure
           CREATE TABLE IF NOT EXISTS user_profiles (
-            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-            user_id UUID NOT NULL,
+            id BIGSERIAL PRIMARY KEY,
             username VARCHAR(50) UNIQUE NOT NULL,
-            display_name VARCHAR(100),
-            avatar_url TEXT,
+            firstname VARCHAR(100),
+            lastname VARCHAR(100),
             bio TEXT,
+            age INTEGER,
+            gender VARCHAR(50),
             location VARCHAR(100),
-            website TEXT,
-            social_links JSONB DEFAULT '{}'::jsonb,
-            preferences JSONB DEFAULT '{"theme":"light","privacy":"public","language":"en","soundEnabled":true,"notifications":true}'::jsonb,
-            message_count INTEGER DEFAULT 0,
-            last_active TIMESTAMPTZ DEFAULT NOW(),
-            status VARCHAR(20) DEFAULT 'online',
+            interests TEXT,
+            avatar TEXT,
             created_at TIMESTAMPTZ DEFAULT NOW(),
             updated_at TIMESTAMPTZ DEFAULT NOW()
           );
@@ -1410,22 +1238,14 @@ app.get('/api/test-profile', async (req, res) => {
         username: username,
         defaultProfile: {
           username: username,
-          display_name: username,
-          avatar_url: `https://i.pravatar.cc/150?u=${username}`,
+          firstname: '',
+          lastname: '',
           bio: '',
+          age: null,
+          gender: '',
           location: '',
-          website: null,
-          social_links: {},
-          preferences: {
-            theme: 'light',
-            privacy: 'public',
-            language: 'en',
-            soundEnabled: true,
-            notifications: true
-          },
-          message_count: 0,
-          last_active: new Date().toISOString(),
-          status: 'online'
+          interests: '',
+          avatar: `https://i.pravatar.cc/150?u=${username}`
         }
       });
     }
@@ -1464,22 +1284,14 @@ app.get('/api/user/profile/:username', async (req, res) => {
         // Table doesn't exist, return basic profile
         const defaultProfile = {
           username: username,
-          display_name: username,
-          avatar_url: `https://i.pravatar.cc/150?u=${username}`,
+          firstname: '',
+          lastname: '',
           bio: '',
+          age: null,
+          gender: '',
           location: '',
-          website: null,
-          social_links: {},
-          preferences: {
-            theme: 'light',
-            privacy: 'public',
-            language: 'en',
-            soundEnabled: true,
-            notifications: true
-          },
-          message_count: 0,
-          last_active: new Date().toISOString(),
-          status: 'online'
+          interests: '',
+          avatar: `https://i.pravatar.cc/150?u=${username}`
         };
         return res.json({ 
           success: true,
@@ -1497,22 +1309,14 @@ app.get('/api/user/profile/:username', async (req, res) => {
       // Return basic profile if none exists
       const defaultProfile = {
         username: username,
-        display_name: username,
-        avatar_url: `https://i.pravatar.cc/150?u=${username}`,
+        firstname: '',
+        lastname: '',
         bio: '',
+        age: null,
+        gender: '',
         location: '',
-        website: null,
-        social_links: {},
-        preferences: {
-          theme: 'light',
-          privacy: 'public',
-          language: 'en',
-          soundEnabled: true,
-          notifications: true
-        },
-        message_count: 0,
-        last_active: new Date().toISOString(),
-        status: 'online'
+        interests: '',
+        avatar: `https://i.pravatar.cc/150?u=${username}`
       };
       return res.json({ 
         success: true,
@@ -3855,26 +3659,16 @@ io.on('connection', (socket) => {
         isOnline: true
       });
       
-      // Update user profile status
-      supabase
-        .from('user_profiles')
-        .update({ 
-          last_active: new Date().toISOString(),
-          status: 'online'
-        })
-        .eq('username', username)
-        .then(() => {
-          // Get current online users list
-          const onlineUsersArray = Array.from(onlineUsers.keys());
-          console.log('📊 Updated online users:', onlineUsersArray);
-          
-          // Broadcast to all users that this user is online
-          io.emit('user-status-change', { 
-            username, 
-            status: 'online',
-            onlineUsers: onlineUsersArray
-          });
-        });
+      // Get current online users list
+      const onlineUsersArray = Array.from(onlineUsers.keys());
+      console.log('📊 Updated online users:', onlineUsersArray);
+      
+      // Broadcast to all users that this user is online
+      io.emit('user-status-change', { 
+        username, 
+        status: 'online',
+        onlineUsers: onlineUsersArray
+      });
     }
   });
 
@@ -3886,15 +3680,6 @@ io.on('connection', (socket) => {
       const userData = onlineUsers.get(username);
       userData.lastSeen = Date.now();
       userData.isOnline = false;
-      
-      // Update user profile status
-      supabase
-        .from('user_profiles')
-        .update({ 
-          last_active: new Date().toISOString(),
-          status: 'away'
-        })
-        .eq('username', username);
       
       // Broadcast away status
       io.emit('user-status-change', { 
@@ -4040,16 +3825,6 @@ io.on('connection', (socket) => {
         // Update last seen but keep in list
         data.lastSeen = Date.now();
         data.isOnline = false;
-        
-        // Update user profile status
-        supabase
-          .from('user_profiles')
-          .update({ 
-            last_active: new Date().toISOString(),
-            status: 'away'
-          })
-          .eq('username', username);
-        
         console.log('⏸️ User marked as inactive:', username);
         break;
       }
@@ -4069,15 +3844,6 @@ io.on('connection', (socket) => {
   function removeUserFromOnlineList(username) {
     if (onlineUsers.has(username)) {
       onlineUsers.delete(username);
-      
-      // Update user profile status
-      supabase
-        .from('user_profiles')
-        .update({ 
-          last_active: new Date().toISOString(),
-          status: 'offline'
-        })
-        .eq('username', username);
       
       // Get updated online users list
       const onlineUsersArray = Array.from(onlineUsers.keys());
@@ -4108,16 +3874,6 @@ setInterval(() => {
     // 3 minute timeout (180000 milliseconds)
     if (now - data.lastSeen > onlineStatusTimeout) {
       console.log('⏰ Removing inactive user (3 minutes):', username);
-      
-      // Update user profile status
-      supabase
-        .from('user_profiles')
-        .update({ 
-          last_active: new Date().toISOString(),
-          status: 'offline'
-        })
-        .eq('username', username);
-      
       onlineUsers.delete(username);
       removedUsers.push(username);
     }
@@ -4157,6 +3913,7 @@ server.listen(port, () => {
   console.log(`🌐 Cross-browser compatibility: ENABLED`);
   console.log(`📱 OPERA FIX: Using polling transport for real-time updates with limited data`);
   
+  // NEW: Added missing endpoints
   console.log(`🤖 NEW: POST /api/ai/private - Private AI endpoint`);
   console.log(`🤖 NEW: POST /api/ai/chat - Main AI chat endpoint`);
   console.log(`💬 NEW: GET /api/private/conversations - Get conversations`);
@@ -4178,8 +3935,7 @@ server.listen(port, () => {
   console.log(`   POST /api/auth/check-username - Check username availability (client-compatible)`);
   console.log(`   POST /api/auth/auto-login - Auto-login with token`);
   console.log(`   GET /api/user/profile/:username - Get user profile`);
-  console.log(`   POST /api/user/profile - Update user profile (FIXED!)`);
-  console.log(`   PUT /api/user/profile - Update user profile (FIXED!)`);
+  console.log(`   POST /api/user/profile - Update user profile`);
   console.log(`   GET /api/auth-test - Test all authentication endpoints`);
   console.log(`📨 MESSAGES ENDPOINTS:`);
   console.log(`   GET /api/messages - Get messages (client-compatible)`);
@@ -4205,12 +3961,6 @@ server.listen(port, () => {
   console.log(`   "help" → automatically becomes "!help"`);
   console.log(`   "ai tell me a joke" → automatically becomes "!ai tell me a joke"`);
   console.log(`   "!ping" → works normally (prefix already present)`);
-  console.log(`🔧 PROFILE SYSTEM FIX:`);
-  console.log(`   ✓ Now using correct table structure from your database`);
-  console.log(`   ✓ Maps firstname/lastname to display_name`);
-  console.log(`   ✓ Maps avatar to avatar_url`);
-  console.log(`   ✓ Ignores age/gender/interests (not in your table)`);
-  console.log(`   ✓ Automatically creates profiles on registration`);
 
   if (isRender && renderExternalUrl) {
     console.log(`🌐 Render External URL: ${renderExternalUrl}`);
