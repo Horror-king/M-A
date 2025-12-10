@@ -110,26 +110,42 @@ async function initializeUsersTable() {
       console.log('📋 SQL to create users table:');
       console.log(`
         CREATE TABLE IF NOT EXISTS users (
-          id BIGSERIAL PRIMARY KEY,
+          id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
           username VARCHAR(50) UNIQUE NOT NULL,
           password_hash VARCHAR(255) NOT NULL,
+          email VARCHAR(255),
           created_at TIMESTAMPTZ DEFAULT NOW(),
-          last_login TIMESTAMPTZ DEFAULT NOW()
+          last_login TIMESTAMPTZ DEFAULT NOW(),
+          is_active BOOLEAN DEFAULT TRUE
         );
         
         CREATE TABLE IF NOT EXISTS user_profiles (
-          id BIGSERIAL PRIMARY KEY,
-          username VARCHAR(50) UNIQUE NOT NULL,
+          id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+          user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+          username TEXT UNIQUE NOT NULL,
+          display_name TEXT,
+          avatar_url TEXT,
+          bio TEXT,
+          location VARCHAR(100),
+          website TEXT,
+          social_links JSONB DEFAULT '{}'::jsonb,
+          preferences JSONB DEFAULT '{
+            "theme": "light",
+            "privacy": "public",
+            "language": "en",
+            "soundEnabled": true,
+            "notifications": true
+          }'::jsonb,
+          message_count INTEGER DEFAULT 0,
+          last_active TIMESTAMPTZ DEFAULT NOW(),
+          status VARCHAR(20) DEFAULT 'online',
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW(),
           firstname VARCHAR(100),
           lastname VARCHAR(100),
-          bio TEXT,
           age INTEGER,
           gender VARCHAR(50),
-          location VARCHAR(100),
-          interests TEXT,
-          avatar TEXT,
-          created_at TIMESTAMPTZ DEFAULT NOW(),
-          updated_at TIMESTAMPTZ DEFAULT NOW()
+          interests TEXT
         );
       `);
     } else if (!error) {
@@ -148,9 +164,9 @@ initializeUsersTable();
 // User registration endpoint - POST
 app.post('/api/register', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, email } = req.body;
 
-    console.log('📝 Registration attempt:', { username });
+    console.log('📝 Registration attempt:', { username, email });
 
     if (!username || !password) {
       return res.status(400).json({ 
@@ -212,8 +228,10 @@ app.post('/api/register', async (req, res) => {
         { 
           username: username.trim(),
           password_hash: hashedPassword,
+          email: email || null,
           created_at: new Date().toISOString(),
-          last_login: new Date().toISOString()
+          last_login: new Date().toISOString(),
+          is_active: true
         }
       ])
       .select();
@@ -327,7 +345,8 @@ app.post('/api/login', async (req, res) => {
 // Simple token generation function
 function generateUserToken(username) {
   const timestamp = Date.now();
-  return Buffer.from(`${username}:${timestamp}`).toString('base64');
+  const data = `${username}:${timestamp}:${Math.random().toString(36).substr(2, 9)}`;
+  return Buffer.from(data).toString('base64');
 }
 
 // Token verification middleware - FIXED: Now handles both Bearer token and basic token
@@ -439,9 +458,9 @@ app.post('/api/check-username', async (req, res) => {
 // Add /api/auth/register endpoint (same as /api/register)
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, email } = req.body;
 
-    console.log('📝 Auth Registration attempt:', { username });
+    console.log('📝 Auth Registration attempt:', { username, email });
 
     if (!username || !password) {
       return res.status(400).json({ 
@@ -503,8 +522,10 @@ app.post('/api/auth/register', async (req, res) => {
         { 
           username: username.trim(),
           password_hash: hashedPassword,
+          email: email || null,
           created_at: new Date().toISOString(),
-          last_login: new Date().toISOString()
+          last_login: new Date().toISOString(),
+          is_active: true
         }
       ])
       .select();
@@ -832,84 +853,37 @@ app.get('/api/user/profile', verifyToken, async (req, res) => {
     
     console.log('📋 Loading profile for:', username);
 
-    // Check if table exists first
-    try {
-      const { data: tableCheck, error: tableError } = await supabase
-        .from('user_profiles')
-        .select('username')
-        .limit(1);
+    // First get user info
+    const { data: users, error: userError } = await supabase
+      .from('users')
+      .select('id, username, email, created_at, last_login')
+      .ilike('username', username)
+      .limit(1);
 
-      if (tableError && tableError.code === '42P01') {
-        console.log('⚠️ user_profiles table does not exist, returning default profile');
-        // Return default profile
-        const defaultProfile = {
-          username: username,
-          firstname: '',
-          lastname: '',
-          bio: '',
-          age: null,
-          gender: '',
-          location: '',
-          interests: '',
-          avatar: `https://i.pravatar.cc/150?u=${username}`,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        return res.json({ 
-          success: true,
-          profile: defaultProfile,
-          message: "Using default profile (table not found)",
-          instructions: "Run the SQL script in Supabase to create the user_profiles table"
-        });
-      }
-    } catch (tableError) {
-      console.error('❌ Table check exception:', tableError);
-      // Continue anyway
+    if (userError || !users || users.length === 0) {
+      console.error('❌ User not found:', userError);
+      return res.status(404).json({ 
+        success: false, 
+        error: "User not found" 
+      });
     }
 
-    // Try to get the profile
-    const { data: profiles, error } = await supabase
+    const user = users[0];
+
+    // Now get user profile
+    const { data: profiles, error: profileError } = await supabase
       .from('user_profiles')
       .select('*')
       .eq('username', username)
       .limit(1);
 
-    if (error) {
-      console.error('❌ Database query error:', error);
+    let profileData;
+    
+    if (profileError && profileError.code === '42P01') {
+      console.log('⚠️ user_profiles table does not exist, returning default profile');
       
-      // If table doesn't exist, return default profile
-      if (error.code === '42P01') {
-        const defaultProfile = {
-          username: username,
-          firstname: '',
-          lastname: '',
-          bio: '',
-          age: null,
-          gender: '',
-          location: '',
-          interests: '',
-          avatar: `https://i.pravatar.cc/150?u=${username}`,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        return res.json({ 
-          success: true,
-          profile: defaultProfile,
-          message: "Using default profile (table not found)"
-        });
-      }
-      
-      return res.status(500).json({ 
-        success: false, 
-        error: "Database error: " + error.message 
-      });
-    }
-
-    console.log('📋 Profiles found:', profiles ? profiles.length : 0);
-
-    if (!profiles || profiles.length === 0) {
-      // Return default profile if none exists
-      const defaultProfile = {
+      // Create default profile structure
+      profileData = {
         username: username,
         firstname: '',
         lastname: '',
@@ -918,31 +892,127 @@ app.get('/api/user/profile', verifyToken, async (req, res) => {
         gender: '',
         location: '',
         interests: '',
-        avatar: `https://i.pravatar.cc/150?u=${username}`,
+        avatar_url: `https://i.pravatar.cc/150?u=${username}`,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        display_name: username,
+        status: 'online'
       };
-      return res.json({ 
-        success: true,
-        profile: defaultProfile,
-        message: "Using default profile (no existing profile)"
-      });
+      
+      // Try to create the profile
+      try {
+        await supabase
+          .from('user_profiles')
+          .insert([
+            {
+              user_id: user.id,
+              username: username,
+              display_name: username,
+              avatar_url: `https://i.pravatar.cc/150?u=${username}`,
+              firstname: '',
+              lastname: '',
+              bio: '',
+              age: null,
+              gender: '',
+              location: '',
+              interests: '',
+              status: 'online'
+            }
+          ]);
+      } catch (createError) {
+        console.log('⚠️ Could not create profile, table might not exist');
+      }
+      
+    } else if (profileError) {
+      console.error('❌ Profile query error:', profileError);
+      profileData = {
+        username: username,
+        firstname: '',
+        lastname: '',
+        bio: '',
+        age: null,
+        gender: '',
+        location: '',
+        interests: '',
+        avatar_url: `https://i.pravatar.cc/150?u=${username}`,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        display_name: username,
+        status: 'online'
+      };
+    } else if (!profiles || profiles.length === 0) {
+      // Create default profile if none exists
+      profileData = {
+        username: username,
+        firstname: '',
+        lastname: '',
+        bio: '',
+        age: null,
+        gender: '',
+        location: '',
+        interests: '',
+        avatar_url: `https://i.pravatar.cc/150?u=${username}`,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        display_name: username,
+        status: 'online'
+      };
+      
+      // Try to create the profile
+      try {
+        const { data: newProfile } = await supabase
+          .from('user_profiles')
+          .insert([
+            {
+              user_id: user.id,
+              username: username,
+              display_name: username,
+              avatar_url: `https://i.pravatar.cc/150?u=${username}`,
+              firstname: '',
+              lastname: '',
+              bio: '',
+              age: null,
+              gender: '',
+              location: '',
+              interests: '',
+              status: 'online'
+            }
+          ])
+          .select();
+          
+        if (newProfile && newProfile.length > 0) {
+          profileData = { ...profileData, ...newProfile[0] };
+        }
+      } catch (createError) {
+        console.log('⚠️ Could not create profile:', createError);
+      }
+    } else {
+      // Profile exists, use it
+      profileData = profiles[0];
     }
 
-    // Ensure all fields are present
-    const profile = profiles[0];
+    // Ensure all fields are present and map avatar_url to avatar for frontend compatibility
     const completeProfile = {
-      username: profile.username || username,
-      firstname: profile.firstname || '',
-      lastname: profile.lastname || '',
-      bio: profile.bio || '',
-      age: profile.age || null,
-      gender: profile.gender || '',
-      location: profile.location || '',
-      interests: profile.interests || '',
-      avatar: profile.avatar || `https://i.pravatar.cc/150?u=${username}`,
-      created_at: profile.created_at || new Date().toISOString(),
-      updated_at: profile.updated_at || new Date().toISOString()
+      // User table fields
+      username: username,
+      email: user.email,
+      user_id: user.id,
+      created_at: user.created_at,
+      last_login: user.last_login,
+      
+      // Profile fields with defaults
+      firstname: profileData.firstname || '',
+      lastname: profileData.lastname || '',
+      bio: profileData.bio || '',
+      age: profileData.age || null,
+      gender: profileData.gender || '',
+      location: profileData.location || '',
+      interests: profileData.interests || '',
+      avatar: profileData.avatar_url || `https://i.pravatar.cc/150?u=${username}`,
+      display_name: profileData.display_name || username,
+      status: profileData.status || 'online',
+      profile_created_at: profileData.created_at || new Date().toISOString(),
+      profile_updated_at: profileData.updated_at || new Date().toISOString()
     };
 
     console.log('✅ Profile loaded successfully');
@@ -989,14 +1059,14 @@ app.post('/api/user/profile', verifyToken, async (req, res) => {
   await updateProfileHandler(req, res);
 });
 
-// Profile update handler function
+// Profile update handler function - FIXED FOR NEW SCHEMA
 async function updateProfileHandler(req, res) {
   try {
     const username = req.user.username;
     const profileData = req.body;
 
     console.log('💾 Saving profile for:', username);
-    console.log('📝 Profile data:', JSON.stringify(profileData, null, 2));
+    console.log('📝 Profile data received:', JSON.stringify(profileData, null, 2));
     console.log('🔐 Using token from user:', req.user);
 
     if (!username) {
@@ -1006,95 +1076,76 @@ async function updateProfileHandler(req, res) {
       });
     }
 
-    // First check if table exists
-    let tableExists = true;
-    try {
-      const { error: tableError } = await supabase
-        .from('user_profiles')
-        .select('username')
-        .limit(1);
-      
-      if (tableError && tableError.code === '42P01') {
-        tableExists = false;
-        console.log('⚠️ user_profiles table does not exist');
-        return res.status(500).json({ 
-          success: false, 
-          error: "Profile table does not exist. Please create the user_profiles table first.",
-          instructions: "Use the /api/create-user-profiles-table endpoint to get SQL instructions"
-        });
-      }
-    } catch (tableError) {
-      console.error('❌ Table check error:', tableError);
-      tableExists = false;
-    }
+    // First get user ID
+    const { data: users, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .ilike('username', username)
+      .limit(1);
 
-    if (!tableExists) {
-      return res.status(500).json({ 
+    if (userError || !users || users.length === 0) {
+      console.error('❌ User not found:', userError);
+      return res.status(404).json({ 
         success: false, 
-        error: "Profile table does not exist. Please create the user_profiles table first.",
-        instructions: "Use the /api/create-user-profiles-table endpoint to get SQL instructions"
+        error: "User not found" 
       });
     }
+
+    const userId = users[0].id;
 
     // Check if profile exists
     const { data: existingProfiles, error: checkError } = await supabase
       .from('user_profiles')
-      .select('id, username')
+      .select('id')
       .eq('username', username)
       .limit(1);
 
-    if (checkError) {
-      console.error('❌ Database error checking profile:', checkError);
-      if (checkError.code === '42P01') {
-        return res.status(500).json({ 
-          success: false, 
-          error: "Profile table does not exist. Please create the user_profiles table first.",
-          instructions: "Use the /api/create-user-profiles-table endpoint to get SQL instructions"
-        });
-      }
+    if (checkError && checkError.code === '42P01') {
+      console.log('⚠️ user_profiles table does not exist');
       return res.status(500).json({ 
         success: false, 
-        error: "Database error: " + checkError.message 
+        error: "Profile table does not exist. Please run the database setup script.",
+        instructions: "Run the SQL script provided in Supabase SQL Editor to create all tables"
       });
     }
 
     let result;
     const now = new Date().toISOString();
     
+    // Prepare data for update/insert - using new schema field names
+    const profileUpdateData = {
+      username: username,
+      user_id: userId,
+      display_name: profileData.display_name || username,
+      avatar_url: profileData.avatar || `https://i.pravatar.cc/150?u=${username}`,
+      bio: profileData.bio || '',
+      location: profileData.location || '',
+      firstname: profileData.firstname || '',
+      lastname: profileData.lastname || '',
+      age: profileData.age || null,
+      gender: profileData.gender || '',
+      interests: profileData.interests || '',
+      status: 'online',
+      updated_at: now
+    };
+
     if (existingProfiles && existingProfiles.length > 0) {
       // Update existing profile
+      console.log('📝 Updating existing profile for:', username);
       result = await supabase
         .from('user_profiles')
-        .update({
-          firstname: profileData.firstname || '',
-          lastname: profileData.lastname || '',
-          bio: profileData.bio || '',
-          age: profileData.age || null,
-          gender: profileData.gender || '',
-          location: profileData.location || '',
-          interests: profileData.interests || '',
-          avatar: profileData.avatar || `https://i.pravatar.cc/150?u=${username}`,
-          updated_at: now
-        })
+        .update(profileUpdateData)
         .eq('username', username)
         .select();
     } else {
       // Create new profile
+      console.log('📝 Creating new profile for:', username);
       result = await supabase
         .from('user_profiles')
         .insert([
           {
-            username: username,
-            firstname: profileData.firstname || '',
-            lastname: profileData.lastname || '',
-            bio: profileData.bio || '',
-            age: profileData.age || null,
-            gender: profileData.gender || '',
-            location: profileData.location || '',
-            interests: profileData.interests || '',
-            avatar: profileData.avatar || `https://i.pravatar.cc/150?u=${username}`,
-            created_at: now,
-            updated_at: now
+            ...profileUpdateData,
+            created_at: now
           }
         ])
         .select();
@@ -1102,13 +1153,24 @@ async function updateProfileHandler(req, res) {
 
     if (result.error) {
       console.error('❌ Database error saving profile:', result.error);
+      
+      // Provide helpful error messages
       if (result.error.code === '42P01') {
         return res.status(500).json({ 
           success: false, 
-          error: "Profile table does not exist. Please create the user_profiles table first.",
-          instructions: "Use the /api/create-user-profiles-table endpoint to get SQL instructions"
+          error: "Profile table does not exist. Please run the database setup script.",
+          instructions: "Run the SQL script in Supabase SQL Editor to create all tables"
         });
       }
+      
+      if (result.error.message.includes('column') && result.error.message.includes('does not exist')) {
+        return res.status(500).json({ 
+          success: false, 
+          error: "Database schema mismatch. Please update your database with the new schema.",
+          details: "The user_profiles table is missing required columns. Run the updated SQL script."
+        });
+      }
+      
       return res.status(500).json({ 
         success: false, 
         error: "Failed to save profile: " + result.error.message,
@@ -1119,10 +1181,17 @@ async function updateProfileHandler(req, res) {
 
     console.log('✅ Profile saved successfully for:', username);
     
+    // Return the saved profile with avatar field for frontend compatibility
+    const savedProfile = result.data[0];
+    const responseProfile = {
+      ...savedProfile,
+      avatar: savedProfile.avatar_url || `https://i.pravatar.cc/150?u=${username}`
+    };
+    
     res.json({ 
       success: true, 
       message: "Profile updated successfully",
-      profile: result.data[0]
+      profile: responseProfile
     });
 
   } catch (error) {
@@ -1157,34 +1226,73 @@ app.get('/api/create-user-profiles-table', async (req, res) => {
           "2. Go to the SQL Editor",
           "3. Run this SQL to create the table:",
           `
-          CREATE TABLE IF NOT EXISTS user_profiles (
-            id BIGSERIAL PRIMARY KEY,
-            username VARCHAR(50) UNIQUE NOT NULL,
+          -- Drop if exists and recreate with new schema
+          DROP TABLE IF EXISTS public.user_profiles CASCADE;
+
+          CREATE TABLE public.user_profiles (
+            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+            user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+            username TEXT UNIQUE NOT NULL,
+            display_name TEXT,
+            avatar_url TEXT,
+            bio TEXT,
+            location VARCHAR(100),
+            website TEXT,
+            social_links JSONB DEFAULT '{}'::jsonb,
+            preferences JSONB DEFAULT '{
+              "theme": "light",
+              "privacy": "public",
+              "language": "en",
+              "soundEnabled": true,
+              "notifications": true
+            }'::jsonb,
+            message_count INTEGER DEFAULT 0,
+            last_active TIMESTAMPTZ DEFAULT NOW(),
+            status VARCHAR(20) DEFAULT 'online',
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW(),
             firstname VARCHAR(100),
             lastname VARCHAR(100),
-            bio TEXT,
             age INTEGER,
             gender VARCHAR(50),
-            location VARCHAR(100),
-            interests TEXT,
-            avatar TEXT,
-            created_at TIMESTAMPTZ DEFAULT NOW(),
-            updated_at TIMESTAMPTZ DEFAULT NOW()
+            interests TEXT
           );
+
+          -- Create indexes
+          CREATE INDEX IF NOT EXISTS idx_user_profiles_username ON public.user_profiles(username);
+          CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id ON public.user_profiles(user_id);
+          CREATE INDEX IF NOT EXISTS idx_user_profiles_status ON public.user_profiles(status);
+
+          -- Enable RLS
+          ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
+
+          -- RLS Policy
+          DROP POLICY IF EXISTS "allow_all_user_profiles_operations" ON public.user_profiles;
+          CREATE POLICY "allow_all_user_profiles_operations" ON public.user_profiles FOR ALL USING (true) WITH CHECK (true);
           `,
-          "4. Enable RLS if needed",
-          "5. Add policies for users to read/write their own profiles"
+          "4. Run the complete database setup script for all tables"
         ]
       });
     } else if (checkError) {
       throw checkError;
     } else {
       console.log('✅ user_profiles table exists');
+      
+      // Check if it has the required columns
+      const sampleRow = tableCheck?.[0];
+      const hasRequiredFields = sampleRow && 
+        'firstname' in sampleRow && 
+        'lastname' in sampleRow && 
+        'age' in sampleRow;
+        
       res.json({
         success: true,
-        message: "user_profiles table exists",
-        sampleData: tableCheck?.[0],
-        rowCount: tableCheck?.length || 0
+        message: hasRequiredFields ? "user_profiles table exists with all required fields" : "Table exists but missing some fields",
+        hasRequiredFields: hasRequiredFields,
+        sampleData: sampleRow,
+        rowCount: tableCheck?.length || 0,
+        missingFields: hasRequiredFields ? [] : ["firstname", "lastname", "age", "gender", "interests"],
+        instructions: !hasRequiredFields ? "Run the updated SQL script to add missing fields" : null
       });
     }
 
@@ -1251,9 +1359,17 @@ app.get('/api/test-profile', async (req, res) => {
     }
 
     console.log('✅ Found profile:', profiles[0]);
+    
+    // Map avatar_url to avatar for frontend compatibility
+    const profile = profiles[0];
+    const responseProfile = {
+      ...profile,
+      avatar: profile.avatar_url || `https://i.pravatar.cc/150?u=${username}`
+    };
+    
     res.json({ 
       success: true,
-      profile: profiles[0]
+      profile: responseProfile
     });
 
   } catch (error) {
@@ -1324,9 +1440,16 @@ app.get('/api/user/profile/:username', async (req, res) => {
       });
     }
 
+    // Map avatar_url to avatar for frontend compatibility
+    const profile = profiles[0];
+    const responseProfile = {
+      ...profile,
+      avatar: profile.avatar_url || `https://i.pravatar.cc/150?u=${username}`
+    };
+    
     res.json({ 
       success: true,
-      profile: profiles[0]
+      profile: responseProfile
     });
 
   } catch (error) {
