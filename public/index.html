@@ -5751,24 +5751,6 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// ===== ADDED: Function to get user avatar URL =====
-function getUserAvatarUrl(username) {
-    if (!username) return `https://i.pravatar.cc/50?u=default`;
-    
-    // Try to get from userProfiles in localStorage
-    const userProfiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
-    const userProfile = userProfiles[username];
-    
-    if (userProfile && userProfile.avatar) {
-        return userProfile.avatar;
-    }
-    
-    // Try to get from server via API
-    // This would require an API endpoint that returns user profile
-    // For now, use default
-    return `https://i.pravatar.cc/50?u=${encodeURIComponent(username)}`;
-}
-
 // ===== MODIFIED: Update showContainer function to initialize posts =====
 function showContainer(containerId) {
     console.log('🔄 Showing container:', containerId);
@@ -6089,7 +6071,7 @@ async function sendPrivateMessage() {
     }, 1000);
 }
 
-// ===== MODIFIED: MESSAGE DISPLAY FUNCTIONS WITH USER AVATAR SUPPORT =====
+// ===== FIXED: MESSAGE DISPLAY FUNCTIONS WITH PROPER ORDERING =====
 function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
     if (!elements.chatContainer) return;
     
@@ -6112,8 +6094,8 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
         const avatarDiv = document.createElement('div');
         avatarDiv.className = 'avatar';
         
-        // MODIFIED: Get user profile to display correct avatar
-        const avatarUrl = getUserAvatarUrl(username);
+        // Get user profile to display correct avatar
+        const avatarUrl = `https://i.pravatar.cc/50?u=${encodeURIComponent(username)}`;
         
         avatarDiv.innerHTML = `<img src="${avatarUrl}" alt="avatar">`;
         
@@ -6267,8 +6249,7 @@ function displayPrivateMessage(text, sender, repliedTo = null, username = 'Priva
     if (sender === 'received') {
         const avatarDiv = document.createElement('div');
         avatarDiv.className = 'avatar';
-        // MODIFIED: Use getUserAvatarUrl for consistency
-        avatarDiv.innerHTML = `<img src="${getUserAvatarUrl(username)}" alt="avatar">`;
+        avatarDiv.innerHTML = `<img src="https://i.pravatar.cc/50?u=${encodeURIComponent(username)}" alt="avatar">`;
         messageDiv.appendChild(avatarDiv);
     }
 
@@ -7252,7 +7233,7 @@ async function loadPrivateUsers() {
             
             userItem.innerHTML = `
                 <div class="user-avatar">
-                    <img src="${conversation.avatar || getUserAvatarUrl(conversation.username)}" alt="${conversation.username}">
+                    <img src="${conversation.avatar || `https://i.pravatar.cc/50?u=${conversation.username}`}" alt="${conversation.username}">
                     <div class="user-status ${isOnline ? 'online' : 'offline'}"></div>
                     ${conversation.unread ? '<div class="unread-badge"></div>' : ''}
                 </div>
@@ -7301,7 +7282,7 @@ async function openPrivateChat(username) {
     
     // Update chat header
     document.getElementById('partner-avatar').innerHTML = 
-        `<img src="${getUserAvatarUrl(username)}" alt="${username}">`;
+        `<img src="https://i.pravatar.cc/50?u=${username}" alt="${username}">`;
     
     document.getElementById('partner-name').textContent = username;
     
@@ -7553,7 +7534,7 @@ function showPrivateMessageNotification(message) {
         new Notification(`New message from ${message.sender_username}`, {
             body: message.content.length > 50 ? 
                 message.content.substring(0, 50) + '...' : message.content,
-            icon: getUserAvatarUrl(message.sender_username)
+            icon: 'https://i.pravatar.cc/50?u=' + encodeURIComponent(message.sender_username)
         });
     }
     
@@ -7830,43 +7811,6 @@ function clearOldMessageTracking() {
 // Run cleanup every 30 seconds
 setInterval(clearOldMessageTracking, 30000);
 
-// ===== MODIFIED: Profile avatar update function =====
-function updateMessageAvatars(avatarUrl) {
-    // Update all message avatars for the current user in all chats
-    const currentUser = currentUserSession?.username;
-    if (!currentUser) return;
-    
-    // Update in main chat
-    const userMessages = document.querySelectorAll(`.message[data-username="${currentUser}"] .avatar img`);
-    userMessages.forEach(img => {
-        if (avatarUrl) {
-            img.src = avatarUrl;
-        }
-    });
-    
-    // Update in online users list
-    const onlineUserAvatars = document.querySelectorAll(`.online-user-avatar img[src*="${currentUser}"]`);
-    onlineUserAvatars.forEach(img => {
-        if (avatarUrl) {
-            img.src = avatarUrl;
-        }
-    });
-    
-    // Update in private messages user list
-    const userItemAvatars = document.querySelectorAll(`.user-item[data-username="${currentUser}"] img`);
-    userItemAvatars.forEach(img => {
-        if (avatarUrl) {
-            img.src = avatarUrl;
-        }
-    });
-    
-    // Update in user profile popup if open
-    const popupAvatar = document.getElementById('popup-avatar');
-    if (popupAvatar && popupAvatar.src.includes(currentUser)) {
-        popupAvatar.src = avatarUrl;
-    }
-}
-
 // ===== FIXED: PROFILE MANAGEMENT FUNCTIONS =====
 // MODIFIED: Load profile from server instead of localStorage
 function loadProfile() {
@@ -8004,9 +7948,6 @@ function saveProfile() {
                 document.getElementById('profile-avatar-img').src = updatedProfile.avatar || `https://i.pravatar.cc/150?u=${username}`;
             }
             
-            // Update all avatars for this user
-            updateMessageAvatars(updatedProfile.avatar);
-            
             // Show success message
             showSuccess('Profile updated successfully and saved to server!');
             
@@ -8043,7 +7984,7 @@ function showUserProfile(username) {
             gender: '',
             location: '',
             interests: '',
-            avatar: getUserAvatarUrl(username)
+            avatar: `https://i.pravatar.cc/150?u=${username}`
         };
         
         const userProfile = data.success ? data.profile : defaultProfile;
@@ -8105,7 +8046,7 @@ function showUserProfile(username) {
         // Fallback to basic profile display
         const popup = document.getElementById('user-profile-popup');
         if (popup) {
-            document.getElementById('popup-avatar').src = getUserAvatarUrl(username);
+            document.getElementById('popup-avatar').src = `https://i.pravatar.cc/150?u=${username}`;
             document.getElementById('popup-username').textContent = username;
             document.getElementById('popup-bio').textContent = 'No bio available';
             document.getElementById('popup-age').textContent = 'Not specified';
@@ -8154,7 +8095,7 @@ function updateProfileDisplay(profile) {
     
     if (displayAvatar) {
         // Use avatar_url if available, otherwise use avatar
-        const avatarUrl = profile.avatar_url || profile.avatar || getUserAvatarUrl(profile.username || currentUserSession?.username || 'default');
+        const avatarUrl = profile.avatar_url || profile.avatar || `https://i.pravatar.cc/50?u=${profile.username || currentUserSession?.username || 'default'}`;
         displayAvatar.src = avatarUrl;
     }
     
@@ -8173,6 +8114,59 @@ function changeAvatar() {
         } else {
             showError('Please enter a valid URL starting with http:// or https://');
         }
+    }
+}
+
+function updateMessageAvatars(avatarUrl) {
+    // Update all message avatars for the current user
+    const userMessages = document.querySelectorAll('.message.sent .avatar img');
+    userMessages.forEach(img => {
+        if (avatarUrl) {
+            img.src = avatarUrl;
+        }
+    });
+}
+
+// FIXED: Profile section creation function
+function updateProfileSection() {
+    const dropdown = document.getElementById('dropdown');
+    if (!dropdown) return;
+    
+    const currentUsername = currentUserSession?.username;
+    
+    // Remove existing profile section if it exists
+    const existingProfile = document.querySelector('.profile-display-section');
+    const existingDivider = document.querySelector('.menu-divider');
+    if (existingProfile) existingProfile.remove();
+    if (existingDivider && existingDivider.nextElementSibling === existingProfile) {
+        existingDivider.remove();
+    }
+    
+    // Only add profile section if user is logged in
+    if (currentUsername) {
+        const profileSection = document.createElement('div');
+        profileSection.className = 'profile-display-section';
+        profileSection.innerHTML = `
+            <div class="profile-display-avatar">
+                <img id="display-avatar" src="https://i.pravatar.cc/50?u=${encodeURIComponent(currentUsername)}" alt="Profile">
+            </div>
+            <div class="profile-display-info">
+                <div class="profile-display-username" id="display-username">${currentUsername}</div>
+                <div class="profile-display-bio" id="display-bio">No bio yet</div>
+            </div>
+            <div class="profile-display-edit" onclick="showContainer('profile')">
+                Edit
+            </div>
+        `;
+        
+        const divider = document.createElement('div');
+        divider.className = 'menu-divider';
+        
+        // Insert at the beginning of dropdown
+        dropdown.insertBefore(divider, dropdown.firstChild);
+        dropdown.insertBefore(profileSection, dropdown.firstChild);
+        
+        console.log('✅ Profile section created for user:', currentUsername);
     }
 }
 
@@ -8395,7 +8389,7 @@ function updateSingleOnlineList(listElementId, countElementId, onlineUsers) {
             userElement.className = 'online-user';
             
             // Get user profile to display correct avatar
-            const avatarUrl = getUserAvatarUrl(user);
+            const avatarUrl = `https://i.pravatar.cc/50?u=${encodeURIComponent(user)}`;
             
             userElement.innerHTML = `
                 <div class="online-user-avatar">
