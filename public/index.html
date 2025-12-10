@@ -7354,7 +7354,7 @@ async function loadPrivateMessages(username) {
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
             throw new Error(errorData.error || `Failed to load messages: ${response.status}`);
-        });
+        }
         
         const messages = await response.json();
         
