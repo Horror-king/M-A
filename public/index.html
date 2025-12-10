@@ -5292,7 +5292,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('🎯 Application initialization complete');
     });
 });
-// --- CUT HERE ---
+
 // ===== YOUR EXISTING VARIABLES AND FUNCTIONS =====
 
 let isLogin = true;
@@ -5375,376 +5375,6 @@ const elements = {
 };
 
 let replyToText = null;
-
-// ===== ENHANCED USER SESSION MANAGEMENT =====
-function checkUserSession() {
-    const savedSession = localStorage.getItem('userSession');
-    const savedToken = localStorage.getItem('auth_token');
-    
-    if (savedSession && savedToken) {
-        try {
-            currentUserSession = JSON.parse(savedSession);
-            return true;
-        } catch (e) {
-            console.error('Error parsing saved session:', e);
-            clearUserSession();
-        }
-    }
-    
-    const sessionData = sessionStorage.getItem('currentUserSession');
-    if (sessionData) {
-        currentUserSession = JSON.parse(sessionData);
-        return true;
-    }
-    return false;
-}
-
-function saveUserSession(userData) {
-    currentUserSession = userData;
-    
-    sessionStorage.setItem('currentUserSession', JSON.stringify(userData));
-    localStorage.setItem('userSession', JSON.stringify(userData));
-    
-    if (userData.token) {
-        localStorage.setItem('auth_token', userData.token);
-        console.log('✅ Token saved to localStorage');
-    }
-    
-    console.log('✅ User session saved for persistent login');
-}
-
-function clearUserSession() {
-    currentUserSession = null;
-    sessionStorage.removeItem('currentUserSession');
-    localStorage.removeItem('userSession');
-    localStorage.removeItem('auth_token');
-    console.log('✅ User session cleared');
-}
-
-// ===== COMPLETELY FIXED PROFILE FUNCTIONS =====
-function loadProfile() {
-    const username = currentUserSession?.username;
-    if (!username) {
-        console.error('No username in session');
-        showError('Please login first');
-        return;
-    }
-    
-    // FIXED: Get token from the right place
-    const token = currentUserSession?.token || localStorage.getItem('auth_token');
-    
-    if (!token) {
-        console.error('No authentication token found');
-        showError('Please login again');
-        return;
-    }
-    
-    console.log('🔐 Loading profile for:', username);
-    console.log('📋 Using token:', token.substring(0, 20) + '...');
-    
-    // FIXED: Proper fetch with Authorization header
-    fetch('/api/user/profile', {
-        method: 'GET',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(response => {
-        console.log('📋 Profile response status:', response.status);
-        
-        if (response.status === 401) {
-            // Token is invalid or expired
-            throw new Error('Session expired. Please login again.');
-        }
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        return response.json();
-    })
-    .then(data => {
-        console.log('📋 Profile data received:', data);
-        
-        let profile;
-        if (data.success && data.profile) {
-            profile = data.profile;
-        } else if (data.firstname !== undefined || data.username !== undefined) {
-            // If the data itself is the profile object
-            profile = data;
-        } else {
-            throw new Error(data.error || 'Failed to load profile');
-        }
-        
-        // Populate form fields
-        document.getElementById('profile-firstname').value = profile.firstname || '';
-        document.getElementById('profile-lastname').value = profile.lastname || '';
-        document.getElementById('profile-username').value = profile.username || '';
-        document.getElementById('profile-bio').value = profile.bio || '';
-        document.getElementById('profile-age').value = profile.age || '';
-        document.getElementById('profile-gender').value = profile.gender || '';
-        document.getElementById('profile-location').value = profile.location || '';
-        document.getElementById('profile-interests').value = profile.interests || '';
-        document.getElementById('profile-avatar-img').src = profile.avatar || `https://i.pravatar.cc/150?u=${username}`;
-        
-        // Update display section
-        updateProfileDisplay(profile);
-        
-        console.log('✅ Profile loaded successfully');
-    })
-    .catch(error => {
-        console.error('❌ Error loading profile:', error);
-        showError('Cannot load profile. Please try again.');
-    });
-}
-
-function saveProfile() {
-    const username = currentUserSession?.username;
-    if (!username) {
-        showError('You must be logged in to save profile');
-        return;
-    }
-    
-    // FIXED: Get token properly
-    const token = currentUserSession?.token || localStorage.getItem('auth_token');
-    
-    if (!token) {
-        showError('No authentication token found');
-        return;
-    }
-    
-    const profileData = {
-        firstname: document.getElementById('profile-firstname').value,
-        lastname: document.getElementById('profile-lastname').value,
-        username: document.getElementById('profile-username').value || username,
-        bio: document.getElementById('profile-bio').value,
-        age: document.getElementById('profile-age').value,
-        gender: document.getElementById('profile-gender').value,
-        location: document.getElementById('profile-location').value,
-        interests: document.getElementById('profile-interests').value,
-        avatar: document.getElementById('profile-avatar-img').src
-    };
-    
-    console.log('💾 Saving profile for:', username);
-    console.log('📝 Profile data:', profileData);
-    console.log('🔐 Using token:', token.substring(0, 20) + '...');
-    
-    fetch('/api/user/profile', {
-        method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(profileData)
-    })
-    .then(response => {
-        console.log('💾 Save response status:', response.status);
-        
-        if (response.status === 401) {
-            throw new Error('Session expired. Please login again.');
-        }
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        return response.json();
-    })
-    .then(data => {
-        console.log('💾 Save response data:', data);
-        
-        let updatedProfile;
-        if (data.success) {
-            updatedProfile = data.profile || profileData;
-        } else if (data.firstname !== undefined || data.username !== undefined) {
-            updatedProfile = data;
-        } else {
-            throw new Error(data.error || 'Failed to update profile');
-        }
-        
-        // Update display section with the returned profile data
-        updateProfileDisplay(updatedProfile);
-        showSuccess('Profile updated successfully!');
-        
-        // Close profile editor after a short delay
-        setTimeout(() => {
-            hideContainer('profile');
-        }, 1500);
-    })
-    .catch(error => {
-        console.error('❌ Error saving profile:', error);
-        showError(`Save failed: ${error.message}`);
-    });
-}
-
-// FIXED: Profile display function
-function updateProfileDisplay(profile) {
-    const displayUsername = document.getElementById('display-username');
-    const displayBio = document.getElementById('display-bio');
-    const displayAvatar = document.getElementById('display-avatar');
-    
-    if (displayUsername) {
-        if (profile.firstname && profile.lastname) {
-            displayUsername.textContent = `${profile.firstname} ${profile.lastname}`;
-        } else if (profile.firstname) {
-            displayUsername.textContent = profile.firstname;
-        } else if (profile.lastname) {
-            displayUsername.textContent = profile.lastname;
-        } else {
-            displayUsername.textContent = profile.username || currentUserSession?.username || 'User';
-        }
-    }
-    
-    if (displayBio) {
-        displayBio.textContent = profile.bio || 'No bio yet';
-    }
-    
-    if (displayAvatar) {
-        displayAvatar.src = profile.avatar || `https://i.pravatar.cc/50?u=${profile.username || currentUserSession?.username || 'default'}`;
-    }
-    
-    // Update profile picture in messages if needed
-    updateMessageAvatars(profile.avatar);
-    
-    console.log('✅ Profile display updated');
-}
-
-function updateMessageAvatars(avatarUrl) {
-    // Update all message avatars for the current user
-    const userMessages = document.querySelectorAll('.message.sent .avatar img');
-    userMessages.forEach(img => {
-        img.src = avatarUrl;
-    });
-}
-
-// ===== FIXED AUTHENTICATION FUNCTIONS =====
-async function handleAuth() {
-    const username = document.getElementById('auth-username').value.trim();
-    const password = document.getElementById('auth-password').value;
-    const loader = document.getElementById('loader');
-    
-    elements.errorDisplay.style.display = 'none';
-    elements.successDisplay.style.display = 'none';
-    
-    if (!username || !password) {
-        showError('Please enter both username and password');
-        return;
-    }
-    
-    if (username.length < 3 || username.length > 20) {
-        showError('Username must be between 3-20 characters');
-        return;
-    }
-    
-    if (password.length < 4 || password.length > 20) {
-        showError('Password must be between 4-20 characters');
-        return;
-    }
-    
-    // Validate username format
-    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-        showError('Username can only contain letters, numbers, and underscores');
-        return;
-    }
-    
-    loader.style.display = 'flex';
-    
-    try {
-        if (isLogin) {
-            // Login
-            const response = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ username, password })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                showSuccess('Login successful!');
-                
-                // Save user session with token for persistent login
-                saveUserSession({
-                    username: data.username,
-                    user_id: data.user_id,
-                    token: data.token
-                });
-                
-                setTimeout(() => {
-                    loader.style.display = 'none';
-                    document.getElementById('auth-container').style.display = 'none';
-                    
-                    // Initialize main app
-                    showContainer('chat');
-                    updateProfileSection();
-                    
-                    // Load profile data
-                    setTimeout(() => {
-                        loadProfile();
-                    }, 500);
-                    
-                }, 500);
-            } else {
-                throw new Error(data.error || 'Login failed');
-            }
-        } else {
-            // Signup
-            const response = await fetch('/api/auth/register', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ username, password })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                showSuccess('Account created successfully! Please login.');
-                setTimeout(() => {
-                    loader.style.display = 'none';
-                    toggleAuth();
-                }, 1000);
-            } else {
-                throw new Error(data.error || 'Registration failed');
-            }
-        }
-    } catch (error) {
-        loader.style.display = 'none';
-        showError(error.message);
-    }
-}
-
-function toggleAuth() {
-    isLogin = !isLogin;
-    const authTitle = document.getElementById('auth-title');
-    const authButton = document.querySelector('.auth-box button');
-    const toggleText = document.getElementById('toggle-text');
-    const toggleLink = document.getElementById('toggle-link');
-    elements.errorDisplay.style.display = 'none';
-    elements.successDisplay.style.display = 'none';
-    
-    if (isLogin) {
-        authTitle.textContent = 'Login';
-        authButton.textContent = 'Login';
-        toggleText.textContent = "Don't have an account? ";
-        toggleLink.textContent = 'Sign Up';
-    } else {
-        authTitle.textContent = 'Sign Up';
-        authButton.textContent = 'Sign Up';
-        toggleText.textContent = 'Already have an account? ';
-        toggleLink.textContent = 'Login';
-    }
-    
-    // Reset username validation
-    const usernameInput = document.getElementById('auth-username');
-    if (usernameInput) {
-        usernameInput.classList.remove('username-valid', 'username-invalid');
-    }
-}
 
 // ===== TYPING INDICATOR FUNCTIONS =====
 function showTypingIndicator(username) {
@@ -5874,27 +5504,234 @@ function setupTypingSocketEvents() {
     });
 }
 
-// ===== UTILITY FUNCTIONS =====
-function showSuccess(message) {
-    const successDisplay = document.getElementById('success-message');
-    if (successDisplay) {
-        successDisplay.textContent = message;
-        successDisplay.style.display = 'block';
-        setTimeout(() => {
-            successDisplay.style.display = 'none';
-        }, 3000);
+// ===== AUTHENTICATION FUNCTIONS =====
+async function handleAuth() {
+    const username = document.getElementById('auth-username').value.trim();
+    const password = document.getElementById('auth-password').value;
+    const loader = document.getElementById('loader');
+    
+    elements.errorDisplay.style.display = 'none';
+    elements.successDisplay.style.display = 'none';
+    
+    if (!username || !password) {
+        showError('Please enter both username and password');
+        return;
+    }
+    
+    if (username.length < 3 || username.length > 20) {
+        showError('Username must be between 3-20 characters');
+        return;
+    }
+    
+    if (password.length < 4 || password.length > 20) {
+        showError('Password must be between 4-20 characters');
+        return;
+    }
+    
+    // Validate username format
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+        showError('Username can only contain letters, numbers, and underscores');
+        return;
+    }
+    
+    loader.style.display = 'flex';
+    
+    try {
+        if (isLogin) {
+            // Login - USING UPDATED ENDPOINT
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, password })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showSuccess('Login successful!');
+                
+                // Save user session with token for persistent login
+                saveUserSession({
+                    username: data.username,
+                    user_id: data.user_id,
+                    token: data.token
+                });
+                
+                setTimeout(() => {
+                    loader.style.display = 'none';
+                    document.getElementById('auth-container').style.display = 'none';
+                    
+                    // Use the new initializeMainApp function
+                    initializeMainApp();
+                }, 500);
+            } else {
+                throw new Error(data.error || 'Login failed');
+            }
+        } else {
+            // Signup - USING UPDATED ENDPOINT
+            const response = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, password })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showSuccess('Account created successfully! Please login.');
+                setTimeout(() => {
+                    loader.style.display = 'none';
+                    toggleAuth();
+                }, 1000);
+            } else {
+                throw new Error(data.error || 'Registration failed');
+            }
+        }
+    } catch (error) {
+        loader.style.display = 'none';
+        showError(error.message);
     }
 }
 
-function showError(message) {
-    const errorDisplay = document.getElementById('error-message');
-    if (errorDisplay) {
-        errorDisplay.textContent = message;
-        errorDisplay.style.display = 'block';
-        setTimeout(() => {
-            errorDisplay.style.display = 'none';
-        }, 3000);
+function toggleAuth() {
+    isLogin = !isLogin;
+    const authTitle = document.getElementById('auth-title');
+    const authButton = document.querySelector('.auth-box button');
+    const toggleText = document.getElementById('toggle-text');
+    const toggleLink = document.getElementById('toggle-link');
+    elements.errorDisplay.style.display = 'none';
+    elements.successDisplay.style.display = 'none';
+    
+    if (isLogin) {
+        authTitle.textContent = 'Login';
+        authButton.textContent = 'Login';
+        toggleText.textContent = "Don't have an account? ";
+        toggleLink.textContent = 'Sign Up';
+    } else {
+        authTitle.textContent = 'Sign Up';
+        authButton.textContent = 'Sign Up';
+        toggleText.textContent = 'Already have an account? ';
+        toggleLink.textContent = 'Login';
     }
+    
+    // Reset username validation
+    const usernameInput = document.getElementById('auth-username');
+    if (usernameInput) {
+        usernameInput.classList.remove('username-valid', 'username-invalid');
+    }
+}
+
+// ===== ENHANCED USER SESSION MANAGEMENT =====
+function checkUserSession() {
+    // Check localStorage first for persistent login
+    const savedSession = localStorage.getItem('userSession');
+    const savedToken = localStorage.getItem('auth_token');
+    
+    if (savedSession && savedToken) {
+        try {
+            currentUserSession = JSON.parse(savedSession);
+            return true;
+        } catch (e) {
+            console.error('Error parsing saved session:', e);
+            clearUserSession();
+        }
+    }
+    
+    // Fallback to sessionStorage
+    const sessionData = sessionStorage.getItem('currentUserSession');
+    if (sessionData) {
+        currentUserSession = JSON.parse(sessionData);
+        return true;
+    }
+    return false;
+}
+
+function saveUserSession(userData) {
+    currentUserSession = userData;
+    
+    // Save to both sessionStorage (for current session) and localStorage (for persistence)
+    sessionStorage.setItem('currentUserSession', JSON.stringify(userData));
+    localStorage.setItem('userSession', JSON.stringify(userData));
+    
+    // Also store token for API calls
+    if (userData.token) {
+        localStorage.setItem('auth_token', userData.token);
+    }
+    
+    console.log('✅ User session saved for persistent login');
+}
+
+function clearUserSession() {
+    currentUserSession = null;
+    sessionStorage.removeItem('currentUserSession');
+    localStorage.removeItem('userSession');
+    localStorage.removeItem('auth_token');
+    console.log('✅ User session cleared');
+}
+
+// ===== AUTO-LOGIN FUNCTIONALITY =====
+async function attemptAutoLogin() {
+    const savedSession = localStorage.getItem('userSession');
+    const savedToken = localStorage.getItem('auth_token');
+    
+    if (!savedSession || !savedToken) {
+        return false;
+    }
+    
+    try {
+        const userData = JSON.parse(savedSession);
+        const response = await fetch('/api/auth/auto-login', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${savedToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            console.log('✅ Auto-login successful for:', data.username);
+            
+            // Update session with fresh data
+            saveUserSession({
+                ...userData,
+                username: data.username,
+                user_id: data.user_id
+            });
+            
+            return true;
+        } else {
+            // Auto-login failed, clear invalid session
+            clearUserSession();
+            return false;
+        }
+    } catch (error) {
+        console.error('Auto-login error:', error);
+        clearUserSession();
+        return false;
+    }
+}
+
+// ===== UTILITY FUNCTIONS =====
+function showSuccess(message) {
+    elements.successDisplay.textContent = message;
+    elements.successDisplay.style.display = 'block';
+    setTimeout(() => {
+        elements.successDisplay.style.display = 'none';
+    }, 3000);
+}
+
+function showError(message) {
+    elements.errorDisplay.textContent = message;
+    elements.errorDisplay.style.display = 'block';
+    setTimeout(() => {
+        elements.errorDisplay.style.display = 'none';
+    }, 3000);
 }
 
 function autoResize(textarea) {
@@ -7969,17 +7806,353 @@ function clearOldMessageTracking() {
 // Run cleanup every 30 seconds
 setInterval(clearOldMessageTracking, 30000);
 
-// ===== ADDED: Profile functions =====
+// ===== FIXED: ENHANCED PROFILE MANAGEMENT FUNCTIONS =====
+async function loadProfile() {
+    const username = currentUserSession?.username;
+    if (!username) {
+        showError('You must be logged in to load profile');
+        return;
+    }
+    
+    console.log('🔍 Loading profile for:', username);
+    
+    try {
+        const token = localStorage.getItem('auth_token');
+        console.log('🔐 Using token:', token ? 'Present' : 'Missing');
+        
+        const response = await fetch('/api/user/profile', {
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        console.log('📡 Profile response status:', response.status);
+        
+        if (!response.ok) {
+            throw new Error(`Failed to load profile: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('📊 Profile data received:', data);
+        
+        if (data.success && data.profile) {
+            const profile = data.profile;
+            
+            // Populate form fields
+            document.getElementById('profile-firstname').value = profile.firstname || '';
+            document.getElementById('profile-lastname').value = profile.lastname || '';
+            document.getElementById('profile-username').value = profile.username || username;
+            document.getElementById('profile-bio').value = profile.bio || '';
+            document.getElementById('profile-age').value = profile.age || '';
+            document.getElementById('profile-gender').value = profile.gender || '';
+            document.getElementById('profile-location').value = profile.location || '';
+            document.getElementById('profile-interests').value = profile.interests || '';
+            document.getElementById('profile-avatar-img').src = profile.avatar || profile.avatar_url || `https://i.pravatar.cc/150?u=${username}`;
+            
+            // Update display section
+            updateProfileDisplay(profile);
+            
+            // Update localStorage for posts functionality
+            const userProfiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
+            userProfiles[username] = profile;
+            localStorage.setItem('userProfiles', JSON.stringify(userProfiles));
+            
+            console.log('✅ Profile loaded successfully');
+        } else {
+            throw new Error(data.error || 'Failed to load profile');
+        }
+    } catch (error) {
+        console.error('❌ Error loading profile:', error);
+        
+        // Fallback to local storage if API fails
+        const storedProfiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
+        if (storedProfiles[username]) {
+            const profile = storedProfiles[username];
+            updateProfileDisplay(profile);
+            console.log('✅ Loaded profile from localStorage as fallback');
+        } else {
+            // Create default profile
+            const defaultProfile = {
+                username: username,
+                firstname: '',
+                lastname: '',
+                bio: '',
+                age: '',
+                gender: '',
+                location: '',
+                interests: '',
+                avatar: `https://i.pravatar.cc/150?u=${username}`
+            };
+            updateProfileDisplay(defaultProfile);
+            console.log('✅ Created default profile');
+        }
+    }
+}
+
+// FIXED: Save profile function with better error handling
+async function saveProfile() {
+    const username = currentUserSession?.username;
+    if (!username) {
+        showError('You must be logged in to save profile');
+        return;
+    }
+    
+    console.log('💾 Saving profile for:', username);
+    
+    const profileData = {
+        firstname: document.getElementById('profile-firstname').value.trim(),
+        lastname: document.getElementById('profile-lastname').value.trim(),
+        username: document.getElementById('profile-username').value.trim() || username,
+        bio: document.getElementById('profile-bio').value.trim(),
+        age: document.getElementById('profile-age').value.trim(),
+        gender: document.getElementById('profile-gender').value.trim(),
+        location: document.getElementById('profile-location').value.trim(),
+        interests: document.getElementById('profile-interests').value.trim(),
+        avatar: document.getElementById('profile-avatar-img').src
+    };
+    
+    console.log('📝 Profile data:', profileData);
+    
+    try {
+        const token = localStorage.getItem('auth_token');
+        console.log('🔐 Using token for save:', token ? 'Present' : 'Missing');
+        
+        // Try both PUT and POST methods for compatibility
+        const response = await fetch('/api/user/profile', {
+            method: 'PUT', // Try PUT first
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': token ? `Bearer ${token}` : ''
+            },
+            body: JSON.stringify(profileData)
+        });
+        
+        console.log('📡 Save response status:', response.status);
+        
+        let data;
+        if (!response.ok) {
+            // If PUT fails, try POST
+            console.log('🔄 PUT failed, trying POST...');
+            const postResponse = await fetch('/api/user/profile', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': token ? `Bearer ${token}` : ''
+                },
+                body: JSON.stringify(profileData)
+            });
+            
+            if (!postResponse.ok) {
+                throw new Error(`Failed to save profile: ${postResponse.status}`);
+            }
+            
+            data = await postResponse.json();
+        } else {
+            data = await response.json();
+        }
+        
+        console.log('📊 Save response data:', data);
+        
+        if (data.success) {
+            // Update display section with the returned profile data
+            updateProfileDisplay(data.profile || profileData);
+            
+            // Update localStorage for userProfiles (for posts functionality)
+            const userProfiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
+            userProfiles[username] = data.profile || profileData;
+            localStorage.setItem('userProfiles', JSON.stringify(userProfiles));
+            
+            // Update session with new username if changed
+            if (data.profile && data.profile.username !== username) {
+                currentUserSession.username = data.profile.username;
+                saveUserSession(currentUserSession);
+                
+                // Update profile section in dropdown
+                updateProfileSection();
+                
+                // Load profile again to refresh everything
+                setTimeout(() => loadProfile(), 500);
+            }
+            
+            // Show success message
+            showSuccess('Profile updated successfully!');
+            
+            // Force refresh profile display in all components
+            forceRefreshProfileDisplay();
+            
+            // Close profile editor after a short delay
+            setTimeout(() => {
+                hideContainer('profile');
+                // Show main chat
+                showContainer('chat');
+            }, 1500);
+        } else {
+            throw new Error(data.error || 'Failed to update profile');
+        }
+    } catch (error) {
+        console.error('❌ Error saving profile:', error);
+        showError(error.message);
+        
+        // Fallback: Save to localStorage if server fails
+        try {
+            const userProfiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
+            userProfiles[username] = profileData;
+            localStorage.setItem('userProfiles', JSON.stringify(userProfiles));
+            updateProfileDisplay(profileData);
+            showSuccess('Profile saved locally (server unavailable)');
+        } catch (localError) {
+            console.error('❌ Failed to save locally:', localError);
+        }
+    }
+}
+
+// FIXED: Force refresh profile display across all components
+function forceRefreshProfileDisplay() {
+    const username = currentUserSession?.username;
+    if (!username) return;
+    
+    // Load profile data again to ensure consistency
+    setTimeout(() => {
+        loadProfile();
+        updateProfileSection();
+        
+        // Also update posts if they're loaded
+        if (document.getElementById('posts').style.display === 'block') {
+            initializePosts();
+        }
+        
+        // Clear any cached profile data
+        localStorage.removeItem(`profile_${username}_cache`);
+        sessionStorage.removeItem(`profile_${username}_cache`);
+        
+        console.log('🔄 Profile display force-refreshed');
+    }, 500);
+}
+
+// FIXED: Profile display function - properly updates the dropdown
+function updateProfileDisplay(profile) {
+    console.log('🎨 Updating profile display with:', profile);
+    
+    // Update display section in dropdown
+    const displayUsername = document.getElementById('display-username');
+    const displayBio = document.getElementById('display-bio');
+    const displayAvatar = document.getElementById('display-avatar');
+    
+    if (displayUsername) {
+        let displayName = profile.username || currentUserSession?.username || 'User';
+        
+        if (profile.firstname && profile.lastname) {
+            displayName = `${profile.firstname} ${profile.lastname}`;
+        } else if (profile.firstname) {
+            displayName = profile.firstname;
+        } else if (profile.lastname) {
+            displayName = profile.lastname;
+        } else if (profile.display_name) {
+            displayName = profile.display_name;
+        }
+        
+        displayUsername.textContent = displayName;
+        console.log('✅ Updated display name:', displayName);
+    }
+    
+    if (displayBio) {
+        displayBio.textContent = profile.bio || 'No bio yet';
+        console.log('✅ Updated bio:', profile.bio || 'No bio yet');
+    }
+    
+    if (displayAvatar) {
+        const avatarUrl = profile.avatar || profile.avatar_url || `https://i.pravatar.cc/50?u=${profile.username || currentUserSession?.username || 'default'}`;
+        displayAvatar.src = avatarUrl;
+        console.log('✅ Updated avatar:', avatarUrl);
+    }
+    
+    // Update profile picture in messages if needed
+    updateMessageAvatars(profile.avatar || profile.avatar_url);
+    
+    // Cache the profile data for quick access
+    cacheProfileData(profile);
+}
+
 function changeAvatar() {
     const avatarUrl = prompt('Enter the URL for your new profile picture:');
     if (avatarUrl) {
         // Basic URL validation
         if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) {
             document.getElementById('profile-avatar-img').src = avatarUrl;
+            
+            // Auto-save the avatar change
+            setTimeout(() => saveProfile(), 1000);
         } else {
             showError('Please enter a valid URL starting with http:// or https://');
         }
     }
+}
+
+function updateMessageAvatars(avatarUrl) {
+    if (!avatarUrl) return;
+    
+    // Update all message avatars for the current user
+    const userMessages = document.querySelectorAll('.message.sent .avatar img');
+    userMessages.forEach(img => {
+        img.src = avatarUrl;
+    });
+    
+    // Also update in online users list
+    const onlineUserAvatars = document.querySelectorAll('.online-user-avatar img');
+    const currentUsername = currentUserSession?.username;
+    
+    onlineUserAvatars.forEach(img => {
+        const userItem = img.closest('.online-user');
+        if (userItem) {
+            const userNameElement = userItem.querySelector('.online-user-name');
+            if (userNameElement && userNameElement.textContent === currentUsername) {
+                img.src = avatarUrl;
+            }
+        }
+    });
+}
+
+// FIXED: Cache profile data for quick access
+function cacheProfileData(profile) {
+    const username = currentUserSession?.username;
+    if (!username) return;
+    
+    try {
+        // Cache in localStorage (persistent)
+        localStorage.setItem(`profile_${username}_cache`, JSON.stringify(profile));
+        
+        // Cache in sessionStorage (temporary)
+        sessionStorage.setItem(`profile_${username}_cache`, JSON.stringify(profile));
+        
+        console.log('💾 Profile data cached');
+    } catch (error) {
+        console.error('❌ Error caching profile:', error);
+    }
+}
+
+// FIXED: Get cached profile data
+function getCachedProfile() {
+    const username = currentUserSession?.username;
+    if (!username) return null;
+    
+    try {
+        // Try sessionStorage first (more recent)
+        const sessionCache = sessionStorage.getItem(`profile_${username}_cache`);
+        if (sessionCache) {
+            return JSON.parse(sessionCache);
+        }
+        
+        // Try localStorage next
+        const localCache = localStorage.getItem(`profile_${username}_cache`);
+        if (localCache) {
+            return JSON.parse(localCache);
+        }
+    } catch (error) {
+        console.error('❌ Error getting cached profile:', error);
+    }
+    
+    return null;
 }
 
 // FIXED: Profile section creation function
@@ -7999,15 +8172,28 @@ function updateProfileSection() {
     
     // Only add profile section if user is logged in
     if (currentUsername) {
+        // Try to get cached profile first
+        const cachedProfile = getCachedProfile();
+        const displayName = cachedProfile?.firstname && cachedProfile?.lastname 
+            ? `${cachedProfile.firstname} ${cachedProfile.lastname}`
+            : cachedProfile?.firstname 
+                ? cachedProfile.firstname 
+                : cachedProfile?.display_name 
+                    ? cachedProfile.display_name 
+                    : currentUsername;
+        
+        const bio = cachedProfile?.bio || 'No bio yet';
+        const avatarUrl = cachedProfile?.avatar || cachedProfile?.avatar_url || `https://i.pravatar.cc/50?u=${encodeURIComponent(currentUsername)}`;
+        
         const profileSection = document.createElement('div');
         profileSection.className = 'profile-display-section';
         profileSection.innerHTML = `
             <div class="profile-display-avatar">
-                <img id="display-avatar" src="https://i.pravatar.cc/50?u=${encodeURIComponent(currentUsername)}" alt="Profile">
+                <img id="display-avatar" src="${avatarUrl}" alt="Profile">
             </div>
             <div class="profile-display-info">
-                <div class="profile-display-username" id="display-username">${currentUsername}</div>
-                <div class="profile-display-bio" id="display-bio">No bio yet</div>
+                <div class="profile-display-username" id="display-username">${displayName}</div>
+                <div class="profile-display-bio" id="display-bio">${bio}</div>
             </div>
             <div class="profile-display-edit" onclick="showContainer('profile')">
                 Edit
@@ -8022,23 +8208,58 @@ function updateProfileSection() {
         dropdown.insertBefore(profileSection, dropdown.firstChild);
         
         console.log('✅ Profile section created for user:', currentUsername);
+        
+        // Load fresh profile data in background
+        setTimeout(() => loadProfile(), 1000);
     }
 }
 
-// ===== ADDED: USER PROFILE POPUP FUNCTIONS =====
-function showUserProfile(username) {
+// ===== ADDED: ENHANCED USER PROFILE POPUP FUNCTIONS =====
+async function showUserProfile(username) {
     const popup = document.getElementById('user-profile-popup');
     if (!popup) return;
     
-    // Get user profile data from API
-    const token = localStorage.getItem('auth_token');
-    fetch(`/api/user/profile/${username}`, {
-        headers: {
-            'Authorization': token ? `Bearer ${token}` : ''
+    console.log('👤 Loading user profile for:', username);
+    
+    // Show loading state
+    popup.innerHTML = `
+        <div class="user-profile-content">
+            <div class="user-profile-header">
+                <div class="user-profile-avatar loading"></div>
+                <div class="user-profile-info">
+                    <h3 class="loading" style="width: 120px; height: 24px;"></h3>
+                    <div class="user-profile-status loading" style="width: 80px; height: 16px;"></div>
+                </div>
+            </div>
+            <div class="user-profile-body">
+                <div class="user-profile-section">
+                    <h4>Bio</h4>
+                    <p class="loading" style="width: 100%; height: 60px;"></p>
+                </div>
+            </div>
+        </div>
+    `;
+    popup.style.display = 'flex';
+    
+    try {
+        // Get user profile data from API
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch(`/api/user/profile/${username}`, {
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : ''
+            }
+        });
+        
+        let profile;
+        if (response.ok) {
+            const data = await response.json();
+            profile = data.profile || data;
+        } else {
+            // Fallback to cached data or default
+            const userProfiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
+            profile = userProfiles[username];
         }
-    })
-    .then(response => response.json())
-    .then(profile => {
+        
         // Set default values
         const defaultProfile = {
             firstname: '',
@@ -8049,15 +8270,60 @@ function showUserProfile(username) {
             gender: '',
             location: '',
             interests: '',
-            avatar: `https://i.pravatar.cc/150?u=${username}`
+            avatar: `https://i.pravatar.cc/150?u=${username}`,
+            status: 'offline'
         };
         
         const userProfile = { ...defaultProfile, ...profile };
         
         // Update popup content
-        document.getElementById('popup-avatar').src = userProfile.avatar;
+        popup.innerHTML = `
+            <div class="user-profile-content">
+                <div class="user-profile-header">
+                    <div class="user-profile-avatar">
+                        <img id="popup-avatar" src="${userProfile.avatar}" alt="${username}">
+                    </div>
+                    <div class="user-profile-info">
+                        <h3 id="popup-username">${username}</h3>
+                        <div class="user-profile-status">
+                            <span id="popup-status-dot" class="user-status-indicator ${userProfile.status === 'online' ? 'online' : 'offline'}"></span>
+                            <span id="popup-status-text">${userProfile.status === 'online' ? 'Online' : 'Offline'}</span>
+                        </div>
+                    </div>
+                    <button class="close-popup" onclick="hideUserProfile()">×</button>
+                </div>
+                <div class="user-profile-body">
+                    <div class="user-profile-section">
+                        <h4>Bio</h4>
+                        <p id="popup-bio">${userProfile.bio || 'No bio available'}</p>
+                    </div>
+                    <div class="user-profile-details">
+                        <div class="detail-item">
+                            <span class="detail-label">Age</span>
+                            <span id="popup-age" class="detail-value">${userProfile.age || 'Not specified'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Gender</span>
+                            <span id="popup-gender" class="detail-value">${userProfile.gender ? userProfile.gender.charAt(0).toUpperCase() + userProfile.gender.slice(1) : 'Not specified'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Location</span>
+                            <span id="popup-location" class="detail-value">${userProfile.location || 'Not specified'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Interests</span>
+                            <span id="popup-interests" class="detail-value">${userProfile.interests || 'Not specified'}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="user-profile-footer">
+                    <button id="popup-message-btn" class="btn-primary" onclick="messageUserFromPopup('${username}')">Message</button>
+                    <button class="btn-secondary" onclick="hideUserProfile()">Close</button>
+                </div>
+            </div>
+        `;
         
-        // Set display name
+        // Update display name if available
         let displayName = username;
         if (userProfile.firstname && userProfile.lastname) {
             displayName = `${userProfile.firstname} ${userProfile.lastname}`;
@@ -8065,71 +8331,60 @@ function showUserProfile(username) {
             displayName = userProfile.firstname;
         } else if (userProfile.lastname) {
             displayName = userProfile.lastname;
+        } else if (userProfile.display_name) {
+            displayName = userProfile.display_name;
         }
+        
         document.getElementById('popup-username').textContent = displayName;
         
-        // Set status (check if user is online)
-        const statusDot = document.getElementById('popup-status-dot');
-        const statusText = document.getElementById('popup-status-text');
-        const isOnline = onlineUsers.includes(username);
-        
-        statusDot.className = `user-status-indicator ${isOnline ? 'online' : 'offline'}`;
-        statusText.textContent = isOnline ? 'Online' : 'Offline';
-        
-        // Set bio
-        document.getElementById('popup-bio').textContent = userProfile.bio || 'No bio available';
-        
-        // Set details
-        document.getElementById('popup-age').textContent = userProfile.age || 'Not specified';
-        document.getElementById('popup-gender').textContent = userProfile.gender ? 
-            userProfile.gender.charAt(0).toUpperCase() + userProfile.gender.slice(1) : 'Not specified';
-        document.getElementById('popup-location').textContent = userProfile.location || 'Not specified';
-        document.getElementById('popup-interests').textContent = userProfile.interests || 'Not specified';
-        
-        // Update message button
+        // Update message button visibility
         const messageBtn = document.getElementById('popup-message-btn');
         const currentUser = currentUserSession?.username;
         if (username === currentUser) {
             messageBtn.style.display = 'none';
-        } else {
-            messageBtn.style.display = 'block';
-            messageBtn.onclick = () => {
-                hideUserProfile();
-                // Switch to private messages and open chat with this user
-                showContainer('private-messages');
-                setTimeout(() => {
-                    openPrivateChat(username);
-                }, 100);
-            };
         }
         
-        // Show popup
-        popup.style.display = 'flex';
-    })
-    .catch(error => {
-        console.error('Error loading user profile:', error);
-        // Fallback to basic profile display
-        const popup = document.getElementById('user-profile-popup');
-        if (popup) {
-            document.getElementById('popup-avatar').src = `https://i.pravatar.cc/150?u=${username}`;
-            document.getElementById('popup-username').textContent = username;
-            document.getElementById('popup-bio').textContent = 'No bio available';
-            document.getElementById('popup-age').textContent = 'Not specified';
-            document.getElementById('popup-gender').textContent = 'Not specified';
-            document.getElementById('popup-location').textContent = 'Not specified';
-            document.getElementById('popup-interests').textContent = 'Not specified';
-            
-            const messageBtn = document.getElementById('popup-message-btn');
-            const currentUser = currentUserSession?.username;
-            if (username === currentUser) {
-                messageBtn.style.display = 'none';
-            } else {
-                messageBtn.style.display = 'block';
-            }
-            
-            popup.style.display = 'flex';
-        }
-    });
+        console.log('✅ User profile loaded:', username);
+        
+    } catch (error) {
+        console.error('❌ Error loading user profile:', error);
+        // Show error state
+        popup.innerHTML = `
+            <div class="user-profile-content">
+                <div class="user-profile-header">
+                    <div class="user-profile-avatar">
+                        <img src="https://i.pravatar.cc/150?u=${username}" alt="${username}">
+                    </div>
+                    <div class="user-profile-info">
+                        <h3>${username}</h3>
+                        <div class="user-profile-status">
+                            <span class="user-status-indicator offline"></span>
+                            <span>Offline</span>
+                        </div>
+                    </div>
+                    <button class="close-popup" onclick="hideUserProfile()">×</button>
+                </div>
+                <div class="user-profile-body">
+                    <div class="error-message">
+                        <p>Unable to load profile information.</p>
+                    </div>
+                </div>
+                <div class="user-profile-footer">
+                    <button class="btn-primary" onclick="messageUserFromPopup('${username}')">Message</button>
+                    <button class="btn-secondary" onclick="hideUserProfile()">Close</button>
+                </div>
+            </div>
+        `;
+    }
+}
+
+function messageUserFromPopup(username) {
+    hideUserProfile();
+    // Switch to private messages and open chat with this user
+    showContainer('private-messages');
+    setTimeout(() => {
+        openPrivateChat(username);
+    }, 100);
 }
 
 function hideUserProfile() {
@@ -8137,11 +8392,6 @@ function hideUserProfile() {
     if (popup) {
         popup.style.display = 'none';
     }
-}
-
-function messageUser() {
-    // This function is called from the popup message button
-    // The actual implementation is in showUserProfile function
 }
 
 // ===== FIXED: MESSAGE ORDER AND SECTION MANAGEMENT =====
@@ -9367,105 +9617,116 @@ function setupPrivateMessageInputHandlers() {
     }
 }
 
-// ===== AUTO-LOGIN FUNCTIONALITY =====
-async function attemptAutoLogin() {
-    const savedSession = localStorage.getItem('userSession');
-    const savedToken = localStorage.getItem('auth_token');
+// ===== FIXED: MAIN APP INITIALIZATION =====
+async function initializeMainApp() {
+    console.log('🚀 Initializing main app...');
     
-    if (!savedSession || !savedToken) {
-        return false;
+    // Check if user session exists
+    if (!checkUserSession()) {
+        console.error('❌ No user session found');
+        document.getElementById('auth-container').style.display = 'flex';
+        return;
     }
     
+    const username = currentUserSession?.username;
+    console.log('👤 Initializing for user:', username);
+    
+    // Show main containers
+    document.getElementById('auth-container').style.display = 'none';
+    document.getElementById('chat').style.display = 'block';
+    
+    const chatInput = document.querySelector('.chat-input');
+    if (chatInput) chatInput.style.display = 'flex';
+    
+    // Update profile section
+    updateProfileSection();
+    
+    // Initialize chat components
+    initializeChat();
+    initializeButtons();
+    
+    // Initialize real-time features
+    initSocket();
+    setupTypingHandlers();
+    setupTypingDetection();
+    setupTypingSocketEvents();
+    
+    // Initialize private messaging
+    initializePrivateMessaging();
+    
+    // Load user profile
+    setTimeout(() => {
+        loadProfile();
+        // Also load profile for display in dropdown
+        loadProfileForDisplay();
+    }, 1000);
+    
+    // Add page event listeners
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
+    
+    // Enable SQL Editor access if already verified
+    if (hasVerifiedCode()) {
+        enableSQLEditorAccess();
+    }
+    
+    // Initialize online panel toggle
+    initializeOnlinePanelToggle();
+    
+    // Load user panel preference
+    loadUserPanelPreference();
+    
+    console.log('✅ Main app initialized successfully');
+}
+
+// ===== FIXED: Load profile for display function =====
+async function loadProfileForDisplay() {
+    const username = currentUserSession?.username;
+    if (!username) return;
+    
+    console.log('📋 Loading profile for display:', username);
+    
     try {
-        const userData = JSON.parse(savedSession);
-        const response = await fetch('/api/auth/auto-login', {
-            method: 'POST',
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch('/api/user/profile', {
             headers: {
-                'Authorization': `Bearer ${savedToken}`,
-                'Content-Type': 'application/json'
+                'Authorization': token ? `Bearer ${token}` : ''
             }
         });
         
-        const data = await response.json();
-        
-        if (data.success) {
-            console.log('✅ Auto-login successful for:', data.username);
-            
-            // Update session with fresh data
-            saveUserSession({
-                ...userData,
-                username: data.username,
-                user_id: data.user_id
-            });
-            
-            return true;
-        } else {
-            // Auto-login failed, clear invalid session
-            clearUserSession();
-            return false;
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.profile) {
+                updateProfileDisplay(data.profile);
+                console.log('✅ Profile loaded for display');
+            }
         }
     } catch (error) {
-        console.error('Auto-login error:', error);
-        clearUserSession();
-        return false;
+        console.error('❌ Error loading profile for display:', error);
     }
 }
 
-// ===== INITIALIZATION =====
+// Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
-    // Attempt auto-login first
-    attemptAutoLogin().then(success => {
-        if (success || checkUserSession()) {
-            document.getElementById('auth-container').style.display = 'none';
-            showContainer('chat');
-            updateProfileSection();
-            
-            // Load profile data
-            setTimeout(() => {
-                loadProfile();
-            }, 500);
-            
-            // Initialize real-time features
-            initSocket();
-            setupTypingHandlers();
-            setupTypingDetection();
-            setupTypingSocketEvents();
-            
-            // Add page event listeners
-            document.addEventListener('visibilitychange', handleVisibilityChange);
-            window.addEventListener('beforeunload', handleBeforeUnload);
-            window.addEventListener('pagehide', handlePageHide);
-            
-            // Enable SQL Editor access if already verified
-            if (hasVerifiedCode()) {
-                enableSQLEditorAccess();
-            }
+    console.log('📄 DOM loaded');
+    
+    // Try auto-login first
+    attemptAutoLogin().then(isLoggedIn => {
+        if (isLoggedIn) {
+            console.log('✅ Auto-login successful');
+            initializeMainApp();
         } else {
+            console.log('🔒 Auto-login failed or no session found');
             document.getElementById('auth-container').style.display = 'flex';
         }
+    }).catch(error => {
+        console.error('❌ Auto-login error:', error);
+        document.getElementById('auth-container').style.display = 'flex';
     });
     
-    // Setup event listeners
-    const authButton = document.querySelector('.auth-box button');
-    if (authButton) {
-        authButton.addEventListener('click', handleAuth);
-    }
-    
-    const toggleLink = document.getElementById('toggle-link');
-    if (toggleLink) {
-        toggleLink.addEventListener('click', toggleAuth);
-    }
-    
-    // Setup profile form
-    const saveProfileButton = document.getElementById('save-profile-button');
-    if (saveProfileButton) {
-        saveProfileButton.addEventListener('click', saveProfile);
-    }
-    
-    const changeAvatarButton = document.getElementById('change-avatar-button');
-    if (changeAvatarButton) {
-        changeAvatarButton.addEventListener('click', changeAvatar);
-    }
+    // Setup username validation
+    setupUsernameValidation();
 });
 
 // Add click handler for images to open zoom
@@ -9474,7 +9735,6 @@ document.addEventListener('click', function (e) {
         openZoom(e.target.src);
     }
 });
-
  </script>
 </body>
 </html>
