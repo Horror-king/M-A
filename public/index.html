@@ -5364,9 +5364,6 @@ let userPanelVisible = true;
 // ✅ ADDED: Current user session
 let currentUserSession = null;
 
-// ✅ ADDED: Avatar Cache for user avatars
-const avatarCache = new Map();
-
 const elements = {
     usernameInput: document.getElementById('auth-username'),
     messageInput: document.getElementById('user-input'),
@@ -5380,197 +5377,6 @@ const elements = {
 };
 
 let replyToText = null;
-
-// ===== ADDED: AVATAR FUNCTIONS =====
-async function fetchUserAvatar(username) {
-    try {
-        const response = await fetch(`/api/user/profile/${username}`);
-        if (!response.ok) return null;
-        
-        const data = await response.json();
-        if (data.success && data.profile) {
-            return data.profile.avatar_url || data.profile.avatar || `https://i.pravatar.cc/50?u=${username}`;
-        }
-        return null;
-    } catch (error) {
-        console.error('Error fetching avatar for', username, error);
-        return null;
-    }
-}
-
-// MODIFIED: Update online users lists to show actual avatars
-function updateOnlineUsersList(onlineUsers) {
-    console.log('Updating online users list with avatars:', onlineUsers);
-    
-    // Update main chat online list
-    updateSingleOnlineList('online-users-list', 'online-count', onlineUsers);
-    
-    // Update private AI online list
-    updateSingleOnlineList('private-online-users-list', 'private-online-count', onlineUsers);
-}
-
-// MODIFIED: Update single online list with actual avatars
-async function updateSingleOnlineList(listElementId, countElementId, onlineUsers) {
-    const onlineList = document.getElementById(listElementId);
-    const onlineCount = document.getElementById(countElementId);
-    
-    if (onlineList) {
-        onlineList.innerHTML = '';
-        
-        // Create a loading state
-        onlineList.innerHTML = '<div class="loading-users">Loading online users...</div>';
-        
-        // Process each user
-        for (const username of onlineUsers) {
-            const userElement = document.createElement('div');
-            userElement.className = 'online-user';
-            
-            // Check cache first
-            let avatarUrl = avatarCache.get(username);
-            
-            // If not in cache or cache is stale, fetch fresh data
-            if (!avatarUrl || avatarUrl.includes('pravatar')) {
-                avatarUrl = await fetchUserAvatar(username);
-                if (avatarUrl) {
-                    avatarCache.set(username, avatarUrl);
-                }
-            }
-            
-            // Use the avatar URL from cache or default
-            const displayAvatar = avatarUrl || `https://i.pravatar.cc/50?u=${encodeURIComponent(username)}`;
-            
-            userElement.innerHTML = `
-                <div class="online-user-avatar">
-                    <img src="${displayAvatar}" alt="${username}">
-                    <div class="online-dot"></div>
-                </div>
-                <div class="online-user-info">
-                    <div class="online-user-name">${username}</div>
-                </div>
-            `;
-            
-            // ADDED: Add click event to show user profile
-            userElement.onclick = () => {
-                showUserProfile(username);
-            };
-            
-            onlineList.appendChild(userElement);
-        }
-        
-        // Remove loading message if it exists
-        const loadingMsg = onlineList.querySelector('.loading-users');
-        if (loadingMsg) loadingMsg.remove();
-    }
-    
-    if (onlineCount) {
-        onlineCount.textContent = onlineUsers.length;
-    }
-}
-
-// MODIFIED: Clear avatar from cache when user goes offline
-function removeOfflineUser(username) {
-    console.log('Removing offline user from cache:', username);
-    
-    // Remove from cache
-    avatarCache.delete(username);
-    
-    // Remove from main chat online list
-    removeUserFromSingleList('online-users-list', 'online-count', username);
-    
-    // Remove from private AI online list
-    removeUserFromSingleList('private-online-users-list', 'private-online-count', username);
-    
-    // Update status indicator in messages to offline
-    updateUserStatusIndicator(username, 'offline');
-}
-
-function removeUserFromSingleList(listElementId, countElementId, username) {
-    const onlineList = document.getElementById(listElementId);
-    if (onlineList) {
-        const userElements = onlineList.querySelectorAll('.online-user');
-        userElements.forEach(userElement => {
-            const userNameElement = userElement.querySelector('.online-user-name');
-            if (userNameElement && userNameElement.textContent === username) {
-                userElement.remove();
-            }
-        });
-        // Update online count
-        const onlineCount = document.getElementById(countElementId);
-        if (onlineCount) {
-            const currentCount = parseInt(onlineCount.textContent) || 0;
-            onlineCount.textContent = Math.max(0, currentCount - 1);
-        }
-    }
-}
-
-// NEW: Function to refresh avatars for online users
-async function refreshOnlineUserAvatars() {
-    const onlineList = document.getElementById('online-users-list');
-    const privateList = document.getElementById('private-online-users-list');
-    
-    if (!onlineList && !privateList) return;
-    
-    console.log('Refreshing avatars for online users...');
-    
-    // Clear cache to force fresh fetch
-    avatarCache.clear();
-    
-    // Get current online users
-    const response = await fetch('/online-users');
-    if (!response.ok) return;
-    
-    const onlineUsers = await response.json();
-    
-    // Update both lists with fresh avatars
-    updateSingleOnlineList('online-users-list', 'online-count', onlineUsers);
-    updateSingleOnlineList('private-online-users-list', 'private-online-count', onlineUsers);
-}
-
-// Update user status indicator
-function updateUserStatusIndicator(username, status) {
-    // Find all online user elements and update their status
-    const onlineLists = [
-        document.getElementById('online-users-list'),
-        document.getElementById('private-online-users-list')
-    ];
-    
-    onlineLists.forEach(list => {
-        if (!list) return;
-        
-        const userElements = list.querySelectorAll('.online-user');
-        userElements.forEach(userElement => {
-            const userNameElement = userElement.querySelector('.online-user-name');
-            if (userNameElement && userNameElement.textContent === username) {
-                const dot = userElement.querySelector('.online-dot');
-                if (dot) {
-                    dot.className = 'online-dot';
-                    dot.classList.add(status === 'online' ? 'online' : 'away');
-                }
-            }
-        });
-    });
-    
-    // Update message avatars if they have status indicator
-    const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
-    userMessages.forEach(msg => {
-        let statusIndicator = msg.querySelector('.user-status-indicator');
-        if (!statusIndicator) {
-            statusIndicator = createStatusIndicator();
-            const usernameDiv = msg.querySelector('.username');
-            if (usernameDiv) {
-                usernameDiv.appendChild(statusIndicator);
-            }
-        }
-        statusIndicator.className = `user-status-indicator ${status}`;
-    });
-}
-
-// Create a status indicator element
-function createStatusIndicator() {
-    const indicator = document.createElement('span');
-    indicator.className = 'user-status-indicator';
-    return indicator;
-}
 
 // ===== TYPING INDICATOR FUNCTIONS =====
 function showTypingIndicator(username) {
@@ -6288,11 +6094,8 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
         const avatarDiv = document.createElement('div');
         avatarDiv.className = 'avatar';
         
-        // Get cached avatar or default
-        let avatarUrl = avatarCache.get(username);
-        if (!avatarUrl) {
-            avatarUrl = `https://i.pravatar.cc/50?u=${encodeURIComponent(username)}`;
-        }
+        // Get user profile to display correct avatar
+        const avatarUrl = `https://i.pravatar.cc/50?u=${encodeURIComponent(username)}`;
         
         avatarDiv.innerHTML = `<img src="${avatarUrl}" alt="avatar">`;
         
@@ -7062,9 +6865,6 @@ function logout() {
         sqlEditorMenuItem.style.display = 'none';
     }
     
-    // Clear avatar cache on logout
-    avatarCache.clear();
-    
     console.log('✅ User logged out successfully');
 }
 
@@ -7431,15 +7231,9 @@ async function loadPrivateUsers() {
             // For demo online status - in real app, use actual online status
             const isOnline = onlineUsers.includes(conversation.username);
             
-            // Get cached avatar or default
-            let avatarUrl = avatarCache.get(conversation.username);
-            if (!avatarUrl) {
-                avatarUrl = conversation.avatar || `https://i.pravatar.cc/50?u=${conversation.username}`;
-            }
-            
             userItem.innerHTML = `
                 <div class="user-avatar">
-                    <img src="${avatarUrl}" alt="${conversation.username}">
+                    <img src="${conversation.avatar || `https://i.pravatar.cc/50?u=${conversation.username}`}" alt="${conversation.username}">
                     <div class="user-status ${isOnline ? 'online' : 'offline'}"></div>
                     ${conversation.unread ? '<div class="unread-badge"></div>' : ''}
                 </div>
@@ -7487,15 +7281,8 @@ async function openPrivateChat(username) {
     }
     
     // Update chat header
-    const partnerAvatar = document.getElementById('partner-avatar');
-    if (partnerAvatar) {
-        // Get cached avatar or default
-        let avatarUrl = avatarCache.get(username);
-        if (!avatarUrl) {
-            avatarUrl = `https://i.pravatar.cc/50?u=${username}`;
-        }
-        partnerAvatar.innerHTML = `<img src="${avatarUrl}" alt="${username}">`;
-    }
+    document.getElementById('partner-avatar').innerHTML = 
+        `<img src="https://i.pravatar.cc/50?u=${username}" alt="${username}">`;
     
     document.getElementById('partner-name').textContent = username;
     
@@ -8025,7 +7812,7 @@ function clearOldMessageTracking() {
 setInterval(clearOldMessageTracking, 30000);
 
 // ===== FIXED: PROFILE MANAGEMENT FUNCTIONS =====
-// MODIFIED: Load profile from server with avatar cache
+// MODIFIED: Load profile from server instead of localStorage
 function loadProfile() {
     const username = currentUserSession?.username;
     if (!username) {
@@ -8068,21 +7855,12 @@ function loadProfile() {
             // Update display section
             updateProfileDisplay(profile);
             
-            // Update cache with current user's avatar
-            const avatarUrl = profile.avatar_url || profile.avatar || `https://i.pravatar.cc/50?u=${username}`;
-            avatarCache.set(username, avatarUrl);
-            
             // Store in localStorage for posts functionality
             const userProfiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
             userProfiles[username] = profile;
             localStorage.setItem('userProfiles', JSON.stringify(userProfiles));
             
             console.log('✅ Profile loaded successfully from server');
-            
-            // Refresh online users list after loading profile
-            setTimeout(() => {
-                refreshOnlineUserAvatars();
-            }, 1000);
         } else {
             console.error('Profile load failed:', data.error);
         }
@@ -8105,7 +7883,7 @@ function loadProfile() {
     });
 }
 
-// MODIFIED: Save profile to server with avatar cache update
+// MODIFIED: Save profile to server instead of localStorage
 function saveProfile() {
     const username = currentUserSession?.username;
     if (!username) {
@@ -8158,10 +7936,6 @@ function saveProfile() {
             userProfiles[username] = updatedProfile;
             localStorage.setItem('userProfiles', JSON.stringify(userProfiles));
             
-            // Update avatar in cache
-            const avatarUrl = updatedProfile.avatar_url || updatedProfile.avatar || `https://i.pravatar.cc/150?u=${username}`;
-            avatarCache.set(username, avatarUrl);
-            
             // Update form fields with returned data
             if (document.getElementById('profile-firstname')) {
                 document.getElementById('profile-firstname').value = updatedProfile.firstname || '';
@@ -8171,13 +7945,8 @@ function saveProfile() {
                 document.getElementById('profile-gender').value = updatedProfile.gender || '';
                 document.getElementById('profile-location').value = updatedProfile.location || '';
                 document.getElementById('profile-interests').value = updatedProfile.interests || '';
-                document.getElementById('profile-avatar-img').src = avatarUrl;
+                document.getElementById('profile-avatar-img').src = updatedProfile.avatar || `https://i.pravatar.cc/150?u=${username}`;
             }
-            
-            // IMPORTANT: Refresh online users list to show updated avatar
-            setTimeout(() => {
-                refreshOnlineUserAvatars();
-            }, 500);
             
             // Show success message
             showSuccess('Profile updated successfully and saved to server!');
@@ -8196,7 +7965,7 @@ function saveProfile() {
     });
 }
 
-// MODIFIED: Update showUserProfile to use cached avatar
+// MODIFIED: Get user profile from server for popups
 function showUserProfile(username) {
     const popup = document.getElementById('user-profile-popup');
     if (!popup) return;
@@ -8220,12 +7989,8 @@ function showUserProfile(username) {
         
         const userProfile = data.success ? data.profile : defaultProfile;
         
-        // Use cached avatar if available
-        const cachedAvatar = avatarCache.get(username);
-        const avatarUrl = cachedAvatar || userProfile.avatar || `https://i.pravatar.cc/150?u=${username}`;
-        
         // Update popup content
-        document.getElementById('popup-avatar').src = avatarUrl;
+        document.getElementById('popup-avatar').src = userProfile.avatar;
         
         // Set display name
         let displayName = username;
@@ -8281,10 +8046,7 @@ function showUserProfile(username) {
         // Fallback to basic profile display
         const popup = document.getElementById('user-profile-popup');
         if (popup) {
-            const cachedAvatar = avatarCache.get(username);
-            const avatarUrl = cachedAvatar || `https://i.pravatar.cc/150?u=${username}`;
-            
-            document.getElementById('popup-avatar').src = avatarUrl;
+            document.getElementById('popup-avatar').src = `https://i.pravatar.cc/150?u=${username}`;
             document.getElementById('popup-username').textContent = username;
             document.getElementById('popup-bio').textContent = 'No bio available';
             document.getElementById('popup-age').textContent = 'Not specified';
@@ -8384,16 +8146,9 @@ function updateProfileSection() {
     if (currentUsername) {
         const profileSection = document.createElement('div');
         profileSection.className = 'profile-display-section';
-        
-        // Get cached avatar or default
-        let avatarUrl = avatarCache.get(currentUsername);
-        if (!avatarUrl) {
-            avatarUrl = `https://i.pravatar.cc/50?u=${encodeURIComponent(currentUsername)}`;
-        }
-        
         profileSection.innerHTML = `
             <div class="profile-display-avatar">
-                <img id="display-avatar" src="${avatarUrl}" alt="Profile">
+                <img id="display-avatar" src="https://i.pravatar.cc/50?u=${encodeURIComponent(currentUsername)}" alt="Profile">
             </div>
             <div class="profile-display-info">
                 <div class="profile-display-username" id="display-username">${currentUsername}</div>
@@ -8610,6 +8365,111 @@ function renderMessages(messages) {
         setTimeout(() => forceScrollToBottom('chat-container'), 50);
         setTimeout(() => forceScrollToBottom('chat-container'), 100);
     }, 10);
+}
+
+// Update online users lists
+function updateOnlineUsersList(onlineUsers) {
+    console.log('Updating online users list:', onlineUsers);
+    
+    // Update main chat online list
+    updateSingleOnlineList('online-users-list', 'online-count', onlineUsers);
+    
+    // Update private AI online list
+    updateSingleOnlineList('private-online-users-list', 'private-online-count', onlineUsers);
+}
+
+function updateSingleOnlineList(listElementId, countElementId, onlineUsers) {
+    const onlineList = document.getElementById(listElementId);
+    const onlineCount = document.getElementById(countElementId);
+    
+    if (onlineList) {
+        onlineList.innerHTML = '';
+        onlineUsers.forEach(user => {
+            const userElement = document.createElement('div');
+            userElement.className = 'online-user';
+            
+            // Get user profile to display correct avatar
+            const avatarUrl = `https://i.pravatar.cc/50?u=${encodeURIComponent(user)}`;
+            
+            userElement.innerHTML = `
+                <div class="online-user-avatar">
+                    <img src="${avatarUrl}" alt="${user}">
+                    <div class="online-dot"></div>
+                </div>
+                <div class="online-user-info">
+                    <div class="online-user-name">${user}</div>
+                </div>
+            `;
+            
+            // ADDED: Add click event to show user profile
+            userElement.onclick = () => {
+                showUserProfile(user);
+            };
+            
+            onlineList.appendChild(userElement);
+        });
+    }
+    
+    if (onlineCount) {
+        onlineCount.textContent = onlineUsers.length;
+    }
+}
+
+// Remove offline user from the lists
+function removeOfflineUser(username) {
+    console.log('Removing offline user from UI:', username);
+    
+    // Remove from main chat online list
+    removeUserFromSingleList('online-users-list', 'online-count', username);
+    
+    // Remove from private AI online list
+    removeUserFromSingleList('private-online-users-list', 'private-online-count', username);
+    
+    // Update status indicator in messages to offline
+    updateUserStatusIndicator(username, 'offline');
+}
+
+function removeUserFromSingleList(listElementId, countElementId, username) {
+    const onlineList = document.getElementById(listElementId);
+    if (onlineList) {
+        const userElements = onlineList.querySelectorAll('.online-user');
+        userElements.forEach(userElement => {
+            const userNameElement = userElement.querySelector('.online-user-name');
+            if (userNameElement && userNameElement.textContent === username) {
+                userElement.remove();
+            }
+        });
+        // Update online count
+        const onlineCount = document.getElementById(countElementId);
+        if (onlineCount) {
+            const currentCount = parseInt(onlineCount.textContent) || 0;
+            onlineCount.textContent = Math.max(0, currentCount - 1);
+        }
+    }
+}
+
+// Update status indicator for a specific user
+function updateUserStatusIndicator(username, status) {
+    // Find all messages from this user and update their status
+    const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
+    userMessages.forEach(msg => {
+        let statusIndicator = msg.querySelector('.user-status-indicator');
+        if (!statusIndicator) {
+            statusIndicator = createStatusIndicator();
+            const usernameDiv = msg.querySelector('.username');
+            if (usernameDiv) {
+                usernameDiv.appendChild(statusIndicator);
+            }
+        }
+        statusIndicator.className = `user-status-indicator ${status}`;
+    });
+}
+
+// Create a status indicator element
+function createStatusIndicator() {
+    const indicator = document.createElement('span');
+    indicator.className = 'user-status-indicator';
+    return indicator;
 }
 
 // Handle typing events
@@ -9230,14 +9090,6 @@ function resetSecretCodeForm() {
 // Initialize username validation
 document.addEventListener('DOMContentLoaded', function() {
     setupUsernameValidation();
-    
-    // Initialize avatar cache when page loads
-    avatarCache.clear();
-    
-    // Load current user's avatar into cache when logged in
-    if (currentUserSession?.username) {
-        loadProfile();
-    }
 });
 
 function setupUsernameValidation() {
@@ -9586,12 +9438,6 @@ document.addEventListener('click', function (e) {
         openZoom(e.target.src);
     }
 });
-
-// ===== ADDED: Periodically refresh avatars (every 5 minutes) =====
-setInterval(() => {
-    refreshOnlineUserAvatars();
-}, 300000); // 5 minutes
-
 </script>
 </body>
 </html>
