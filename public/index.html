@@ -3502,7 +3502,21 @@
 .post-media {
     margin: 10px 0;
 }
+.message img, .avatar img, .online-user-avatar img {
+    content-visibility: auto;
+    contain-intrinsic-size: 50px;
+}
 
+.chat-messages, .private-chat-messages {
+    will-change: transform;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+}
+
+/* Reduce repaints for scrollable containers */
+#chat-container, #private-ai-container, #private-chat-messages {
+    transform: translateZ(0);
+        }
 .post-media video {
     width: 100%;
     max-width: 500px;
@@ -5269,9 +5283,9 @@ document.addEventListener('DOMContentLoaded', function() {
         setupTypingDetection();
         setupTypingSocketEvents();
 
-        // Add scroll event listener for main chat
+        // Add optimized scroll event listener for main chat
         if (elements.chatContainer) {
-            elements.chatContainer.addEventListener('scroll', updateScrollState);
+            elements.chatContainer.addEventListener('scroll', throttle(updateScrollState, 100));
         }
 
         // Initialize Private AI input handler
@@ -5293,6 +5307,69 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('🎯 Application initialization complete');
     });
 });
+
+// ===== PERFORMANCE OPTIMIZATIONS =====
+
+// Throttle function to limit how often a function can be called
+function throttle(func, limit) {
+    let inThrottle;
+    return function() {
+        const args = arguments;
+        const context = this;
+        if (!inThrottle) {
+            func.apply(context, args);
+            inThrottle = true;
+            setTimeout(() => inThrottle = false, limit);
+        }
+    }
+}
+
+// Debounce function to delay function execution
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// Batch DOM updates for better performance
+let renderQueue = [];
+let isRendering = false;
+
+function batchMessageRender(messages, renderFunction) {
+    if (!messages.length) return;
+    
+    renderQueue = renderQueue.concat(messages);
+    
+    if (!isRendering) {
+        isRendering = true;
+        requestAnimationFrame(() => {
+            const fragment = document.createDocumentFragment();
+            const batch = renderQueue.splice(0, 50); // Render 50 messages at once
+            
+            batch.forEach(message => {
+                const messageDiv = renderFunction(message);
+                if (messageDiv) fragment.appendChild(messageDiv);
+            });
+            
+            elements.chatContainer.appendChild(fragment);
+            
+            if (renderQueue.length > 0) {
+                isRendering = false;
+                batchMessageRender([], renderFunction);
+            } else {
+                isRendering = false;
+                // Scroll to bottom after rendering
+                setTimeout(() => forceScrollToBottom('chat-container'), 50);
+            }
+        });
+    }
+}
 
 // --- CUT HERE ---
 // ===== YOUR EXISTING VARIABLES AND FUNCTIONS =====
@@ -5364,6 +5441,12 @@ let userPanelVisible = true;
 // ✅ ADDED: Current user session
 let currentUserSession = null;
 
+// ✅ ADDED: Message pagination
+let messagePage = 0;
+const MESSAGES_PER_PAGE = 50;
+let isLoadingMessages = false;
+let hasMoreMessages = true;
+
 const elements = {
     usernameInput: document.getElementById('auth-username'),
     messageInput: document.getElementById('user-input'),
@@ -5378,7 +5461,7 @@ const elements = {
 
 let replyToText = null;
 
-// ===== TYPING INDICATOR FUNCTIONS =====
+// ===== OPTIMIZED TYPING INDICATOR FUNCTIONS =====
 function showTypingIndicator(username) {
     if (!username || username === currentUserSession?.username) return;
     
@@ -5751,7 +5834,7 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// ===== MODIFIED: Update showContainer function to initialize posts =====
+// ===== OPTIMIZED: Update showContainer function =====
 function showContainer(containerId) {
     console.log('🔄 Showing container:', containerId);
     
@@ -5760,7 +5843,7 @@ function showContainer(containerId) {
         container.style.display = 'none';
     });
     
-    // Hide all info containers (INCLUDING PROFILE CONTAINER)
+    // Hide all info containers
     document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container, .profile-container').forEach(container => {
         container.style.display = 'none';
     });
@@ -5787,7 +5870,7 @@ function showContainer(containerId) {
             initializePrivateMessaging();
         }
         
-        // Load profile data when showing profile container - FIXED
+        // Load profile data when showing profile container
         if (containerId === 'profile') {
             loadProfile();
         }
@@ -5800,7 +5883,6 @@ function showContainer(containerId) {
         
         // Initialize SQL editor if showing that container
         if (containerId === 'sql-editor-container') {
-            // Check if user has verified the secret code
             if (!hasVerifiedCode()) {
                 showError('Access denied. Please verify the secret code first.');
                 showContainer('secret-code');
@@ -5831,7 +5913,6 @@ function showContainer(containerId) {
         // Re-initialize scroll button for main chat
         setTimeout(() => {
             initializeButtons();
-            // FIXED: Force scroll to bottom when switching to chat
             setTimeout(() => {
                 forceScrollToBottom('chat-container');
                 updateScrollState();
@@ -5859,9 +5940,8 @@ function showContainer(containerId) {
         }
         // Attach scroll event for private container
         if (privateContainer) {
-            privateContainer.addEventListener('scroll', handlePrivateScroll);
+            privateContainer.addEventListener('scroll', throttle(handlePrivateScroll, 100));
             setTimeout(handlePrivateScroll, 100);
-            // FIXED: Scroll to bottom when switching to private AI
             setTimeout(() => forceScrollToBottom('private-ai-container'), 200);
         }
     } else if (containerId === 'private-messages') {
@@ -5925,7 +6005,7 @@ function hideContainer(containerId) {
     showContainer('chat');
 }
 
-// ===== MESSAGE FUNCTIONS =====
+// ===== OPTIMIZED MESSAGE FUNCTIONS =====
 async function sendMessage() {
     if (isSending || isProcessingCommand) return;
     isSending = true;
@@ -5938,7 +6018,7 @@ async function sendMessage() {
         return showError('Please enter both username and message');
     }
 
-    // ADDED: Check for duplicate message in main chat
+    // Check for duplicate message in main chat
     const messageKey = `main-${username}-${content}`;
     if (lastSentMessages.main[messageKey] && 
         Date.now() - lastSentMessages.main[messageKey] < 3000) {
@@ -5947,7 +6027,7 @@ async function sendMessage() {
         return;
     }
     
-    // ADDED: Track this message
+    // Track this message
     lastSentMessages.main[messageKey] = Date.now();
 
     // Bad word filtering
@@ -5997,7 +6077,7 @@ async function sendMessage() {
             reply_to: replyToText || null 
         };
         
-        // Send message to server via HTTP - USING UPDATED ENDPOINT
+        // Send message to server via HTTP
         const token = localStorage.getItem('auth_token');
         const response = await fetch('/api/messages', {
             method: 'POST',
@@ -6010,7 +6090,7 @@ async function sendMessage() {
 
         if (!response.ok) throw new Error('Failed to send message');
 
-        // FIXED: Display message immediately for the sender with proper scrolling
+        // Display message immediately for the sender
         displayMessage(content, 'sent', replyToText, username, null, true);
         
         // Clear input immediately for better UX
@@ -6018,7 +6098,7 @@ async function sendMessage() {
         autoResize(elements.messageInput);
         clearReply();
 
-        // FIXED: Only get AI response if it's NOT a command
+        // Only get AI response if it's NOT a command
         const PREFIX = '!';
         if (!content.startsWith(PREFIX)) {
             fetchChatResponse(content);
@@ -6056,7 +6136,7 @@ async function sendPrivateMessage() {
     elements.privateSendButton.classList.remove('enabled');
 
     try {
-        // Get AI response directly instead of using socket for private messages
+        // Get AI response directly
         await fetchPrivateAIResponse(content);
     } catch (error) {
         console.error('Error sending private message:', error);
@@ -6071,35 +6151,28 @@ async function sendPrivateMessage() {
     }, 1000);
 }
 
-// ===== FIXED: MESSAGE DISPLAY FUNCTIONS WITH PROPER ORDERING =====
-function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
-    if (!elements.chatContainer) return;
-    
-    // Check if message already exists to prevent duplicates
-    const existingMessage = document.querySelector(`[data-id="${messageId}"]`);
-    if (existingMessage) {
-        console.log('⚠️ Message already exists, skipping:', messageId);
-        return;
-    }
-    
+// ===== OPTIMIZED: MESSAGE DISPLAY FUNCTIONS =====
+function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${sender}`;
     if (messageId) messageDiv.dataset.id = messageId;
     messageDiv.dataset.content = text;
     messageDiv.dataset.username = username;
-    messageDiv.dataset.timestamp = Date.now(); // Add timestamp for ordering
+    messageDiv.dataset.timestamp = Date.now();
 
     // Only create avatar for received messages
     if (sender === 'received') {
         const avatarDiv = document.createElement('div');
         avatarDiv.className = 'avatar';
         
-        // Get user profile to display correct avatar
         const avatarUrl = `https://i.pravatar.cc/50?u=${encodeURIComponent(username)}`;
+        const img = new Image();
+        img.src = avatarUrl;
+        img.alt = "avatar";
+        img.loading = "lazy";
+        avatarDiv.appendChild(img);
         
-        avatarDiv.innerHTML = `<img src="${avatarUrl}" alt="avatar">`;
-        
-        // ADDED: Add click event to show user profile
+        // Add click event to show user profile
         avatarDiv.onclick = (e) => {
             e.stopPropagation();
             showUserProfile(username);
@@ -6114,7 +6187,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
         const usernameDiv = document.createElement('div');
         usernameDiv.className = 'username';
         
-        // ADDED: Add click event to username to show user profile
+        // Add click event to username to show user profile
         usernameDiv.onclick = (e) => {
             e.stopPropagation();
             showUserProfile(username);
@@ -6144,15 +6217,24 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
             modifiedText = modifiedText.replace(match[0], '');
         });
         modifiedText = modifiedText.trim();
+        
         if (modifiedText) {
             const textDiv = document.createElement('div');
             textDiv.textContent = modifiedText;
             contentDiv.appendChild(textDiv);
         }
 
-        // FIXED: Use immediate image loading
+        // Use lazy loading for images
         imageMatches.forEach(match => {
-            displayImageImmediately(match[0], contentDiv);
+            const img = new Image();
+            img.src = match[0];
+            img.alt = "image";
+            img.loading = "lazy";
+            img.style.maxWidth = "100%";
+            img.style.height = "auto";
+            img.style.borderRadius = "8px";
+            img.style.marginTop = "5px";
+            contentDiv.appendChild(img);
         });
 
         audioMatches.forEach(match => {
@@ -6161,6 +6243,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
             audio.src = match[0];
             contentDiv.appendChild(audio);
         });
+        
         messageBody.appendChild(contentDiv);
         messageDiv.appendChild(messageBody);
     } else {
@@ -6179,38 +6262,22 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
         messageDiv.appendChild(contentDiv);
     }
     
-    // FIXED: Always append new messages to the bottom with proper ordering
-    const existingMessages = elements.chatContainer.querySelectorAll('.message');
-    let inserted = false;
+    return messageDiv;
+}
+
+function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
+    if (!elements.chatContainer) return;
     
-    // If no messages yet or this is a new message, just append to bottom
-    if (existingMessages.length === 0 || isNew) {
-        elements.chatContainer.appendChild(messageDiv);
-    } else {
-        // For historical messages, insert in chronological order
-        const newTimestamp = messageDiv.dataset.timestamp;
-        
-        for (let i = existingMessages.length - 1; i >= 0; i--) {
-            const existingMessage = existingMessages[i];
-            const existingTimestamp = existingMessage.dataset.timestamp;
-            
-            if (parseInt(newTimestamp) >= parseInt(existingTimestamp)) {
-                if (i === existingMessages.length - 1) {
-                    elements.chatContainer.appendChild(messageDiv);
-                } else {
-                    existingMessages[i].after(messageDiv);
-                }
-                inserted = true;
-                break;
-            }
-        }
-        
-        // If not inserted (should be oldest), prepend at beginning
-        if (!inserted) {
-            elements.chatContainer.prepend(messageDiv);
-        }
+    // Check if message already exists to prevent duplicates
+    const existingMessage = document.querySelector(`[data-id="${messageId}"]`);
+    if (existingMessage) {
+        console.log('⚠️ Message already exists, skipping:', messageId);
+        return;
     }
     
+    const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId);
+    
+    // Add event listeners
     messageDiv.addEventListener('touchstart', handleTouchStart);
     messageDiv.addEventListener('touchend', handleTouchEnd);
     messageDiv.addEventListener('touchmove', handleTouchMove);
@@ -6219,94 +6286,27 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
         showMessageContextMenu(e, messageDiv);
     });
 
-    // Force image rendering after adding message
-    setTimeout(forceImageRendering, 50);
-
-    // FIXED: ALWAYS SCROLL TO BOTTOM FOR NEW MESSAGES
-    if (isNew) {
-        setTimeout(() => {
-            forceScrollToBottom('chat-container');
-            // Additional scroll to ensure it works
-            setTimeout(() => forceScrollToBottom('chat-container'), 30);
-        }, 10);
+    // Always append new messages to the bottom
+    elements.chatContainer.appendChild(messageDiv);
+    
+    // Only scroll if it's a new message and we're at the bottom
+    if (isNew && isAtBottom) {
+        requestAnimationFrame(() => {
+            elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
+        });
     }
 
-    // Update scroll state after adding message
-    setTimeout(updateScrollState, 0);
+    // Update scroll state
+    updateScrollState();
 }
 
 function displayPrivateMessage(text, sender, repliedTo = null, username = 'Private AI', messageId = null) {
     const container = document.getElementById('private-ai-container');
     if (!container) return;
     
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${sender}`;
-    messageDiv.dataset.content = text;
-    messageDiv.dataset.username = username;
-    messageDiv.dataset.timestamp = Date.now();
-
-    // Only create avatar for received messages
-    if (sender === 'received') {
-        const avatarDiv = document.createElement('div');
-        avatarDiv.className = 'avatar';
-        avatarDiv.innerHTML = `<img src="https://i.pravatar.cc/50?u=${encodeURIComponent(username)}" alt="avatar">`;
-        messageDiv.appendChild(avatarDiv);
-    }
-
-    const messageBody = document.createElement('div');
-    messageBody.className = 'message-body';
+    const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId);
     
-    if (username && sender === 'received') {
-        const usernameDiv = document.createElement('div');
-        usernameDiv.className = 'username';
-        const statusIndicator = document.createElement('span');
-        statusIndicator.className = 'user-status-indicator online';
-        usernameDiv.appendChild(document.createTextNode(username));
-        usernameDiv.appendChild(statusIndicator);
-        messageBody.appendChild(usernameDiv);
-    }
-
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'content';
-    
-    // Parse for image URLs and render them as images
-    const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
-    const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
-    const imageMatches = [...text.matchAll(imagePattern)];
-    const audioMatches = [...text.matchAll(audioPattern)];
-    let modifiedText = text;
-    
-    [...imageMatches, ...audioMatches].forEach(match => {
-        modifiedText = modifiedText.replace(match[0], '');
-    });
-    modifiedText = modifiedText.trim();
-    
-    if (modifiedText) {
-        const textDiv = document.createElement('div');
-        textDiv.textContent = modifiedText;
-        contentDiv.appendChild(textDiv);
-    }
-
-    // Add images to the message - FIXED: Use immediate loading
-    imageMatches.forEach(match => {
-        displayImageImmediately(match[0], contentDiv);
-    });
-
-    // Add audio files to the message
-    audioMatches.forEach(match => {
-        const audio = document.createElement('audio');
-        audio.controls = true;
-        audio.src = match[0];
-        contentDiv.appendChild(audio);
-    });
-
-    messageBody.appendChild(contentDiv);
-    messageDiv.appendChild(messageBody);
-    
-    // FIXED: Always append to the bottom of private chat container
-    container.appendChild(messageDiv);
-
-    // ADDED: Add event listeners for long press and context menu to private AI messages
+    // Add event listeners for private messages
     messageDiv.addEventListener('touchstart', handlePrivateMessageTouchStart);
     messageDiv.addEventListener('touchend', handlePrivateMessageTouchEnd);
     messageDiv.addEventListener('touchmove', handlePrivateMessageTouchMove);
@@ -6315,42 +6315,23 @@ function displayPrivateMessage(text, sender, repliedTo = null, username = 'Priva
         showPrivateMessageContextMenu(e, messageDiv);
     });
 
-    // FIXED: IMMEDIATELY scroll to bottom for private chat
-    setTimeout(() => {
-        forceScrollToBottom('private-ai-container');
-        setTimeout(() => forceScrollToBottom('private-ai-container'), 50);
-    }, 10);
+    // Append to container
+    container.appendChild(messageDiv);
+
+    // Scroll to bottom
+    requestAnimationFrame(() => {
+        container.scrollTop = container.scrollHeight;
+    });
 }
 
-// ===== SCROLL FUNCTIONS =====
+// ===== OPTIMIZED SCROLL FUNCTIONS =====
 function forceScrollToBottom(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
     
-    // Multiple methods to ensure scrolling works
-    const scrollToBottom = () => {
-        // Method 1: Direct scroll
+    requestAnimationFrame(() => {
         container.scrollTop = container.scrollHeight;
-        
-        // Method 2: Smooth scroll
-        container.scrollTo({
-            top: container.scrollHeight,
-            behavior: 'smooth'
-        });
-        
-        // Method 3: Alternative approach
-        setTimeout(() => {
-            container.scrollTop = container.scrollHeight;
-        }, 10);
-    };
-    
-    // Initial scroll
-    scrollToBottom();
-    
-    // Additional attempts to handle dynamic content loading
-    setTimeout(scrollToBottom, 50);
-    setTimeout(scrollToBottom, 100);
-    setTimeout(scrollToBottom, 200);
+    });
 }
 
 function scrollToBottomMain() {
@@ -6367,31 +6348,22 @@ function scrollToBottomMain() {
 }
 
 function updateScrollState() {
-    const chatContainer = document.getElementById('chat-container');
-    if (!chatContainer || !scrollToBottomBtn) return;
+    if (!elements.chatContainer || !scrollToBottomBtn) return;
     
-    const scrollTop = chatContainer.scrollTop;
-    const scrollHeight = chatContainer.scrollHeight;
-    const clientHeight = chatContainer.clientHeight;
+    const scrollTop = elements.chatContainer.scrollTop;
+    const scrollHeight = elements.chatContainer.scrollHeight;
+    const clientHeight = elements.chatContainer.clientHeight;
     
     // Calculate if we're at the bottom (within 50px threshold)
     const isAtBottomNow = Math.abs(scrollHeight - scrollTop - clientHeight) <= 50;
-    
-    console.log('Scroll state:', {
-        scrollTop,
-        scrollHeight, 
-        clientHeight,
-        isAtBottomNow,
-        wasAtBottom: isAtBottom
-    });
     
     if (!isAtBottomNow) {
         // User has scrolled up - show the button
         if (!scrollToBottomBtn.classList.contains('visible')) {
             scrollToBottomBtn.style.display = 'flex';
-            setTimeout(() => {
+            requestAnimationFrame(() => {
                 scrollToBottomBtn.classList.add('visible');
-            }, 10);
+            });
         }
         
         // Update new messages count if we're receiving messages while scrolled up
@@ -6416,7 +6388,7 @@ function updateScrollState() {
     isAtBottom = isAtBottomNow;
 }
 
-// ===== FIXED: TOUCH AND CONTEXT MENU FUNCTIONS =====
+// ===== OPTIMIZED TOUCH AND CONTEXT MENU FUNCTIONS =====
 function handleTouchStart(e) {
     isLongPress = false;
     e.currentTarget.classList.add('no-select');
@@ -6531,8 +6503,6 @@ function showPrivateMessageContextMenu(e, message) {
     const replyButton = document.createElement('button');
     replyButton.textContent = 'Reply';
     replyButton.onclick = () => {
-        // For private AI, we can implement reply functionality if needed
-        // For now, just copy and close the menu
         copyToClipboard(messageText, copyButton);
         contextMenu.remove();
     };
@@ -6880,7 +6850,7 @@ function showNotification(username, message) {
     };
 }
 
-// ✅ FIXED: COMPLETELY REWRITTEN - No more duplicate responses
+// ✅ OPTIMIZED: AI Response function
 async function fetchChatResponse(userInput) {
     if (isProcessingCommand) {
         console.log('🛑 Command already being processed, skipping...');
@@ -6890,7 +6860,7 @@ async function fetchChatResponse(userInput) {
     isProcessingCommand = true;
     
     try {
-        const PREFIX = '!'; // Make sure this matches your server prefix
+        const PREFIX = '!';
         
         // Don't process commands that start with prefix - let the server handle them
         if (userInput.startsWith(PREFIX)) {
@@ -6898,7 +6868,6 @@ async function fetchChatResponse(userInput) {
             return;
         }
         
-        // Only process non-command messages for AI response
         const response = await fetch('/api/command', {
             method: 'POST',
             headers: {
@@ -6910,15 +6879,11 @@ async function fetchChatResponse(userInput) {
             }),
         });
         
-        // ✅ FIXED: Don't display the response here - let Socket.io handle it
-        // The server will save the response and broadcast it via Socket.io
-        // We'll display it when we receive the 'new-message' event
         console.log('🤖 Command sent to server, waiting for Socket.io response...');
         
     } catch (error) {
         console.error("Error fetching AI response:", error);
     } finally {
-        // Reset the flag after a short delay
         setTimeout(() => {
             isProcessingCommand = false;
         }, 1000);
@@ -6927,16 +6892,12 @@ async function fetchChatResponse(userInput) {
 
 async function fetchPrivateAIResponse(userInput) {
     try {
-        // Check if it's a command (starts with !) - if it is, send it as-is
-        // If it's not a command, treat it as AI command
         let processedInput = userInput;
         
-        // If it doesn't start with prefix and is not empty, treat it as AI command
         if (!userInput.startsWith('-') && userInput.trim() !== '') {
             processedInput = `-ai ${userInput}`;
         }
         
-        // If it's just "ai" without prefix, add the prefix
         if (userInput.trim().toLowerCase() === 'ai') {
             processedInput = '-ai';
         }
@@ -6960,7 +6921,6 @@ async function fetchPrivateAIResponse(userInput) {
         
         const data = await response.json();
         if (data.reply) {
-            // Display in private AI container
             if (Array.isArray(data.reply)) {
                 data.reply.forEach(reply => displayPrivateMessage(reply, 'received'));
             } else {
@@ -6973,28 +6933,26 @@ async function fetchPrivateAIResponse(userInput) {
         console.error("Error fetching Private AI response:", error);
         displayPrivateMessage("Sorry, I encountered an error processing your message. Please try again.", 'received');
     }
-    }
+}
 
-// ===== IMAGE HANDLING FUNCTIONS =====
+// ===== OPTIMIZED IMAGE HANDLING FUNCTIONS =====
 function displayImageImmediately(imgUrl, container) {
     return new Promise((resolve) => {
-        const img = document.createElement('img');
+        const img = new Image();
         img.src = imgUrl;
         img.alt = "Image";
-        img.loading = "eager"; // Force immediate loading
+        img.loading = "lazy";
         img.style.opacity = "1";
-        img.style.transition = "none";
+        img.style.transition = "opacity 0.3s";
         img.style.width = "100%";
         img.style.borderRadius = "10px";
         img.style.objectFit = "cover";
         
-        // Force immediate display
         img.onload = function() {
             container.appendChild(img);
             resolve(img);
         };
         
-        // Fallback in case onload doesn't fire
         setTimeout(() => {
             if (!img.parentNode) {
                 container.appendChild(img);
@@ -7006,14 +6964,9 @@ function displayImageImmediately(imgUrl, container) {
 
 function forceImageRendering() {
     document.querySelectorAll('.message img').forEach(img => {
-        // Force reflow and repaint
-        img.style.display = 'none';
-        img.offsetHeight; // Trigger reflow
-        img.style.display = 'block';
-        
-        // Ensure full opacity
-        img.style.opacity = '1';
-        img.style.visibility = 'visible';
+        if (img.complete) {
+            img.style.opacity = '1';
+        }
     });
 }
 
@@ -7041,7 +6994,7 @@ function closeZoom() {
     if (overlay) overlay.style.display = 'none';
 }
 
-// ===== INITIALIZATION FUNCTIONS =====
+// ===== OPTIMIZED INITIALIZATION FUNCTIONS =====
 function initializeButtons() {
     console.log('Initializing buttons...');
     
@@ -7059,7 +7012,7 @@ function initializeButtons() {
         // Add proper scroll event listener to main chat
         const chatContainer = document.getElementById('chat-container');
         if (chatContainer) {
-            chatContainer.addEventListener('scroll', updateScrollState);
+            chatContainer.addEventListener('scroll', throttle(updateScrollState, 100));
             console.log('Added scroll listener to main chat');
         }
     } else {
@@ -7106,7 +7059,7 @@ function initializePrivateMessaging() {
     loadPrivateUsers();
     setupPrivateMessageInputHandlers();
     
-    // ADDED: Clear old tracking data
+    // Clear old tracking data
     clearOldMessageTracking();
     
     // Listen for real-time private messages
@@ -7196,7 +7149,7 @@ async function loadPrivateUsers() {
         // Show loading
         usersList.innerHTML = '<div class="no-users">Loading conversations...</div>';
         
-        // Get conversations from server - FIXED: Add username parameter
+        // Get conversations from server
         const token = localStorage.getItem('auth_token');
         const response = await fetch(`/api/private/conversations?username=${encodeURIComponent(currentUser)}`, {
             headers: {
@@ -7228,12 +7181,12 @@ async function loadPrivateUsers() {
             userItem.dataset.username = conversation.username;
             userItem.onclick = () => openPrivateChat(conversation.username);
             
-            // For demo online status - in real app, use actual online status
+            // For demo online status
             const isOnline = onlineUsers.includes(conversation.username);
             
             userItem.innerHTML = `
                 <div class="user-avatar">
-                    <img src="${conversation.avatar || `https://i.pravatar.cc/50?u=${conversation.username}`}" alt="${conversation.username}">
+                    <img src="${conversation.avatar || `https://i.pravatar.cc/50?u=${conversation.username}`}" alt="${conversation.username}" loading="lazy">
                     <div class="user-status ${isOnline ? 'online' : 'offline'}"></div>
                     ${conversation.unread ? '<div class="unread-badge"></div>' : ''}
                 </div>
@@ -7256,7 +7209,7 @@ async function loadPrivateUsers() {
     }
 }
 
-// MODIFIED: Open private chat with a user - HIDE SEARCH CONTAINER
+// MODIFIED: Open private chat with a user
 async function openPrivateChat(username) {
     currentPrivateChatUser = username;
     
@@ -7282,7 +7235,7 @@ async function openPrivateChat(username) {
     
     // Update chat header
     document.getElementById('partner-avatar').innerHTML = 
-        `<img src="https://i.pravatar.cc/50?u=${username}" alt="${username}">`;
+        `<img src="https://i.pravatar.cc/50?u=${username}" alt="${username}" loading="lazy">`;
     
     document.getElementById('partner-name').textContent = username;
     
@@ -7421,15 +7374,15 @@ async function sendPrivateMessageToUser() {
     
     const currentUser = currentUserSession?.username;
     
-    // ADDED: Check for duplicate message
+    // Check for duplicate message
     const messageKey = `${currentUser}-${currentPrivateChatUser}-${content}`;
     if (lastSentMessages.private[messageKey] && 
-        Date.now() - lastSentMessages.private[messageKey] < 3000) { // 3 second cooldown
+        Date.now() - lastSentMessages.private[messageKey] < 3000) {
         console.log('Duplicate private message prevented');
         return;
     }
     
-    // ADDED: Track this message
+    // Track this message
     lastSentMessages.private[messageKey] = Date.now();
     
     try {
@@ -7444,7 +7397,7 @@ async function sendPrivateMessageToUser() {
                 content: content
             });
         } else {
-            // Fallback to HTTP - USING UPDATED ENDPOINT
+            // Fallback to HTTP
             const response = await fetch('/api/private/messages', {
                 method: 'POST',
                 headers: {
@@ -7494,7 +7447,7 @@ function handleNewPrivateMessage(message) {
     // Check if this message is relevant to current user
     if (message.sender_username === currentUser || message.receiver_username === currentUser) {
         
-        // ADDED: Check for duplicate display
+        // Check for duplicate display
         const messageKey = `display-${message.sender_username}-${message.receiver_username}-${message.content}`;
         if (lastSentMessages.private[messageKey]) {
             console.log('Duplicate private message display prevented');
@@ -7625,7 +7578,7 @@ function updatePrivateMessagesBadge(count) {
 function setupUsersSearch() {
     const searchInput = document.getElementById('search-users');
     if (searchInput) {
-        searchInput.addEventListener('input', function() {
+        searchInput.addEventListener('input', debounce(function() {
             const searchTerm = this.value.toLowerCase();
             const userItems = document.querySelectorAll('.user-item');
             
@@ -7639,7 +7592,7 @@ function setupUsersSearch() {
                     item.style.display = 'none';
                 }
             });
-        });
+        }, 300));
     }
 }
 
@@ -7708,7 +7661,7 @@ function setupPrivateMessageTypingHandlers() {
     });
 }
 
-// MODIFIED: Function to show users panel and hide chat - SHOW SEARCH CONTAINER
+// MODIFIED: Function to show users panel and hide chat
 function showUsersPanel() {
     const usersPanel = document.getElementById('users-panel');
     const chatContainer = document.getElementById('private-chat-container');
@@ -7717,7 +7670,6 @@ function showUsersPanel() {
     if (usersPanel && chatContainer && privateMessagesContainer) {
         usersPanel.classList.remove('hidden');
         chatContainer.classList.remove('active');
-        // ADD THIS LINE: Remove class to show the header again
         privateMessagesContainer.classList.remove('private-chat-active');
         
         // SHOW SEARCH CONTAINER AGAIN
@@ -7769,7 +7721,6 @@ function showChatContainer() {
     if (usersPanel && chatContainer && privateMessagesContainer) {
         usersPanel.classList.add('hidden');
         chatContainer.classList.add('active');
-        // ADD THIS LINE: Add class to hide the header
         privateMessagesContainer.classList.add('private-chat-active');
         
         // Show chat input if we have a user selected
@@ -7780,7 +7731,7 @@ function showChatContainer() {
             }
         }
         
-        // ADDED: Adjust padding for private chat messages to prevent hiding
+        // Adjust padding for private chat messages to prevent hiding
         const privateChatMessages = document.getElementById('private-chat-messages');
         if (privateChatMessages) {
             privateChatMessages.style.paddingBottom = '120px';
@@ -7788,7 +7739,7 @@ function showChatContainer() {
     }
 }
 
-// ===== ADDED: Function to clear old message tracking data =====
+// ===== Function to clear old message tracking data =====
 function clearOldMessageTracking() {
     const now = Date.now();
     const maxAge = 60000; // 1 minute
@@ -7811,8 +7762,7 @@ function clearOldMessageTracking() {
 // Run cleanup every 30 seconds
 setInterval(clearOldMessageTracking, 30000);
 
-// ===== FIXED: PROFILE MANAGEMENT FUNCTIONS =====
-// MODIFIED: Load profile from server instead of localStorage
+// ===== OPTIMIZED PROFILE MANAGEMENT FUNCTIONS =====
 function loadProfile() {
     const username = currentUserSession?.username;
     if (!username) {
@@ -7883,7 +7833,6 @@ function loadProfile() {
     });
 }
 
-// MODIFIED: Save profile to server instead of localStorage
 function saveProfile() {
     const username = currentUserSession?.username;
     if (!username) {
@@ -7965,12 +7914,12 @@ function saveProfile() {
     });
 }
 
-// MODIFIED: Get user profile from server for popups
+// Get user profile from server for popups
 function showUserProfile(username) {
     const popup = document.getElementById('user-profile-popup');
     if (!popup) return;
     
-    // Get user profile data from API (no auth needed for public profiles)
+    // Get user profile data from API
     fetch(`/api/user/profile/${username}`)
     .then(response => response.json())
     .then(data => {
@@ -8067,7 +8016,7 @@ function showUserProfile(username) {
     });
 }
 
-// FIXED: Profile display function - properly updates the dropdown
+// Profile display function - properly updates the dropdown
 function updateProfileDisplay(profile) {
     console.log('Updating profile display:', profile);
     
@@ -8127,7 +8076,7 @@ function updateMessageAvatars(avatarUrl) {
     });
 }
 
-// FIXED: Profile section creation function
+// Profile section creation function
 function updateProfileSection() {
     const dropdown = document.getElementById('dropdown');
     if (!dropdown) return;
@@ -8148,7 +8097,7 @@ function updateProfileSection() {
         profileSection.className = 'profile-display-section';
         profileSection.innerHTML = `
             <div class="profile-display-avatar">
-                <img id="display-avatar" src="https://i.pravatar.cc/50?u=${encodeURIComponent(currentUsername)}" alt="Profile">
+                <img id="display-avatar" src="https://i.pravatar.cc/50?u=${encodeURIComponent(currentUsername)}" alt="Profile" loading="lazy">
             </div>
             <div class="profile-display-info">
                 <div class="profile-display-username" id="display-username">${currentUsername}</div>
@@ -8179,18 +8128,105 @@ function hideUserProfile() {
 
 function messageUser() {
     // This function is called from the popup message button
-    // The actual implementation is in showUserProfile function
 }
 
-// ===== FIXED: MESSAGE ORDER AND SECTION MANAGEMENT =====
+// ===== OPTIMIZED MESSAGE LOADING WITH PAGINATION =====
+async function loadMessages() {
+    if (isLoadingMessages) return;
+    isLoadingMessages = true;
+    
+    try {
+        console.log('📥 Loading messages...');
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch(`/api/messages?page=${messagePage}&limit=${MESSAGES_PER_PAGE}`, {
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : ''
+            }
+        });
+        
+        if (!response.ok) throw new Error('Failed to load messages');
+        const data = await response.json();
+        
+        // Check for new messages to show notification
+        if (data.length > 0) {
+            const latestMessage = data[data.length - 1];
+            if (latestMessage.id !== lastMessageId && 
+                latestMessage.username !== currentUserSession?.username && 
+                document.visibilityState !== 'visible') {
+                showNotification(latestMessage.username, latestMessage.content);
+            }
+            lastMessageId = latestMessage.id;
+        }
+        
+        // Check if we have more messages
+        hasMoreMessages = data.length === MESSAGES_PER_PAGE;
+        
+        renderMessages(data, messagePage === 0);
+        
+        if (hasMoreMessages) {
+            messagePage++;
+        }
+        
+    } catch (error) {
+        console.error('❌ Error loading messages:', error);
+        showError('Failed to load messages. Using real-time updates only.');
+        // If HTTP fails, rely on socket for real-time messages
+        if (socket && socket.connected) {
+            socket.emit('request-messages');
+        }
+    } finally {
+        isLoadingMessages = false;
+    }
+}
 
-// Initialize socket connection for real-time messaging
+// ===== OPTIMIZED RENDER MESSAGES =====
+function renderMessages(messages, isFirstLoad = false) {
+    if (!elements.chatContainer) return;
+    
+    if (isFirstLoad) {
+        // Clear container for first load
+        elements.chatContainer.innerHTML = '';
+    }
+    
+    // Sort messages by timestamp or ID in ascending order
+    const sortedMessages = messages.sort((a, b) => {
+        if (a.created_at && b.created_at) {
+            return new Date(a.created_at) - new Date(b.created_at);
+        }
+        return a.id - b.id;
+    });
+    
+    // Use document fragment for better performance
+    const fragment = document.createDocumentFragment();
+    
+    sortedMessages.forEach(msg => {
+        const isOwn = msg.username?.trim().toLowerCase() === currentUserSession?.username?.trim().toLowerCase();
+        const messageDiv = createMessageElement(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id);
+        fragment.appendChild(messageDiv);
+    });
+    
+    if (isFirstLoad) {
+        elements.chatContainer.appendChild(fragment);
+        
+        // Scroll to bottom after rendering
+        requestAnimationFrame(() => {
+            elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
+        });
+    } else {
+        // Prepend for pagination
+        elements.chatContainer.prepend(fragment);
+    }
+    
+    // Update scroll state after rendering messages
+    setTimeout(updateScrollState, 0);
+}
+
+// ===== OPTIMIZED SOCKET INITIALIZATION =====
 function initSocket() {
     console.log('🔌 Initializing socket connection...');
     
-    // FIXED: Added polling-only configuration for Opera 50MB data issue
     socket = io({
-        transports: ['polling', 'websocket'], // Try both, but prefer polling
+        transports: ['polling', 'websocket'],
         upgrade: false,
         forceNew: true,
         reconnection: true,
@@ -8205,8 +8241,6 @@ function initSocket() {
         const username = currentUserSession?.username;
         if (username) {
             socket.emit('user-online', username);
-            // Request existing messages when connecting
-            socket.emit('request-messages');
         }
     });
 
@@ -8214,15 +8248,12 @@ function initSocket() {
     socket.on('new-message', (message) => {
         console.log('💬 New message received via socket:', message);
         
-        // Only display if message is from another user or if it's an AI/bot response
         const isOwnMessage = message.username === currentUserSession?.username;
         const isAIResponse = message.username === 'AI' || message.username === 'Bot';
         
         if (!isOwnMessage || isAIResponse) {
-            // Check if message already exists to prevent duplicates
             const existingMessage = document.querySelector(`[data-id="${message.id}"]`);
             if (!existingMessage) {
-                // Display message immediately
                 displayMessage(
                     message.content, 
                     isOwnMessage ? 'sent' : 'received', 
@@ -8232,7 +8263,6 @@ function initSocket() {
                     true
                 );
                 
-                // Show notification if page is not focused
                 if (document.visibilityState !== 'visible' && !isOwnMessage) {
                     showNotification(message.username, message.content);
                 }
@@ -8243,7 +8273,7 @@ function initSocket() {
     // Listen for message history when first connecting
     socket.on('chat-messages', (messages) => {
         console.log('📨 Received message history:', messages.length, 'messages');
-        renderMessages(messages);
+        renderMessages(messages, true);
     });
 
     // User status updates
@@ -8254,7 +8284,7 @@ function initSocket() {
         updateUserStatusIndicator(data.username, data.status);
     });
 
-    // ADDED: Typing events
+    // Typing events
     socket.on('user-typing-start', (data) => {
         console.log('⌨️ User started typing:', data.username);
         showTypingIndicator(data.username);
@@ -8298,75 +8328,6 @@ function initSocket() {
     });
 }
 
-// ===== FIXED: LOAD MESSAGES WITH CORRECT ORDER =====
-async function loadMessages() {
-    try {
-        console.log('📥 Loading messages...');
-        const token = localStorage.getItem('auth_token');
-        const response = await fetch('/api/messages', {
-            headers: {
-                'Authorization': token ? `Bearer ${token}` : ''
-            }
-        });
-        if (!response.ok) throw new Error('Failed to load messages');
-        const data = await response.json();
-
-        // Check for new messages to show notification
-        if (data.length > 0) {
-            const latestMessage = data[data.length - 1];
-            if (latestMessage.id !== lastMessageId && 
-                latestMessage.username !== currentUserSession?.username && 
-                document.visibilityState !== 'visible') {
-                showNotification(latestMessage.username, latestMessage.content);
-            }
-            lastMessageId = latestMessage.id;
-        }
-        
-        renderMessages(data);
-    } catch (error) {
-        console.error('❌ Error loading messages:', error);
-        showError('Failed to load messages. Using real-time updates only.');
-        // If HTTP fails, rely on socket for real-time messages
-        if (socket && socket.connected) {
-            socket.emit('request-messages');
-        }
-    }
-}
-
-// ===== FIXED: RENDER MESSAGES WITH CORRECT ORDER =====
-function renderMessages(messages) {
-    if (!elements.chatContainer) return;
-    
-    // FIXED: Clear container but maintain scroll position
-    elements.chatContainer.innerHTML = '';
-    
-    // FIXED: Sort messages by timestamp or ID in ascending order (oldest first)
-    const sortedMessages = messages.sort((a, b) => {
-        // Use timestamp if available, otherwise use ID
-        if (a.created_at && b.created_at) {
-            return new Date(a.created_at) - new Date(b.created_at);
-        }
-        return a.id - b.id;
-    });
-    
-    // FIXED: Display messages in correct chronological order (oldest to newest)
-    sortedMessages.forEach(msg => {
-        const isOwn = msg.username?.trim().toLowerCase() === currentUserSession?.username?.trim().toLowerCase();
-        displayMessage(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id, false);
-    });
-
-    // Update scroll state after rendering messages
-    setTimeout(updateScrollState, 0);
-
-    // FIXED: IMMEDIATELY scroll to bottom after loading ALL messages
-    setTimeout(() => {
-        forceScrollToBottom('chat-container');
-        // Additional attempts to ensure it works
-        setTimeout(() => forceScrollToBottom('chat-container'), 50);
-        setTimeout(() => forceScrollToBottom('chat-container'), 100);
-    }, 10);
-}
-
 // Update online users lists
 function updateOnlineUsersList(onlineUsers) {
     console.log('Updating online users list:', onlineUsers);
@@ -8388,12 +8349,11 @@ function updateSingleOnlineList(listElementId, countElementId, onlineUsers) {
             const userElement = document.createElement('div');
             userElement.className = 'online-user';
             
-            // Get user profile to display correct avatar
             const avatarUrl = `https://i.pravatar.cc/50?u=${encodeURIComponent(user)}`;
             
             userElement.innerHTML = `
                 <div class="online-user-avatar">
-                    <img src="${avatarUrl}" alt="${user}">
+                    <img src="${avatarUrl}" alt="${user}" loading="lazy">
                     <div class="online-dot"></div>
                 </div>
                 <div class="online-user-info">
@@ -8401,7 +8361,6 @@ function updateSingleOnlineList(listElementId, countElementId, onlineUsers) {
                 </div>
             `;
             
-            // ADDED: Add click event to show user profile
             userElement.onclick = () => {
                 showUserProfile(user);
             };
@@ -8528,10 +8487,8 @@ function handleVisibilityChange() {
     const username = currentUserSession?.username;
     if (username && socket) {
         if (document.visibilityState === 'hidden') {
-            // User switched tabs or minimized browser - mark as away
             socket.emit('user-away', username);
         } else {
-            // User came back to the tab - mark as online
             socket.emit('user-online', username);
         }
     }
@@ -8540,7 +8497,6 @@ function handleVisibilityChange() {
 function handleBeforeUnload() {
     const username = currentUserSession?.username;
     if (username && socket) {
-        // Send away status instead of offline
         socket.emit('user-away', username);
     }
 }
@@ -8548,7 +8504,6 @@ function handleBeforeUnload() {
 function handlePageHide() {
     const username = currentUserSession?.username;
     if (username && socket) {
-        // Send away status instead of offline
         socket.emit('user-away', username);
     }
 }
@@ -9263,7 +9218,7 @@ function toggleOnlinePanel(panel, toggleBtn) {
     // Save state to localStorage
     saveOnlinePanelState();
     
-    // FIXED: Force scroll to bottom after panel state change
+    // Force scroll to bottom after panel state change
     setTimeout(() => {
         const currentContainer = getCurrentChatContainer();
         if (currentContainer) {
@@ -9367,7 +9322,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // ADDED: Close user profile popup when clicking outside
+    // Close user profile popup when clicking outside
     document.addEventListener('click', function(e) {
         const popup = document.getElementById('user-profile-popup');
         if (popup && popup.style.display === 'flex' && e.target === popup) {
@@ -9376,7 +9331,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// ===== ADDED: Function to setup private messages input handlers =====
+// ===== Function to setup private messages input handlers =====
 function setupPrivateMessageInputHandlers() {
     const input = document.getElementById('private-message-input');
     const sendButton = document.getElementById('private-messages-send-button');
