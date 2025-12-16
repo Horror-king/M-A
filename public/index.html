@@ -3502,6 +3502,12 @@
 .post-media {
     margin: 10px 0;
 }
+
+.post-media video {
+    width: 100%;
+    max-width: 500px;
+    border-radius: 8px;
+}
 .message img, .avatar img, .online-user-avatar img {
     content-visibility: auto;
     contain-intrinsic-size: 50px;
@@ -3516,13 +3522,7 @@
 /* Reduce repaints for scrollable containers */
 #chat-container, #private-ai-container, #private-chat-messages {
     transform: translateZ(0);
-        }
-.post-media video {
-    width: 100%;
-    max-width: 500px;
-    border-radius: 8px;
 }
-
 .post-text-content {
     margin-bottom: 10px;
     line-height: 1.4;
@@ -5461,6 +5461,40 @@ const elements = {
 
 let replyToText = null;
 
+// ===== NEW: AVATAR URL HELPER FUNCTION =====
+function getAvatarUrl(username) {
+    if (!username) return `https://i.pravatar.cc/50?u=default`;
+    
+    // First check if this is the current user and we have their profile
+    if (currentUserSession && username === currentUserSession.username) {
+        // Check localStorage for userProfiles
+        const userProfiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
+        const currentUserProfile = userProfiles[username];
+        
+        if (currentUserProfile && currentUserProfile.avatar) {
+            // Use the user's uploaded avatar
+            return currentUserProfile.avatar;
+        }
+        
+        // Also check the current profile in the DOM
+        const profileAvatar = document.getElementById('profile-avatar-img');
+        if (profileAvatar && profileAvatar.src && !profileAvatar.src.includes('pravatar')) {
+            return profileAvatar.src;
+        }
+    }
+    
+    // Check other users' profiles
+    const userProfiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
+    const userProfile = userProfiles[username];
+    
+    if (userProfile && userProfile.avatar && !userProfile.avatar.includes('pravatar')) {
+        return userProfile.avatar;
+    }
+    
+    // Fallback to default Pravatar
+    return `https://i.pravatar.cc/50?u=${encodeURIComponent(username)}`;
+}
+
 // ===== OPTIMIZED TYPING INDICATOR FUNCTIONS =====
 function showTypingIndicator(username) {
     if (!username || username === currentUserSession?.username) return;
@@ -6165,7 +6199,8 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
         const avatarDiv = document.createElement('div');
         avatarDiv.className = 'avatar';
         
-        const avatarUrl = `https://i.pravatar.cc/50?u=${encodeURIComponent(username)}`;
+        // MODIFIED: Use getAvatarUrl function instead of hardcoded Pravatar
+        const avatarUrl = getAvatarUrl(username);
         const img = new Image();
         img.src = avatarUrl;
         img.alt = "avatar";
@@ -7186,7 +7221,7 @@ async function loadPrivateUsers() {
             
             userItem.innerHTML = `
                 <div class="user-avatar">
-                    <img src="${conversation.avatar || `https://i.pravatar.cc/50?u=${conversation.username}`}" alt="${conversation.username}" loading="lazy">
+                    <img src="${conversation.avatar || getAvatarUrl(conversation.username)}" alt="${conversation.username}" loading="lazy">
                     <div class="user-status ${isOnline ? 'online' : 'offline'}"></div>
                     ${conversation.unread ? '<div class="unread-badge"></div>' : ''}
                 </div>
@@ -7235,7 +7270,7 @@ async function openPrivateChat(username) {
     
     // Update chat header
     document.getElementById('partner-avatar').innerHTML = 
-        `<img src="https://i.pravatar.cc/50?u=${username}" alt="${username}" loading="lazy">`;
+        `<img src="${getAvatarUrl(username)}" alt="${username}" loading="lazy">`;
     
     document.getElementById('partner-name').textContent = username;
     
@@ -7487,7 +7522,7 @@ function showPrivateMessageNotification(message) {
         new Notification(`New message from ${message.sender_username}`, {
             body: message.content.length > 50 ? 
                 message.content.substring(0, 50) + '...' : message.content,
-            icon: 'https://i.pravatar.cc/50?u=' + encodeURIComponent(message.sender_username)
+            icon: getAvatarUrl(message.sender_username)
         });
     }
     
@@ -7939,7 +7974,7 @@ function showUserProfile(username) {
         const userProfile = data.success ? data.profile : defaultProfile;
         
         // Update popup content
-        document.getElementById('popup-avatar').src = userProfile.avatar;
+        document.getElementById('popup-avatar').src = getAvatarUrl(username);
         
         // Set display name
         let displayName = username;
@@ -7995,7 +8030,7 @@ function showUserProfile(username) {
         // Fallback to basic profile display
         const popup = document.getElementById('user-profile-popup');
         if (popup) {
-            document.getElementById('popup-avatar').src = `https://i.pravatar.cc/150?u=${username}`;
+            document.getElementById('popup-avatar').src = getAvatarUrl(username);
             document.getElementById('popup-username').textContent = username;
             document.getElementById('popup-bio').textContent = 'No bio available';
             document.getElementById('popup-age').textContent = 'Not specified';
@@ -8044,7 +8079,7 @@ function updateProfileDisplay(profile) {
     
     if (displayAvatar) {
         // Use avatar_url if available, otherwise use avatar
-        const avatarUrl = profile.avatar_url || profile.avatar || `https://i.pravatar.cc/50?u=${profile.username || currentUserSession?.username || 'default'}`;
+        const avatarUrl = profile.avatar_url || profile.avatar || getAvatarUrl(profile.username || currentUserSession?.username || 'default');
         displayAvatar.src = avatarUrl;
     }
     
@@ -8097,7 +8132,7 @@ function updateProfileSection() {
         profileSection.className = 'profile-display-section';
         profileSection.innerHTML = `
             <div class="profile-display-avatar">
-                <img id="display-avatar" src="https://i.pravatar.cc/50?u=${encodeURIComponent(currentUsername)}" alt="Profile" loading="lazy">
+                <img id="display-avatar" src="${getAvatarUrl(currentUsername)}" alt="Profile" loading="lazy">
             </div>
             <div class="profile-display-info">
                 <div class="profile-display-username" id="display-username">${currentUsername}</div>
@@ -8349,7 +8384,8 @@ function updateSingleOnlineList(listElementId, countElementId, onlineUsers) {
             const userElement = document.createElement('div');
             userElement.className = 'online-user';
             
-            const avatarUrl = `https://i.pravatar.cc/50?u=${encodeURIComponent(user)}`;
+            // MODIFIED: Use getAvatarUrl instead of hardcoded Pravatar
+            const avatarUrl = getAvatarUrl(user);
             
             userElement.innerHTML = `
                 <div class="online-user-avatar">
