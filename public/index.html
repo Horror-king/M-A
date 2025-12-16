@@ -5202,6 +5202,52 @@ function animateWelcomeText() {
 }
 
 // --- CUT HERE ---
+// ... REST OF YOUR EXISTING CODE CONTINUES EXACTLY AS BEFORE ...
+// ===== YOUR EXISTING CODE CONTINUES BELOW =====
+
+// NEW: Welcome screen animation function
+function animateWelcomeText() {
+    const text = "MessageMate";
+    const animatedText = document.getElementById('animated-text');
+    
+    // Clear any existing content
+    animatedText.innerHTML = '';
+    
+    // Create individual letter elements
+    for (let i = 0; i < text.length; i++) {
+        const letter = document.createElement('span');
+        letter.className = 'letter';
+        letter.textContent = text[i];
+        letter.style.animationDelay = `${i * 0.1}s`;
+        animatedText.appendChild(letter);
+    }
+    
+    // Check if user is already logged in
+    const isLoggedIn = currentUserSession !== null;
+    
+    console.log('User login status:', isLoggedIn ? 'Logged in' : 'Not logged in');
+    
+    // Hide welcome screen after animation completes
+    setTimeout(() => {
+        const welcomeScreen = document.getElementById('welcome-screen');
+        welcomeScreen.style.opacity = '0';
+        setTimeout(() => {
+            welcomeScreen.style.display = 'none';
+            
+            if (isLoggedIn) {
+                // User is already logged in - go directly to main app
+                console.log('✅ User already logged in, skipping auth screen');
+                initializeMainApp();
+            } else {
+                // User not logged in - show auth container
+                console.log('❌ User not logged in, showing auth screen');
+                document.getElementById('auth-container').style.display = 'flex';
+            }
+        }, 500);
+    }, 2500); // Total animation time: 2.5 seconds
+}
+
+// --- CUT HERE ---
 // ... THE REST OF YOUR CODE REMAINS EXACTLY THE SAME ...
 // --- CUT HERE ---
 
@@ -5218,7 +5264,7 @@ function initializeMainApp() {
     
     // IMPORTANT: Create profile section and load profile data
     updateProfileSection(); // Create the profile section first
-    loadProfile(); // Then load the actual profile data
+    loadProfile(); // Then load the actual profile data from server
     
     initializeChat();
 
@@ -5447,6 +5493,9 @@ const MESSAGES_PER_PAGE = 50;
 let isLoadingMessages = false;
 let hasMoreMessages = true;
 
+// ✅ ADDED: Profile cache to reduce server calls
+let profileCache = {};
+
 const elements = {
     usernameInput: document.getElementById('auth-username'),
     messageInput: document.getElementById('user-input'),
@@ -5461,38 +5510,121 @@ const elements = {
 
 let replyToText = null;
 
-// ===== NEW: AVATAR URL HELPER FUNCTION =====
+// ===== MODIFIED: AVATAR URL HELPER FUNCTION =====
 function getAvatarUrl(username) {
     if (!username) return `https://i.pravatar.cc/50?u=default`;
     
-    // First check if this is the current user and we have their profile
+    // First check if we have the profile in cache
+    if (profileCache[username]) {
+        // Use cached avatar
+        return profileCache[username].avatar || `https://i.pravatar.cc/50?u=${encodeURIComponent(username)}`;
+    }
+    
+    // Check if this is the current user
     if (currentUserSession && username === currentUserSession.username) {
-        // Check localStorage for userProfiles
-        const userProfiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
-        const currentUserProfile = userProfiles[username];
-        
-        if (currentUserProfile && currentUserProfile.avatar) {
-            // Use the user's uploaded avatar
-            return currentUserProfile.avatar;
-        }
-        
-        // Also check the current profile in the DOM
-        const profileAvatar = document.getElementById('profile-avatar-img');
-        if (profileAvatar && profileAvatar.src && !profileAvatar.src.includes('pravatar')) {
-            return profileAvatar.src;
-        }
+        // For current user, we should have loaded the profile already
+        // Return default while we fetch or if not available
+        return `https://i.pravatar.cc/50?u=${encodeURIComponent(username)}`;
     }
     
-    // Check other users' profiles
-    const userProfiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
-    const userProfile = userProfiles[username];
-    
-    if (userProfile && userProfile.avatar && !userProfile.avatar.includes('pravatar')) {
-        return userProfile.avatar;
-    }
-    
-    // Fallback to default Pravatar
+    // For other users, return default for now
+    // The actual profile will be fetched when needed
     return `https://i.pravatar.cc/50?u=${encodeURIComponent(username)}`;
+}
+
+// ===== NEW: FUNCTION TO FETCH PROFILE FROM SERVER =====
+async function fetchUserProfileFromServer(username) {
+    if (!username) return null;
+    
+    // Check cache first
+    if (profileCache[username]) {
+        return profileCache[username];
+    }
+    
+    try {
+        console.log(`📋 Fetching profile from server for: ${username}`);
+        
+        const response = await fetch(`/api/user/profile/${username}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.profile) {
+                // Cache the profile
+                profileCache[username] = {
+                    username: data.profile.username,
+                    firstname: data.profile.firstname || '',
+                    lastname: data.profile.lastname || '',
+                    bio: data.profile.bio || '',
+                    age: data.profile.age || '',
+                    gender: data.profile.gender || '',
+                    location: data.profile.location || '',
+                    interests: data.profile.interests || '',
+                    avatar: data.profile.avatar || `https://i.pravatar.cc/150?u=${username}`,
+                    display_name: data.profile.display_name || username,
+                    status: data.profile.status || 'offline'
+                };
+                
+                console.log(`✅ Profile fetched from server for: ${username}`);
+                return profileCache[username];
+            }
+        }
+        
+        // If not found or error, return default profile
+        const defaultProfile = {
+            username: username,
+            firstname: '',
+            lastname: '',
+            bio: '',
+            age: '',
+            gender: '',
+            location: '',
+            interests: '',
+            avatar: `https://i.pravatar.cc/150?u=${username}`,
+            display_name: username,
+            status: 'offline'
+        };
+        
+        profileCache[username] = defaultProfile;
+        return defaultProfile;
+        
+    } catch (error) {
+        console.error(`❌ Error fetching profile for ${username}:`, error);
+        
+        // Return default profile on error
+        const defaultProfile = {
+            username: username,
+            firstname: '',
+            lastname: '',
+            bio: '',
+            age: '',
+            gender: '',
+            location: '',
+            interests: '',
+            avatar: `https://i.pravatar.cc/150?u=${username}`,
+            display_name: username,
+            status: 'offline'
+        };
+        
+        profileCache[username] = defaultProfile;
+        return defaultProfile;
+    }
+}
+
+// ===== NEW: FUNCTION TO FETCH AND UPDATE AVATAR =====
+async function updateAvatarFromServer(username, element) {
+    try {
+        const profile = await fetchUserProfileFromServer(username);
+        if (profile && profile.avatar && element) {
+            element.src = profile.avatar;
+        }
+    } catch (error) {
+        console.error(`❌ Error updating avatar for ${username}:`, error);
+    }
 }
 
 // ===== OPTIMIZED TYPING INDICATOR FUNCTIONS =====
@@ -5789,6 +5921,8 @@ function clearUserSession() {
     sessionStorage.removeItem('currentUserSession');
     localStorage.removeItem('userSession');
     localStorage.removeItem('auth_token');
+    // Clear profile cache on logout
+    profileCache = {};
     console.log('✅ User session cleared');
 }
 
@@ -6185,7 +6319,7 @@ async function sendPrivateMessage() {
     }, 1000);
 }
 
-// ===== OPTIMIZED: MESSAGE DISPLAY FUNCTIONS =====
+// ===== MODIFIED: MESSAGE DISPLAY FUNCTIONS WITH SERVER PROFILE FETCHING =====
 function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${sender}`;
@@ -6199,12 +6333,18 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
         const avatarDiv = document.createElement('div');
         avatarDiv.className = 'avatar';
         
-        // MODIFIED: Use getAvatarUrl function instead of hardcoded Pravatar
+        // MODIFIED: Use getAvatarUrl function which now fetches from server
         const avatarUrl = getAvatarUrl(username);
         const img = new Image();
         img.src = avatarUrl;
         img.alt = "avatar";
         img.loading = "lazy";
+        
+        // Fetch and update avatar from server in background
+        setTimeout(() => {
+            updateAvatarFromServer(username, img);
+        }, 100);
+        
         avatarDiv.appendChild(img);
         
         // Add click event to show user profile
@@ -7219,18 +7359,34 @@ async function loadPrivateUsers() {
             // For demo online status
             const isOnline = onlineUsers.includes(conversation.username);
             
-            userItem.innerHTML = `
-                <div class="user-avatar">
-                    <img src="${conversation.avatar || getAvatarUrl(conversation.username)}" alt="${conversation.username}" loading="lazy">
-                    <div class="user-status ${isOnline ? 'online' : 'offline'}"></div>
-                    ${conversation.unread ? '<div class="unread-badge"></div>' : ''}
-                </div>
-                <div class="user-info">
-                    <div class="user-name">${conversation.displayName || conversation.username}</div>
-                    <div class="user-last-message">${conversation.isSender ? 'You: ' : ''}${conversation.lastMessage || 'No messages'}</div>
-                    <div class="user-time">${formatMessageTime(conversation.lastMessageTime)}</div>
-                </div>
-            `;
+            // Fetch user profile for avatar
+            fetchUserProfileFromServer(conversation.username).then(profile => {
+                userItem.innerHTML = `
+                    <div class="user-avatar">
+                        <img src="${profile.avatar || getAvatarUrl(conversation.username)}" alt="${conversation.username}" loading="lazy">
+                        <div class="user-status ${isOnline ? 'online' : 'offline'}"></div>
+                        ${conversation.unread ? '<div class="unread-badge"></div>' : ''}
+                    </div>
+                    <div class="user-info">
+                        <div class="user-name">${profile.display_name || conversation.username}</div>
+                        <div class="user-last-message">${conversation.isSender ? 'You: ' : ''}${conversation.lastMessage || 'No messages'}</div>
+                        <div class="user-time">${formatMessageTime(conversation.lastMessageTime)}</div>
+                    </div>
+                `;
+            }).catch(() => {
+                userItem.innerHTML = `
+                    <div class="user-avatar">
+                        <img src="${getAvatarUrl(conversation.username)}" alt="${conversation.username}" loading="lazy">
+                        <div class="user-status ${isOnline ? 'online' : 'offline'}"></div>
+                        ${conversation.unread ? '<div class="unread-badge"></div>' : ''}
+                    </div>
+                    <div class="user-info">
+                        <div class="user-name">${conversation.username}</div>
+                        <div class="user-last-message">${conversation.isSender ? 'You: ' : ''}${conversation.lastMessage || 'No messages'}</div>
+                        <div class="user-time">${formatMessageTime(conversation.lastMessageTime)}</div>
+                    </div>
+                `;
+            });
             
             usersList.appendChild(userItem);
         });
@@ -7268,11 +7424,18 @@ async function openPrivateChat(username) {
         privateMessagesHeader.style.padding = '8px 15px';
     }
     
-    // Update chat header
-    document.getElementById('partner-avatar').innerHTML = 
-        `<img src="${getAvatarUrl(username)}" alt="${username}" loading="lazy">`;
-    
-    document.getElementById('partner-name').textContent = username;
+    // Update chat header with profile data
+    fetchUserProfileFromServer(username).then(profile => {
+        document.getElementById('partner-avatar').innerHTML = 
+            `<img src="${profile.avatar || getAvatarUrl(username)}" alt="${username}" loading="lazy">`;
+        
+        document.getElementById('partner-name').textContent = profile.display_name || username;
+    }).catch(() => {
+        document.getElementById('partner-avatar').innerHTML = 
+            `<img src="${getAvatarUrl(username)}" alt="${username}" loading="lazy">`;
+        
+        document.getElementById('partner-name').textContent = username;
+    });
     
     // Set online status
     const isOnline = onlineUsers.includes(username);
@@ -7797,60 +7960,83 @@ function clearOldMessageTracking() {
 // Run cleanup every 30 seconds
 setInterval(clearOldMessageTracking, 30000);
 
-// ===== OPTIMIZED PROFILE MANAGEMENT FUNCTIONS =====
-function loadProfile() {
+// ===== MODIFIED: PROFILE MANAGEMENT FUNCTIONS =====
+async function loadProfile() {
     const username = currentUserSession?.username;
     if (!username) {
         console.error('No user logged in');
         return;
     }
     
-    console.log('Loading profile for:', username);
+    console.log('Loading profile from server for:', username);
     
-    // Load profile from API
-    const token = localStorage.getItem('auth_token');
-    fetch('/api/user/profile', {
-        headers: {
-            'Authorization': token ? `Bearer ${token}` : ''
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
+    try {
+        // Load profile from API
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch('/api/user/profile', {
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : ''
+            }
+        });
+        
+        const data = await response.json();
         console.log('Profile data received:', data);
         
         if (data.success) {
             const profile = data.profile;
             
+            // Cache the profile
+            profileCache[username] = {
+                username: profile.username,
+                firstname: profile.firstname || '',
+                lastname: profile.lastname || '',
+                bio: profile.bio || '',
+                age: profile.age || '',
+                gender: profile.gender || '',
+                location: profile.location || '',
+                interests: profile.interests || '',
+                avatar: profile.avatar || `https://i.pravatar.cc/150?u=${username}`,
+                display_name: profile.display_name || username,
+                status: profile.status || 'online'
+            };
+            
             // Populate form fields
             if (document.getElementById('profile-firstname')) {
-                document.getElementById('profile-firstname').value = profile.firstname || '';
-                document.getElementById('profile-lastname').value = profile.lastname || '';
-                document.getElementById('profile-username').value = profile.username || username;
-                document.getElementById('profile-bio').value = profile.bio || '';
-                document.getElementById('profile-age').value = profile.age || '';
-                document.getElementById('profile-gender').value = profile.gender || '';
-                document.getElementById('profile-location').value = profile.location || '';
-                document.getElementById('profile-interests').value = profile.interests || '';
-                
-                // Use avatar_url if available, otherwise use avatar
-                const avatarUrl = profile.avatar_url || profile.avatar || `https://i.pravatar.cc/150?u=${username}`;
-                document.getElementById('profile-avatar-img').src = avatarUrl;
+                document.getElementById('profile-firstname').value = profileCache[username].firstname;
+                document.getElementById('profile-lastname').value = profileCache[username].lastname;
+                document.getElementById('profile-username').value = profileCache[username].username || username;
+                document.getElementById('profile-bio').value = profileCache[username].bio;
+                document.getElementById('profile-age').value = profileCache[username].age;
+                document.getElementById('profile-gender').value = profileCache[username].gender;
+                document.getElementById('profile-location').value = profileCache[username].location;
+                document.getElementById('profile-interests').value = profileCache[username].interests;
+                document.getElementById('profile-avatar-img').src = profileCache[username].avatar;
             }
             
             // Update display section
-            updateProfileDisplay(profile);
-            
-            // Store in localStorage for posts functionality
-            const userProfiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
-            userProfiles[username] = profile;
-            localStorage.setItem('userProfiles', JSON.stringify(userProfiles));
+            updateProfileDisplay(profileCache[username]);
             
             console.log('✅ Profile loaded successfully from server');
         } else {
             console.error('Profile load failed:', data.error);
+            // Create default profile if none exists
+            const defaultProfile = {
+                username: username,
+                firstname: '',
+                lastname: '',
+                bio: '',
+                age: '',
+                gender: '',
+                location: '',
+                interests: '',
+                avatar: `https://i.pravatar.cc/150?u=${username}`,
+                display_name: username,
+                status: 'online'
+            };
+            profileCache[username] = defaultProfile;
+            updateProfileDisplay(defaultProfile);
         }
-    })
-    .catch(error => {
+    } catch (error) {
         console.error('Error loading profile:', error);
         // If profile doesn't exist yet, create a default one
         const defaultProfile = {
@@ -7862,20 +8048,23 @@ function loadProfile() {
             gender: '',
             location: '',
             interests: '',
-            avatar: `https://i.pravatar.cc/150?u=${username}`
+            avatar: `https://i.pravatar.cc/150?u=${username}`,
+            display_name: username,
+            status: 'online'
         };
+        profileCache[username] = defaultProfile;
         updateProfileDisplay(defaultProfile);
-    });
+    }
 }
 
-function saveProfile() {
+async function saveProfile() {
     const username = currentUserSession?.username;
     if (!username) {
         showError('You must be logged in to save profile');
         return;
     }
     
-    console.log('Saving profile for:', username);
+    console.log('Saving profile to server for:', username);
     
     const profileData = {
         firstname: document.getElementById('profile-firstname').value,
@@ -7889,47 +8078,56 @@ function saveProfile() {
         avatar: document.getElementById('profile-avatar-img').src
     };
     
-    console.log('Profile data:', profileData);
+    console.log('Profile data to save:', profileData);
     
     const token = localStorage.getItem('auth_token');
     console.log('Using token:', token ? 'Token present' : 'No token');
     
-    // Use POST method to save to server
-    fetch('/api/user/profile', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': token ? `Bearer ${token}` : ''
-        },
-        body: JSON.stringify(profileData)
-    })
-    .then(response => {
+    try {
+        // Use POST method to save to server
+        const response = await fetch('/api/user/profile', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': token ? `Bearer ${token}` : ''
+            },
+            body: JSON.stringify(profileData)
+        });
+        
         console.log('Save response status:', response.status);
-        return response.json();
-    })
-    .then(data => {
+        const data = await response.json();
         console.log('Save response data:', data);
         
         if (data.success) {
-            // Update display section with the returned profile data
+            // Update cache with the returned profile data
             const updatedProfile = data.profile || profileData;
-            updateProfileDisplay(updatedProfile);
+            profileCache[username] = {
+                username: updatedProfile.username || username,
+                firstname: updatedProfile.firstname || '',
+                lastname: updatedProfile.lastname || '',
+                bio: updatedProfile.bio || '',
+                age: updatedProfile.age || '',
+                gender: updatedProfile.gender || '',
+                location: updatedProfile.location || '',
+                interests: updatedProfile.interests || '',
+                avatar: updatedProfile.avatar || `https://i.pravatar.cc/150?u=${username}`,
+                display_name: updatedProfile.display_name || username,
+                status: updatedProfile.status || 'online'
+            };
             
-            // Update localStorage for userProfiles
-            const userProfiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
-            userProfiles[username] = updatedProfile;
-            localStorage.setItem('userProfiles', JSON.stringify(userProfiles));
+            // Update display section
+            updateProfileDisplay(profileCache[username]);
             
             // Update form fields with returned data
             if (document.getElementById('profile-firstname')) {
-                document.getElementById('profile-firstname').value = updatedProfile.firstname || '';
-                document.getElementById('profile-lastname').value = updatedProfile.lastname || '';
-                document.getElementById('profile-bio').value = updatedProfile.bio || '';
-                document.getElementById('profile-age').value = updatedProfile.age || '';
-                document.getElementById('profile-gender').value = updatedProfile.gender || '';
-                document.getElementById('profile-location').value = updatedProfile.location || '';
-                document.getElementById('profile-interests').value = updatedProfile.interests || '';
-                document.getElementById('profile-avatar-img').src = updatedProfile.avatar || `https://i.pravatar.cc/150?u=${username}`;
+                document.getElementById('profile-firstname').value = profileCache[username].firstname;
+                document.getElementById('profile-lastname').value = profileCache[username].lastname;
+                document.getElementById('profile-bio').value = profileCache[username].bio;
+                document.getElementById('profile-age').value = profileCache[username].age;
+                document.getElementById('profile-gender').value = profileCache[username].gender;
+                document.getElementById('profile-location').value = profileCache[username].location;
+                document.getElementById('profile-interests').value = profileCache[username].interests;
+                document.getElementById('profile-avatar-img').src = profileCache[username].avatar;
             }
             
             // Show success message
@@ -7942,48 +8140,32 @@ function saveProfile() {
         } else {
             throw new Error(data.error || 'Failed to update profile');
         }
-    })
-    .catch(error => {
+    } catch (error) {
         console.error('Profile save error:', error);
         showError(error.message);
-    });
+    }
 }
 
-// Get user profile from server for popups
-function showUserProfile(username) {
+// MODIFIED: Get user profile from server for popups
+async function showUserProfile(username) {
     const popup = document.getElementById('user-profile-popup');
     if (!popup) return;
     
-    // Get user profile data from API
-    fetch(`/api/user/profile/${username}`)
-    .then(response => response.json())
-    .then(data => {
-        // Set default values
-        const defaultProfile = {
-            firstname: '',
-            lastname: '',
-            username: username,
-            bio: '',
-            age: '',
-            gender: '',
-            location: '',
-            interests: '',
-            avatar: `https://i.pravatar.cc/150?u=${username}`
-        };
-        
-        const userProfile = data.success ? data.profile : defaultProfile;
+    try {
+        // Fetch user profile from server
+        const profile = await fetchUserProfileFromServer(username);
         
         // Update popup content
-        document.getElementById('popup-avatar').src = getAvatarUrl(username);
+        document.getElementById('popup-avatar').src = profile.avatar || getAvatarUrl(username);
         
         // Set display name
-        let displayName = username;
-        if (userProfile.firstname && userProfile.lastname) {
-            displayName = `${userProfile.firstname} ${userProfile.lastname}`;
-        } else if (userProfile.firstname) {
-            displayName = userProfile.firstname;
-        } else if (userProfile.lastname) {
-            displayName = userProfile.lastname;
+        let displayName = profile.display_name || username;
+        if (profile.firstname && profile.lastname) {
+            displayName = `${profile.firstname} ${profile.lastname}`;
+        } else if (profile.firstname) {
+            displayName = profile.firstname;
+        } else if (profile.lastname) {
+            displayName = profile.lastname;
         }
         document.getElementById('popup-username').textContent = displayName;
         
@@ -7996,14 +8178,14 @@ function showUserProfile(username) {
         statusText.textContent = isOnline ? 'Online' : 'Offline';
         
         // Set bio
-        document.getElementById('popup-bio').textContent = userProfile.bio || 'No bio available';
+        document.getElementById('popup-bio').textContent = profile.bio || 'No bio available';
         
         // Set details
-        document.getElementById('popup-age').textContent = userProfile.age || 'Not specified';
-        document.getElementById('popup-gender').textContent = userProfile.gender ? 
-            userProfile.gender.charAt(0).toUpperCase() + userProfile.gender.slice(1) : 'Not specified';
-        document.getElementById('popup-location').textContent = userProfile.location || 'Not specified';
-        document.getElementById('popup-interests').textContent = userProfile.interests || 'Not specified';
+        document.getElementById('popup-age').textContent = profile.age || 'Not specified';
+        document.getElementById('popup-gender').textContent = profile.gender ? 
+            profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1) : 'Not specified';
+        document.getElementById('popup-location').textContent = profile.location || 'Not specified';
+        document.getElementById('popup-interests').textContent = profile.interests || 'Not specified';
         
         // Update message button
         const messageBtn = document.getElementById('popup-message-btn');
@@ -8024,8 +8206,7 @@ function showUserProfile(username) {
         
         // Show popup
         popup.style.display = 'flex';
-    })
-    .catch(error => {
+    } catch (error) {
         console.error('Error loading user profile:', error);
         // Fallback to basic profile display
         const popup = document.getElementById('user-profile-popup');
@@ -8048,10 +8229,10 @@ function showUserProfile(username) {
             
             popup.style.display = 'flex';
         }
-    });
+    }
 }
 
-// Profile display function - properly updates the dropdown
+// MODIFIED: Profile display function - properly updates the dropdown
 function updateProfileDisplay(profile) {
     console.log('Updating profile display:', profile);
     
@@ -8068,8 +8249,8 @@ function updateProfileDisplay(profile) {
         } else if (profile.lastname) {
             displayUsername.textContent = profile.lastname;
         } else {
-            // Use username if no first/last name
-            displayUsername.textContent = profile.username || currentUserSession?.username || 'User';
+            // Use display_name or username if no first/last name
+            displayUsername.textContent = profile.display_name || profile.username || currentUserSession?.username || 'User';
         }
     }
     
@@ -8078,13 +8259,8 @@ function updateProfileDisplay(profile) {
     }
     
     if (displayAvatar) {
-        // Use avatar_url if available, otherwise use avatar
-        const avatarUrl = profile.avatar_url || profile.avatar || getAvatarUrl(profile.username || currentUserSession?.username || 'default');
-        displayAvatar.src = avatarUrl;
+        displayAvatar.src = profile.avatar || getAvatarUrl(profile.username || currentUserSession?.username || 'default');
     }
-    
-    // Update profile picture in messages if needed
-    updateMessageAvatars(profile.avatar);
     
     console.log('✅ Profile display updated');
 }
@@ -8101,6 +8277,7 @@ function changeAvatar() {
     }
 }
 
+// MODIFIED: Update message avatars from cache
 function updateMessageAvatars(avatarUrl) {
     // Update all message avatars for the current user
     const userMessages = document.querySelectorAll('.message.sent .avatar img');
@@ -8130,13 +8307,22 @@ function updateProfileSection() {
     if (currentUsername) {
         const profileSection = document.createElement('div');
         profileSection.className = 'profile-display-section';
+        
+        // Use cached profile or default
+        const profile = profileCache[currentUsername] || {
+            username: currentUsername,
+            display_name: currentUsername,
+            avatar: getAvatarUrl(currentUsername),
+            bio: 'No bio yet'
+        };
+        
         profileSection.innerHTML = `
             <div class="profile-display-avatar">
-                <img id="display-avatar" src="${getAvatarUrl(currentUsername)}" alt="Profile" loading="lazy">
+                <img id="display-avatar" src="${profile.avatar}" alt="Profile" loading="lazy">
             </div>
             <div class="profile-display-info">
-                <div class="profile-display-username" id="display-username">${currentUsername}</div>
-                <div class="profile-display-bio" id="display-bio">No bio yet</div>
+                <div class="profile-display-username" id="display-username">${profile.display_name}</div>
+                <div class="profile-display-bio" id="display-bio">${profile.bio}</div>
             </div>
             <div class="profile-display-edit" onclick="showContainer('profile')">
                 Edit
@@ -8384,18 +8570,31 @@ function updateSingleOnlineList(listElementId, countElementId, onlineUsers) {
             const userElement = document.createElement('div');
             userElement.className = 'online-user';
             
-            // MODIFIED: Use getAvatarUrl instead of hardcoded Pravatar
-            const avatarUrl = getAvatarUrl(user);
-            
-            userElement.innerHTML = `
-                <div class="online-user-avatar">
-                    <img src="${avatarUrl}" alt="${user}" loading="lazy">
-                    <div class="online-dot"></div>
-                </div>
-                <div class="online-user-info">
-                    <div class="online-user-name">${user}</div>
-                </div>
-            `;
+            // Fetch profile for each online user
+            fetchUserProfileFromServer(user).then(profile => {
+                const avatarUrl = profile.avatar || getAvatarUrl(user);
+                const displayName = profile.display_name || user;
+                
+                userElement.innerHTML = `
+                    <div class="online-user-avatar">
+                        <img src="${avatarUrl}" alt="${displayName}" loading="lazy">
+                        <div class="online-dot"></div>
+                    </div>
+                    <div class="online-user-info">
+                        <div class="online-user-name">${displayName}</div>
+                    </div>
+                `;
+            }).catch(() => {
+                userElement.innerHTML = `
+                    <div class="online-user-avatar">
+                        <img src="${getAvatarUrl(user)}" alt="${user}" loading="lazy">
+                        <div class="online-dot"></div>
+                    </div>
+                    <div class="online-user-info">
+                        <div class="online-user-name">${user}</div>
+                    </div>
+                `;
+            });
             
             userElement.onclick = () => {
                 showUserProfile(user);
