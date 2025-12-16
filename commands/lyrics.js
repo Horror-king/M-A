@@ -1,73 +1,67 @@
-const axios = require("axios");
-
-const LYRICS_API = "https://shizuapi.onrender.com/api/lyricsv2?query=";
+const axios = require('axios');
 
 module.exports = {
   config: {
-    name: "lyrics",
-    version: "1.0",
-    author: "Hassan",
-    countDown: 5,
+    name: 'lyrics',
+    aliases: ['lyric', 'song'],
+    version: '1.0.0',
+    author: 'Hassan',
     role: 0,
-    shortDescription: { en: "Get song lyrics" },
-    longDescription: {
-      en: "Fetch song lyrics based on a song name or artist using Shizu Lyrics API."
+    category: 'music',
+    shortDescription: {
+      en: 'Fetch song lyrics by artist and title.'
     },
-    category: "music",
+    longDescription: {
+      en: 'Uses lyrics.ovh API to fetch song lyrics instantly.'
+    },
     guide: {
-      en:
-        `Usage:\n` +
-        `{pn} <song name>\n\n` +
-        `Example:\n` +
-        `{pn} shape of you`
+      en: '{pn} lyrics <artist> | <title>'
     }
   },
 
-  onStart: async function ({ api, event, args }) {
+  onStart: async function ({ message, args }) {
     try {
-      const query = args.join(" ").trim();
+      const input = args.join(' ').trim();
 
-      if (!query) {
-        return api.sendMessage(
-          "❌ Please provide a song name.\n\nExample:\n!lyrics shape of you",
-          event.threadID,
-          event.messageID
+      if (!input || !input.includes('|')) {
+        return message.reply(
+          '❌ Usage:\nlyrics <artist> | <song title>\n\nExample:\nlyrics Eminem | Lose Yourself'
         );
       }
 
-      await api.sendMessage("🎵Lyrics.", event.threadID, event.messageID);
+      const [artistRaw, titleRaw] = input.split('|');
 
-      const apiUrl = `${LYRICS_API}${encodeURIComponent(query)}`;
-      const response = await axios.get(apiUrl, { responseType: "json", timeout: 60000 });
+      const artist = artistRaw.trim();
+      const title = titleRaw.trim();
 
-      if (!response.data || !response.data.result) {
-        throw new Error("Lyrics not found or invalid API response.");
+      if (!artist || !title) {
+        return message.reply('❌ Both artist and song title are required.');
       }
 
-      const result = response.data.result;
-      const title = result.title || query;
-      const artist = result.artist || "Unknown Artist";
-      const lyrics = result.lyrics || "No lyrics found.";
+      const url = `https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(title)}`;
 
-      const fullMessage =
-        `🎵 *${title}* - *${artist}*\n\n` +
-        `${lyrics}`;
+      const response = await axios.get(url, {
+        timeout: 15000,
+        validateStatus: () => true
+      });
 
-      await api.sendMessage(fullMessage, event.threadID, event.messageID);
+      if (!response.data || !response.data.lyrics) {
+        return message.reply('❌ Lyrics not found. Try another song.');
+      }
+
+      let lyrics = response.data.lyrics;
+
+      // Limit very long lyrics
+      if (lyrics.length > 3500) {
+        lyrics = lyrics.substring(0, 3500) + '\n\n...lyrics truncated';
+      }
+
+      return message.reply(
+        `🎵 **${title}** — *${artist}*\n\n${lyrics}`
+      );
 
     } catch (error) {
-      console.error("❌ Lyrics command error:", error);
-      let errorMessage = "❌ Failed to fetch lyrics. ";
-
-      if (error.code === "ECONNABORTED" || error.message.includes("timeout")) {
-        errorMessage += "The request timed out. Please try again.";
-      } else if (error.response) {
-        errorMessage += `API error: ${error.response.status}`;
-      } else {
-        errorMessage += error.message;
-      }
-
-      await api.sendMessage(errorMessage, event.threadID, event.messageID);
+      return message.reply(`⚠️ Lyrics Error: ${error.message}`);
     }
   }
 };
