@@ -5202,52 +5202,6 @@ function animateWelcomeText() {
 }
 
 // --- CUT HERE ---
-// ... REST OF YOUR EXISTING CODE CONTINUES EXACTLY AS BEFORE ...
-// ===== YOUR EXISTING CODE CONTINUES BELOW =====
-
-// NEW: Welcome screen animation function
-function animateWelcomeText() {
-    const text = "MessageMate";
-    const animatedText = document.getElementById('animated-text');
-    
-    // Clear any existing content
-    animatedText.innerHTML = '';
-    
-    // Create individual letter elements
-    for (let i = 0; i < text.length; i++) {
-        const letter = document.createElement('span');
-        letter.className = 'letter';
-        letter.textContent = text[i];
-        letter.style.animationDelay = `${i * 0.1}s`;
-        animatedText.appendChild(letter);
-    }
-    
-    // Check if user is already logged in
-    const isLoggedIn = currentUserSession !== null;
-    
-    console.log('User login status:', isLoggedIn ? 'Logged in' : 'Not logged in');
-    
-    // Hide welcome screen after animation completes
-    setTimeout(() => {
-        const welcomeScreen = document.getElementById('welcome-screen');
-        welcomeScreen.style.opacity = '0';
-        setTimeout(() => {
-            welcomeScreen.style.display = 'none';
-            
-            if (isLoggedIn) {
-                // User is already logged in - go directly to main app
-                console.log('✅ User already logged in, skipping auth screen');
-                initializeMainApp();
-            } else {
-                // User not logged in - show auth container
-                console.log('❌ User not logged in, showing auth screen');
-                document.getElementById('auth-container').style.display = 'flex';
-            }
-        }, 500);
-    }, 2500); // Total animation time: 2.5 seconds
-}
-
-// --- CUT HERE ---
 // ... THE REST OF YOUR CODE REMAINS EXACTLY THE SAME ...
 // --- CUT HERE ---
 
@@ -6002,6 +5956,26 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// ===== NEW: FUNCTION TO ATTACH EVENT LISTENERS TO MESSAGES =====
+function attachMessageEventListeners(messageDiv) {
+    // Attach touch event listeners for long-press functionality
+    messageDiv.addEventListener('touchstart', handleTouchStart);
+    messageDiv.addEventListener('touchend', handleTouchEnd);
+    messageDiv.addEventListener('touchmove', handleTouchMove);
+    messageDiv.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showMessageContextMenu(e, messageDiv);
+    });
+    
+    // Also attach click event for desktop compatibility
+    messageDiv.addEventListener('mousedown', function(e) {
+        if (e.button === 2) { // Right click
+            e.preventDefault();
+            showMessageContextMenu(e, messageDiv);
+        }
+    });
+}
+
 // ===== OPTIMIZED: Update showContainer function =====
 function showContainer(containerId) {
     console.log('🔄 Showing container:', containerId);
@@ -6062,6 +6036,13 @@ function showContainer(containerId) {
         // MODIFIED: Initialize posts if showing that container
         if (containerId === 'posts') {
             initializePosts();
+        }
+        
+        // FIXED: Attach event listeners to existing messages when switching to chat container
+        if (containerId === 'chat') {
+            setTimeout(() => {
+                attachEventListenersToAllMessages();
+            }, 100);
         }
     }
     
@@ -6452,14 +6433,8 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
     
     const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId);
     
-    // Add event listeners
-    messageDiv.addEventListener('touchstart', handleTouchStart);
-    messageDiv.addEventListener('touchend', handleTouchEnd);
-    messageDiv.addEventListener('touchmove', handleTouchMove);
-    messageDiv.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        showMessageContextMenu(e, messageDiv);
-    });
+    // FIXED: Use the new function to attach event listeners
+    attachMessageEventListeners(messageDiv);
 
     // Always append new messages to the bottom
     elements.chatContainer.appendChild(messageDiv);
@@ -6496,6 +6471,20 @@ function displayPrivateMessage(text, sender, repliedTo = null, username = 'Priva
     // Scroll to bottom
     requestAnimationFrame(() => {
         container.scrollTop = container.scrollHeight;
+    });
+}
+
+// ===== NEW: FUNCTION TO ATTACH EVENT LISTENERS TO ALL EXISTING MESSAGES =====
+function attachEventListenersToAllMessages() {
+    const messages = document.querySelectorAll('#chat-container .message');
+    console.log(`📝 Attaching event listeners to ${messages.length} existing messages`);
+    
+    messages.forEach(message => {
+        // Check if event listeners are already attached
+        if (!message.hasAttribute('data-events-attached')) {
+            attachMessageEventListeners(message);
+            message.setAttribute('data-events-attached', 'true');
+        }
     });
 }
 
@@ -8400,7 +8389,7 @@ async function loadMessages() {
     }
 }
 
-// ===== OPTIMIZED RENDER MESSAGES =====
+// ===== MODIFIED: OPTIMIZED RENDER MESSAGES WITH EVENT LISTENERS =====
 function renderMessages(messages, isFirstLoad = false) {
     if (!elements.chatContainer) return;
     
@@ -8423,6 +8412,10 @@ function renderMessages(messages, isFirstLoad = false) {
     sortedMessages.forEach(msg => {
         const isOwn = msg.username?.trim().toLowerCase() === currentUserSession?.username?.trim().toLowerCase();
         const messageDiv = createMessageElement(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id);
+        
+        // FIXED: Attach event listeners to ALL messages, not just new ones
+        attachMessageEventListeners(messageDiv);
+        
         fragment.appendChild(messageDiv);
     });
     
@@ -8440,6 +8433,11 @@ function renderMessages(messages, isFirstLoad = false) {
     
     // Update scroll state after rendering messages
     setTimeout(updateScrollState, 0);
+    
+    // FIXED: Mark all loaded messages as having events attached
+    if (isFirstLoad) {
+        setTimeout(attachEventListenersToAllMessages, 100);
+    }
 }
 
 // ===== OPTIMIZED SOCKET INITIALIZATION =====
