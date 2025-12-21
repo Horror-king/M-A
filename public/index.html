@@ -5155,8 +5155,166 @@ function showContainer(containerId) {
     if (kebabDropdown) kebabDropdown.classList.remove('active');
 }
 
-// --- CUT HERE ---
-// ... REST OF YOUR EXISTING CODE CONTINUES EXACTLY AS BEFORE ...
+// ===== MODIFIED: CONTEXT MENU FUNCTION WITH DELETE OPTION =====
+function showMessageContextMenu(e, message) {
+    const messageText = message.dataset.content || '';
+    const messageId = message.dataset.id;
+    const messageUsername = message.dataset.username;
+    const currentUser = currentUserSession?.username;
+    
+    document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());
+
+    const contextMenu = document.createElement('div');
+    contextMenu.className = 'message-context-menu active';
+    contextMenu.style.left = `${(e.touches?.[0]?.pageX || e.clientX)}px`;
+    contextMenu.style.top = `${(e.touches?.[0]?.pageY || e.clientY)}px`;
+
+    const copyButton = document.createElement('button');
+    copyButton.textContent = 'Copy';
+    copyButton.onclick = () => {
+        copyToClipboard(messageText, copyButton);
+        contextMenu.remove();
+    };
+
+    const replyButton = document.createElement('button');
+    replyButton.textContent = 'Reply';
+    replyButton.onclick = () => {
+        replyToText = messageText;
+        elements.messageInput.focus();
+        showReplyPreview();
+        contextMenu.remove();
+    };
+
+    contextMenu.appendChild(copyButton);
+    contextMenu.appendChild(replyButton);
+
+    // ===== FIXED: DELETE BUTTON LOGIC =====
+    // Show delete button if:
+    // 1. Message has an ID AND
+    // 2. Current user is the sender OR current user is admin
+    if (messageId && (message.classList.contains('sent') || currentUser === 'admin')) {
+        const deleteButton = document.createElement('button');
+        deleteButton.textContent = 'Delete';
+        deleteButton.style.color = '#ff4444'; // Red color for delete
+        deleteButton.onclick = async () => {
+            // Confirm before deleting
+            if (confirm('Are you sure you want to delete this message?')) {
+                try {
+                    const token = localStorage.getItem('auth_token');
+                    const response = await fetch(`/api/messages/${messageId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': token ? `Bearer ${token}` : ''
+                        }
+                    });
+                    if (!response.ok) throw new Error('Delete failed');
+                    
+                    // Remove message from UI
+                    message.remove();
+                    
+                    // Show success message
+                    showSuccess('Message deleted successfully');
+                    
+                } catch (err) {
+                    showError(err.message);
+                }
+            }
+            contextMenu.remove();
+        };
+        contextMenu.appendChild(deleteButton);
+    }
+
+    document.body.appendChild(contextMenu);
+    
+    // Close menu when clicking elsewhere
+    setTimeout(() => {
+        document.addEventListener('click', function closeMenu() {
+            contextMenu.remove();
+            document.removeEventListener('click', closeMenu);
+        }, { once: true });
+    }, 0);
+}
+
+// ===== MODIFIED: PRIVATE MESSAGE CONTEXT MENU WITH DELETE =====
+function showPrivateMessageContextMenu(e, message) {
+    const messageText = message.dataset.content || '';
+    const messageId = message.dataset.id;
+    const currentUser = currentUserSession?.username;
+    const messageUsername = message.dataset.username;
+    
+    document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());
+
+    const contextMenu = document.createElement('div');
+    contextMenu.className = 'message-context-menu active';
+    contextMenu.style.left = `${(e.touches?.[0]?.pageX || e.clientX)}px`;
+    contextMenu.style.top = `${(e.touches?.[0]?.pageY || e.clientY)}px`;
+
+    const copyButton = document.createElement('button');
+    copyButton.textContent = 'Copy';
+    copyButton.onclick = () => {
+        copyToClipboard(messageText, copyButton);
+        contextMenu.remove();
+    };
+
+    const replyButton = document.createElement('button');
+    replyButton.textContent = 'Reply';
+    replyButton.onclick = () => {
+        replyToText = messageText;
+        const input = document.querySelector('#private-user-input') || document.querySelector('#private-message-input');
+        if (input) {
+            input.focus();
+            input.value = `Replying to: ${messageText}\n`;
+        }
+        contextMenu.remove();
+    };
+
+    contextMenu.appendChild(copyButton);
+    contextMenu.appendChild(replyButton);
+
+    // Add delete button for private messages sent by current user
+    if (messageId && message.classList.contains('sent')) {
+        const deleteButton = document.createElement('button');
+        deleteButton.textContent = 'Delete';
+        deleteButton.style.color = '#ff4444';
+        deleteButton.onclick = async () => {
+            if (confirm('Delete this private message?')) {
+                try {
+                    const token = localStorage.getItem('auth_token');
+                    const response = await fetch(`/api/private/messages/${messageId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': token ? `Bearer ${token}` : '',
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        message.remove();
+                        showSuccess('Private message deleted');
+                    } else {
+                        const error = await response.json();
+                        throw new Error(error.error || 'Delete failed');
+                    }
+                } catch (err) {
+                    showError(err.message);
+                }
+            }
+            contextMenu.remove();
+        };
+        contextMenu.appendChild(deleteButton);
+    }
+
+    document.body.appendChild(contextMenu);
+    
+    // Close menu when clicking elsewhere
+    setTimeout(() => {
+        document.addEventListener('click', function closeMenu() {
+            contextMenu.remove();
+            document.removeEventListener('click', closeMenu);
+        }, { once: true });
+    }, 0);
+}
+
 // ===== YOUR EXISTING CODE CONTINUES BELOW =====
 
 // NEW: Welcome screen animation function
@@ -5200,10 +5358,6 @@ function animateWelcomeText() {
         }, 500);
     }, 2500); // Total animation time: 2.5 seconds
 }
-
-// --- CUT HERE ---
-// ... THE REST OF YOUR CODE REMAINS EXACTLY THE SAME ...
-// --- CUT HERE ---
 
 // NEW: Function to initialize main app when user is already logged in
 function initializeMainApp() {
@@ -5371,7 +5525,6 @@ function batchMessageRender(messages, renderFunction) {
     }
 }
 
-// --- CUT HERE ---
 // ===== YOUR EXISTING VARIABLES AND FUNCTIONS =====
 
 let isLogin = true;
@@ -5948,7 +6101,6 @@ function autoResize(textarea) {
     }
 }
 
-// --- CUT HERE ---
 // Helper function to escape HTML
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -6132,8 +6284,6 @@ function showContainer(containerId) {
     const kebabDropdown = document.querySelector('.kebab-dropdown');
     if (kebabDropdown) kebabDropdown.classList.remove('active');
 }
-
-// --- CUT HERE ---
 
 function hideContainer(containerId) {
     console.log('🔄 Hiding container:', containerId);
@@ -6589,95 +6739,6 @@ function handlePrivateMessageTouchMove(e) {
 function handlePrivateMessageTouchEnd(e) {
     clearTimeout(longPressTimer);
     e.currentTarget.classList.remove('no-select');
-}
-
-function showMessageContextMenu(e, message) {
-    const messageText = message.dataset.content || '';
-    const messageId = message.dataset.id;
-    document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());
-
-    const contextMenu = document.createElement('div');
-    contextMenu.className = 'message-context-menu active';
-    contextMenu.style.left = `${(e.touches?.[0]?.pageX || e.clientX)}px`;
-    contextMenu.style.top = `${(e.touches?.[0]?.pageY || e.clientY)}px`;
-
-    const copyButton = document.createElement('button');
-    copyButton.textContent = 'Copy';
-    copyButton.onclick = () => {
-        copyToClipboard(messageText, copyButton);
-        contextMenu.remove();
-    };
-
-    const replyButton = document.createElement('button');
-    replyButton.textContent = 'Reply';
-    replyButton.onclick = () => {
-        replyToText = messageText;
-        elements.messageInput.focus();
-        showReplyPreview();
-        contextMenu.remove();
-    };
-
-    contextMenu.appendChild(copyButton);
-    contextMenu.appendChild(replyButton);
-
-    if (messageId && message.classList.contains('sent')) {
-        const deleteButton = document.createElement('button');
-        deleteButton.textContent = 'Delete';
-        deleteButton.onclick = async () => {
-            try {
-                const token = localStorage.getItem('auth_token');
-                const response = await fetch(`/api/messages/${messageId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': token ? `Bearer ${token}` : ''
-                    }
-                });
-                if (!response.ok) throw new Error('Delete failed');
-                message.remove();
-            } catch (err) {
-                showError(err.message);
-            }
-            contextMenu.remove();
-        };
-        contextMenu.appendChild(deleteButton);
-    }
-
-    document.body.appendChild(contextMenu);
-    document.addEventListener('click', () => contextMenu.remove(), {
-        once: true
-    });
-}
-
-function showPrivateMessageContextMenu(e, message) {
-    const messageText = message.dataset.content || '';
-    document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());
-
-    const contextMenu = document.createElement('div');
-    contextMenu.className = 'message-context-menu active';
-    contextMenu.style.left = `${(e.touches?.[0]?.pageX || e.clientX)}px`;
-    contextMenu.style.top = `${(e.touches?.[0]?.pageY || e.clientY)}px`;
-
-    const copyButton = document.createElement('button');
-    copyButton.textContent = 'Copy';
-    copyButton.onclick = () => {
-        copyToClipboard(messageText, copyButton);
-        contextMenu.remove();
-    };
-
-    const replyButton = document.createElement('button');
-    replyButton.textContent = 'Reply';
-    replyButton.onclick = () => {
-        copyToClipboard(messageText, copyButton);
-        contextMenu.remove();
-    };
-
-    contextMenu.appendChild(copyButton);
-    contextMenu.appendChild(replyButton);
-
-    document.body.appendChild(contextMenu);
-    document.addEventListener('click', () => contextMenu.remove(), {
-        once: true
-    });
 }
 
 function copyToClipboard(text, button) {  
