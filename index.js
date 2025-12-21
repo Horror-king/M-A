@@ -1217,7 +1217,6 @@ app.get('/api/create-user-profiles-table', async (req, res) => {
       .limit(1);
 
     if (checkError && checkError.code === '42P01') {
-      // Table doesn't exist - provide SQL to create it
       res.json({
         success: false,
         error: "Table doesn't exist",
