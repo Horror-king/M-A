@@ -5188,12 +5188,11 @@ function showMessageContextMenu(e, message) {
     contextMenu.appendChild(copyButton);
     contextMenu.appendChild(replyButton);
 
-    // ===== FIXED: DELETE BUTTON LOGIC - SHOW FOR ALL SENT MESSAGES =====
+    // ===== FIXED: DELETE BUTTON LOGIC =====
     // Show delete button if:
-    // 1. Message is sent by current user (has 'sent' class) OR
-    // 2. Current user is admin
-    // This works even for newly sent messages without ID
-    if (message.classList.contains('sent') || currentUser === 'admin') {
+    // 1. Message has an ID AND
+    // 2. Current user is the sender OR current user is admin
+    if (messageId && (message.classList.contains('sent') || currentUser === 'admin')) {
         const deleteButton = document.createElement('button');
         deleteButton.textContent = 'Delete';
         deleteButton.style.color = '#ff4444'; // Red color for delete
@@ -5201,33 +5200,23 @@ function showMessageContextMenu(e, message) {
             // Confirm before deleting
             if (confirm('Are you sure you want to delete this message?')) {
                 try {
-                    // Only make server request if we have a message ID
-                    if (messageId) {
-                        const token = localStorage.getItem('auth_token');
-                        const response = await fetch(`/api/messages/${messageId}`, {
-                            method: 'DELETE',
-                            headers: {
-                                'Authorization': token ? `Bearer ${token}` : ''
-                            }
-                        });
-                        
-                        if (!response.ok) {
-                            const errorData = await response.json().catch(() => ({}));
-                            throw new Error(errorData.error || 'Delete failed');
+                    const token = localStorage.getItem('auth_token');
+                    const response = await fetch(`/api/messages/${messageId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': token ? `Bearer ${token}` : ''
                         }
-                    }
+                    });
+                    if (!response.ok) throw new Error('Delete failed');
                     
-                    // Always remove from UI immediately
+                    // Remove message from UI
                     message.remove();
                     
                     // Show success message
                     showSuccess('Message deleted successfully');
                     
                 } catch (err) {
-                    console.error('Delete error:', err);
-                    // Even if server delete fails, remove from UI
-                    message.remove();
-                    showSuccess('Message removed from your view');
+                    showError(err.message);
                 }
             }
             contextMenu.remove();
@@ -5282,41 +5271,32 @@ function showPrivateMessageContextMenu(e, message) {
     contextMenu.appendChild(copyButton);
     contextMenu.appendChild(replyButton);
 
-    // ===== FIXED: DELETE BUTTON FOR ALL SENT PRIVATE MESSAGES =====
-    // Show delete button for all sent private messages (even without ID)
-    if (message.classList.contains('sent')) {
+    // Add delete button for private messages sent by current user
+    if (messageId && message.classList.contains('sent')) {
         const deleteButton = document.createElement('button');
         deleteButton.textContent = 'Delete';
         deleteButton.style.color = '#ff4444';
         deleteButton.onclick = async () => {
             if (confirm('Delete this private message?')) {
                 try {
-                    // Only make server request if we have a message ID
-                    if (messageId) {
-                        const token = localStorage.getItem('auth_token');
-                        const response = await fetch(`/api/private/messages/${messageId}`, {
-                            method: 'DELETE',
-                            headers: {
-                                'Authorization': token ? `Bearer ${token}` : '',
-                                'Content-Type': 'application/json'
-                            }
-                        });
-                        
-                        if (!response.ok) {
-                            const error = await response.json().catch(() => ({}));
-                            throw new Error(error.error || 'Delete failed');
+                    const token = localStorage.getItem('auth_token');
+                    const response = await fetch(`/api/private/messages/${messageId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': token ? `Bearer ${token}` : '',
+                            'Content-Type': 'application/json'
                         }
+                    });
+                    
+                    if (response.ok) {
+                        message.remove();
+                        showSuccess('Private message deleted');
+                    } else {
+                        const error = await response.json();
+                        throw new Error(error.error || 'Delete failed');
                     }
-                    
-                    // Always remove from UI
-                    message.remove();
-                    showSuccess('Private message deleted');
-                    
                 } catch (err) {
-                    console.error('Delete error:', err);
-                    // Even if server delete fails, remove from UI
-                    message.remove();
-                    showSuccess('Message removed from your view');
+                    showError(err.message);
                 }
             }
             contextMenu.remove();
@@ -5333,446 +5313,6 @@ function showPrivateMessageContextMenu(e, message) {
             document.removeEventListener('click', closeMenu);
         }, { once: true });
     }, 0);
-}
-
-// ===== NEW: TRACK LOCALLY SENT MESSAGES =====
-let locallySentMessages = new Set();
-
-// ===== MODIFIED: SEND MESSAGE FUNCTION =====
-async function sendMessage() {
-    if (isSending || isProcessingCommand) return;
-    isSending = true;
-    
-    const content = elements.messageInput.value.trim();
-    const username = currentUserSession?.username;
-    
-    if (!content || !username) {
-        isSending = false;
-        return showError('Please enter both username and message');
-    }
-
-    // Check for duplicate message in main chat
-    const messageKey = `main-${username}-${content}`;
-    if (lastSentMessages.main[messageKey] && 
-        Date.now() - lastSentMessages.main[messageKey] < 3000) {
-        console.log('Duplicate message prevented in main chat');
-        isSending = false;
-        return;
-    }
-    
-    // Track this message
-    lastSentMessages.main[messageKey] = Date.now();
-
-    // Bad word filtering
-    const lowerContent = content.toLowerCase();
-    if (badWords.some(word => lowerContent.includes(word))) {
-        if (!warnedUsers[username]) {
-            warnedUsers[username] = true;
-            isSending = false;
-            return showError('Warning: bad word detected! If you repeat, you will be banned.');
-        } else {
-            bannedUsers[username] = Date.now() + BAN_DURATION;
-            showError('You used bad words again. Account deleted and banned.');
-            isSending = false;
-            setTimeout(() => {
-                logout();
-            }, 2000);
-            return;
-        }
-    }
-
-    // Spam protection
-    const now = Date.now();
-    if (bannedUsers[username] && bannedUsers[username] > now) {
-        isSending = false;
-        return showError(`You're banned. Wait ${Math.ceil((bannedUsers[username] - now) / 1000)}s.`);
-    }
-    
-    if (!spamTracker[username]) {
-        spamTracker[username] = [];
-    }
-    spamTracker[username].push(now);
-    spamTracker[username] = spamTracker[username].filter(ts => now - ts <= SPAM_WINDOW);
-    
-    if (spamTracker[username].length > SPAM_LIMIT) {
-        bannedUsers[username] = now + BAN_DURATION;
-        isSending = false;
-        return showError("You're banned for spamming.");
-    }
-
-    try {
-        elements.sendButton.disabled = true;
-        elements.sendButton.classList.remove('enabled');
-        
-        const payload = { 
-            content, 
-            username, 
-            reply_to: replyToText || null 
-        };
-        
-        // Generate a temporary ID for the message
-        const tempMessageId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        
-        // Display message immediately for the sender with temp ID
-        displayMessage(content, 'sent', replyToText, username, tempMessageId, true);
-        
-        // Add to locally sent messages tracking
-        locallySentMessages.add(tempMessageId);
-        
-        // Send message to server via HTTP
-        const token = localStorage.getItem('auth_token');
-        const response = await fetch('/api/messages', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': token ? `Bearer ${token}` : ''
-            },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || 'Failed to send message');
-        }
-
-        const responseData = await response.json();
-        
-        // If server returns a message ID, update the message element
-        if (responseData.messageId) {
-            const messageElement = document.querySelector(`[data-id="${tempMessageId}"]`);
-            if (messageElement) {
-                messageElement.dataset.id = responseData.messageId;
-                // Remove from temp tracking
-                locallySentMessages.delete(tempMessageId);
-            }
-        }
-        
-        // Clear input immediately for better UX
-        elements.messageInput.value = '';
-        autoResize(elements.messageInput);
-        clearReply();
-
-        // Only get AI response if it's NOT a command
-        const PREFIX = '!';
-        if (!content.startsWith(PREFIX)) {
-            fetchChatResponse(content);
-        }
-        
-    } catch (error) {
-        console.error('Send message error:', error);
-        showError(error.message || 'Failed to send message');
-        
-        // Remove from tracking on error
-        delete lastSentMessages.main[messageKey];
-    } finally {
-        setTimeout(() => {
-            isSending = false;
-            const hasText = elements.messageInput.value.trim().length > 0;
-            elements.sendButton.disabled = !hasText;
-            elements.sendButton.classList.toggle('enabled', hasText);
-        }, 500);
-    }
-}
-
-// ===== MODIFIED: DISPLAY MESSAGE FUNCTION =====
-function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
-    if (!elements.chatContainer) return;
-    
-    // Check if message already exists to prevent duplicates
-    if (messageId) {
-        const existingMessage = document.querySelector(`[data-id="${messageId}"]`);
-        if (existingMessage) {
-            console.log('⚠️ Message already exists, skipping:', messageId);
-            return;
-        }
-    }
-    
-    const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId);
-    
-    // FIXED: Use the new function to attach event listeners
-    attachMessageEventListeners(messageDiv);
-
-    // Always append new messages to the bottom
-    elements.chatContainer.appendChild(messageDiv);
-    
-    // Only scroll if it's a new message and we're at the bottom
-    if (isNew && isAtBottom) {
-        requestAnimationFrame(() => {
-            elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
-        });
-    }
-
-    // Update scroll state
-    updateScrollState();
-}
-
-// ===== MODIFIED: CREATE MESSAGE ELEMENT =====
-function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${sender}`;
-    
-    // Always set an ID - either real or temp
-    if (messageId) {
-        messageDiv.dataset.id = messageId;
-    } else if (sender === 'sent') {
-        // Generate a temp ID for sent messages without one
-        const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        messageDiv.dataset.id = tempId;
-        locallySentMessages.add(tempId);
-    }
-    
-    messageDiv.dataset.content = text;
-    messageDiv.dataset.username = username;
-    messageDiv.dataset.timestamp = Date.now();
-
-    // Only create avatar for received messages
-    if (sender === 'received') {
-        const avatarDiv = document.createElement('div');
-        avatarDiv.className = 'avatar';
-        
-        // MODIFIED: Use getAvatarUrl function which now fetches from server
-        const avatarUrl = getAvatarUrl(username);
-        const img = new Image();
-        img.src = avatarUrl;
-        img.alt = "avatar";
-        img.loading = "lazy";
-        
-        // Fetch and update avatar from server in background
-        setTimeout(() => {
-            updateAvatarFromServer(username, img);
-        }, 100);
-        
-        avatarDiv.appendChild(img);
-        
-        // Add click event to show user profile
-        avatarDiv.onclick = (e) => {
-            e.stopPropagation();
-            showUserProfile(username);
-        };
-        
-        messageDiv.appendChild(avatarDiv);
-
-        const messageBody = document.createElement('div');
-        messageBody.className = 'message-body';
-        
-        // Username with status indicator
-        const usernameDiv = document.createElement('div');
-        usernameDiv.className = 'username';
-        
-        // Add click event to username to show user profile
-        usernameDiv.onclick = (e) => {
-            e.stopPropagation();
-            showUserProfile(username);
-        };
-        
-        const statusIndicator = document.createElement('span');
-        statusIndicator.className = 'user-status-indicator online';
-        usernameDiv.appendChild(document.createTextNode(username));
-        usernameDiv.appendChild(statusIndicator);
-        messageBody.appendChild(usernameDiv);
-
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'content';
-        if (repliedTo) {
-            const replyBubble = document.createElement('div');
-            replyBubble.className = 'reply-preview';
-            replyBubble.textContent = repliedTo;
-            contentDiv.appendChild(replyBubble);
-        }
-
-        const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
-        const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
-        const imageMatches = [...text.matchAll(imagePattern)];
-        const audioMatches = [...text.matchAll(audioPattern)];
-        let modifiedText = text;
-        [...imageMatches, ...audioMatches].forEach(match => {
-            modifiedText = modifiedText.replace(match[0], '');
-        });
-        modifiedText = modifiedText.trim();
-        
-        if (modifiedText) {
-            const textDiv = document.createElement('div');
-            textDiv.textContent = modifiedText;
-            contentDiv.appendChild(textDiv);
-        }
-
-        // Use lazy loading for images
-        imageMatches.forEach(match => {
-            const img = new Image();
-            img.src = match[0];
-            img.alt = "image";
-            img.loading = "lazy";
-            img.style.maxWidth = "100%";
-            img.style.height = "auto";
-            img.style.borderRadius = "8px";
-            img.style.marginTop = "5px";
-            contentDiv.appendChild(img);
-        });
-
-        audioMatches.forEach(match => {
-            const audio = document.createElement('audio');
-            audio.controls = true;
-            audio.src = match[0];
-            contentDiv.appendChild(audio);
-        });
-        
-        messageBody.appendChild(contentDiv);
-        messageDiv.appendChild(messageBody);
-    } else {
-        // For sent messages - simpler structure without avatar/username
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'content';
-        if (repliedTo) {
-            const replyBubble = document.createElement('div');
-            replyBubble.className = 'reply-preview';
-            replyBubble.textContent = repliedTo;
-            contentDiv.appendChild(replyBubble);
-        }
-        const textDiv = document.createElement('div');
-        textDiv.textContent = text;
-        contentDiv.appendChild(textDiv);
-        messageDiv.appendChild(contentDiv);
-    }
-    
-    return messageDiv;
-}
-
-// ===== NEW: SOCKET EVENT HANDLER FOR MESSAGE UPDATES =====
-function handleSocketMessageUpdate(message) {
-    // Check if this is an update to a locally sent message
-    if (locallySentMessages.has(message.tempId) || message.username === currentUserSession?.username) {
-        // Find and update the message element
-        const messageElement = document.querySelector(`[data-id="${message.tempId}"]`) || 
-                              document.querySelector(`.message.sent[data-content="${message.content}"]:not([data-id])`);
-        
-        if (messageElement && message.id) {
-            // Update with real server ID
-            messageElement.dataset.id = message.id;
-            locallySentMessages.delete(message.tempId);
-        }
-    }
-}
-
-// ===== MODIFIED: SOCKET INITIALIZATION =====
-function initSocket() {
-    console.log('🔌 Initializing socket connection...');
-    
-    socket = io({
-        transports: ['polling', 'websocket'],
-        upgrade: false,
-        forceNew: true,
-        reconnection: true,
-        reconnectionAttempts: 10,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        timeout: 20000
-    });
-    
-    socket.on('connect', () => {
-        console.log('✅ Socket connected');
-        const username = currentUserSession?.username;
-        if (username) {
-            socket.emit('user-online', username);
-        }
-    });
-
-    // Listen for new messages in real-time
-    socket.on('new-message', (message) => {
-        console.log('💬 New message received via socket:', message);
-        
-        const isOwnMessage = message.username === currentUserSession?.username;
-        const isAIResponse = message.username === 'AI' || message.username === 'Bot';
-        
-        if (!isOwnMessage || isAIResponse) {
-            const existingMessage = document.querySelector(`[data-id="${message.id}"]`);
-            if (!existingMessage) {
-                displayMessage(
-                    message.content, 
-                    isOwnMessage ? 'sent' : 'received', 
-                    message.reply_to, 
-                    message.username, 
-                    message.id, 
-                    true
-                );
-                
-                if (document.visibilityState !== 'visible' && !isOwnMessage) {
-                    showNotification(message.username, message.content);
-                }
-            }
-        } else if (isOwnMessage && message.tempId) {
-            // Handle update for our own sent messages
-            handleSocketMessageUpdate(message);
-        }
-    });
-
-    // Listen for message history when first connecting
-    socket.on('chat-messages', (messages) => {
-        console.log('📨 Received message history:', messages.length, 'messages');
-        renderMessages(messages, true);
-    });
-
-    // User status updates
-    socket.on('user-status-change', (data) => {
-        console.log('👤 User status change:', data);
-        onlineUsers = data.onlineUsers || [];
-        updateOnlineUsersList(onlineUsers);
-        updateUserStatusIndicator(data.username, data.status);
-    });
-
-    // Typing events
-    socket.on('user-typing-start', (data) => {
-        console.log('⌨️ User started typing:', data.username);
-        showTypingIndicator(data.username);
-    });
-
-    socket.on('user-typing-stop', (data) => {
-        console.log('💤 User stopped typing:', data.username);
-        hideTypingIndicator(data.username);
-    });
-
-    // Message update events (for temp ID -> real ID conversion)
-    socket.on('message-update', (data) => {
-        console.log('🔄 Message update received:', data);
-        if (data.oldId && data.newId) {
-            const messageElement = document.querySelector(`[data-id="${data.oldId}"]`);
-            if (messageElement) {
-                messageElement.dataset.id = data.newId;
-                locallySentMessages.delete(data.oldId);
-            }
-        }
-    });
-
-    socket.on('disconnect', (reason) => {
-        console.log('🔌 Socket disconnected:', reason);
-    });
-
-    socket.on('connect_error', (error) => {
-        console.error('❌ Socket connection error:', error);
-        // Fallback to HTTP polling if Socket.IO fails
-        if (!window.socketFallback) {
-            window.socketFallback = setInterval(() => {
-                loadMessages();
-            }, 3000);
-            console.log('🔄 Using HTTP polling fallback');
-        }
-    });
-
-    // Send heartbeat every 2 minutes to stay online
-    const heartbeatInterval = setInterval(() => {
-        const username = currentUserSession?.username;
-        if (username && socket.connected) {
-            socket.emit('user-online', username);
-            console.log('💓 Heartbeat sent - keeping user online');
-        }
-    }, 120000); // 2 minutes
-
-    // Cleanup interval on page unload
-    window.addEventListener('beforeunload', () => {
-        clearInterval(heartbeatInterval);
-        if (window.socketFallback) {
-            clearInterval(window.socketFallback);
-        }
-    });
 }
 
 // ===== YOUR EXISTING CODE CONTINUES BELOW =====
@@ -6764,7 +6304,120 @@ function hideContainer(containerId) {
     showContainer('chat');
 }
 
-// ===== MODIFIED: SEND PRIVATE MESSAGE =====
+// ===== OPTIMIZED MESSAGE FUNCTIONS =====
+async function sendMessage() {
+    if (isSending || isProcessingCommand) return;
+    isSending = true;
+    
+    const content = elements.messageInput.value.trim();
+    const username = currentUserSession?.username;
+    
+    if (!content || !username) {
+        isSending = false;
+        return showError('Please enter both username and message');
+    }
+
+    // Check for duplicate message in main chat
+    const messageKey = `main-${username}-${content}`;
+    if (lastSentMessages.main[messageKey] && 
+        Date.now() - lastSentMessages.main[messageKey] < 3000) {
+        console.log('Duplicate message prevented in main chat');
+        isSending = false;
+        return;
+    }
+    
+    // Track this message
+    lastSentMessages.main[messageKey] = Date.now();
+
+    // Bad word filtering
+    const lowerContent = content.toLowerCase();
+    if (badWords.some(word => lowerContent.includes(word))) {
+        if (!warnedUsers[username]) {
+            warnedUsers[username] = true;
+            isSending = false;
+            return showError('Warning: bad word detected! If you repeat, you will be banned.');
+        } else {
+            bannedUsers[username] = Date.now() + BAN_DURATION;
+            showError('You used bad words again. Account deleted and banned.');
+            isSending = false;
+            setTimeout(() => {
+                logout();
+            }, 2000);
+            return;
+        }
+    }
+
+    // Spam protection
+    const now = Date.now();
+    if (bannedUsers[username] && bannedUsers[username] > now) {
+        isSending = false;
+        return showError(`You're banned. Wait ${Math.ceil((bannedUsers[username] - now) / 1000)}s.`);
+    }
+    
+    if (!spamTracker[username]) {
+        spamTracker[username] = [];
+    }
+    spamTracker[username].push(now);
+    spamTracker[username] = spamTracker[username].filter(ts => now - ts <= SPAM_WINDOW);
+    
+    if (spamTracker[username].length > SPAM_LIMIT) {
+        bannedUsers[username] = now + BAN_DURATION;
+        isSending = false;
+        return showError("You're banned for spamming.");
+    }
+
+    try {
+        elements.sendButton.disabled = true;
+        elements.sendButton.classList.remove('enabled');
+        
+        const payload = { 
+            content, 
+            username, 
+            reply_to: replyToText || null 
+        };
+        
+        // Send message to server via HTTP
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch('/api/messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': token ? `Bearer ${token}` : ''
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) throw new Error('Failed to send message');
+
+        // Display message immediately for the sender
+        displayMessage(content, 'sent', replyToText, username, null, true);
+        
+        // Clear input immediately for better UX
+        elements.messageInput.value = '';
+        autoResize(elements.messageInput);
+        clearReply();
+
+        // Only get AI response if it's NOT a command
+        const PREFIX = '!';
+        if (!content.startsWith(PREFIX)) {
+            fetchChatResponse(content);
+        }
+        
+    } catch (error) {
+        showError(error.message);
+        
+        // Remove from tracking on error
+        delete lastSentMessages.main[messageKey];
+    } finally {
+        setTimeout(() => {
+            isSending = false;
+            const hasText = elements.messageInput.value.trim().length > 0;
+            elements.sendButton.disabled = !hasText;
+            elements.sendButton.classList.toggle('enabled', hasText);
+        }, 500);
+    }
+}
+
 async function sendPrivateMessage() {
     const input = document.getElementById('private-user-input');
     if (!input) return;
@@ -6772,11 +6425,8 @@ async function sendPrivateMessage() {
     const content = input.value.trim();
     if (!content) return;
 
-    // Generate a temporary ID for the private message
-    const tempMessageId = `temp_private_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    // Display user message immediately with temp ID
-    displayPrivateMessage(content, 'sent', null, 'You', tempMessageId);
+    // Display user message immediately
+    displayPrivateMessage(content, 'sent');
     input.value = '';
     autoResize(input);
 
@@ -6787,9 +6437,6 @@ async function sendPrivateMessage() {
     try {
         // Get AI response directly
         await fetchPrivateAIResponse(content);
-        
-        // Track the message
-        locallySentMessages.add(tempMessageId);
     } catch (error) {
         console.error('Error sending private message:', error);
         showError('Could not process your private message. Please try again.');
@@ -6801,6 +6448,180 @@ async function sendPrivateMessage() {
         elements.privateSendButton.disabled = !hasText;
         elements.privateSendButton.classList.toggle('enabled', hasText);
     }, 1000);
+}
+
+// ===== MODIFIED: MESSAGE DISPLAY FUNCTIONS WITH SERVER PROFILE FETCHING =====
+function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${sender}`;
+    if (messageId) messageDiv.dataset.id = messageId;
+    messageDiv.dataset.content = text;
+    messageDiv.dataset.username = username;
+    messageDiv.dataset.timestamp = Date.now();
+
+    // Only create avatar for received messages
+    if (sender === 'received') {
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'avatar';
+        
+        // MODIFIED: Use getAvatarUrl function which now fetches from server
+        const avatarUrl = getAvatarUrl(username);
+        const img = new Image();
+        img.src = avatarUrl;
+        img.alt = "avatar";
+        img.loading = "lazy";
+        
+        // Fetch and update avatar from server in background
+        setTimeout(() => {
+            updateAvatarFromServer(username, img);
+        }, 100);
+        
+        avatarDiv.appendChild(img);
+        
+        // Add click event to show user profile
+        avatarDiv.onclick = (e) => {
+            e.stopPropagation();
+            showUserProfile(username);
+        };
+        
+        messageDiv.appendChild(avatarDiv);
+
+        const messageBody = document.createElement('div');
+        messageBody.className = 'message-body';
+        
+        // Username with status indicator
+        const usernameDiv = document.createElement('div');
+        usernameDiv.className = 'username';
+        
+        // Add click event to username to show user profile
+        usernameDiv.onclick = (e) => {
+            e.stopPropagation();
+            showUserProfile(username);
+        };
+        
+        const statusIndicator = document.createElement('span');
+        statusIndicator.className = 'user-status-indicator online';
+        usernameDiv.appendChild(document.createTextNode(username));
+        usernameDiv.appendChild(statusIndicator);
+        messageBody.appendChild(usernameDiv);
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'content';
+        if (repliedTo) {
+            const replyBubble = document.createElement('div');
+            replyBubble.className = 'reply-preview';
+            replyBubble.textContent = repliedTo;
+            contentDiv.appendChild(replyBubble);
+        }
+
+        const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
+        const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
+        const imageMatches = [...text.matchAll(imagePattern)];
+        const audioMatches = [...text.matchAll(audioPattern)];
+        let modifiedText = text;
+        [...imageMatches, ...audioMatches].forEach(match => {
+            modifiedText = modifiedText.replace(match[0], '');
+        });
+        modifiedText = modifiedText.trim();
+        
+        if (modifiedText) {
+            const textDiv = document.createElement('div');
+            textDiv.textContent = modifiedText;
+            contentDiv.appendChild(textDiv);
+        }
+
+        // Use lazy loading for images
+        imageMatches.forEach(match => {
+            const img = new Image();
+            img.src = match[0];
+            img.alt = "image";
+            img.loading = "lazy";
+            img.style.maxWidth = "100%";
+            img.style.height = "auto";
+            img.style.borderRadius = "8px";
+            img.style.marginTop = "5px";
+            contentDiv.appendChild(img);
+        });
+
+        audioMatches.forEach(match => {
+            const audio = document.createElement('audio');
+            audio.controls = true;
+            audio.src = match[0];
+            contentDiv.appendChild(audio);
+        });
+        
+        messageBody.appendChild(contentDiv);
+        messageDiv.appendChild(messageBody);
+    } else {
+        // For sent messages - simpler structure without avatar/username
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'content';
+        if (repliedTo) {
+            const replyBubble = document.createElement('div');
+            replyBubble.className = 'reply-preview';
+            replyBubble.textContent = repliedTo;
+            contentDiv.appendChild(replyBubble);
+        }
+        const textDiv = document.createElement('div');
+        textDiv.textContent = text;
+        contentDiv.appendChild(textDiv);
+        messageDiv.appendChild(contentDiv);
+    }
+    
+    return messageDiv;
+}
+
+function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
+    if (!elements.chatContainer) return;
+    
+    // Check if message already exists to prevent duplicates
+    const existingMessage = document.querySelector(`[data-id="${messageId}"]`);
+    if (existingMessage) {
+        console.log('⚠️ Message already exists, skipping:', messageId);
+        return;
+    }
+    
+    const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId);
+    
+    // FIXED: Use the new function to attach event listeners
+    attachMessageEventListeners(messageDiv);
+
+    // Always append new messages to the bottom
+    elements.chatContainer.appendChild(messageDiv);
+    
+    // Only scroll if it's a new message and we're at the bottom
+    if (isNew && isAtBottom) {
+        requestAnimationFrame(() => {
+            elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
+        });
+    }
+
+    // Update scroll state
+    updateScrollState();
+}
+
+function displayPrivateMessage(text, sender, repliedTo = null, username = 'Private AI', messageId = null) {
+    const container = document.getElementById('private-ai-container');
+    if (!container) return;
+    
+    const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId);
+    
+    // Add event listeners for private messages
+    messageDiv.addEventListener('touchstart', handlePrivateMessageTouchStart);
+    messageDiv.addEventListener('touchend', handlePrivateMessageTouchEnd);
+    messageDiv.addEventListener('touchmove', handlePrivateMessageTouchMove);
+    messageDiv.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showPrivateMessageContextMenu(e, messageDiv);
+    });
+
+    // Append to container
+    container.appendChild(messageDiv);
+
+    // Scroll to bottom
+    requestAnimationFrame(() => {
+        container.scrollTop = container.scrollHeight;
+    });
 }
 
 // ===== NEW: FUNCTION TO ATTACH EVENT LISTENERS TO ALL EXISTING MESSAGES =====
@@ -7812,17 +7633,8 @@ async function sendPrivateMessageToUser() {
     // Track this message
     lastSentMessages.private[messageKey] = Date.now();
     
-    // Generate a temporary ID for the message
-    const tempMessageId = `temp_private_user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
     try {
         const token = localStorage.getItem('auth_token');
-        
-        // Display immediately with temp ID
-        displayPrivateUserMessage(content, 'sent', new Date().toISOString(), currentUser);
-        
-        // Add to tracking
-        locallySentMessages.add(tempMessageId);
         
         // Send via HTTP or Socket.io
         if (socket) {
@@ -7830,8 +7642,7 @@ async function sendPrivateMessageToUser() {
             socket.emit('send-private-message-socket', {
                 sender_username: currentUser,
                 receiver_username: currentPrivateChatUser,
-                content: content,
-                tempId: tempMessageId
+                content: content
             });
         } else {
             // Fallback to HTTP
@@ -7850,6 +7661,9 @@ async function sendPrivateMessageToUser() {
             
             if (!response.ok) throw new Error('Failed to send message');
         }
+        
+        // Display message immediately for better UX
+        displayPrivateUserMessage(content, 'sent', new Date().toISOString(), currentUser);
         
         // Clear input
         input.value = '';
@@ -8687,63 +8501,247 @@ function renderMessages(messages, isFirstLoad = false) {
     }
 }
 
-// ===== MODIFIED: Display private AI message =====
-function displayPrivateMessage(text, sender, repliedTo = null, username = 'Private AI', messageId = null) {
-    const container = document.getElementById('private-ai-container');
-    if (!container) return;
+// ===== OPTIMIZED SOCKET INITIALIZATION =====
+function initSocket() {
+    console.log('🔌 Initializing socket connection...');
     
-    const messageDiv = createPrivateAIMessageElement(text, sender, repliedTo, username, messageId);
+    socket = io({
+        transports: ['polling', 'websocket'],
+        upgrade: false,
+        forceNew: true,
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 20000
+    });
     
-    // Add event listeners for private messages
-    messageDiv.addEventListener('touchstart', handlePrivateMessageTouchStart);
-    messageDiv.addEventListener('touchend', handlePrivateMessageTouchEnd);
-    messageDiv.addEventListener('touchmove', handlePrivateMessageTouchMove);
-    messageDiv.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        showPrivateMessageContextMenu(e, messageDiv);
+    socket.on('connect', () => {
+        console.log('✅ Socket connected');
+        const username = currentUserSession?.username;
+        if (username) {
+            socket.emit('user-online', username);
+        }
     });
 
-    // Append to container
-    container.appendChild(messageDiv);
+    // Listen for new messages in real-time
+    socket.on('new-message', (message) => {
+        console.log('💬 New message received via socket:', message);
+        
+        const isOwnMessage = message.username === currentUserSession?.username;
+        const isAIResponse = message.username === 'AI' || message.username === 'Bot';
+        
+        if (!isOwnMessage || isAIResponse) {
+            const existingMessage = document.querySelector(`[data-id="${message.id}"]`);
+            if (!existingMessage) {
+                displayMessage(
+                    message.content, 
+                    isOwnMessage ? 'sent' : 'received', 
+                    message.reply_to, 
+                    message.username, 
+                    message.id, 
+                    true
+                );
+                
+                if (document.visibilityState !== 'visible' && !isOwnMessage) {
+                    showNotification(message.username, message.content);
+                }
+            }
+        }
+    });
 
-    // Scroll to bottom
-    requestAnimationFrame(() => {
-        container.scrollTop = container.scrollHeight;
+    // Listen for message history when first connecting
+    socket.on('chat-messages', (messages) => {
+        console.log('📨 Received message history:', messages.length, 'messages');
+        renderMessages(messages, true);
+    });
+
+    // User status updates
+    socket.on('user-status-change', (data) => {
+        console.log('👤 User status change:', data);
+        onlineUsers = data.onlineUsers || [];
+        updateOnlineUsersList(onlineUsers);
+        updateUserStatusIndicator(data.username, data.status);
+    });
+
+    // Typing events
+    socket.on('user-typing-start', (data) => {
+        console.log('⌨️ User started typing:', data.username);
+        showTypingIndicator(data.username);
+    });
+
+    socket.on('user-typing-stop', (data) => {
+        console.log('💤 User stopped typing:', data.username);
+        hideTypingIndicator(data.username);
+    });
+
+    socket.on('disconnect', (reason) => {
+        console.log('🔌 Socket disconnected:', reason);
+    });
+
+    socket.on('connect_error', (error) => {
+        console.error('❌ Socket connection error:', error);
+        // Fallback to HTTP polling if Socket.IO fails
+        if (!window.socketFallback) {
+            window.socketFallback = setInterval(() => {
+                loadMessages();
+            }, 3000);
+            console.log('🔄 Using HTTP polling fallback');
+        }
+    });
+
+    // Send heartbeat every 2 minutes to stay online
+    const heartbeatInterval = setInterval(() => {
+        const username = currentUserSession?.username;
+        if (username && socket.connected) {
+            socket.emit('user-online', username);
+            console.log('💓 Heartbeat sent - keeping user online');
+        }
+    }, 120000); // 2 minutes
+
+    // Cleanup interval on page unload
+    window.addEventListener('beforeunload', () => {
+        clearInterval(heartbeatInterval);
+        if (window.socketFallback) {
+            clearInterval(window.socketFallback);
+        }
     });
 }
 
-// ===== NEW: Create private AI message element =====
-function createPrivateAIMessageElement(text, sender, repliedTo = null, username = '', messageId = null) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${sender}`;
+// Update online users lists
+function updateOnlineUsersList(onlineUsers) {
+    console.log('Updating online users list:', onlineUsers);
     
-    // Always set an ID for private AI messages
-    if (messageId) {
-        messageDiv.dataset.id = messageId;
-    } else if (sender === 'sent') {
-        const tempId = `temp_private_ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        messageDiv.dataset.id = tempId;
-        locallySentMessages.add(tempId);
-    }
+    // Update main chat online list
+    updateSingleOnlineList('online-users-list', 'online-count', onlineUsers);
     
-    messageDiv.dataset.content = text;
-    messageDiv.dataset.username = username;
-    messageDiv.dataset.timestamp = Date.now();
+    // Update private AI online list
+    updateSingleOnlineList('private-online-users-list', 'private-online-count', onlineUsers);
+}
 
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'content';
-    if (repliedTo) {
-        const replyBubble = document.createElement('div');
-        replyBubble.className = 'reply-preview';
-        replyBubble.textContent = repliedTo;
-        contentDiv.appendChild(replyBubble);
-    }
-    const textDiv = document.createElement('div');
-    textDiv.textContent = text;
-    contentDiv.appendChild(textDiv);
-    messageDiv.appendChild(contentDiv);
+function updateSingleOnlineList(listElementId, countElementId, onlineUsers) {
+    const onlineList = document.getElementById(listElementId);
+    const onlineCount = document.getElementById(countElementId);
     
-    return messageDiv;
+    if (onlineList) {
+        onlineList.innerHTML = '';
+        onlineUsers.forEach(user => {
+            const userElement = document.createElement('div');
+            userElement.className = 'online-user';
+            
+            // Fetch profile for each online user
+            fetchUserProfileFromServer(user).then(profile => {
+                const avatarUrl = profile.avatar || getAvatarUrl(user);
+                const displayName = profile.display_name || user;
+                
+                userElement.innerHTML = `
+                    <div class="online-user-avatar">
+                        <img src="${avatarUrl}" alt="${displayName}" loading="lazy">
+                        <div class="online-dot"></div>
+                    </div>
+                    <div class="online-user-info">
+                        <div class="online-user-name">${displayName}</div>
+                    </div>
+                `;
+            }).catch(() => {
+                userElement.innerHTML = `
+                    <div class="online-user-avatar">
+                        <img src="${getAvatarUrl(user)}" alt="${user}" loading="lazy">
+                        <div class="online-dot"></div>
+                    </div>
+                    <div class="online-user-info">
+                        <div class="online-user-name">${user}</div>
+                    </div>
+                `;
+            });
+            
+            userElement.onclick = () => {
+                showUserProfile(user);
+            };
+            
+            onlineList.appendChild(userElement);
+        });
+    }
+    
+    if (onlineCount) {
+        onlineCount.textContent = onlineUsers.length;
+    }
+}
+
+// Remove offline user from the lists
+function removeOfflineUser(username) {
+    console.log('Removing offline user from UI:', username);
+    
+    // Remove from main chat online list
+    removeUserFromSingleList('online-users-list', 'online-count', username);
+    
+    // Remove from private AI online list
+    removeUserFromSingleList('private-online-users-list', 'private-online-count', username);
+    
+    // Update status indicator in messages to offline
+    updateUserStatusIndicator(username, 'offline');
+}
+
+function removeUserFromSingleList(listElementId, countElementId, username) {
+    const onlineList = document.getElementById(listElementId);
+    if (onlineList) {
+        const userElements = onlineList.querySelectorAll('.online-user');
+        userElements.forEach(userElement => {
+            const userNameElement = userElement.querySelector('.online-user-name');
+            if (userNameElement && userNameElement.textContent === username) {
+                userElement.remove();
+            }
+        });
+        // Update online count
+        const onlineCount = document.getElementById(countElementId);
+        if (onlineCount) {
+            const currentCount = parseInt(onlineCount.textContent) || 0;
+            onlineCount.textContent = Math.max(0, currentCount - 1);
+        }
+    }
+}
+
+// Update status indicator for a specific user
+function updateUserStatusIndicator(username, status) {
+    // Find all messages from this user and update their status
+    const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
+    userMessages.forEach(msg => {
+        let statusIndicator = msg.querySelector('.user-status-indicator');
+        if (!statusIndicator) {
+            statusIndicator = createStatusIndicator();
+            const usernameDiv = msg.querySelector('.username');
+            if (usernameDiv) {
+                usernameDiv.appendChild(statusIndicator);
+            }
+        }
+        statusIndicator.className = `user-status-indicator ${status}`;
+    });
+}
+
+// Create a status indicator element
+function createStatusIndicator() {
+    const indicator = document.createElement('span');
+    indicator.className = 'user-status-indicator';
+    return indicator;
+}
+
+// Handle typing events
+function setupTypingHandlers() {
+    const messageInput = document.getElementById('user-input');
+    if (!messageInput) return;
+    messageInput.addEventListener('input', () => {
+        const username = currentUserSession?.username;
+        if (!username || !socket) return;
+        if (!isTyping) {
+            isTyping = true;
+            socket.emit('typing-start', { username });
+        }
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(() => {
+            isTyping = false;
+            socket.emit('typing-stop', { username });
+        }, 1000);
+    });
 }
 
 // Improved scroll position detection
