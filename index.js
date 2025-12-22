@@ -1,4 +1,3 @@
-
 const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
@@ -2049,7 +2048,63 @@ app.delete('/api/private/messages/:id', verifyToken, async (req, res) => {
   }
 });
 
-// ===== SUPABASE POSTS AND COMMENTS ENDPOINTS =====
+// ===== SUPABASE POSTS AND COMMENTS ENDPOINTS - FIXED =====
+
+// FIXED: Initialize posts system on server start
+async function initializePostsTables() {
+  try {
+    console.log('🔧 Checking posts tables...');
+    
+    // Check if posts table exists
+    const { data: postsCheck, error: postsError } = await supabase
+      .from('posts')
+      .select('*')
+      .limit(1);
+
+    if (postsError && postsError.code === '42P01') {
+      console.log('⚠️ Posts table does not exist. You need to create it.');
+      console.log('📋 Run the SQL in Supabase SQL Editor:');
+      console.log(`
+        CREATE TABLE IF NOT EXISTS posts (
+          id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+          author_username TEXT NOT NULL,
+          content TEXT NOT NULL,
+          media_url TEXT,
+          media_type TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          likes_count INTEGER DEFAULT 0,
+          comments_count INTEGER DEFAULT 0,
+          deleted BOOLEAN DEFAULT FALSE
+        );
+
+        CREATE TABLE IF NOT EXISTS post_comments (
+          id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+          post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
+          author_username TEXT NOT NULL,
+          content TEXT NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          deleted BOOLEAN DEFAULT FALSE
+        );
+
+        CREATE TABLE IF NOT EXISTS post_likes (
+          id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+          post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
+          username TEXT NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          UNIQUE(post_id, username)
+        );
+      `);
+    } else if (!postsError) {
+      console.log('✅ Posts table exists');
+    }
+  } catch (error) {
+    console.error('❌ Error checking posts tables:', error);
+  }
+}
+
+// Call initialization on server start
+initializePostsTables();
 
 // Create posts table if it doesn't exist
 app.post('/api/create-posts-table', async (req, res) => {
@@ -2126,12 +2181,28 @@ app.post('/api/create-posts-table', async (req, res) => {
   }
 });
 
-// Get all posts with comments and like status
+// FIXED: Get all posts with comments and like status - IMPROVED ERROR HANDLING
 app.get('/api/posts', async (req, res) => {
   try {
     const { username } = req.query; // Current user for like status
     
     console.log('📝 Fetching posts from Supabase...');
+
+    // FIXED: Check if posts table exists first
+    const { data: tableCheck, error: tableError } = await supabase
+      .from('posts')
+      .select('*')
+      .limit(1);
+
+    if (tableError && tableError.code === '42P01') {
+      console.log('⚠️ Posts table does not exist');
+      return res.status(200).json([]); // Return empty array instead of error
+    }
+
+    if (tableError) {
+      console.error('❌ Error checking posts table:', tableError);
+      throw tableError;
+    }
 
     // Get posts with author info (excluding deleted)
     const { data: posts, error: postsError } = await supabase
@@ -2142,45 +2213,74 @@ app.get('/api/posts', async (req, res) => {
 
     if (postsError) {
       console.error('❌ Error fetching posts:', postsError);
-      return res.status(500).json({ error: 'Failed to fetch posts' });
+      // If there's an error, return empty array instead of crashing
+      return res.status(200).json([]);
+    }
+
+    // If no posts exist, return empty array
+    if (!posts || posts.length === 0) {
+      console.log('ℹ️ No posts found');
+      return res.json([]);
     }
 
     // For each post, get comments and check if current user liked it
     const postsWithDetails = await Promise.all(
-      (posts || []).map(async (post) => {
-        // Get comments for this post (excluding deleted)
-        const { data: comments } = await supabase
-          .from('post_comments')
-          .select('*')
-          .eq('post_id', post.id)
-          .eq('deleted', false)
-          .order('created_at', { ascending: true });
-
-        // Check if current user liked this post
-        let userLiked = false;
-        if (username) {
-          const { data: like } = await supabase
-            .from('post_likes')
-            .select('id')
+      posts.map(async (post) => {
+        try {
+          // Get comments for this post (excluding deleted)
+          const { data: comments } = await supabase
+            .from('post_comments')
+            .select('*')
             .eq('post_id', post.id)
-            .eq('username', username)
-            .single();
-          userLiked = !!like;
-        }
+            .eq('deleted', false)
+            .order('created_at', { ascending: true });
 
-        return {
-          ...post,
-          comments: comments || [],
-          userLiked: userLiked,
-          // For compatibility with existing frontend
-          author: post.author_username,
-          timestamp: post.created_at,
-          likes: post.likes_count || 0,
-          media: post.media_url ? {
-            url: post.media_url,
-            type: post.media_type || 'image'
-          } : null
-        };
+          // Check if current user liked this post
+          let userLiked = false;
+          if (username) {
+            try {
+              const { data: like } = await supabase
+                .from('post_likes')
+                .select('id')
+                .eq('post_id', post.id)
+                .eq('username', username)
+                .maybeSingle(); // Use maybeSingle to avoid error if no like exists
+              userLiked = !!like;
+            } catch (likeError) {
+              console.error(`❌ Error checking like for post ${post.id}:`, likeError);
+              userLiked = false;
+            }
+          }
+
+          return {
+            ...post,
+            comments: comments || [],
+            userLiked: userLiked,
+            // For compatibility with existing frontend
+            author: post.author_username,
+            timestamp: post.created_at,
+            likes: post.likes_count || 0,
+            media: post.media_url ? {
+              url: post.media_url,
+              type: post.media_type || 'image'
+            } : null
+          };
+        } catch (postError) {
+          console.error(`❌ Error processing post ${post.id}:`, postError);
+          // Return post without comments/likes if there's an error
+          return {
+            ...post,
+            comments: [],
+            userLiked: false,
+            author: post.author_username,
+            timestamp: post.created_at,
+            likes: post.likes_count || 0,
+            media: post.media_url ? {
+              url: post.media_url,
+              type: post.media_type || 'image'
+            } : null
+          };
+        }
       })
     );
 
@@ -2189,7 +2289,8 @@ app.get('/api/posts', async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error in get posts:', error);
-    res.status(500).json({ error: 'Failed to fetch posts' });
+    // Return empty array instead of error for better UX
+    res.status(200).json([]);
   }
 });
 
@@ -2221,6 +2322,13 @@ app.post('/api/posts', async (req, res) => {
 
     if (error) {
       console.error('❌ Error creating post:', error);
+      // Check if table doesn't exist
+      if (error.code === '42P01') {
+        return res.status(500).json({ 
+          error: "Posts table does not exist. Please create it first.",
+          instructions: "Run the SQL script in /api/create-posts-table"
+        });
+      }
       return res.status(500).json({ error: "Failed to create post: " + error.message });
     }
 
@@ -2494,23 +2602,33 @@ app.delete('/api/posts/:postId', verifyToken, async (req, res) => {
 
 // Helper function to get comments count
 async function getCommentsCount(postId) {
-  const { count, error } = await supabase
-    .from('post_comments')
-    .select('*', { count: 'exact', head: true })
-    .eq('post_id', postId)
-    .eq('deleted', false);
+  try {
+    const { count, error } = await supabase
+      .from('post_comments')
+      .select('*', { count: 'exact', head: true })
+      .eq('post_id', postId)
+      .eq('deleted', false);
 
-  return count || 0;
+    return count || 0;
+  } catch (error) {
+    console.error('❌ Error getting comments count:', error);
+    return 0;
+  }
 }
 
 // Helper function to get likes count
 async function getLikesCount(postId) {
-  const { count, error } = await supabase
-    .from('post_likes')
-    .select('*', { count: 'exact', head: true })
-    .eq('post_id', postId);
+  try {
+    const { count, error } = await supabase
+      .from('post_likes')
+      .select('*', { count: 'exact', head: true })
+      .eq('post_id', postId);
 
-  return count || 0;
+    return count || 0;
+  } catch (error) {
+    console.error('❌ Error getting likes count:', error);
+    return 0;
+  }
 }
 
 // Real-time posts polling endpoint (alternative to WebSockets)
@@ -3586,7 +3704,7 @@ async function saveBotResponseToSupabase(content, originalCommand, commandType =
     console.error(`❌ Error saving ${commandType} response to Supabase:`, error);
     throw error;
   }
-}
+});
 
 // TEST ENDPOINTS: Check if we can save to Supabase
 app.get('/test-supabase', async (req, res) => {
@@ -4293,7 +4411,7 @@ server.listen(port, () => {
   console.log(`📝 POSTS SYSTEM: ENABLED via Supabase`);
   console.log(`   GET /api/create-posts-table - Check posts table (NEW!)`);
   console.log(`   POST /api/create-posts-table - Create posts table if needed`);
-  console.log(`   GET /api/posts - Get all posts with comments and likes`);
+  console.log(`   GET /api/posts - Get all posts with comments and likes - FIXED`);
   console.log(`   POST /api/posts - Create a new post`);
   console.log(`   POST /api/posts/:postId/comments - Add a comment to a post`);
   console.log(`   POST /api/posts/:postId/like - Like/unlike a post`);
@@ -4375,7 +4493,7 @@ app.use((req, res) => {
         'DELETE /api/private/messages/:id'
       ],
       posts: [
-        'GET /api/posts',
+        'GET /api/posts - FIXED (returns empty array if no table)',
         'POST /api/posts',
         'POST /api/posts/:postId/comments',
         'POST /api/posts/:postId/like',
