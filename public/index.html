@@ -5155,7 +5155,7 @@ function showContainer(containerId) {
     if (kebabDropdown) kebabDropdown.classList.remove('active');
 }
 
-// ===== MODIFIED: CONTEXT MENU FUNCTION WITH DELETE OPTION =====
+// ===== MODIFIED: CONTEXT MENU FUNCTION WITH DELETE OPTION - FIXED =====
 function showMessageContextMenu(e, message) {
     const messageText = message.dataset.content || '';
     const messageId = message.dataset.id;
@@ -5188,11 +5188,14 @@ function showMessageContextMenu(e, message) {
     contextMenu.appendChild(copyButton);
     contextMenu.appendChild(replyButton);
 
-    // ===== FIXED: DELETE BUTTON LOGIC =====
-    // Show delete button if:
-    // 1. Message has an ID AND
-    // 2. Current user is the sender OR current user is admin
-    if (messageId && (message.classList.contains('sent') || currentUser === 'admin')) {
+    // ===== FIXED: DELETE BUTTON LOGIC FOR ALL SENT MESSAGES =====
+    // Show delete button for ALL sent messages immediately, even without ID
+    // For received messages, only show if current user is admin
+    const isSentMessage = message.classList.contains('sent');
+    const isCurrentUser = currentUser === messageUsername;
+    const isAdmin = currentUser === 'admin';
+    
+    if ((isSentMessage && isCurrentUser) || (isAdmin && !isSentMessage)) {
         const deleteButton = document.createElement('button');
         deleteButton.textContent = 'Delete';
         deleteButton.style.color = '#ff4444'; // Red color for delete
@@ -5200,23 +5203,29 @@ function showMessageContextMenu(e, message) {
             // Confirm before deleting
             if (confirm('Are you sure you want to delete this message?')) {
                 try {
-                    const token = localStorage.getItem('auth_token');
-                    const response = await fetch(`/api/messages/${messageId}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'Authorization': token ? `Bearer ${token}` : ''
-                        }
-                    });
-                    if (!response.ok) throw new Error('Delete failed');
+                    // Only try to delete from server if we have a real messageId (not temp)
+                    if (messageId && !messageId.startsWith('temp_')) {
+                        const token = localStorage.getItem('auth_token');
+                        const response = await fetch(`/api/messages/${messageId}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Authorization': token ? `Bearer ${token}` : ''
+                            }
+                        });
+                        if (!response.ok) throw new Error('Delete failed');
+                    }
                     
-                    // Remove message from UI
+                    // Remove message from UI immediately
                     message.remove();
                     
                     // Show success message
                     showSuccess('Message deleted successfully');
                     
                 } catch (err) {
-                    showError(err.message);
+                    console.error('Delete error:', err);
+                    // Still remove from UI even if server delete fails
+                    message.remove();
+                    showSuccess('Message removed from chat');
                 }
             }
             contextMenu.remove();
@@ -5235,7 +5244,7 @@ function showMessageContextMenu(e, message) {
     }, 0);
 }
 
-// ===== MODIFIED: PRIVATE MESSAGE CONTEXT MENU WITH DELETE =====
+// ===== MODIFIED: PRIVATE MESSAGE CONTEXT MENU WITH DELETE - FIXED =====
 function showPrivateMessageContextMenu(e, message) {
     const messageText = message.dataset.content || '';
     const messageId = message.dataset.id;
@@ -5271,32 +5280,45 @@ function showPrivateMessageContextMenu(e, message) {
     contextMenu.appendChild(copyButton);
     contextMenu.appendChild(replyButton);
 
-    // Add delete button for private messages sent by current user
-    if (messageId && message.classList.contains('sent')) {
+    // Add delete button for ALL sent private messages immediately
+    const isSentMessage = message.classList.contains('sent');
+    const isCurrentUser = currentUser === messageUsername;
+    
+    if (isSentMessage && isCurrentUser) {
         const deleteButton = document.createElement('button');
         deleteButton.textContent = 'Delete';
         deleteButton.style.color = '#ff4444';
         deleteButton.onclick = async () => {
             if (confirm('Delete this private message?')) {
                 try {
-                    const token = localStorage.getItem('auth_token');
-                    const response = await fetch(`/api/private/messages/${messageId}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'Authorization': token ? `Bearer ${token}` : '',
-                            'Content-Type': 'application/json'
+                    // Only try to delete from server if we have a real messageId (not temp)
+                    if (messageId && !messageId.startsWith('temp_')) {
+                        const token = localStorage.getItem('auth_token');
+                        const response = await fetch(`/api/private/messages/${messageId}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Authorization': token ? `Bearer ${token}` : '',
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            message.remove();
+                            showSuccess('Private message deleted');
+                        } else {
+                            const error = await response.json();
+                            throw new Error(error.error || 'Delete failed');
                         }
-                    });
-                    
-                    if (response.ok) {
+                    } else {
+                        // Just remove from UI for temp messages
                         message.remove();
                         showSuccess('Private message deleted');
-                    } else {
-                        const error = await response.json();
-                        throw new Error(error.error || 'Delete failed');
                     }
                 } catch (err) {
-                    showError(err.message);
+                    console.error('Delete error:', err);
+                    // Still remove from UI
+                    message.remove();
+                    showSuccess('Private message removed');
                 }
             }
             contextMenu.remove();
@@ -5313,6 +5335,356 @@ function showPrivateMessageContextMenu(e, message) {
             document.removeEventListener('click', closeMenu);
         }, { once: true });
     }, 0);
+}
+
+// ===== MODIFIED: SEND MESSAGE FUNCTION - ADD TEMP ID =====
+async function sendMessage() {
+    if (isSending || isProcessingCommand) return;
+    isSending = true;
+    
+    const content = elements.messageInput.value.trim();
+    const username = currentUserSession?.username;
+    
+    if (!content || !username) {
+        isSending = false;
+        return showError('Please enter both username and message');
+    }
+
+    // Check for duplicate message in main chat
+    const messageKey = `main-${username}-${content}`;
+    if (lastSentMessages.main[messageKey] && 
+        Date.now() - lastSentMessages.main[messageKey] < 3000) {
+        console.log('Duplicate message prevented in main chat');
+        isSending = false;
+        return;
+    }
+    
+    // Track this message
+    lastSentMessages.main[messageKey] = Date.now();
+
+    // Bad word filtering
+    const lowerContent = content.toLowerCase();
+    if (badWords.some(word => lowerContent.includes(word))) {
+        if (!warnedUsers[username]) {
+            warnedUsers[username] = true;
+            isSending = false;
+            return showError('Warning: bad word detected! If you repeat, you will be banned.');
+        } else {
+            bannedUsers[username] = Date.now() + BAN_DURATION;
+            showError('You used bad words again. Account deleted and banned.');
+            isSending = false;
+            setTimeout(() => {
+                logout();
+            }, 2000);
+            return;
+        }
+    }
+
+    // Spam protection
+    const now = Date.now();
+    if (bannedUsers[username] && bannedUsers[username] > now) {
+        isSending = false;
+        return showError(`You're banned. Wait ${Math.ceil((bannedUsers[username] - now) / 1000)}s.`);
+    }
+    
+    if (!spamTracker[username]) {
+        spamTracker[username] = [];
+    }
+    spamTracker[username].push(now);
+    spamTracker[username] = spamTracker[username].filter(ts => now - ts <= SPAM_WINDOW);
+    
+    if (spamTracker[username].length > SPAM_LIMIT) {
+        bannedUsers[username] = now + BAN_DURATION;
+        isSending = false;
+        return showError("You're banned for spamming.");
+    }
+
+    try {
+        elements.sendButton.disabled = true;
+        elements.sendButton.classList.remove('enabled');
+        
+        // Generate a temporary ID for immediate display with delete option
+        const tempMessageId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Display message immediately with temp ID
+        displayMessage(content, 'sent', replyToText, username, tempMessageId, true);
+        
+        const payload = { 
+            content, 
+            username, 
+            reply_to: replyToText || null 
+        };
+        
+        // Send message to server via HTTP
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch('/api/messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': token ? `Bearer ${token}` : ''
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) throw new Error('Failed to send message');
+
+        // Clear input immediately for better UX
+        elements.messageInput.value = '';
+        autoResize(elements.messageInput);
+        clearReply();
+
+        // Only get AI response if it's NOT a command
+        const PREFIX = '!';
+        if (!content.startsWith(PREFIX)) {
+            fetchChatResponse(content);
+        }
+        
+    } catch (error) {
+        showError(error.message);
+        
+        // Remove from tracking on error
+        delete lastSentMessages.main[messageKey];
+    } finally {
+        setTimeout(() => {
+            isSending = false;
+            const hasText = elements.messageInput.value.trim().length > 0;
+            elements.sendButton.disabled = !hasText;
+            elements.sendButton.classList.toggle('enabled', hasText);
+        }, 500);
+    }
+}
+
+// ===== MODIFIED: DISPLAY MESSAGE FUNCTION =====
+function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
+    if (!elements.chatContainer) return;
+    
+    // Check if message already exists to prevent duplicates
+    const existingMessage = document.querySelector(`[data-id="${messageId}"]`);
+    if (existingMessage && !messageId.startsWith('temp_')) {
+        console.log('⚠️ Message already exists, skipping:', messageId);
+        return;
+    }
+    
+    // For temp IDs, replace existing temp message with real one
+    if (existingMessage && messageId.startsWith('temp_')) {
+        // Update the temp message with real ID if we have one
+        if (messageId && !messageId.startsWith('temp_')) {
+            existingMessage.dataset.id = messageId;
+        }
+        return;
+    }
+    
+    const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId);
+    
+    // FIXED: Use the new function to attach event listeners
+    attachMessageEventListeners(messageDiv);
+
+    // Always append new messages to the bottom
+    elements.chatContainer.appendChild(messageDiv);
+    
+    // Only scroll if it's a new message and we're at the bottom
+    if (isNew && isAtBottom) {
+        requestAnimationFrame(() => {
+            elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
+        });
+    }
+
+    // Update scroll state
+    updateScrollState();
+}
+
+// ===== MODIFIED: SEND PRIVATE MESSAGE TO USER WITH TEMP ID =====
+async function sendPrivateMessageToUser() {
+    if (!currentPrivateChatUser) {
+        showError('Please select a user to message');
+        return;
+    }
+    
+    const input = document.getElementById('private-message-input');
+    const content = input.value.trim();
+    
+    if (!content) return;
+    
+    const currentUser = currentUserSession?.username;
+    
+    // Check for duplicate message
+    const messageKey = `${currentUser}-${currentPrivateChatUser}-${content}`;
+    if (lastSentMessages.private[messageKey] && 
+        Date.now() - lastSentMessages.private[messageKey] < 3000) {
+        console.log('Duplicate private message prevented');
+        return;
+    }
+    
+    // Track this message
+    lastSentMessages.private[messageKey] = Date.now();
+    
+    try {
+        // Generate temp ID for immediate display
+        const tempMessageId = `temp_private_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Display message immediately for better UX
+        displayPrivateUserMessage(content, 'sent', new Date().toISOString(), currentUser, tempMessageId);
+        
+        const token = localStorage.getItem('auth_token');
+        
+        // Send via HTTP or Socket.io
+        if (socket) {
+            // Send via Socket.io for real-time delivery
+            socket.emit('send-private-message-socket', {
+                sender_username: currentUser,
+                receiver_username: currentPrivateChatUser,
+                content: content
+            });
+        } else {
+            // Fallback to HTTP
+            const response = await fetch('/api/private/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': token ? `Bearer ${token}` : ''
+                },
+                body: JSON.stringify({
+                    sender_username: currentUser,
+                    receiver_username: currentPrivateChatUser,
+                    content: content
+                })
+            });
+            
+            if (!response.ok) throw new Error('Failed to send message');
+        }
+        
+        // Clear input
+        input.value = '';
+        autoResize(input);
+        
+        // Disable send button temporarily
+        const sendButton = document.getElementById('private-messages-send-button');
+        if (sendButton) {
+            sendButton.disabled = true;
+            sendButton.classList.remove('enabled');
+        }
+        
+        // Update user list to show last message
+        loadPrivateUsers();
+        
+    } catch (error) {
+        console.error('Error sending private message:', error);
+        showError('Failed to send message');
+        
+        // Remove from tracking on error
+        delete lastSentMessages.private[messageKey];
+    }
+}
+
+// ===== MODIFIED: DISPLAY PRIVATE USER MESSAGE =====
+function displayPrivateUserMessage(text, sender, timestamp, username, messageId = null) {
+    const messagesContainer = document.getElementById('private-chat-messages');
+    if (!messagesContainer) return;
+    
+    // Check for existing message with same temp ID
+    if (messageId && messageId.startsWith('temp_')) {
+        const existingTemp = messagesContainer.querySelector(`[data-id="${messageId}"]`);
+        if (existingTemp) {
+            // Update with real ID if needed
+            return;
+        }
+    }
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `private-message ${sender}`;
+    if (messageId) messageDiv.dataset.id = messageId;
+    messageDiv.dataset.content = text;
+    messageDiv.dataset.username = username;
+    
+    const time = formatMessageTime(timestamp);
+    
+    messageDiv.innerHTML = `
+        <div class="message-content">${text}</div>
+        <div class="message-time">${time}</div>
+    `;
+    
+    // Add event listeners for context menu
+    messageDiv.addEventListener('touchstart', handlePrivateMessageTouchStart);
+    messageDiv.addEventListener('touchend', handlePrivateMessageTouchEnd);
+    messageDiv.addEventListener('touchmove', handlePrivateMessageTouchMove);
+    messageDiv.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showPrivateMessageContextMenu(e, messageDiv);
+    });
+    
+    messagesContainer.appendChild(messageDiv);
+    
+    // Remove no-messages placeholder if it exists
+    const noMessages = messagesContainer.querySelector('.no-messages');
+    if (noMessages) {
+        noMessages.remove();
+    }
+    
+    // Remove no-chat-selected placeholder if it exists
+    const noChatSelected = messagesContainer.querySelector('.no-chat-selected');
+    if (noChatSelected) {
+        noChatSelected.remove();
+    }
+    
+    // Scroll to bottom
+    setTimeout(() => {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }, 10);
+}
+
+// ===== MODIFIED: HANDLE NEW PRIVATE MESSAGE =====
+function handleNewPrivateMessage(message) {
+    const currentUser = currentUserSession?.username;
+    
+    // Check if this message is relevant to current user
+    if (message.sender_username === currentUser || message.receiver_username === currentUser) {
+        
+        // Check for duplicate display
+        const messageKey = `display-${message.sender_username}-${message.receiver_username}-${message.content}`;
+        if (lastSentMessages.private[messageKey]) {
+            console.log('Duplicate private message display prevented');
+            return;
+        }
+        
+        lastSentMessages.private[messageKey] = Date.now();
+        
+        // If we're in the chat with this user, display the message
+        if (currentPrivateChatUser && 
+            (currentPrivateChatUser === message.sender_username || 
+             currentPrivateChatUser === message.receiver_username)) {
+            
+            const senderType = message.sender_username === currentUser ? 'sent' : 'received';
+            
+            // Try to find and update temp message
+            if (senderType === 'sent') {
+                const tempMessages = document.querySelectorAll('.private-message.sent[data-id^="temp_"]');
+                for (let tempMsg of tempMessages) {
+                    if (tempMsg.dataset.content === message.content) {
+                        // Update temp message with real ID
+                        tempMsg.dataset.id = message.id;
+                        return;
+                    }
+                }
+            }
+            
+            // Otherwise display new message
+            displayPrivateUserMessage(message.content, senderType, message.created_at, message.sender_username, message.id);
+            
+            // Mark as read if we're the receiver
+            if (message.receiver_username === currentUser) {
+                markMessagesAsRead(message.sender_username);
+            }
+        }
+        
+        // Update conversations list
+        loadPrivateUsers();
+        
+        // Show notification if not in chat
+        if (message.sender_username !== currentUser && 
+            (!currentPrivateChatUser || currentPrivateChatUser !== message.sender_username)) {
+            showPrivateMessageNotification(message);
+        }
+    }
 }
 
 // ===== YOUR EXISTING CODE CONTINUES BELOW =====
@@ -6305,119 +6677,6 @@ function hideContainer(containerId) {
 }
 
 // ===== OPTIMIZED MESSAGE FUNCTIONS =====
-async function sendMessage() {
-    if (isSending || isProcessingCommand) return;
-    isSending = true;
-    
-    const content = elements.messageInput.value.trim();
-    const username = currentUserSession?.username;
-    
-    if (!content || !username) {
-        isSending = false;
-        return showError('Please enter both username and message');
-    }
-
-    // Check for duplicate message in main chat
-    const messageKey = `main-${username}-${content}`;
-    if (lastSentMessages.main[messageKey] && 
-        Date.now() - lastSentMessages.main[messageKey] < 3000) {
-        console.log('Duplicate message prevented in main chat');
-        isSending = false;
-        return;
-    }
-    
-    // Track this message
-    lastSentMessages.main[messageKey] = Date.now();
-
-    // Bad word filtering
-    const lowerContent = content.toLowerCase();
-    if (badWords.some(word => lowerContent.includes(word))) {
-        if (!warnedUsers[username]) {
-            warnedUsers[username] = true;
-            isSending = false;
-            return showError('Warning: bad word detected! If you repeat, you will be banned.');
-        } else {
-            bannedUsers[username] = Date.now() + BAN_DURATION;
-            showError('You used bad words again. Account deleted and banned.');
-            isSending = false;
-            setTimeout(() => {
-                logout();
-            }, 2000);
-            return;
-        }
-    }
-
-    // Spam protection
-    const now = Date.now();
-    if (bannedUsers[username] && bannedUsers[username] > now) {
-        isSending = false;
-        return showError(`You're banned. Wait ${Math.ceil((bannedUsers[username] - now) / 1000)}s.`);
-    }
-    
-    if (!spamTracker[username]) {
-        spamTracker[username] = [];
-    }
-    spamTracker[username].push(now);
-    spamTracker[username] = spamTracker[username].filter(ts => now - ts <= SPAM_WINDOW);
-    
-    if (spamTracker[username].length > SPAM_LIMIT) {
-        bannedUsers[username] = now + BAN_DURATION;
-        isSending = false;
-        return showError("You're banned for spamming.");
-    }
-
-    try {
-        elements.sendButton.disabled = true;
-        elements.sendButton.classList.remove('enabled');
-        
-        const payload = { 
-            content, 
-            username, 
-            reply_to: replyToText || null 
-        };
-        
-        // Send message to server via HTTP
-        const token = localStorage.getItem('auth_token');
-        const response = await fetch('/api/messages', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': token ? `Bearer ${token}` : ''
-            },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) throw new Error('Failed to send message');
-
-        // Display message immediately for the sender
-        displayMessage(content, 'sent', replyToText, username, null, true);
-        
-        // Clear input immediately for better UX
-        elements.messageInput.value = '';
-        autoResize(elements.messageInput);
-        clearReply();
-
-        // Only get AI response if it's NOT a command
-        const PREFIX = '!';
-        if (!content.startsWith(PREFIX)) {
-            fetchChatResponse(content);
-        }
-        
-    } catch (error) {
-        showError(error.message);
-        
-        // Remove from tracking on error
-        delete lastSentMessages.main[messageKey];
-    } finally {
-        setTimeout(() => {
-            isSending = false;
-            const hasText = elements.messageInput.value.trim().length > 0;
-            elements.sendButton.disabled = !hasText;
-            elements.sendButton.classList.toggle('enabled', hasText);
-        }, 500);
-    }
-}
-
 async function sendPrivateMessage() {
     const input = document.getElementById('private-user-input');
     if (!input) return;
@@ -6571,38 +6830,14 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
     return messageDiv;
 }
 
-function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
-    if (!elements.chatContainer) return;
-    
-    // Check if message already exists to prevent duplicates
-    const existingMessage = document.querySelector(`[data-id="${messageId}"]`);
-    if (existingMessage) {
-        console.log('⚠️ Message already exists, skipping:', messageId);
-        return;
-    }
-    
-    const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId);
-    
-    // FIXED: Use the new function to attach event listeners
-    attachMessageEventListeners(messageDiv);
-
-    // Always append new messages to the bottom
-    elements.chatContainer.appendChild(messageDiv);
-    
-    // Only scroll if it's a new message and we're at the bottom
-    if (isNew && isAtBottom) {
-        requestAnimationFrame(() => {
-            elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
-        });
-    }
-
-    // Update scroll state
-    updateScrollState();
-}
-
 function displayPrivateMessage(text, sender, repliedTo = null, username = 'Private AI', messageId = null) {
     const container = document.getElementById('private-ai-container');
     if (!container) return;
+    
+    // Generate temp ID for sent messages if not provided
+    if (sender === 'sent' && !messageId) {
+        messageId = `temp_ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
     
     const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId);
     
@@ -7558,7 +7793,8 @@ async function loadPrivateMessages(username) {
                 message.content, 
                 message.sender_username === currentUser ? 'sent' : 'received',
                 message.created_at,
-                message.sender_username
+                message.sender_username,
+                message.id
             );
         });
         
@@ -7571,176 +7807,6 @@ async function loadPrivateMessages(username) {
         console.error('Error loading private messages:', error);
         messagesContainer.innerHTML = `<div class="no-messages">Error loading messages: ${error.message}</div>`;
     }
-}
-
-// Display private user message
-function displayPrivateUserMessage(text, sender, timestamp, username) {
-    const messagesContainer = document.getElementById('private-chat-messages');
-    if (!messagesContainer) return;
-    
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `private-message ${sender}`;
-    
-    const time = formatMessageTime(timestamp);
-    
-    messageDiv.innerHTML = `
-        <div class="message-content">${text}</div>
-        <div class="message-time">${time}</div>
-    `;
-    
-    messagesContainer.appendChild(messageDiv);
-    
-    // Remove no-messages placeholder if it exists
-    const noMessages = messagesContainer.querySelector('.no-messages');
-    if (noMessages) {
-        noMessages.remove();
-    }
-    
-    // Remove no-chat-selected placeholder if it exists
-    const noChatSelected = messagesContainer.querySelector('.no-chat-selected');
-    if (noChatSelected) {
-        noChatSelected.remove();
-    }
-    
-    // Scroll to bottom
-    setTimeout(() => {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }, 10);
-}
-
-// MODIFIED: Send private message to user with duplicate prevention
-async function sendPrivateMessageToUser() {
-    if (!currentPrivateChatUser) {
-        showError('Please select a user to message');
-        return;
-    }
-    
-    const input = document.getElementById('private-message-input');
-    const content = input.value.trim();
-    
-    if (!content) return;
-    
-    const currentUser = currentUserSession?.username;
-    
-    // Check for duplicate message
-    const messageKey = `${currentUser}-${currentPrivateChatUser}-${content}`;
-    if (lastSentMessages.private[messageKey] && 
-        Date.now() - lastSentMessages.private[messageKey] < 3000) {
-        console.log('Duplicate private message prevented');
-        return;
-    }
-    
-    // Track this message
-    lastSentMessages.private[messageKey] = Date.now();
-    
-    try {
-        const token = localStorage.getItem('auth_token');
-        
-        // Send via HTTP or Socket.io
-        if (socket) {
-            // Send via Socket.io for real-time delivery
-            socket.emit('send-private-message-socket', {
-                sender_username: currentUser,
-                receiver_username: currentPrivateChatUser,
-                content: content
-            });
-        } else {
-            // Fallback to HTTP
-            const response = await fetch('/api/private/messages', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': token ? `Bearer ${token}` : ''
-                },
-                body: JSON.stringify({
-                    sender_username: currentUser,
-                    receiver_username: currentPrivateChatUser,
-                    content: content
-                })
-            });
-            
-            if (!response.ok) throw new Error('Failed to send message');
-        }
-        
-        // Display message immediately for better UX
-        displayPrivateUserMessage(content, 'sent', new Date().toISOString(), currentUser);
-        
-        // Clear input
-        input.value = '';
-        autoResize(input);
-        
-        // Disable send button temporarily
-        const sendButton = document.getElementById('private-messages-send-button');
-        if (sendButton) {
-            sendButton.disabled = true;
-            sendButton.classList.remove('enabled');
-        }
-        
-        // Update user list to show last message
-        loadPrivateUsers();
-        
-    } catch (error) {
-        console.error('Error sending private message:', error);
-        showError('Failed to send message');
-        
-        // Remove from tracking on error
-        delete lastSentMessages.private[messageKey];
-    }
-}
-
-// MODIFIED: Handle new private message with duplicate check
-function handleNewPrivateMessage(message) {
-    const currentUser = currentUserSession?.username;
-    
-    // Check if this message is relevant to current user
-    if (message.sender_username === currentUser || message.receiver_username === currentUser) {
-        
-        // Check for duplicate display
-        const messageKey = `display-${message.sender_username}-${message.receiver_username}-${message.content}`;
-        if (lastSentMessages.private[messageKey]) {
-            console.log('Duplicate private message display prevented');
-            return;
-        }
-        
-        lastSentMessages.private[messageKey] = Date.now();
-        
-        // If we're in the chat with this user, display the message
-        if (currentPrivateChatUser && 
-            (currentPrivateChatUser === message.sender_username || 
-             currentPrivateChatUser === message.receiver_username)) {
-            
-            const senderType = message.sender_username === currentUser ? 'sent' : 'received';
-            displayPrivateUserMessage(message.content, senderType, message.created_at, message.sender_username);
-            
-            // Mark as read if we're the receiver
-            if (message.receiver_username === currentUser) {
-                markMessagesAsRead(message.sender_username);
-            }
-        }
-        
-        // Update conversations list
-        loadPrivateUsers();
-        
-        // Show notification if not in chat
-        if (message.sender_username !== currentUser && 
-            (!currentPrivateChatUser || currentPrivateChatUser !== message.sender_username)) {
-            showPrivateMessageNotification(message);
-        }
-    }
-}
-
-// Show notification for new private message
-function showPrivateMessageNotification(message) {
-    if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(`New message from ${message.sender_username}`, {
-            body: message.content.length > 50 ? 
-                message.content.substring(0, 50) + '...' : message.content,
-            icon: getAvatarUrl(message.sender_username)
-        });
-    }
-    
-    // Update unread badge in menu
-    updatePrivateMessagesBadge();
 }
 
 // Mark messages as read
