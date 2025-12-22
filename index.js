@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
-const multer = require('multer');7
+const multer = require('multer');
 const path = require('path');
 const axios = require('axios');
 const fs = require('fs-extra');
@@ -4529,5 +4529,5 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
+// Export for testing
 module.exports = { app, server, io, supabase };
-}); // <-- Remove this
