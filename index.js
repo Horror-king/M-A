@@ -1,5 +1,3 @@
-please help me modify and give me complete index.js code intact after you modify ready to copy and paste to my project I read i need complete index.js code{"error":"Failed to fetch posts"}
-
 const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
