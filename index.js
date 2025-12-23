@@ -1580,32 +1580,36 @@ app.post('/api/ai/chat', async (req, res) => {
 
 // ===== ADD MESSAGES ENDPOINTS TO MATCH CLIENT =====
 
-// GET messages endpoint that client expects - FIXED: Add deleted flag check
+// GET messages endpoint that client expects - FIXED: ALWAYS filter deleted messages
 app.get('/api/messages', async (req, res) => {
   try {
-    // Check if chatter table has a 'deleted' column, if not, get all messages
-    const { data: tableInfo, error: tableError } = await supabase
-      .from('chatter')
-      .select('*')
-      .limit(1);
-
+    // Always try to filter by deleted = false
+    // If the deleted column doesn't exist, we'll catch the error and return all messages
     let query = supabase
       .from('chatter')
       .select('id, content, username, created_at, image_url, reply_to')
       .order('created_at', { ascending: false });
 
-    // If table has a 'deleted' column, filter out deleted messages
-    if (!tableError && tableInfo && tableInfo.length > 0) {
-      const hasDeletedColumn = 'deleted' in tableInfo[0];
-      if (hasDeletedColumn) {
-        query = query.eq('deleted', false);
+    try {
+      // Try to filter by deleted flag
+      const { data, error } = await query.eq('deleted', false);
+      
+      if (error) {
+        // If error (likely column doesn't exist), get all messages
+        console.log('⚠️ deleted column might not exist, fetching all messages');
+        const { data: allData, error: allError } = await query;
+        if (allError) throw allError;
+        res.json(allData || []);
+      } else {
+        res.json(data || []);
       }
+    } catch (filterError) {
+      // Fallback to getting all messages
+      console.log('⚠️ Using fallback - fetching all messages');
+      const { data, error } = await query;
+      if (error) throw error;
+      res.json(data || []);
     }
-
-    const { data, error } = await query;
-
-    if (error) throw error;
-    res.json(data || []);
   } catch (err) {
     console.error('Error fetching messages:', err);
     res.status(500).json({ error: 'Server error' });
@@ -1683,7 +1687,7 @@ app.post('/api/messages', async (req, res) => {
   }
 });
 
-// DELETE messages endpoint that client expects - FIXED: Use soft delete instead of hard delete
+// DELETE messages endpoint that client expects - FIXED: Use hard delete instead of soft delete
 app.delete('/api/messages/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -1708,32 +1712,28 @@ app.delete('/api/messages/:id', verifyToken, async (req, res) => {
       return res.status(403).json({ error: "You can only delete your own messages" });
     }
     
-    // Try soft delete first (update deleted flag)
-    const { error: updateError } = await supabase
+    // Try hard delete first (PERMANENT DELETE)
+    const { error: deleteError } = await supabase
       .from('chatter')
-      .update({ deleted: true })
+      .delete()
       .eq('id', id);
     
-    if (updateError) {
-      console.log('⚠️ Soft delete failed, trying to add deleted column...');
+    if (deleteError) {
+      console.log('⚠️ Hard delete failed, trying soft delete...');
       
-      // Try to add the deleted column if it doesn't exist
-      try {
-        // First try hard delete
-        const { error: deleteError } = await supabase
-          .from('chatter')
-          .delete()
-          .eq('id', id);
-        
-        if (deleteError) throw deleteError;
-        
-      } catch (deleteError) {
-        console.error('❌ Hard delete also failed:', deleteError);
+      // Try soft delete as fallback
+      const { error: updateError } = await supabase
+        .from('chatter')
+        .update({ deleted: true })
+        .eq('id', id);
+      
+      if (updateError) {
+        console.error('❌ Both hard and soft delete failed:', updateError);
         throw new Error("Failed to delete message");
       }
     }
     
-    console.log('✅ Message marked as deleted:', id);
+    console.log('✅ Message permanently deleted:', id);
     
     // Broadcast deletion via Socket.io
     io.emit('message-deleted', id);
@@ -1989,7 +1989,7 @@ app.put('/api/private/messages/read', async (req, res) => {
   }
 });
 
-// Delete private message
+// Delete private message - FIXED: Use hard delete
 app.delete('/api/private/messages/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -2014,25 +2014,25 @@ app.delete('/api/private/messages/:id', verifyToken, async (req, res) => {
       return res.status(403).json({ error: "You can only delete your own messages" });
     }
     
-    // Try soft delete first
-    const { error: updateError } = await supabase
+    // Try hard delete first (PERMANENT DELETE)
+    const { error: deleteError } = await supabase
       .from('private_messages')
-      .update({ deleted: true })
+      .delete()
       .eq('id', id);
     
-    if (updateError) {
-      console.log('⚠️ Soft delete failed, trying hard delete...');
+    if (deleteError) {
+      console.log('⚠️ Hard delete failed, trying soft delete...');
       
-      // Try hard delete
-      const { error: deleteError } = await supabase
+      // Try soft delete as fallback
+      const { error: updateError } = await supabase
         .from('private_messages')
-        .delete()
+        .update({ deleted: true })
         .eq('id', id);
       
-      if (deleteError) throw deleteError;
+      if (updateError) throw updateError;
     }
     
-    console.log('✅ Private message deleted:', id);
+    console.log('✅ Private message permanently deleted:', id);
     
     // Broadcast deletion via Socket.io
     io.emit('private-message-deleted', { 
@@ -3264,32 +3264,36 @@ app.put('/private-messages/read', async (req, res) => {
 
 // ===== PUBLIC CHAT ENDPOINTS =====
 
-// GET messages (legacy endpoint) - FIXED: Add deleted flag check
+// GET messages (legacy endpoint) - FIXED: ALWAYS filter deleted messages
 app.get('/messages', async (req, res) => {
   try {
-    // Check if chatter table has a 'deleted' column, if not, get all messages
-    const { data: tableInfo, error: tableError } = await supabase
-      .from('chatter')
-      .select('*')
-      .limit(1);
-
+    // Always try to filter by deleted = false
+    // If the deleted column doesn't exist, we'll catch the error and return all messages
     let query = supabase
       .from('chatter')
       .select('id, content, username, created_at, image_url, reply_to')
       .order('created_at', { ascending: false });
 
-    // If table has a 'deleted' column, filter out deleted messages
-    if (!tableError && tableInfo && tableInfo.length > 0) {
-      const hasDeletedColumn = 'deleted' in tableInfo[0];
-      if (hasDeletedColumn) {
-        query = query.eq('deleted', false);
+    try {
+      // Try to filter by deleted flag
+      const { data, error } = await query.eq('deleted', false);
+      
+      if (error) {
+        // If error (likely column doesn't exist), get all messages
+        console.log('⚠️ deleted column might not exist, fetching all messages');
+        const { data: allData, error: allError } = await query;
+        if (allError) throw allError;
+        res.json(allData || []);
+      } else {
+        res.json(data || []);
       }
+    } catch (filterError) {
+      // Fallback to getting all messages
+      console.log('⚠️ Using fallback - fetching all messages');
+      const { data, error } = await query;
+      if (error) throw error;
+      res.json(data || []);
     }
-
-    const { data, error } = await query;
-
-    if (error) throw error;
-    res.json(data || []);
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
@@ -3402,7 +3406,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
   }
 });
 
-// DELETE messages (legacy endpoint) - FIXED: Use soft delete
+// DELETE messages (legacy endpoint) - FIXED: Use hard delete
 app.delete('/messages/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -3427,25 +3431,25 @@ app.delete('/messages/:id', verifyToken, async (req, res) => {
       return res.status(403).json({ error: "You can only delete your own messages" });
     }
     
-    // Try soft delete first (update deleted flag)
-    const { error: updateError } = await supabase
+    // Try hard delete first (PERMANENT DELETE)
+    const { error: deleteError } = await supabase
       .from('chatter')
-      .update({ deleted: true })
+      .delete()
       .eq('id', id);
     
-    if (updateError) {
-      console.log('⚠️ Soft delete failed, trying hard delete...');
+    if (deleteError) {
+      console.log('⚠️ Hard delete failed, trying soft delete...');
       
-      // Try hard delete
-      const { error: deleteError } = await supabase
+      // Try soft delete as fallback
+      const { error: updateError } = await supabase
         .from('chatter')
-        .delete()
+        .update({ deleted: true })
         .eq('id', id);
       
-      if (deleteError) throw deleteError;
+      if (updateError) throw updateError;
     }
     
-    console.log('✅ Message deleted (legacy):', id);
+    console.log('✅ Message permanently deleted (legacy):', id);
     
     // Broadcast deletion via Socket.io
     io.emit('message-deleted', id);
@@ -3528,7 +3532,6 @@ app.get('/test-supabase', async (req, res) => {
     const { data: readData, error: readError } = await supabase
       .from('chatter')
       .select('*')
-      .eq('deleted', false) // Exclude deleted messages
       .limit(5)
       .order('created_at', { ascending: false });
 
@@ -3631,7 +3634,6 @@ app.get('/debug-all-commands', async (req, res) => {
     const { data: savedMessages } = await supabase
       .from('chatter')
       .select('*')
-      .eq('deleted', false)
       .order('created_at', { ascending: false })
       .limit(10);
 
@@ -3898,26 +3900,31 @@ io.on('connection', (socket) => {
   // Send existing messages to newly connected client (excluding deleted)
   socket.on('request-messages', async () => {
     try {
-      const { data: tableInfo } = await supabase
-        .from('chatter')
-        .select('*')
-        .limit(1);
-      
       let query = supabase
         .from('chatter')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(50);
       
-      // If table has a 'deleted' column, filter out deleted messages
-      if (tableInfo && tableInfo.length > 0 && 'deleted' in tableInfo[0]) {
-        query = query.eq('deleted', false);
-      }
-      
-      const { data, error } = await query;
-      
-      if (!error && data) {
-        socket.emit('chat-messages', data.reverse());
+      try {
+        // Try to filter by deleted flag
+        const { data, error } = await query.eq('deleted', false);
+        
+        if (error) {
+          // If error, get all messages
+          const { data: allData, error: allError } = await query;
+          if (!allError && allData) {
+            socket.emit('chat-messages', allData.reverse());
+          }
+        } else if (data) {
+          socket.emit('chat-messages', data.reverse());
+        }
+      } catch (filterError) {
+        // Fallback to getting all messages
+        const { data, error } = await query;
+        if (!error && data) {
+          socket.emit('chat-messages', data.reverse());
+        }
       }
     } catch (error) {
       console.error('Error sending messages to client:', error);
