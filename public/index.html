@@ -5155,6 +5155,7 @@ function showContainer(containerId) {
     if (kebabDropdown) kebabDropdown.classList.remove('active');
 }
 
+// --- CUT HERE ---
 // ===== MODIFIED: CONTEXT MENU FUNCTION WITH DELETE OPTION - FIXED =====
 function showMessageContextMenu(e, message) {
     const messageText = message.dataset.content || '';
@@ -5212,41 +5213,20 @@ function showMessageContextMenu(e, message) {
                                 'Authorization': token ? `Bearer ${token}` : ''
                             }
                         });
-                        
-                        if (response.ok) {
-                            // Remove from UI immediately
-                            message.remove();
-                            showSuccess('Message deleted successfully');
-                            
-                            // BROADCAST DELETION TO ALL USERS VIA SOCKET.IO
-                            if (socket) {
-                                socket.emit('message-deleted', messageId);
-                                console.log('📢 Broadcasted message deletion:', messageId);
-                            }
-                        } else {
-                            throw new Error('Delete failed');
-                        }
-                    } else {
-                        // For temp messages, just remove from UI
-                        message.remove();
-                        showSuccess('Message removed from chat');
-                        
-                        // Broadcast temp message deletion to current user only
-                        if (socket) {
-                            socket.emit('temp-message-deleted', messageId);
-                        }
+                        if (!response.ok) throw new Error('Delete failed');
                     }
+                    
+                    // Remove message from UI immediately
+                    message.remove();
+                    
+                    // Show success message
+                    showSuccess('Message deleted successfully');
                     
                 } catch (err) {
                     console.error('Delete error:', err);
                     // Still remove from UI even if server delete fails
                     message.remove();
                     showSuccess('Message removed from chat');
-                    
-                    // Try to broadcast anyway
-                    if (socket && messageId) {
-                        socket.emit('message-deleted', messageId);
-                    }
                 }
             }
             contextMenu.remove();
@@ -5326,16 +5306,6 @@ function showPrivateMessageContextMenu(e, message) {
                         if (response.ok) {
                             message.remove();
                             showSuccess('Private message deleted');
-                            
-                            // BROADCAST PRIVATE MESSAGE DELETION
-                            if (socket) {
-                                socket.emit('private-message-deleted', {
-                                    messageId: messageId,
-                                    sender: currentUser,
-                                    receiver: currentPrivateChatUser
-                                });
-                                console.log('📢 Broadcasted private message deletion:', messageId);
-                            }
                         } else {
                             const error = await response.json();
                             throw new Error(error.error || 'Delete failed');
@@ -5344,26 +5314,12 @@ function showPrivateMessageContextMenu(e, message) {
                         // Just remove from UI for temp messages
                         message.remove();
                         showSuccess('Private message deleted');
-                        
-                        // Broadcast temp message deletion
-                        if (socket) {
-                            socket.emit('temp-private-message-deleted', messageId);
-                        }
                     }
                 } catch (err) {
                     console.error('Delete error:', err);
                     // Still remove from UI
                     message.remove();
                     showSuccess('Private message removed');
-                    
-                    // Try to broadcast anyway
-                    if (socket && messageId) {
-                        socket.emit('private-message-deleted', {
-                            messageId: messageId,
-                            sender: currentUser,
-                            receiver: currentPrivateChatUser
-                        });
-                    }
                 }
             }
             contextMenu.remove();
@@ -5380,65 +5336,6 @@ function showPrivateMessageContextMenu(e, message) {
             document.removeEventListener('click', closeMenu);
         }, { once: true });
     }, 0);
-}
-
-// ===== ADDED: SOCKET.IO EVENT LISTENERS FOR REAL-TIME DELETION =====
-function setupSocketDeletionListeners() {
-    if (!socket) return;
-    
-    // Listen for message deletion events from other users
-    socket.on('message-deleted', (messageId) => {
-        console.log('📢 Received message deletion event:', messageId);
-        
-        // Find and remove the message from UI
-        const messageElement = document.querySelector(`[data-id="${messageId}"]`);
-        if (messageElement) {
-            messageElement.remove();
-            console.log('✅ Message removed from UI:', messageId);
-        } else {
-            // Check in private messages
-            const privateMessageElement = document.querySelector(`.private-message[data-id="${messageId}"]`);
-            if (privateMessageElement) {
-                privateMessageElement.remove();
-                console.log('✅ Private message removed from UI:', messageId);
-            }
-        }
-    });
-    
-    // Listen for private message deletion events
-    socket.on('private-message-deleted', (data) => {
-        console.log('📢 Received private message deletion event:', data);
-        
-        const { messageId, sender, receiver } = data;
-        const currentUser = currentUserSession?.username;
-        
-        // Only remove if we're involved in this conversation
-        if (currentUser === sender || currentUser === receiver) {
-            const messageElement = document.querySelector(`[data-id="${messageId}"]`);
-            if (messageElement) {
-                messageElement.remove();
-                console.log('✅ Private message removed from UI:', messageId);
-            }
-        }
-    });
-    
-    // Listen for temp message deletions
-    socket.on('temp-message-deleted', (tempId) => {
-        console.log('📢 Received temp message deletion:', tempId);
-        const messageElement = document.querySelector(`[data-id="${tempId}"]`);
-        if (messageElement) {
-            messageElement.remove();
-        }
-    });
-    
-    // Listen for temp private message deletions
-    socket.on('temp-private-message-deleted', (tempId) => {
-        console.log('📢 Received temp private message deletion:', tempId);
-        const messageElement = document.querySelector(`[data-id="${tempId}"]`);
-        if (messageElement) {
-            messageElement.remove();
-        }
-    });
 }
 
 // ===== MODIFIED: SEND MESSAGE FUNCTION - ADD TEMP ID =====
@@ -5791,7 +5688,51 @@ function handleNewPrivateMessage(message) {
     }
 }
 
-// ===== MODIFIED: INITIALIZE MAIN APP FUNCTION - ENHANCED =====
+// ===== YOUR EXISTING CODE CONTINUES BELOW =====
+
+// NEW: Welcome screen animation function
+function animateWelcomeText() {
+    const text = "MessageMate";
+    const animatedText = document.getElementById('animated-text');
+    
+    // Clear any existing content
+    animatedText.innerHTML = '';
+    
+    // Create individual letter elements
+    for (let i = 0; i < text.length; i++) {
+        const letter = document.createElement('span');
+        letter.className = 'letter';
+        letter.textContent = text[i];
+        letter.style.animationDelay = `${i * 0.1}s`;
+        animatedText.appendChild(letter);
+    }
+    
+    // Check if user is already logged in
+    const isLoggedIn = currentUserSession !== null;
+    
+    console.log('User login status:', isLoggedIn ? 'Logged in' : 'Not logged in');
+    
+    // Hide welcome screen after animation completes
+    setTimeout(() => {
+        const welcomeScreen = document.getElementById('welcome-screen');
+        welcomeScreen.style.opacity = '0';
+        setTimeout(() => {
+            welcomeScreen.style.display = 'none';
+            
+            if (isLoggedIn) {
+                // User is already logged in - go directly to main app
+                console.log('✅ User already logged in, skipping auth screen');
+                initializeMainApp();
+            } else {
+                // User not logged in - show auth container
+                console.log('❌ User not logged in, showing auth screen');
+                document.getElementById('auth-container').style.display = 'flex';
+            }
+        }, 500);
+    }, 2500); // Total animation time: 2.5 seconds
+}
+
+// NEW: Function to initialize main app when user is already logged in
 function initializeMainApp() {
     console.log('🚀 Initializing main application for logged-in user...');
     
@@ -5803,19 +5744,12 @@ function initializeMainApp() {
     showContainer('chat');
     
     // IMPORTANT: Create profile section and load profile data
-    updateProfileSection();
-    loadProfile();
+    updateProfileSection(); // Create the profile section first
+    loadProfile(); // Then load the actual profile data from server
     
-    // Initialize chat with deletion support
     initializeChat();
 
     initSocket();
-    
-    // Setup deletion listeners after socket is initialized
-    if (socket) {
-        setupSocketDeletionListeners();
-    }
-    
     setupTypingHandlers();
     setupTypingDetection();
     setupTypingSocketEvents();
@@ -5831,10 +5765,7 @@ function initializeMainApp() {
     // Show welcome message instead of login prompt
     showSuccess(`Welcome back, ${currentUserSession?.username || 'User'}!`);
     
-    // Attach deletion listeners to any existing messages
-    setTimeout(attachDeletionEventListeners, 500);
-    
-    console.log('✅ Main application initialized successfully with deletion support');
+    console.log('✅ Main application initialized successfully');
 }
 
 // Initialize welcome screen animation when page loads
@@ -5873,7 +5804,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
-        // Initialize chat with deletion support
         initializeChat();
         
         // ADDED: Setup typing detection
@@ -5901,171 +5831,9 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
-        console.log('🎯 Application initialization complete with deletion support');
+        console.log('🎯 Application initialization complete');
     });
 });
-
-// ===== MODIFIED: INITIALIZE CHAT FUNCTION - ADD DELETION LISTENERS =====
-function initializeChat() {
-    console.log('🚀 Initializing chat with deletion support...');
-    
-    // Initialize Socket.io deletion listeners
-    setupSocketDeletionListeners();
-    
-    if (elements.messageInput) {
-        elements.messageInput.addEventListener('input', function() {
-            autoResize(this);
-            const hasText = this.value.trim().length > 0;
-            elements.sendButton.disabled = !hasText;
-            elements.sendButton.classList.toggle('enabled', hasText);
-        });
-        
-        elements.messageInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-        
-        elements.messageInput.addEventListener('focus', function() {
-            sendTypingStart();
-        });
-        
-        elements.messageInput.addEventListener('blur', function() {
-            sendTypingStop();
-        });
-    }
-    
-    if (elements.sendButton) {
-        elements.sendButton.addEventListener('click', sendMessage);
-    }
-    
-    // Initialize scroll to bottom button
-    scrollToBottomBtn = document.getElementById('scrollToBottomBtn');
-    if (scrollToBottomBtn) {
-        scrollToBottomBtn.addEventListener('click', scrollToBottomMain);
-    }
-    
-    // Initialize private AI scroll button
-    privateGoTopBtn = document.getElementById('private-go-top-btn');
-    if (privateGoTopBtn) {
-        privateGoTopBtn.addEventListener('click', () => {
-            forceScrollToBottom('private-ai-container');
-        });
-    }
-    
-    // Load initial messages with deletion support
-    loadMessages();
-    
-    // Attach deletion event listeners to existing messages
-    attachDeletionEventListeners();
-}
-
-// ===== ADDED: FUNCTION TO ATTACH DELETION EVENT LISTENERS TO ALL MESSAGES =====
-function attachDeletionEventListeners() {
-    // Attach to main chat messages
-    const mainMessages = document.querySelectorAll('#chat-container .message');
-    mainMessages.forEach(message => {
-        if (!message.hasAttribute('data-deletion-bound')) {
-            message.addEventListener('touchstart', handleTouchStart);
-            message.addEventListener('touchend', handleTouchEnd);
-            message.addEventListener('touchmove', handleTouchMove);
-            message.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                showMessageContextMenu(e, message);
-            });
-            message.setAttribute('data-deletion-bound', 'true');
-        }
-    });
-    
-    // Attach to private chat messages
-    const privateMessages = document.querySelectorAll('.private-message');
-    privateMessages.forEach(message => {
-        if (!message.hasAttribute('data-deletion-bound')) {
-            message.addEventListener('touchstart', handlePrivateMessageTouchStart);
-            message.addEventListener('touchend', handlePrivateMessageTouchEnd);
-            message.addEventListener('touchmove', handlePrivateMessageTouchMove);
-            message.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                showPrivateMessageContextMenu(e, message);
-            });
-            message.setAttribute('data-deletion-bound', 'true');
-        }
-    });
-    
-    // Attach to private AI messages
-    const privateAIMessages = document.querySelectorAll('#private-ai-container .message');
-    privateAIMessages.forEach(message => {
-        if (!message.hasAttribute('data-deletion-bound')) {
-            message.addEventListener('touchstart', handlePrivateMessageTouchStart);
-            message.addEventListener('touchend', handlePrivateMessageTouchEnd);
-            message.addEventListener('touchmove', handlePrivateMessageTouchMove);
-            message.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                showPrivateMessageContextMenu(e, message);
-            });
-            message.setAttribute('data-deletion-bound', 'true');
-        }
-    });
-}
-
-// ===== ADDED: LOAD MESSAGES FUNCTION WITH DELETION SUPPORT =====
-async function loadMessages() {
-    try {
-        const token = localStorage.getItem('auth_token');
-        const response = await fetch('/api/messages', {
-            headers: {
-                'Authorization': token ? `Bearer ${token}` : ''
-            }
-        });
-        
-        if (response.ok) {
-            const messages = await response.json();
-            console.log(`📨 Loaded ${messages.length} messages from server`);
-            
-            // Display messages
-            messages.forEach(msg => {
-                const isSent = msg.username === currentUserSession?.username;
-                displayMessage(
-                    msg.content,
-                    isSent ? 'sent' : 'received',
-                    msg.reply_to || null,
-                    msg.username,
-                    msg.id,
-                    false // Not new (loaded from history)
-                );
-            });
-            
-            // Attach deletion event listeners after loading
-            setTimeout(attachDeletionEventListeners, 100);
-        }
-    } catch (error) {
-        console.error('Error loading messages:', error);
-    }
-}
-
-// ===== MODIFIED: ATTACH MESSAGE EVENT LISTENERS FUNCTION =====
-function attachMessageEventListeners(messageDiv) {
-    // Attach touch event listeners for long-press functionality with deletion
-    messageDiv.addEventListener('touchstart', handleTouchStart);
-    messageDiv.addEventListener('touchend', handleTouchEnd);
-    messageDiv.addEventListener('touchmove', handleTouchMove);
-    messageDiv.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        showMessageContextMenu(e, messageDiv);
-    });
-    
-    // Also attach click event for desktop compatibility
-    messageDiv.addEventListener('mousedown', function(e) {
-        if (e.button === 2) { // Right click
-            e.preventDefault();
-            showMessageContextMenu(e, messageDiv);
-        }
-    });
-    
-    // Mark as deletion-bound
-    messageDiv.setAttribute('data-deletion-bound', 'true');
-}
 
 // ===== PERFORMANCE OPTIMIZATIONS =====
 
@@ -6713,6 +6481,26 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// ===== NEW: FUNCTION TO ATTACH EVENT LISTENERS TO MESSAGES =====
+function attachMessageEventListeners(messageDiv) {
+    // Attach touch event listeners for long-press functionality
+    messageDiv.addEventListener('touchstart', handleTouchStart);
+    messageDiv.addEventListener('touchend', handleTouchEnd);
+    messageDiv.addEventListener('touchmove', handleTouchMove);
+    messageDiv.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showMessageContextMenu(e, messageDiv);
+    });
+    
+    // Also attach click event for desktop compatibility
+    messageDiv.addEventListener('mousedown', function(e) {
+        if (e.button === 2) { // Right click
+            e.preventDefault();
+            showMessageContextMenu(e, messageDiv);
+        }
+    });
+}
+
 // ===== OPTIMIZED: Update showContainer function =====
 function showContainer(containerId) {
     console.log('🔄 Showing container:', containerId);
@@ -6778,7 +6566,7 @@ function showContainer(containerId) {
         // FIXED: Attach event listeners to existing messages when switching to chat container
         if (containerId === 'chat') {
             setTimeout(() => {
-                attachDeletionEventListeners();
+                attachEventListenersToAllMessages();
             }, 100);
         }
     }
@@ -7069,6 +6857,20 @@ function displayPrivateMessage(text, sender, repliedTo = null, username = 'Priva
     // Scroll to bottom
     requestAnimationFrame(() => {
         container.scrollTop = container.scrollHeight;
+    });
+}
+
+// ===== NEW: FUNCTION TO ATTACH EVENT LISTENERS TO ALL EXISTING MESSAGES =====
+function attachEventListenersToAllMessages() {
+    const messages = document.querySelectorAll('#chat-container .message');
+    console.log(`📝 Attaching event listeners to ${messages.length} existing messages`);
+    
+    messages.forEach(message => {
+        // Check if event listeners are already attached
+        if (!message.hasAttribute('data-events-attached')) {
+            attachMessageEventListeners(message);
+            message.setAttribute('data-events-attached', 'true');
+        }
     });
 }
 
@@ -7507,185 +7309,6 @@ function showNotification(username, message) {
     notification.onclick = () => {
         window.focus();
     };
-}
-
-// ===== MODIFIED: WELCOME SCREEN ANIMATION FUNCTION =====
-function animateWelcomeText() {
-    const text = "MessageMate";
-    const animatedText = document.getElementById('animated-text');
-    
-    // Clear any existing content
-    animatedText.innerHTML = '';
-    
-    // Create individual letter elements
-    for (let i = 0; i < text.length; i++) {
-        const letter = document.createElement('span');
-        letter.className = 'letter';
-        letter.textContent = text[i];
-        letter.style.animationDelay = `${i * 0.1}s`;
-        animatedText.appendChild(letter);
-    }
-    
-    // Check if user is already logged in
-    const isLoggedIn = currentUserSession !== null;
-    
-    console.log('User login status:', isLoggedIn ? 'Logged in' : 'Not logged in');
-    
-    // Hide welcome screen after animation completes
-    setTimeout(() => {
-        const welcomeScreen = document.getElementById('welcome-screen');
-        welcomeScreen.style.opacity = '0';
-        setTimeout(() => {
-            welcomeScreen.style.display = 'none';
-            
-            if (isLoggedIn) {
-                // User is already logged in - go directly to main app
-                console.log('✅ User already logged in, skipping auth screen');
-                initializeMainApp();
-            } else {
-                // User not logged in - show auth container
-                console.log('❌ User not logged in, showing auth screen');
-                document.getElementById('auth-container').style.display = 'flex';
-            }
-        }, 500);
-    }, 2500); // Total animation time: 2.5 seconds
-}
-
-// ===== ADDITIONAL FUNCTIONS THAT NEED TO BE DEFINED =====
-function initSocket() {
-    // Initialize Socket.io connection
-    if (typeof io !== 'undefined') {
-        socket = io();
-        console.log('🔌 Socket.io initialized');
-    } else {
-        console.error('❌ Socket.io not available');
-    }
-}
-
-function initializeButtons() {
-    // Initialize buttons
-    console.log('🔘 Initializing buttons');
-}
-
-function initializeOnlinePanelToggle() {
-    // Initialize online panel toggle
-    console.log('👥 Initializing online panel toggle');
-}
-
-function loadUserPanelPreference() {
-    // Load user panel preference
-    console.log('⚙️ Loading user panel preference');
-}
-
-function updateProfileSection() {
-    // Update profile section
-    console.log('👤 Updating profile section');
-}
-
-function loadProfile() {
-    // Load profile
-    console.log('📋 Loading profile');
-}
-
-function hasVerifiedCode() {
-    // Check if secret code is verified
-    return false;
-}
-
-function enableSQLEditorAccess() {
-    // Enable SQL editor access
-    console.log('💾 Enabling SQL editor access');
-}
-
-function handleVisibilityChange() {
-    // Handle visibility change
-    console.log('👀 Handling visibility change');
-}
-
-function handleBeforeUnload() {
-    // Handle before unload
-    console.log('⏳ Handling before unload');
-}
-
-function handlePageHide() {
-    // Handle page hide
-    console.log('📄 Handling page hide');
-}
-
-function formatMessageTime(timestamp) {
-    // Format message time
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-function showUserProfile(username) {
-    // Show user profile
-    console.log(`👤 Showing profile for: ${username}`);
-}
-
-function showUsersPanel() {
-    // Show users panel
-    console.log('👥 Showing users panel');
-}
-
-function initializePrivateMessaging() {
-    // Initialize private messaging
-    console.log('🤫 Initializing private messaging');
-}
-
-function loadPrivateUsers() {
-    // Load private users
-    console.log('📋 Loading private users');
-}
-
-function markMessagesAsRead(senderUsername) {
-    // Mark messages as read
-    console.log(`📖 Marking messages as read from: ${senderUsername}`);
-}
-
-function showPrivateMessageNotification(message) {
-    // Show private message notification
-    console.log('🔔 Showing private message notification');
-}
-
-function resetSecretCodeForm() {
-    // Reset secret code form
-    console.log('🔐 Resetting secret code form');
-}
-
-function initializeSecretCodeVerification() {
-    // Initialize secret code verification
-    console.log('🔍 Initializing secret code verification');
-}
-
-function initializeSQLEditor() {
-    // Initialize SQL editor
-    console.log('💾 Initializing SQL editor');
-}
-
-function initializePosts() {
-    // Initialize posts
-    console.log('📝 Initializing posts');
-}
-
-function fetchChatResponse(content) {
-    // Fetch chat response
-    console.log('🤖 Fetching chat response');
-}
-
-function fetchPrivateAIResponse(content) {
-    // Fetch private AI response
-    console.log('🤫 Fetching private AI response');
-}
-
-function handlePrivateScroll() {
-    // Handle private scroll
-    console.log('📜 Handling private scroll');
-}
-
-function setupTypingHandlers() {
-    // Setup typing handlers
-    console.log('⌨️ Setting up typing handlers');
 }
 
 // ✅ OPTIMIZED: AI Response function
@@ -10131,6 +9754,6 @@ document.addEventListener('click', function (e) {
         openZoom(e.target.src);
     }
 });
-</script>
+ </script>
 </body>
 </html>
