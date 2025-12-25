@@ -5219,8 +5219,23 @@ function showMessageContextMenu(e, message) {
                         return;
                     }
                     
-                    // Only try to delete from server if we have a real messageId (not temp)
-                    if (messageId && !messageId.startsWith('temp_')) {
+                    // FIXED: Check if it's a temp message
+                    if (messageId && messageId.startsWith('temp_')) {
+                        console.log('Deleting temp message immediately:', messageId);
+                        
+                        // Remove from UI
+                        message.remove();
+                        showSuccess('Message deleted');
+                        
+                        // FIXED: Cancel the pending message from being sent to server
+                        cancelPendingMessage(messageId);
+                        
+                        // Broadcast temp message deletion
+                        if (socket && socket.connected) {
+                            socket.emit('temp-message-deleted', { tempId: messageId });
+                        }
+                    } else {
+                        // Only try to delete from server if we have a real messageId (not temp)
                         const token = localStorage.getItem('auth_token');
                         console.log('Deleting message from server:', messageId);
                         
@@ -5248,29 +5263,20 @@ function showMessageContextMenu(e, message) {
                             console.error('Server delete failed:', errorText);
                             throw new Error('Delete failed from server');
                         }
-                    } else {
-                        // For temp messages, just remove from UI
-                        console.log('Removing temp message:', messageId);
-                        message.remove();
-                        showSuccess('Message removed from chat');
-                        
-                        // Broadcast temp message deletion to current user only
-                        if (socket && socket.connected) {
-                            socket.emit('temp-message-deleted', { tempId: messageId });
-                        }
                     }
                     
                 } catch (err) {
                     console.error('Delete error:', err);
-                    // Still remove from UI even if server delete fails
-                    if (message && message.parentNode) {
-                        message.remove();
-                        showSuccess('Message removed from chat');
-                    }
-                    
-                    // Try to broadcast anyway
-                    if (socket && socket.connected && messageId) {
-                        socket.emit('message-deleted', { messageId: messageId });
+                    // FIXED: Don't remove from UI if server delete fails for non-temp messages
+                    if (messageId && messageId.startsWith('temp_')) {
+                        // For temp messages, still remove from UI
+                        if (message && message.parentNode) {
+                            message.remove();
+                            showSuccess('Message removed from chat');
+                        }
+                    } else {
+                        // For real messages, show error but don't remove
+                        showError('Failed to delete message from server');
                     }
                 }
             }
@@ -5293,6 +5299,144 @@ function showMessageContextMenu(e, message) {
         document.addEventListener('click', closeMenuHandler);
         document.addEventListener('touchstart', closeMenuHandler);
     }, 0);
+}
+
+// ===== NEW FUNCTION: CANCEL PENDING MESSAGE =====
+function cancelPendingMessage(tempMessageId) {
+    console.log('Canceling pending message:', tempMessageId);
+    
+    // FIXED: Check if there's a pending fetch request for this temp message
+    if (window.pendingMessages && window.pendingMessages[tempMessageId]) {
+        console.log('Found pending fetch, aborting...');
+        window.pendingMessages[tempMessageId].abort();
+        delete window.pendingMessages[tempMessageId];
+    }
+    
+    // FIXED: Check if there's a pending Socket.io message
+    if (window.pendingSocketMessages && window.pendingSocketMessages[tempMessageId]) {
+        console.log('Found pending socket message, canceling...');
+        delete window.pendingSocketMessages[tempMessageId];
+    }
+}
+
+// ===== MODIFIED: SEND MESSAGE FUNCTION WITH PENDING TRACKING =====
+// (This function needs to be added/modified in your existing code)
+function sendMessage() {
+    const content = elements.messageInput.value.trim();
+    if (!content && !currentImage) return;
+    
+    // Clear typing indicator
+    sendTypingStop();
+    
+    // Generate temp ID
+    const tempId = 'temp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    
+    // Get current user info
+    const username = currentUserSession?.username || 'Anonymous';
+    const displayName = currentUserSession?.display_name || username;
+    
+    // Create temp message
+    const tempMessage = {
+        id: tempId,
+        content: content,
+        username: username,
+        displayName: displayName,
+        created_at: new Date().toISOString(),
+        isTemp: true,
+        pending: true
+    };
+    
+    // Display temp message immediately
+    displayMessage(content, 'sent', null, username, tempId, true);
+    
+    // Clear input
+    elements.messageInput.value = '';
+    autoResize(elements.messageInput);
+    elements.sendButton.disabled = true;
+    elements.sendButton.classList.remove('enabled');
+    
+    // Prepare data for server
+    const messageData = {
+        content: content,
+        username: username,
+        image_url: currentImage || '',
+        reply_to: replyToMessageId || ''
+    };
+    
+    // FIXED: Store the fetch controller so we can cancel it if needed
+    const controller = new AbortController();
+    if (!window.pendingMessages) window.pendingMessages = {};
+    window.pendingMessages[tempId] = controller;
+    
+    // Send to server
+    fetch('/api/messages', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
+        },
+        body: JSON.stringify(messageData),
+        signal: controller.signal
+    })
+    .then(async response => {
+        // Remove from pending
+        delete window.pendingMessages[tempId];
+        
+        if (response.ok) {
+            const savedMessage = await response.json();
+            console.log('Message saved to server:', savedMessage);
+            
+            // FIXED: Update the temp message with real ID if it still exists
+            const tempElement = document.querySelector(`[data-id="${tempId}"]`);
+            if (tempElement) {
+                // Update the element with real data
+                tempElement.dataset.id = savedMessage.id;
+                tempElement.setAttribute('data-id', savedMessage.id);
+                
+                // Update any internal data attributes
+                if (tempElement.querySelector('.content div')) {
+                    // Keep the content as is
+                }
+                
+                console.log('Temp message updated with real ID:', savedMessage.id);
+            } else {
+                console.log('Temp message was deleted before server response');
+                // If temp message was deleted, don't display the server version
+            }
+        } else {
+            throw new Error('Failed to save message');
+        }
+    })
+    .catch(error => {
+        // Remove from pending
+        delete window.pendingMessages[tempId];
+        
+        // Don't show error if it was aborted (deleted by user)
+        if (error.name === 'AbortError') {
+            console.log('Message sending was canceled by user');
+            return;
+        }
+        
+        console.error('Error sending message:', error);
+        
+        // FIXED: Mark temp message as failed if it still exists
+        const tempElement = document.querySelector(`[data-id="${tempId}"]`);
+        if (tempElement) {
+            tempElement.classList.add('failed');
+            tempElement.title = 'Failed to send message';
+            console.log('Marked temp message as failed:', tempId);
+        }
+    });
+    
+    // Clear reply
+    if (replyToMessageId) {
+        clearReply();
+    }
+    
+    // Clear image
+    if (currentImage) {
+        clearImage();
+    }
 }
 
 // ===== MODIFIED: PRIVATE MESSAGE CONTEXT MENU WITH REAL-TIME DELETE =====
@@ -5356,8 +5500,21 @@ function showPrivateMessageContextMenu(e, message) {
                         return;
                     }
                     
-                    // Only try to delete from server if we have a real messageId (not temp)
-                    if (messageId && !messageId.startsWith('temp_')) {
+                    // FIXED: Handle temp messages
+                    if (messageId && messageId.startsWith('temp_')) {
+                        console.log('Deleting temp private message:', messageId);
+                        message.remove();
+                        showSuccess('Private message deleted');
+                        
+                        // Cancel pending private message
+                        cancelPendingMessage(messageId);
+                        
+                        // Broadcast temp message deletion
+                        if (socket && socket.connected) {
+                            socket.emit('temp-private-message-deleted', { tempId: messageId });
+                        }
+                    } else {
+                        // Only try to delete from server if we have a real messageId (not temp)
                         const token = localStorage.getItem('auth_token');
                         const response = await fetch(`/api/private/messages/${messageId}`, {
                             method: 'DELETE',
@@ -5383,31 +5540,17 @@ function showPrivateMessageContextMenu(e, message) {
                             const error = await response.json();
                             throw new Error(error.error || 'Delete failed');
                         }
-                    } else {
-                        // Just remove from UI for temp messages
-                        message.remove();
-                        showSuccess('Private message deleted');
-                        
-                        // Broadcast temp message deletion
-                        if (socket && socket.connected) {
-                            socket.emit('temp-private-message-deleted', { tempId: messageId });
-                        }
                     }
                 } catch (err) {
                     console.error('Delete error:', err);
-                    // Still remove from UI
-                    if (message && message.parentNode) {
-                        message.remove();
-                        showSuccess('Private message removed');
-                    }
-                    
-                    // Try to broadcast anyway
-                    if (socket && socket.connected && messageId) {
-                        socket.emit('private-message-deleted', {
-                            messageId: messageId,
-                            sender: currentUser,
-                            receiver: currentPrivateChatUser
-                        });
+                    // FIXED: Only remove temp messages on error
+                    if (messageId && messageId.startsWith('temp_')) {
+                        if (message && message.parentNode) {
+                            message.remove();
+                            showSuccess('Private message removed');
+                        }
+                    } else {
+                        showError('Failed to delete private message from server');
                     }
                 }
             }
@@ -5501,6 +5644,29 @@ function setupSocketDeletionListeners() {
         if (messageElement) {
             messageElement.remove();
         }
+    });
+    
+    // FIXED: Listen for new messages and check if we have pending temp messages
+    socket.on('new-message', (message) => {
+        console.log('Received new message via socket:', message);
+        
+        // Check if this is a duplicate of a temp message we might have deleted
+        const tempElements = document.querySelectorAll(`[data-id^="temp_"]`);
+        tempElements.forEach(tempElement => {
+            const tempId = tempElement.dataset.id;
+            const tempContent = tempElement.dataset.content;
+            
+            // If the new message has similar content and same user, it might be our temp message
+            if (message.username === currentUserSession?.username && 
+                message.content === tempContent) {
+                console.log('New message matches temp message content:', tempId);
+                
+                // Update temp message with real ID
+                tempElement.dataset.id = message.id;
+                tempElement.setAttribute('data-id', message.id);
+                console.log('Updated temp message with real ID:', message.id);
+            }
+        });
     });
     
     console.log('Socket deletion listeners setup complete');
@@ -5945,6 +6111,8 @@ function attachMessageEventListeners(messageDiv) {
 // ===== THE REST OF YOUR EXISTING CODE CONTINUES BELOW =====
 // [Keep all your existing variables and functions below as they are]
 // The rest of your code remains unchanged...
+// --- CUT HERE ---
+// --- CUT HERE ---
 // --- CUT HERE ---
 
 // ===== THE REST OF YOUR EXISTING CODE CONTINUES BELOW =====
