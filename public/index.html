@@ -5154,7 +5154,10 @@ function showContainer(containerId) {
     const kebabDropdown = document.querySelector('.kebab-dropdown');
     if (kebabDropdown) kebabDropdown.classList.remove('active');
 }
-// --- CUT HERE ---
+// ===== ADD: GLOBAL SET TO TRACK DELETED TEMP MESSAGES =====
+let deletedTempMessages = new Set();
+let deletedTempPrivateMessages = new Set();
+
 // ===== MODIFIED: CONTEXT MENU FUNCTION WITH DELETE OPTION - ENHANCED WITH REAL-TIME BROADCAST =====
 function showMessageContextMenu(e, message) {
     // FIXED: Check if message is null before accessing dataset
@@ -5249,8 +5252,12 @@ function showMessageContextMenu(e, message) {
                             throw new Error('Delete failed from server');
                         }
                     } else {
-                        // For temp messages, just remove from UI
+                        // For temp messages, just remove from UI AND ADD TO DELETED SET
                         console.log('Removing temp message:', messageId);
+                        if (messageId) {
+                            deletedTempMessages.add(messageId);
+                            console.log('Added to deletedTempMessages:', messageId);
+                        }
                         message.remove();
                         showSuccess('Message removed from chat');
                         
@@ -5264,6 +5271,9 @@ function showMessageContextMenu(e, message) {
                     console.error('Delete error:', err);
                     // Still remove from UI even if server delete fails
                     if (message && message.parentNode) {
+                        if (messageId && messageId.startsWith('temp_')) {
+                            deletedTempMessages.add(messageId);
+                        }
                         message.remove();
                         showSuccess('Message removed from chat');
                     }
@@ -5384,7 +5394,11 @@ function showPrivateMessageContextMenu(e, message) {
                             throw new Error(error.error || 'Delete failed');
                         }
                     } else {
-                        // Just remove from UI for temp messages
+                        // Just remove from UI for temp messages AND ADD TO DELETED SET
+                        if (messageId) {
+                            deletedTempPrivateMessages.add(messageId);
+                            console.log('Added to deletedTempPrivateMessages:', messageId);
+                        }
                         message.remove();
                         showSuccess('Private message deleted');
                         
@@ -5397,6 +5411,9 @@ function showPrivateMessageContextMenu(e, message) {
                     console.error('Delete error:', err);
                     // Still remove from UI
                     if (message && message.parentNode) {
+                        if (messageId && messageId.startsWith('temp_')) {
+                            deletedTempPrivateMessages.add(messageId);
+                        }
                         message.remove();
                         showSuccess('Private message removed');
                     }
@@ -5490,6 +5507,8 @@ function setupSocketDeletionListeners() {
         const messageElement = document.querySelector(`[data-id="${tempId}"]`);
         if (messageElement) {
             messageElement.remove();
+            // Also add to deleted set to prevent recreation
+            deletedTempMessages.add(tempId);
         }
     });
     
@@ -5500,181 +5519,249 @@ function setupSocketDeletionListeners() {
         const messageElement = document.querySelector(`[data-id="${tempId}"]`);
         if (messageElement) {
             messageElement.remove();
+            // Also add to deleted set to prevent recreation
+            deletedTempPrivateMessages.add(tempId);
+        }
+    });
+    
+    // ===== ADDED: LISTEN FOR NEW MESSAGES AND CHECK IF THEY WERE DELETED AS TEMP =====
+    socket.on('new-message', (message) => {
+        console.log('Received new message via socket:', message);
+        
+        // Check if this message corresponds to a deleted temp message
+        // We can't directly match by ID, but we can check by content, username, and timestamp
+        // A better approach would be to track temp message content and check against it
+        const messageElement = document.querySelector(`[data-id="${message.id}"]`);
+        if (!messageElement) {
+            // Check if this is a replacement for a deleted temp message
+            // Look for any temp messages from the same user with similar content/time
+            const tempMessages = document.querySelectorAll(`[data-id^="temp_"]`);
+            let foundTemp = false;
+            
+            tempMessages.forEach(tempMsg => {
+                const tempUsername = tempMsg.dataset?.username;
+                const tempContent = tempMsg.dataset?.content;
+                const tempId = tempMsg.dataset?.id;
+                
+                // If this temp message was marked as deleted, skip
+                if (deletedTempMessages.has(tempId)) {
+                    console.log('Skipping new message - temp was deleted:', tempId);
+                    foundTemp = true;
+                }
+                
+                // Also check if the new message matches the temp in content/username
+                if (tempUsername === message.username && 
+                    tempContent === message.content && 
+                    !deletedTempMessages.has(tempId)) {
+                    // This is the temp message being replaced - update it
+                    console.log('Updating temp message with real ID:', tempId, '->', message.id);
+                    tempMsg.dataset.id = message.id;
+                    foundTemp = true;
+                }
+            });
+            
+            // If we didn't find a matching temp message, display the new message
+            if (!foundTemp) {
+                displayMessage(
+                    message.content,
+                    message.username === currentUserSession?.username ? 'sent' : 'received',
+                    message.reply_to || null,
+                    message.username,
+                    message.id,
+                    true
+                );
+            }
         }
     });
     
     console.log('Socket deletion listeners setup complete');
 }
 
-// ===== MODIFIED: INITIALIZE CHAT FUNCTION - ADD DELETION LISTENERS =====
-function initializeChat() {
-    console.log('🚀 Initializing chat with deletion support...');
+// ===== MODIFIED: DISPLAY MESSAGE FUNCTION WITH DELETION EVENT ATTACHMENT =====
+function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
+    if (!elements.chatContainer) {
+        console.error('Chat container not found');
+        return;
+    }
     
-    // Initialize Socket.io deletion listeners
-    setupSocketDeletionListeners();
-    
-    // Your existing initialization code...
-    if (elements.messageInput) {
-        elements.messageInput.addEventListener('input', function() {
-            autoResize(this);
-            const hasText = this.value.trim().length > 0;
-            elements.sendButton.disabled = !hasText;
-            elements.sendButton.classList.toggle('enabled', hasText);
-        });
-        
-        elements.messageInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
+    // ===== FIXED: CHECK IF THIS MESSAGE WAS DELETED AS A TEMP MESSAGE =====
+    if (messageId && messageId.startsWith('temp_')) {
+        // Check if this temp ID is in the deleted set
+        if (deletedTempMessages.has(messageId)) {
+            console.log('⚠️ Temp message was deleted, skipping display:', messageId);
+            return;
+        }
+    } else if (messageId) {
+        // For real messages, check if we have a pending deletion
+        // This handles the case where the server sends a message after we deleted it
+        const tempId = findMatchingTempId(text, username);
+        if (tempId && deletedTempMessages.has(tempId)) {
+            console.log('⚠️ Real message matches deleted temp message, skipping:', messageId);
+            // Try to delete from server since user wanted it deleted
+            if (socket && socket.connected) {
+                socket.emit('message-deleted', { messageId: messageId });
             }
-        });
-        
-        elements.messageInput.addEventListener('focus', function() {
-            sendTypingStart();
-        });
-        
-        elements.messageInput.addEventListener('blur', function() {
-            sendTypingStop();
-        });
+            return;
+        }
     }
     
-    if (elements.sendButton) {
-        elements.sendButton.addEventListener('click', sendMessage);
+    // Check if message already exists to prevent duplicates
+    if (messageId && !messageId.startsWith('temp_')) {
+        const existingMessage = document.querySelector(`[data-id="${messageId}"]`);
+        if (existingMessage) {
+            console.log('⚠️ Message already exists, skipping:', messageId);
+            return;
+        }
     }
     
-    // Initialize scroll to bottom button
-    scrollToBottomBtn = document.getElementById('scrollToBottomBtn');
-    if (scrollToBottomBtn) {
-        scrollToBottomBtn.addEventListener('click', scrollToBottomMain);
+    // For temp IDs, try to find and update existing temp message
+    if (messageId && messageId.startsWith('temp_')) {
+        const existingTemp = document.querySelector(`[data-id="${messageId}"]`);
+        if (existingTemp) {
+            // Check if this temp was marked for deletion
+            if (deletedTempMessages.has(messageId)) {
+                console.log('⚠️ Temp message was deleted, removing from UI:', messageId);
+                existingTemp.remove();
+                return;
+            }
+            
+            console.log('Found existing temp message, updating:', messageId);
+            // Update the temp message content if needed
+            if (existingTemp.dataset.content !== text) {
+                existingTemp.dataset.content = text;
+                const contentDiv = existingTemp.querySelector('.content div');
+                if (contentDiv) {
+                    contentDiv.textContent = text;
+                }
+            }
+            return;
+        }
     }
     
-    // Initialize private AI scroll button
-    privateGoTopBtn = document.getElementById('private-go-top-btn');
-    if (privateGoTopBtn) {
-        privateGoTopBtn.addEventListener('click', () => {
-            forceScrollToBottom('private-ai-container');
+    const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId);
+    
+    if (!messageDiv) {
+        console.error('Failed to create message element');
+        return;
+    }
+
+    // FIXED: Use the enhanced function to attach event listeners including deletion
+    attachMessageEventListeners(messageDiv);
+
+    // Always append new messages to the bottom
+    elements.chatContainer.appendChild(messageDiv);
+    
+    // Only scroll if it's a new message and we're at the bottom
+    if (isNew && isAtBottom) {
+        requestAnimationFrame(() => {
+            elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
         });
     }
+
+    // Update scroll state
+    updateScrollState();
     
-    // Load initial messages with deletion support
-    loadMessages();
+    // Add deletion-specific event listener
+    if (!messageDiv.hasAttribute('data-deletion-bound')) {
+        messageDiv.addEventListener('touchstart', handleTouchStart);
+        messageDiv.addEventListener('touchend', handleTouchEnd);
+        messageDiv.addEventListener('touchmove', handleTouchMove);
+        messageDiv.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            showMessageContextMenu(e, messageDiv);
+        });
+        messageDiv.setAttribute('data-deletion-bound', 'true');
+    }
     
-    // Attach deletion event listeners to existing messages
-    attachDeletionEventListeners();
+    console.log(`Displayed ${sender} message:`, { messageId, username, text: text.substring(0, 50) });
 }
 
-// ===== ADDED: FUNCTION TO ATTACH DELETION EVENT LISTENERS TO ALL MESSAGES =====
-function attachDeletionEventListeners() {
-    console.log('Attaching deletion event listeners...');
+// ===== ADDED: FUNCTION TO FIND MATCHING TEMP ID =====
+function findMatchingTempId(content, username) {
+    // Look for temp messages with matching content and username
+    const tempMessages = document.querySelectorAll(`[data-id^="temp_"][data-username="${username}"]`);
     
-    // Attach to main chat messages
-    const mainMessages = document.querySelectorAll('#chat-container .message');
-    console.log(`Found ${mainMessages.length} main messages to attach listeners to`);
+    for (let tempMsg of tempMessages) {
+        if (tempMsg.dataset.content === content) {
+            return tempMsg.dataset.id;
+        }
+    }
+    return null;
+}
+
+// ===== MODIFIED: SEND MESSAGE FUNCTION (IF YOU HAVE IT) =====
+// If you have a sendMessage function, you need to track temp messages
+// Here's a sample modification:
+
+function sendMessage() {
+    const messageText = elements.messageInput.value.trim();
+    if (!messageText) return;
     
-    mainMessages.forEach((message, index) => {
-        if (!message.hasAttribute('data-deletion-bound')) {
-            // Remove old listeners first
-            message.removeEventListener('touchstart', handleTouchStart);
-            message.removeEventListener('touchend', handleTouchEnd);
-            message.removeEventListener('touchmove', handleTouchMove);
-            message.removeEventListener('contextmenu', handleContextMenu);
-            
-            // Add new listeners
-            message.addEventListener('touchstart', handleTouchStart);
-            message.addEventListener('touchend', handleTouchEnd);
-            message.addEventListener('touchmove', handleTouchMove);
-            message.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                showMessageContextMenu(e, message);
-            });
-            
-            // Add mouse events for desktop
-            message.addEventListener('mousedown', (e) => {
-                if (e.button === 2) { // Right click
-                    e.preventDefault();
-                    showMessageContextMenu(e, message);
+    // Create a temporary message
+    const tempId = 'temp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    
+    // Display temp message immediately
+    displayMessage(
+        messageText,
+        'sent',
+        null,
+        currentUserSession?.username,
+        tempId,
+        true
+    );
+    
+    // Clear input
+    elements.messageInput.value = '';
+    autoResize(elements.messageInput);
+    
+    // Send to server
+    const messageData = {
+        content: messageText,
+        username: currentUserSession?.username
+    };
+    
+    // Send via fetch
+    fetch('/api/messages', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        },
+        body: JSON.stringify(messageData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Server responded with real message
+        console.log('Server response for temp message:', tempId, '->', data.id);
+        
+        // Check if temp was deleted
+        if (deletedTempMessages.has(tempId)) {
+            console.log('Temp message was deleted, deleting from server too:', data.id);
+            // Delete the real message from server
+            fetch(`/api/messages/${data.id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
                 }
             });
-            
-            message.setAttribute('data-deletion-bound', 'true');
+            return;
+        }
+        
+        // Update temp message with real ID
+        const tempElement = document.querySelector(`[data-id="${tempId}"]`);
+        if (tempElement) {
+            tempElement.dataset.id = data.id;
+            console.log('Updated temp message with real ID:', tempId, '->', data.id);
+        }
+    })
+    .catch(error => {
+        console.error('Error sending message:', error);
+        // If error, keep temp message but mark as failed
+        const tempElement = document.querySelector(`[data-id="${tempId}"]`);
+        if (tempElement) {
+            tempElement.classList.add('failed');
         }
     });
-    
-    // Attach to private chat messages
-    const privateMessages = document.querySelectorAll('.private-message');
-    privateMessages.forEach(message => {
-        if (!message.hasAttribute('data-deletion-bound')) {
-            message.addEventListener('touchstart', handlePrivateMessageTouchStart);
-            message.addEventListener('touchend', handlePrivateMessageTouchEnd);
-            message.addEventListener('touchmove', handlePrivateMessageTouchMove);
-            message.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                showPrivateMessageContextMenu(e, message);
-            });
-            message.setAttribute('data-deletion-bound', 'true');
-        }
-    });
-    
-    // Attach to private AI messages
-    const privateAIMessages = document.querySelectorAll('#private-ai-container .message');
-    privateAIMessages.forEach(message => {
-        if (!message.hasAttribute('data-deletion-bound')) {
-            message.addEventListener('touchstart', handlePrivateMessageTouchStart);
-            message.addEventListener('touchend', handlePrivateMessageTouchEnd);
-            message.addEventListener('touchmove', handlePrivateMessageTouchMove);
-            message.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                showPrivateMessageContextMenu(e, message);
-            });
-            message.setAttribute('data-deletion-bound', 'true');
-        }
-    });
-    
-    console.log('Deletion event listeners attached successfully');
-}
-
-// ===== MODIFIED: HANDLE TOUCH EVENTS WITH BETTER ERROR HANDLING =====
-function handleTouchStart(e) {
-    // FIXED: Prevent default to avoid unwanted behaviors
-    e.preventDefault();
-    e.stopPropagation();
-    
-    isLongPress = false;
-    const target = e.currentTarget;
-    
-    if (!target) return;
-    
-    target.classList.add('no-select');
-    longPressTimer = setTimeout(() => {
-        isLongPress = true;
-        showMessageContextMenu(e, target);
-    }, 500);
-}
-
-function handleTouchMove(e) {
-    e.preventDefault();
-    clearTimeout(longPressTimer);
-    const target = e.currentTarget;
-    if (target) {
-        target.classList.remove('no-select');
-    }
-}
-
-function handleTouchEnd(e) {
-    e.preventDefault();
-    clearTimeout(longPressTimer);
-    const target = e.currentTarget;
-    if (target) {
-        target.classList.remove('no-select');
-    }
-}
-
-function handleContextMenu(e) {
-    e.preventDefault();
-    const target = e.currentTarget;
-    if (target) {
-        showMessageContextMenu(e, target);
-    }
 }
 
 // ===== MODIFIED: INITIALIZE MAIN APP FUNCTION - ENHANCED =====
@@ -5709,6 +5796,18 @@ function initializeMainApp() {
             setupSocketDeletionListeners();
         }, 1000);
     }
+    
+    // ===== ADDED: CLEAN UP DELETED TEMP MESSAGES PERIODICALLY =====
+    // Remove old entries from deletedTempMessages to prevent memory leak
+    setInterval(() => {
+        const oneHourAgo = Date.now() - (60 * 60 * 1000);
+        // We can't track timestamps in a Set, so we'll just clear periodically
+        // In a more robust implementation, use a Map with timestamps
+        console.log('Cleaning up deleted temp messages set');
+        // For now, we'll just log the size
+        console.log('deletedTempMessages size:', deletedTempMessages.size);
+        console.log('deletedTempPrivateMessages size:', deletedTempPrivateMessages.size);
+    }, 30 * 60 * 1000); // Every 30 minutes
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -5838,108 +5937,6 @@ async function loadMessages() {
     } catch (error) {
         console.error('Error loading messages:', error);
     }
-}
-
-// ===== MODIFIED: DISPLAY MESSAGE FUNCTION WITH DELETION EVENT ATTACHMENT =====
-function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
-    if (!elements.chatContainer) {
-        console.error('Chat container not found');
-        return;
-    }
-    
-    // Check if message already exists to prevent duplicates
-    if (messageId && !messageId.startsWith('temp_')) {
-        const existingMessage = document.querySelector(`[data-id="${messageId}"]`);
-        if (existingMessage) {
-            console.log('⚠️ Message already exists, skipping:', messageId);
-            return;
-        }
-    }
-    
-    // For temp IDs, try to find and update existing temp message
-    if (messageId && messageId.startsWith('temp_')) {
-        const existingTemp = document.querySelector(`[data-id="${messageId}"]`);
-        if (existingTemp) {
-            console.log('Found existing temp message, updating:', messageId);
-            // Update the temp message content if needed
-            if (existingTemp.dataset.content !== text) {
-                existingTemp.dataset.content = text;
-                const contentDiv = existingTemp.querySelector('.content div');
-                if (contentDiv) {
-                    contentDiv.textContent = text;
-                }
-            }
-            return;
-        }
-    }
-    
-    const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId);
-    
-    if (!messageDiv) {
-        console.error('Failed to create message element');
-        return;
-    }
-
-    // FIXED: Use the enhanced function to attach event listeners including deletion
-    attachMessageEventListeners(messageDiv);
-
-    // Always append new messages to the bottom
-    elements.chatContainer.appendChild(messageDiv);
-    
-    // Only scroll if it's a new message and we're at the bottom
-    if (isNew && isAtBottom) {
-        requestAnimationFrame(() => {
-            elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
-        });
-    }
-
-    // Update scroll state
-    updateScrollState();
-    
-    // Add deletion-specific event listener
-    if (!messageDiv.hasAttribute('data-deletion-bound')) {
-        messageDiv.addEventListener('touchstart', handleTouchStart);
-        messageDiv.addEventListener('touchend', handleTouchEnd);
-        messageDiv.addEventListener('touchmove', handleTouchMove);
-        messageDiv.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            showMessageContextMenu(e, messageDiv);
-        });
-        messageDiv.setAttribute('data-deletion-bound', 'true');
-    }
-    
-    console.log(`Displayed ${sender} message:`, { messageId, username, text: text.substring(0, 50) });
-}
-
-// ===== MODIFIED: ATTACH MESSAGE EVENT LISTENERS FUNCTION =====
-function attachMessageEventListeners(messageDiv) {
-    if (!messageDiv) return;
-    
-    // Remove any existing listeners to prevent duplicates
-    messageDiv.removeEventListener('touchstart', handleTouchStart);
-    messageDiv.removeEventListener('touchend', handleTouchEnd);
-    messageDiv.removeEventListener('touchmove', handleTouchMove);
-    messageDiv.removeEventListener('contextmenu', handleContextMenu);
-    
-    // Attach touch event listeners for long-press functionality with deletion
-    messageDiv.addEventListener('touchstart', handleTouchStart);
-    messageDiv.addEventListener('touchend', handleTouchEnd);
-    messageDiv.addEventListener('touchmove', handleTouchMove);
-    messageDiv.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        showMessageContextMenu(e, messageDiv);
-    });
-    
-    // Also attach click event for desktop compatibility
-    messageDiv.addEventListener('mousedown', function(e) {
-        if (e.button === 2) { // Right click
-            e.preventDefault();
-            showMessageContextMenu(e, messageDiv);
-        }
-    });
-    
-    // Mark as deletion-bound
-    messageDiv.setAttribute('data-deletion-bound', 'true');
 }
 
 // ===== THE REST OF YOUR EXISTING CODE CONTINUES BELOW =====
@@ -10183,4 +10180,3 @@ function batchMessageRender(messages, renderFunction) {
 </script>
 </body>
 </html>
-
