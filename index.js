@@ -2066,6 +2066,79 @@ app.delete('/api/private/messages/:id', verifyToken, async (req, res) => {
 });
 
 // --- CUT HERE ---
+// FIXED: DELETE messages endpoint that client expects
+app.delete('/api/messages/:id', verifyToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const username = req.user.username;
+        
+        console.log('🗑️ Deleting message:', { id, username });
+        
+        // First check if the message exists
+        const { data: message, error: fetchError } = await supabase
+            .from('chatter')
+            .select('username, id')
+            .eq('id', id)
+            .single();
+        
+        if (fetchError) {
+            console.error('❌ Message not found:', fetchError);
+            return res.status(404).json({ error: "Message not found" });
+        }
+        
+        // Check ownership
+        if (message.username !== username && username !== 'admin') {
+            return res.status(403).json({ error: "You can only delete your own messages" });
+        }
+        
+        // Try to update deleted flag first
+        const { error: updateError } = await supabase
+            .from('chatter')
+            .update({ deleted: true })
+            .eq('id', id);
+        
+        if (updateError) {
+            console.log('⚠️ Soft delete failed, trying hard delete...');
+            
+            // Try hard delete
+            const { error: deleteError } = await supabase
+                .from('chatter')
+                .delete()
+                .eq('id', id);
+            
+            if (deleteError) {
+                console.error('❌ Hard delete failed:', deleteError);
+                return res.status(500).json({ error: "Failed to delete message from database" });
+            }
+        }
+        
+        console.log('✅ Message marked as deleted:', id);
+        
+        // Broadcast deletion via Socket.io
+        io.emit('message-deleted', id);
+        
+        // Also send a new message event with deleted flag to update other clients
+        io.emit('new-message', {
+            id: id,
+            username: message.username,
+            content: '[Message deleted]',
+            deleted: true,
+            created_at: new Date().toISOString()
+        });
+        
+        res.status(200).json({ 
+            success: true,
+            message: "Message deleted successfully"
+        });
+        
+    } catch (error) {
+        console.error('❌ Delete error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: "Failed to delete message: " + error.message 
+        });
+    }
+});
 // --- CUT HERE ---
 // ===== SUPABASE POSTS AND COMMENTS ENDPOINTS =====
 
