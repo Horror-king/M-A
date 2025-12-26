@@ -1683,7 +1683,7 @@ app.post('/api/messages', async (req, res) => {
   }
 });
 
-// DELETE messages endpoint that client expects - FIXED: Use soft delete instead of hard delete
+// DELETE messages endpoint - FIXED: Ensure proper soft delete
 app.delete('/api/messages/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -1691,10 +1691,10 @@ app.delete('/api/messages/:id', verifyToken, async (req, res) => {
     
     console.log('🗑️ Deleting message:', { id, username });
     
-    // First check if the message exists and belongs to the user
+    // First check if the message exists
     const { data: message, error: fetchError } = await supabase
       .from('chatter')
-      .select('username, id')
+      .select('username, id, deleted')
       .eq('id', id)
       .single();
     
@@ -1703,41 +1703,52 @@ app.delete('/api/messages/:id', verifyToken, async (req, res) => {
       return res.status(404).json({ error: "Message not found" });
     }
     
-    // Check ownership - only allow deletion by message owner or admin
+    // Check if already deleted
+    if (message.deleted) {
+      console.log('⚠️ Message already deleted');
+      return res.status(200).json({ success: true, message: "Already deleted" });
+    }
+    
+    // Check ownership
     if (message.username !== username && username !== 'admin') {
       return res.status(403).json({ error: "You can only delete your own messages" });
     }
     
-    // Try soft delete first (update deleted flag)
+    // Try soft delete (update deleted flag)
     const { error: updateError } = await supabase
       .from('chatter')
       .update({ deleted: true })
       .eq('id', id);
     
     if (updateError) {
-      console.log('⚠️ Soft delete failed, trying to add deleted column...');
+      console.error('❌ Soft delete failed:', updateError);
       
       // Try to add the deleted column if it doesn't exist
+      console.log('🔄 Trying to add deleted column...');
       try {
-        // First try hard delete
+        // Try direct delete
         const { error: deleteError } = await supabase
           .from('chatter')
           .delete()
           .eq('id', id);
         
         if (deleteError) throw deleteError;
+        console.log('✅ Message hard deleted');
         
       } catch (deleteError) {
         console.error('❌ Hard delete also failed:', deleteError);
         throw new Error("Failed to delete message");
       }
+    } else {
+      console.log('✅ Message soft deleted (marked as deleted)');
     }
-    
-    console.log('✅ Message marked as deleted:', id);
     
     // Broadcast deletion via Socket.io
     io.emit('message-deleted', id);
-    res.status(200).json({ success: true });
+    res.status(200).json({ 
+      success: true, 
+      message: "Message deleted successfully" 
+    });
   } catch (error) {
     console.error('❌ Delete error:', error);
     res.status(500).json({ error: "Failed to delete message: " + error.message });
