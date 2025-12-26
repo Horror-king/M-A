@@ -1578,36 +1578,42 @@ app.post('/api/ai/chat', async (req, res) => {
   }
 });
 
-// ===== ADD MESSAGES ENDPOINTS TO MATCH CLIENT =====
-
-// GET messages endpoint that client expects - FIXED: Add deleted flag check
+// ===== FIXED: GET messages endpoint - Properly exclude deleted messages =====
 app.get('/api/messages', async (req, res) => {
   try {
-    // Check if chatter table has a 'deleted' column, if not, get all messages
-    const { data: tableInfo, error: tableError } = await supabase
+    console.log('📥 Fetching messages from API...');
+    
+    // Check if chatter table has a 'deleted' column
+    const { data: tableInfo } = await supabase
       .from('chatter')
       .select('*')
       .limit(1);
-
+    
     let query = supabase
       .from('chatter')
       .select('id, content, username, created_at, image_url, reply_to')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(50);
 
     // If table has a 'deleted' column, filter out deleted messages
-    if (!tableError && tableInfo && tableInfo.length > 0) {
-      const hasDeletedColumn = 'deleted' in tableInfo[0];
-      if (hasDeletedColumn) {
-        query = query.eq('deleted', false);
-      }
+    if (tableInfo && tableInfo.length > 0 && 'deleted' in tableInfo[0]) {
+      console.log('✅ Filtering out deleted messages');
+      query = query.eq('deleted', false);
+    } else {
+      console.log('⚠️ No deleted column found, showing all messages');
     }
 
     const { data, error } = await query;
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error fetching messages:', error);
+      throw error;
+    }
+    
+    console.log(`✅ Loaded ${data?.length || 0} messages (excluding deleted ones)`);
     res.json(data || []);
   } catch (err) {
-    console.error('Error fetching messages:', err);
+    console.error('❌ Error in GET /api/messages:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1683,7 +1689,7 @@ app.post('/api/messages', async (req, res) => {
   }
 });
 
-// DELETE messages endpoint - FIXED: Ensure proper soft delete
+// ===== DELETE messages endpoint - FIXED: Ensure proper soft delete =====
 app.delete('/api/messages/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -3275,26 +3281,24 @@ app.put('/private-messages/read', async (req, res) => {
 
 // ===== PUBLIC CHAT ENDPOINTS =====
 
-// GET messages (legacy endpoint) - FIXED: Add deleted flag check
+// ===== GET messages (legacy endpoint) - FIXED: Properly filter deleted messages =====
 app.get('/messages', async (req, res) => {
   try {
-    // Check if chatter table has a 'deleted' column, if not, get all messages
-    const { data: tableInfo, error: tableError } = await supabase
+    // Check if chatter table has a 'deleted' column
+    const { data: tableInfo } = await supabase
       .from('chatter')
       .select('*')
       .limit(1);
-
+    
     let query = supabase
       .from('chatter')
       .select('id, content, username, created_at, image_url, reply_to')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(50);
 
     // If table has a 'deleted' column, filter out deleted messages
-    if (!tableError && tableInfo && tableInfo.length > 0) {
-      const hasDeletedColumn = 'deleted' in tableInfo[0];
-      if (hasDeletedColumn) {
-        query = query.eq('deleted', false);
-      }
+    if (tableInfo && tableInfo.length > 0 && 'deleted' in tableInfo[0]) {
+      query = query.eq('deleted', false);
     }
 
     const { data, error } = await query;
@@ -4355,4 +4359,3 @@ process.on('uncaughtException', (err) => {
 
 // Export for testing
 module.exports = { app, server, io, supabase };
-  
