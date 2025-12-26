@@ -1578,40 +1578,36 @@ app.post('/api/ai/chat', async (req, res) => {
   }
 });
 
-// ===== FIXED: GET messages endpoint - Properly exclude deleted messages =====
+// ===== FIXED: GET messages endpoint - EXCLUDES DELETED MESSAGES =====
 app.get('/api/messages', async (req, res) => {
   try {
-    console.log('📥 Fetching messages from API...');
+    console.log('📥 Fetching messages from API (excluding deleted)...');
     
-    // Check if chatter table has a 'deleted' column
-    const { data: tableInfo } = await supabase
-      .from('chatter')
-      .select('*')
-      .limit(1);
+    const { page = 0, limit = 50 } = req.query;
+    const offset = page * limit;
     
-    let query = supabase
+    // ⚠️ IMPORTANT: Use raw SQL to ensure deleted messages are filtered
+    const { data, error } = await supabase
       .from('chatter')
-      .select('id, content, username, created_at, image_url, reply_to')
+      .select('id, content, username, created_at, image_url, reply_to, deleted')
+      .eq('deleted', false) // Explicitly filter out deleted messages
       .order('created_at', { ascending: false })
-      .limit(50);
-
-    // If table has a 'deleted' column, filter out deleted messages
-    if (tableInfo && tableInfo.length > 0 && 'deleted' in tableInfo[0]) {
-      console.log('✅ Filtering out deleted messages');
-      query = query.eq('deleted', false);
-    } else {
-      console.log('⚠️ No deleted column found, showing all messages');
-    }
-
-    const { data, error } = await query;
-
+      .range(offset, offset + limit - 1);
+    
     if (error) {
       console.error('❌ Error fetching messages:', error);
       throw error;
     }
     
-    console.log(`✅ Loaded ${data?.length || 0} messages (excluding deleted ones)`);
-    res.json(data || []);
+    console.log(`✅ Loaded ${data?.length || 0} messages (deleted messages filtered)`);
+    
+    // Double-check on server side to ensure no deleted messages slip through
+    const filteredData = (data || []).filter(msg => {
+      const isDeleted = msg.deleted === true || msg.deleted === 'true' || msg.deleted === 1;
+      return !isDeleted;
+    });
+    
+    res.json(filteredData);
   } catch (err) {
     console.error('❌ Error in GET /api/messages:', err);
     res.status(500).json({ error: 'Server error' });
@@ -1689,13 +1685,13 @@ app.post('/api/messages', async (req, res) => {
   }
 });
 
-// ===== DELETE messages endpoint - FIXED: Ensure proper soft delete =====
+// ===== FIXED: DELETE messages endpoint - PROPER HARD DELETE =====
 app.delete('/api/messages/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     const username = req.user.username;
     
-    console.log('🗑️ Deleting message:', { id, username });
+    console.log('🗑️ Deleting message (HARD DELETE):', { id, username });
     
     // First check if the message exists
     const { data: message, error: fetchError } = await supabase
@@ -1706,58 +1702,57 @@ app.delete('/api/messages/:id', verifyToken, async (req, res) => {
     
     if (fetchError) {
       console.error('❌ Message not found:', fetchError);
-      return res.status(404).json({ error: "Message not found" });
+      return res.status(404).json({ 
+        success: false,
+        error: "Message not found" 
+      });
     }
     
     // Check if already deleted
     if (message.deleted) {
-      console.log('⚠️ Message already deleted');
-      return res.status(200).json({ success: true, message: "Already deleted" });
+      console.log('⚠️ Message already marked as deleted');
+      // Still delete it permanently
     }
     
     // Check ownership
     if (message.username !== username && username !== 'admin') {
-      return res.status(403).json({ error: "You can only delete your own messages" });
+      return res.status(403).json({ 
+        success: false,
+        error: "You can only delete your own messages" 
+      });
     }
     
-    // Try soft delete (update deleted flag)
-    const { error: updateError } = await supabase
+    // ⚠️ CRITICAL FIX: HARD DELETE instead of soft delete
+    // This permanently removes the message from the database
+    const { error: deleteError } = await supabase
       .from('chatter')
-      .update({ deleted: true })
+      .delete()
       .eq('id', id);
     
-    if (updateError) {
-      console.error('❌ Soft delete failed:', updateError);
-      
-      // Try to add the deleted column if it doesn't exist
-      console.log('🔄 Trying to add deleted column...');
-      try {
-        // Try direct delete
-        const { error: deleteError } = await supabase
-          .from('chatter')
-          .delete()
-          .eq('id', id);
-        
-        if (deleteError) throw deleteError;
-        console.log('✅ Message hard deleted');
-        
-      } catch (deleteError) {
-        console.error('❌ Hard delete also failed:', deleteError);
-        throw new Error("Failed to delete message");
-      }
-    } else {
-      console.log('✅ Message soft deleted (marked as deleted)');
+    if (deleteError) {
+      console.error('❌ Hard delete failed:', deleteError);
+      throw new Error("Failed to permanently delete message");
     }
     
-    // Broadcast deletion via Socket.io
+    console.log('✅ Message PERMANENTLY deleted:', id);
+    
+    // Broadcast deletion via Socket.io so all clients update
     io.emit('message-deleted', id);
+    
+    // Send immediate update to refresh messages for all clients
+    io.emit('refresh-messages');
+    
     res.status(200).json({ 
-      success: true, 
-      message: "Message deleted successfully" 
+      success: true,
+      message: "Message permanently deleted"
     });
+    
   } catch (error) {
     console.error('❌ Delete error:', error);
-    res.status(500).json({ error: "Failed to delete message: " + error.message });
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to delete message: " + error.message 
+    });
   }
 });
 
@@ -2065,81 +2060,6 @@ app.delete('/api/private/messages/:id', verifyToken, async (req, res) => {
   }
 });
 
-// --- CUT HERE ---
-// FIXED: DELETE messages endpoint that client expects
-app.delete('/api/messages/:id', verifyToken, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const username = req.user.username;
-        
-        console.log('🗑️ Deleting message:', { id, username });
-        
-        // First check if the message exists
-        const { data: message, error: fetchError } = await supabase
-            .from('chatter')
-            .select('username, id')
-            .eq('id', id)
-            .single();
-        
-        if (fetchError) {
-            console.error('❌ Message not found:', fetchError);
-            return res.status(404).json({ error: "Message not found" });
-        }
-        
-        // Check ownership
-        if (message.username !== username && username !== 'admin') {
-            return res.status(403).json({ error: "You can only delete your own messages" });
-        }
-        
-        // Try to update deleted flag first
-        const { error: updateError } = await supabase
-            .from('chatter')
-            .update({ deleted: true })
-            .eq('id', id);
-        
-        if (updateError) {
-            console.log('⚠️ Soft delete failed, trying hard delete...');
-            
-            // Try hard delete
-            const { error: deleteError } = await supabase
-                .from('chatter')
-                .delete()
-                .eq('id', id);
-            
-            if (deleteError) {
-                console.error('❌ Hard delete failed:', deleteError);
-                return res.status(500).json({ error: "Failed to delete message from database" });
-            }
-        }
-        
-        console.log('✅ Message marked as deleted:', id);
-        
-        // Broadcast deletion via Socket.io
-        io.emit('message-deleted', id);
-        
-        // Also send a new message event with deleted flag to update other clients
-        io.emit('new-message', {
-            id: id,
-            username: message.username,
-            content: '[Message deleted]',
-            deleted: true,
-            created_at: new Date().toISOString()
-        });
-        
-        res.status(200).json({ 
-            success: true,
-            message: "Message deleted successfully"
-        });
-        
-    } catch (error) {
-        console.error('❌ Delete error:', error);
-        res.status(500).json({ 
-            success: false,
-            error: "Failed to delete message: " + error.message 
-        });
-    }
-});
-// --- CUT HERE ---
 // ===== SUPABASE POSTS AND COMMENTS ENDPOINTS =====
 
 // Create posts table if it doesn't exist
@@ -4009,6 +3929,26 @@ io.on('connection', (socket) => {
       }
     } catch (error) {
       console.error('Error sending messages to client:', error);
+    }
+  });
+
+  // ===== FIXED: Socket.io refresh messages event =====
+  socket.on('refresh-messages', async () => {
+    try {
+      console.log('🔄 Refreshing messages via Socket.io...');
+      
+      const { data: messages, error } = await supabase
+        .from('chatter')
+        .select('*')
+        .eq('deleted', false)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      
+      if (!error && messages) {
+        socket.emit('chat-messages', messages.reverse());
+      }
+    } catch (error) {
+      console.error('Error refreshing messages:', error);
     }
   });
 
