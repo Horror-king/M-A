@@ -5157,58 +5157,24 @@ function showContainer(containerId) {
 // --- CUT HERE ---
 // --- CUT HERE ---
 // ===== MODIFIED: CONTEXT MENU FUNCTION WITH DELETE OPTION =====
-// ===== FIXED: CONTEXT MENU FUNCTION WITH PROPER NULL CHECKING =====
 function showMessageContextMenu(e, message) {
-    // FIXED: Check if message is null or undefined
-    if (!message) {
-        console.error('❌ Message is null in showMessageContextMenu');
-        return;
-    }
-    
-    // FIXED: Check if message has dataset property
-    if (!message.dataset) {
-        console.error('❌ Message dataset is null:', message);
-        return;
-    }
-    
     const messageText = message.dataset.content || '';
     const messageId = message.dataset.id;
     const messageUsername = message.dataset.username;
     const currentUser = currentUserSession?.username;
     
-    // FIXED: Remove existing menus with null checking
-    const existingMenus = document.querySelectorAll('.message-context-menu');
-    if (existingMenus) {
-        existingMenus.forEach(menu => {
-            if (menu && menu.remove) {
-                menu.remove();
-            }
-        });
-    }
+    document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());
 
     const contextMenu = document.createElement('div');
     contextMenu.className = 'message-context-menu active';
-    
-    // FIXED: Handle both touch and mouse events properly
-    let clientX, clientY;
-    if (e.touches && e.touches.length > 0) {
-        clientX = e.touches[0].pageX || e.touches[0].clientX;
-        clientY = e.touches[0].pageY || e.touches[0].clientY;
-    } else {
-        clientX = e.clientX;
-        clientY = e.clientY;
-    }
-    
-    contextMenu.style.left = `${clientX}px`;
-    contextMenu.style.top = `${clientY}px`;
+    contextMenu.style.left = `${(e.touches?.[0]?.pageX || e.clientX)}px`;
+    contextMenu.style.top = `${(e.touches?.[0]?.pageY || e.clientY)}px`;
 
     const copyButton = document.createElement('button');
     copyButton.textContent = 'Copy';
     copyButton.onclick = () => {
         copyToClipboard(messageText, copyButton);
-        if (contextMenu && contextMenu.remove) {
-            contextMenu.remove();
-        }
+        contextMenu.remove();
     };
 
     const replyButton = document.createElement('button');
@@ -5217,30 +5183,22 @@ function showMessageContextMenu(e, message) {
         replyToText = messageText;
         elements.messageInput.focus();
         showReplyPreview();
-        if (contextMenu && contextMenu.remove) {
-            contextMenu.remove();
-        }
+        contextMenu.remove();
     };
 
     contextMenu.appendChild(copyButton);
     contextMenu.appendChild(replyButton);
 
-    // FIXED: DELETE BUTTON WITH PROPER CHECKS
-    // Show delete button if message has 'sent' class OR user is admin
-    const hasSentClass = message.classList && message.classList.contains('sent');
-    const isAdmin = currentUser === 'admin';
-    
-    if (hasSentClass || isAdmin) {
+    // ===== FIXED: DELETE BUTTON LOGIC - PROPER PERSISTENCE =====
+    if (message.classList.contains('sent') || currentUser === 'admin') {
         const deleteButton = document.createElement('button');
         deleteButton.textContent = 'Delete';
         deleteButton.style.color = '#ff4444';
         deleteButton.onclick = async () => {
             if (confirm('Are you sure you want to delete this message?')) {
                 try {
-                    // Remove message from UI immediately
-                    if (message && message.remove) {
-                        message.remove();
-                    }
+                    // Remove from UI immediately for better UX
+                    message.remove();
                     
                     // Only try server delete if we have an ID
                     if (messageId) {
@@ -5252,116 +5210,71 @@ function showMessageContextMenu(e, message) {
                             }
                         });
                         
-                        if (response.ok) {
-                            showSuccess('Message deleted successfully');
-                            console.log('✅ Message deleted from server:', messageId);
-                        } else {
-                            throw new Error('Server delete failed');
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(errorData.error || 'Delete failed');
                         }
+                        
+                        console.log('✅ Server delete successful');
+                        
+                        // Show success message
+                        showSuccess('Message deleted successfully');
                     } else {
+                        // No ID available (local message)
                         showSuccess('Message removed');
                     }
                 } catch (err) {
                     console.error('❌ Delete error:', err);
-                    // Show error but message was already removed from UI
-                    showError('Message removed locally. Server delete failed.');
                     
-                    // Re-add message to UI if it still exists in DOM
-                    if (message && !document.body.contains(message)) {
+                    // Re-add the message if server delete failed
+                    if (messageId) {
+                        showError('Failed to delete message from server: ' + err.message);
+                        
+                        // Re-insert the message at its original position
                         const chatContainer = document.getElementById('chat-container');
-                        if (chatContainer) {
+                        if (chatContainer && !chatContainer.contains(message)) {
                             chatContainer.appendChild(message);
                         }
+                    } else {
+                        showError('Message removed locally');
                     }
                 }
             }
-            if (contextMenu && contextMenu.remove) {
-                contextMenu.remove();
-            }
+            contextMenu.remove();
         };
         contextMenu.appendChild(deleteButton);
     }
 
-    // FIXED: Append with null check
-    if (document.body) {
-        document.body.appendChild(contextMenu);
-    }
+    document.body.appendChild(contextMenu);
     
     // Close menu when clicking elsewhere
     setTimeout(() => {
-        const closeMenuHandler = () => {
-            if (contextMenu && contextMenu.remove) {
-                contextMenu.remove();
-            }
-            document.removeEventListener('click', closeMenuHandler);
-        };
-        document.addEventListener('click', closeMenuHandler, { once: true });
-    }, 0);
-    
-    // Also close on touch outside
-    setTimeout(() => {
-        const closeMenuHandlerTouch = () => {
-            if (contextMenu && contextMenu.remove) {
-                contextMenu.remove();
-            }
-            document.removeEventListener('touchstart', closeMenuHandlerTouch);
-        };
-        document.addEventListener('touchstart', closeMenuHandlerTouch, { once: true });
+        document.addEventListener('click', function closeMenu() {
+            contextMenu.remove();
+            document.removeEventListener('click', closeMenu);
+        }, { once: true });
     }, 0);
 }
 
-// ===== FIXED: PRIVATE MESSAGE CONTEXT MENU =====
+// ===== MODIFIED: PRIVATE MESSAGE CONTEXT MENU WITH DELETE =====
 function showPrivateMessageContextMenu(e, message) {
-    // FIXED: Check if message is null or undefined
-    if (!message) {
-        console.error('❌ Message is null in showPrivateMessageContextMenu');
-        return;
-    }
-    
-    // FIXED: Check if message has dataset property
-    if (!message.dataset) {
-        console.error('❌ Message dataset is null in private menu:', message);
-        return;
-    }
-    
     const messageText = message.dataset.content || '';
     const messageId = message.dataset.id;
     const currentUser = currentUserSession?.username;
     const messageUsername = message.dataset.username;
     
-    // Remove existing menus
-    const existingMenus = document.querySelectorAll('.message-context-menu');
-    if (existingMenus) {
-        existingMenus.forEach(menu => {
-            if (menu && menu.remove) {
-                menu.remove();
-            }
-        });
-    }
+    document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());
 
     const contextMenu = document.createElement('div');
     contextMenu.className = 'message-context-menu active';
-    
-    // FIXED: Handle both touch and mouse events
-    let clientX, clientY;
-    if (e.touches && e.touches.length > 0) {
-        clientX = e.touches[0].pageX || e.touches[0].clientX;
-        clientY = e.touches[0].pageY || e.touches[0].clientY;
-    } else {
-        clientX = e.clientX;
-        clientY = e.clientY;
-    }
-    
-    contextMenu.style.left = `${clientX}px`;
-    contextMenu.style.top = `${clientY}px`;
+    contextMenu.style.left = `${(e.touches?.[0]?.pageX || e.clientX)}px`;
+    contextMenu.style.top = `${(e.touches?.[0]?.pageY || e.clientY)}px`;
 
     const copyButton = document.createElement('button');
     copyButton.textContent = 'Copy';
     copyButton.onclick = () => {
         copyToClipboard(messageText, copyButton);
-        if (contextMenu && contextMenu.remove) {
-            contextMenu.remove();
-        }
+        contextMenu.remove();
     };
 
     const replyButton = document.createElement('button');
@@ -5373,17 +5286,14 @@ function showPrivateMessageContextMenu(e, message) {
             input.focus();
             input.value = `Replying to: ${messageText}\n`;
         }
-        if (contextMenu && contextMenu.remove) {
-            contextMenu.remove();
-        }
+        contextMenu.remove();
     };
 
     contextMenu.appendChild(copyButton);
     contextMenu.appendChild(replyButton);
 
-    // FIXED: DELETE BUTTON FOR PRIVATE MESSAGES WITH PROPER CHECKS
-    const hasSentClass = message.classList && message.classList.contains('sent');
-    if (hasSentClass) {
+    // ===== FIXED: DELETE BUTTON FOR PRIVATE MESSAGES =====
+    if (message.classList.contains('sent')) {
         const deleteButton = document.createElement('button');
         deleteButton.textContent = 'Delete';
         deleteButton.style.color = '#ff4444';
@@ -5391,9 +5301,7 @@ function showPrivateMessageContextMenu(e, message) {
             if (confirm('Delete this private message?')) {
                 try {
                     // Remove from UI immediately
-                    if (message && message.remove) {
-                        message.remove();
-                    }
+                    message.remove();
                     
                     // Only try server delete if we have an ID
                     if (messageId) {
@@ -5416,55 +5324,38 @@ function showPrivateMessageContextMenu(e, message) {
                         showSuccess('Message removed');
                     }
                 } catch (err) {
-                    console.error('❌ Private message delete error:', err);
-                    showError('Message removed locally. Server delete failed.');
+                    console.error('❌ Delete error:', err);
+                    showError('Message removed locally. Server delete failed: ' + err.message);
                     
-                    // Re-add if needed
-                    if (message && !document.body.contains(message)) {
+                    // Re-add if server delete failed
+                    if (messageId) {
                         const container = document.getElementById('private-ai-container') || 
                                         document.getElementById('private-chat-messages');
-                        if (container) {
+                        if (container && !container.contains(message)) {
                             container.appendChild(message);
                         }
                     }
                 }
             }
-            if (contextMenu && contextMenu.remove) {
-                contextMenu.remove();
-            }
+            contextMenu.remove();
         };
         contextMenu.appendChild(deleteButton);
     }
 
-    // Append with null check
-    if (document.body) {
-        document.body.appendChild(contextMenu);
-    }
+    document.body.appendChild(contextMenu);
     
     // Close menu when clicking elsewhere
     setTimeout(() => {
-        const closeMenuHandler = () => {
-            if (contextMenu && contextMenu.remove) {
-                contextMenu.remove();
-            }
-            document.removeEventListener('click', closeMenuHandler);
-        };
-        document.addEventListener('click', closeMenuHandler, { once: true });
-    }, 0);
-    
-    // Also close on touch outside
-    setTimeout(() => {
-        const closeMenuHandlerTouch = () => {
-            if (contextMenu && contextMenu.remove) {
-                contextMenu.remove();
-            }
-            document.removeEventListener('touchstart', closeMenuHandlerTouch);
-        };
-        document.addEventListener('touchstart', closeMenuHandlerTouch, { once: true });
+        document.addEventListener('click', function closeMenu() {
+            contextMenu.remove();
+            document.removeEventListener('click', closeMenu);
+        }, { once: true });
     }, 0);
 }
 
-// ===== NEW: Welcome screen animation function =====
+// ===== YOUR EXISTING CODE CONTINUES BELOW =====
+
+// NEW: Welcome screen animation function
 function animateWelcomeText() {
     const text = "MessageMate";
     const animatedText = document.getElementById('animated-text');
@@ -5506,7 +5397,7 @@ function animateWelcomeText() {
     }, 2500); // Total animation time: 2.5 seconds
 }
 
-// ===== NEW: Function to initialize main app when user is already logged in =====
+// NEW: Function to initialize main app when user is already logged in
 function initializeMainApp() {
     console.log('🚀 Initializing main application for logged-in user...');
     
@@ -6257,32 +6148,12 @@ function escapeHtml(text) {
 
 // ===== NEW: FUNCTION TO ATTACH EVENT LISTENERS TO MESSAGES =====
 function attachMessageEventListeners(messageDiv) {
-    // FIXED: Check if messageDiv exists
-    if (!messageDiv) {
-        console.error('❌ Cannot attach listeners to null messageDiv');
-        return;
-    }
-    
-    // Check if event listeners are already attached
-    if (messageDiv.hasAttribute('data-events-attached')) {
-        return;
-    }
-    
     // Attach touch event listeners for long-press functionality
     messageDiv.addEventListener('touchstart', handleTouchStart);
     messageDiv.addEventListener('touchend', handleTouchEnd);
     messageDiv.addEventListener('touchmove', handleTouchMove);
-    
-    // FIXED: Context menu with proper error handling
     messageDiv.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        
-        // FIXED: Check if messageDiv still exists
-        if (!messageDiv || !document.body.contains(messageDiv)) {
-            console.error('❌ Message div no longer exists for context menu');
-            return;
-        }
-        
         showMessageContextMenu(e, messageDiv);
     });
     
@@ -6290,31 +6161,517 @@ function attachMessageEventListeners(messageDiv) {
     messageDiv.addEventListener('mousedown', function(e) {
         if (e.button === 2) { // Right click
             e.preventDefault();
-            
-            // FIXED: Check if messageDiv still exists
-            if (!messageDiv || !document.body.contains(messageDiv)) {
-                console.error('❌ Message div no longer exists for mouse context menu');
-                return;
-            }
-            
             showMessageContextMenu(e, messageDiv);
         }
     });
-    
-    // Mark as having events attached
-    messageDiv.setAttribute('data-events-attached', 'true');
 }
 
-// ===== FIXED: FUNCTION TO ATTACH EVENT LISTENERS TO ALL EXISTING MESSAGES =====
+// ===== OPTIMIZED: Update showContainer function =====
+function showContainer(containerId) {
+    console.log('🔄 Showing container:', containerId);
+    
+    // Hide all containers
+    document.querySelectorAll('.main-chat-interface').forEach(container => {
+        container.style.display = 'none';
+    });
+    
+    // Hide all info containers
+    document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container, .profile-container').forEach(container => {
+        container.style.display = 'none';
+    });
+    
+    // Hide all chat inputs
+    document.querySelectorAll('.chat-input').forEach(input => {
+        input.style.display = 'none';
+    });
+    
+    // Show the selected container
+    const container = document.getElementById(containerId);
+    if (container) {
+        container.style.display = 'block';
+        
+        // Show the appropriate chat input
+        if (containerId === 'chat' || containerId === 'private-ai') {
+            const chatInput = container.querySelector('.chat-input');
+            if (chatInput) chatInput.style.display = 'flex';
+        }
+        
+        // For private messages, only show users panel initially
+        if (containerId === 'private-messages') {
+            showUsersPanel();
+            initializePrivateMessaging();
+        }
+        
+        // Load profile data when showing profile container
+        if (containerId === 'profile') {
+            loadProfile();
+        }
+        
+        // Initialize secret code if showing that container
+        if (containerId === 'secret-code') {
+            resetSecretCodeForm();
+            initializeSecretCodeVerification();
+        }
+        
+        // Initialize SQL editor if showing that container
+        if (containerId === 'sql-editor-container') {
+            if (!hasVerifiedCode()) {
+                showError('Access denied. Please verify the secret code first.');
+                showContainer('secret-code');
+                return;
+            }
+            initializeSQLEditor();
+        }
+        
+        // MODIFIED: Initialize posts if showing that container
+        if (containerId === 'posts') {
+            initializePosts();
+        }
+        
+        // FIXED: Attach event listeners to existing messages when switching to chat container
+        if (containerId === 'chat') {
+            setTimeout(() => {
+                attachEventListenersToAllMessages();
+            }, 100);
+        }
+    }
+    
+    // Show overlay for non-chat containers
+    const overlay = document.getElementById('overlay');
+    if (overlay) {
+        if (containerId === 'chat' || containerId === 'private-ai' || containerId === 'private-messages' || containerId === 'posts') {
+            overlay.style.display = 'none';
+        } else {
+            overlay.style.display = 'block';
+        }
+    }
+    
+    // Handle button visibility based on container
+    if (containerId === 'chat') {
+        console.log('Showing main chat container');
+        // Re-initialize scroll button for main chat
+        setTimeout(() => {
+            initializeButtons();
+            setTimeout(() => {
+                forceScrollToBottom('chat-container');
+                updateScrollState();
+            }, 200);
+        }, 100);
+        
+        // Show main chat scroll button, hide private AI button
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'flex';
+            updateScrollState();
+        }
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.classList.remove('visible');
+        }
+    } else if (containerId === 'private-ai') {
+        // Show private AI button, hide main chat scroll button
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'flex';
+            handlePrivateScroll();
+        }
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'none';
+            scrollToBottomBtn.classList.remove('visible');
+        }
+        // Attach scroll event for private container
+        if (privateContainer) {
+            privateContainer.addEventListener('scroll', throttle(handlePrivateScroll, 100));
+            setTimeout(handlePrivateScroll, 100);
+            setTimeout(() => forceScrollToBottom('private-ai-container'), 200);
+        }
+    } else if (containerId === 'private-messages') {
+        // Hide both buttons for private messages
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'none';
+            scrollToBottomBtn.classList.remove('visible');
+        }
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.classList.remove('visible');
+        }
+    } else if (containerId === 'posts') {
+        // Hide both buttons for posts feed
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'none';
+            scrollToBottomBtn.classList.remove('visible');
+        }
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.classList.remove('visible');
+        }
+    } else {
+        // For other containers, hide both buttons
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'none';
+            scrollToBottomBtn.classList.remove('visible');
+        }
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.classList.remove('visible');
+        }
+    }
+
+    // Close dropdown menu when switching containers
+    const dropdown = document.getElementById('dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    
+    const kebabDropdown = document.querySelector('.kebab-dropdown');
+    if (kebabDropdown) kebabDropdown.classList.remove('active');
+}
+
+function hideContainer(containerId) {
+    console.log('🔄 Hiding container:', containerId);
+    const container = document.getElementById(containerId);
+    if (container) container.style.display = 'none';
+    
+    const overlay = document.getElementById('overlay');
+    if (overlay) overlay.style.display = 'none';
+    
+    // Close all menus when hiding any container
+    const dropdown = document.getElementById('dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    
+    const kebabDropdown = document.querySelector('.kebab-dropdown');
+    if (kebabDropdown) kebabDropdown.classList.remove('active');
+    
+    // Show chat container and input after closing any section
+    showContainer('chat');
+}
+
+// ===== OPTIMIZED MESSAGE FUNCTIONS =====
+async function sendMessage() {
+    if (isSending || isProcessingCommand) return;
+    isSending = true;
+    
+    const content = elements.messageInput.value.trim();
+    const username = currentUserSession?.username;
+    
+    if (!content || !username) {
+        isSending = false;
+        return showError('Please enter both username and message');
+    }
+
+    // Check for duplicate message in main chat
+    const messageKey = `main-${username}-${content}`;
+    if (lastSentMessages.main[messageKey] && 
+        Date.now() - lastSentMessages.main[messageKey] < 3000) {
+        console.log('Duplicate message prevented in main chat');
+        isSending = false;
+        return;
+    }
+    
+    // Track this message
+    lastSentMessages.main[messageKey] = Date.now();
+
+    // Bad word filtering
+    const lowerContent = content.toLowerCase();
+    if (badWords.some(word => lowerContent.includes(word))) {
+        if (!warnedUsers[username]) {
+            warnedUsers[username] = true;
+            isSending = false;
+            return showError('Warning: bad word detected! If you repeat, you will be banned.');
+        } else {
+            bannedUsers[username] = Date.now() + BAN_DURATION;
+            showError('You used bad words again. Account deleted and banned.');
+            isSending = false;
+            setTimeout(() => {
+                logout();
+            }, 2000);
+            return;
+        }
+    }
+
+    // Spam protection
+    const now = Date.now();
+    if (bannedUsers[username] && bannedUsers[username] > now) {
+        isSending = false;
+        return showError(`You're banned. Wait ${Math.ceil((bannedUsers[username] - now) / 1000)}s.`);
+    }
+    
+    if (!spamTracker[username]) {
+        spamTracker[username] = [];
+    }
+    spamTracker[username].push(now);
+    spamTracker[username] = spamTracker[username].filter(ts => now - ts <= SPAM_WINDOW);
+    
+    if (spamTracker[username].length > SPAM_LIMIT) {
+        bannedUsers[username] = now + BAN_DURATION;
+        isSending = false;
+        return showError("You're banned for spamming.");
+    }
+
+    try {
+        elements.sendButton.disabled = true;
+        elements.sendButton.classList.remove('enabled');
+        
+        const payload = { 
+            content, 
+            username, 
+            reply_to: replyToText || null 
+        };
+        
+        // Send message to server via HTTP
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch('/api/messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': token ? `Bearer ${token}` : ''
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) throw new Error('Failed to send message');
+
+        // Display message immediately for the sender
+        displayMessage(content, 'sent', replyToText, username, null, true);
+        
+        // Clear input immediately for better UX
+        elements.messageInput.value = '';
+        autoResize(elements.messageInput);
+        clearReply();
+
+        // Only get AI response if it's NOT a command
+        const PREFIX = '!';
+        if (!content.startsWith(PREFIX)) {
+            fetchChatResponse(content);
+        }
+        
+    } catch (error) {
+        showError(error.message);
+        
+        // Remove from tracking on error
+        delete lastSentMessages.main[messageKey];
+    } finally {
+        setTimeout(() => {
+            isSending = false;
+            const hasText = elements.messageInput.value.trim().length > 0;
+            elements.sendButton.disabled = !hasText;
+            elements.sendButton.classList.toggle('enabled', hasText);
+        }, 500);
+    }
+}
+
+async function sendPrivateMessage() {
+    const input = document.getElementById('private-user-input');
+    if (!input) return;
+    
+    const content = input.value.trim();
+    if (!content) return;
+
+    // Display user message immediately
+    displayPrivateMessage(content, 'sent');
+    input.value = '';
+    autoResize(input);
+
+    // Disable send button after sending
+    elements.privateSendButton.disabled = true;
+    elements.privateSendButton.classList.remove('enabled');
+
+    try {
+        // Get AI response directly
+        await fetchPrivateAIResponse(content);
+    } catch (error) {
+        console.error('Error sending private message:', error);
+        showError('Could not process your private message. Please try again.');
+    }
+
+    // Re-enable send button after processing
+    setTimeout(() => {
+        const hasText = input.value.trim().length > 0;
+        elements.privateSendButton.disabled = !hasText;
+        elements.privateSendButton.classList.toggle('enabled', hasText);
+    }, 1000);
+}
+
+// ===== MODIFIED: MESSAGE DISPLAY FUNCTIONS WITH SERVER PROFILE FETCHING =====
+function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${sender}`;
+    if (messageId) messageDiv.dataset.id = messageId;
+    messageDiv.dataset.content = text;
+    messageDiv.dataset.username = username;
+    messageDiv.dataset.timestamp = Date.now();
+
+    // Only create avatar for received messages
+    if (sender === 'received') {
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'avatar';
+        
+        // MODIFIED: Use getAvatarUrl function which now fetches from server
+        const avatarUrl = getAvatarUrl(username);
+        const img = new Image();
+        img.src = avatarUrl;
+        img.alt = "avatar";
+        img.loading = "lazy";
+        
+        // Fetch and update avatar from server in background
+        setTimeout(() => {
+            updateAvatarFromServer(username, img);
+        }, 100);
+        
+        avatarDiv.appendChild(img);
+        
+        // Add click event to show user profile
+        avatarDiv.onclick = (e) => {
+            e.stopPropagation();
+            showUserProfile(username);
+        };
+        
+        messageDiv.appendChild(avatarDiv);
+
+        const messageBody = document.createElement('div');
+        messageBody.className = 'message-body';
+        
+        // Username with status indicator
+        const usernameDiv = document.createElement('div');
+        usernameDiv.className = 'username';
+        
+        // Add click event to username to show user profile
+        usernameDiv.onclick = (e) => {
+            e.stopPropagation();
+            showUserProfile(username);
+        };
+        
+        const statusIndicator = document.createElement('span');
+        statusIndicator.className = 'user-status-indicator online';
+        usernameDiv.appendChild(document.createTextNode(username));
+        usernameDiv.appendChild(statusIndicator);
+        messageBody.appendChild(usernameDiv);
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'content';
+        if (repliedTo) {
+            const replyBubble = document.createElement('div');
+            replyBubble.className = 'reply-preview';
+            replyBubble.textContent = repliedTo;
+            contentDiv.appendChild(replyBubble);
+        }
+
+        const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
+        const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
+        const imageMatches = [...text.matchAll(imagePattern)];
+        const audioMatches = [...text.matchAll(audioPattern)];
+        let modifiedText = text;
+        [...imageMatches, ...audioMatches].forEach(match => {
+            modifiedText = modifiedText.replace(match[0], '');
+        });
+        modifiedText = modifiedText.trim();
+        
+        if (modifiedText) {
+            const textDiv = document.createElement('div');
+            textDiv.textContent = modifiedText;
+            contentDiv.appendChild(textDiv);
+        }
+
+        // Use lazy loading for images
+        imageMatches.forEach(match => {
+            const img = new Image();
+            img.src = match[0];
+            img.alt = "image";
+            img.loading = "lazy";
+            img.style.maxWidth = "100%";
+            img.style.height = "auto";
+            img.style.borderRadius = "8px";
+            img.style.marginTop = "5px";
+            contentDiv.appendChild(img);
+        });
+
+        audioMatches.forEach(match => {
+            const audio = document.createElement('audio');
+            audio.controls = true;
+            audio.src = match[0];
+            contentDiv.appendChild(audio);
+        });
+        
+        messageBody.appendChild(contentDiv);
+        messageDiv.appendChild(messageBody);
+    } else {
+        // For sent messages - simpler structure without avatar/username
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'content';
+        if (repliedTo) {
+            const replyBubble = document.createElement('div');
+            replyBubble.className = 'reply-preview';
+            replyBubble.textContent = repliedTo;
+            contentDiv.appendChild(replyBubble);
+        }
+        const textDiv = document.createElement('div');
+        textDiv.textContent = text;
+        contentDiv.appendChild(textDiv);
+        messageDiv.appendChild(contentDiv);
+    }
+    
+    return messageDiv;
+}
+
+function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
+    if (!elements.chatContainer) return;
+    
+    // Check if message already exists to prevent duplicates
+    const existingMessage = document.querySelector(`[data-id="${messageId}"]`);
+    if (existingMessage) {
+        console.log('⚠️ Message already exists, skipping:', messageId);
+        return;
+    }
+    
+    const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId);
+    
+    // FIXED: Use the new function to attach event listeners
+    attachMessageEventListeners(messageDiv);
+
+    // Always append new messages to the bottom
+    elements.chatContainer.appendChild(messageDiv);
+    
+    // Only scroll if it's a new message and we're at the bottom
+    if (isNew && isAtBottom) {
+        requestAnimationFrame(() => {
+            elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
+        });
+    }
+
+    // Update scroll state
+    updateScrollState();
+}
+
+function displayPrivateMessage(text, sender, repliedTo = null, username = 'Private AI', messageId = null) {
+    const container = document.getElementById('private-ai-container');
+    if (!container) return;
+    
+    const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId);
+    
+    // Add event listeners for private messages
+    messageDiv.addEventListener('touchstart', handlePrivateMessageTouchStart);
+    messageDiv.addEventListener('touchend', handlePrivateMessageTouchEnd);
+    messageDiv.addEventListener('touchmove', handlePrivateMessageTouchMove);
+    messageDiv.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showPrivateMessageContextMenu(e, messageDiv);
+    });
+
+    // Append to container
+    container.appendChild(messageDiv);
+
+    // Scroll to bottom
+    requestAnimationFrame(() => {
+        container.scrollTop = container.scrollHeight;
+    });
+}
+
+// ===== NEW: FUNCTION TO ATTACH EVENT LISTENERS TO ALL EXISTING MESSAGES =====
 function attachEventListenersToAllMessages() {
     const messages = document.querySelectorAll('#chat-container .message');
     console.log(`📝 Attaching event listeners to ${messages.length} existing messages`);
     
     messages.forEach(message => {
-        try {
+        // Check if event listeners are already attached
+        if (!message.hasAttribute('data-events-attached')) {
             attachMessageEventListeners(message);
-        } catch (error) {
-            console.error('❌ Error attaching listeners to message:', error);
+            message.setAttribute('data-events-attached', 'true');
         }
     });
 }
@@ -6383,82 +6740,43 @@ function updateScrollState() {
     isAtBottom = isAtBottomNow;
 }
 
-// ===== FIXED: TOUCH AND CONTEXT MENU FUNCTIONS =====
+// ===== OPTIMIZED TOUCH AND CONTEXT MENU FUNCTIONS =====
 function handleTouchStart(e) {
-    // FIXED: Check if currentTarget exists
-    if (!e.currentTarget) {
-        console.error('❌ currentTarget is null in handleTouchStart');
-        return;
-    }
-    
     isLongPress = false;
     e.currentTarget.classList.add('no-select');
-    
-    // FIXED: Store reference to the element
-    const targetElement = e.currentTarget;
-    
     longPressTimer = setTimeout(() => {
         isLongPress = true;
-        
-        // FIXED: Check if element still exists in DOM
-        if (targetElement && document.body.contains(targetElement)) {
-            showMessageContextMenu(e, targetElement);
-        } else {
-            console.warn('⚠️ Element no longer exists in DOM');
-            clearTimeout(longPressTimer);
-        }
+        showMessageContextMenu(e, e.currentTarget);
     }, 500);
 }
 
 function handleTouchMove(e) {
     clearTimeout(longPressTimer);
-    if (e.currentTarget) {
-        e.currentTarget.classList.remove('no-select');
-    }
+    e.currentTarget.classList.remove('no-select');
 }
 
 function handleTouchEnd(e) {
     clearTimeout(longPressTimer);
-    if (e.currentTarget) {
-        e.currentTarget.classList.remove('no-select');
-    }
+    e.currentTarget.classList.remove('no-select');
 }
 
 function handlePrivateMessageTouchStart(e) {
-    if (!e.currentTarget) {
-        console.error('❌ currentTarget is null in handlePrivateMessageTouchStart');
-        return;
-    }
-    
     isLongPress = false;
     e.currentTarget.classList.add('no-select');
-    
-    const targetElement = e.currentTarget;
-    
     longPressTimer = setTimeout(() => {
         isLongPress = true;
-        
-        if (targetElement && document.body.contains(targetElement)) {
-            showPrivateMessageContextMenu(e, targetElement);
-        } else {
-            console.warn('⚠️ Private message element no longer exists in DOM');
-            clearTimeout(longPressTimer);
-        }
+        showPrivateMessageContextMenu(e, e.currentTarget);
     }, 500);
 }
 
 function handlePrivateMessageTouchMove(e) {
     clearTimeout(longPressTimer);
-    if (e.currentTarget) {
-        e.currentTarget.classList.remove('no-select');
-    }
+    e.currentTarget.classList.remove('no-select');
 }
 
 function handlePrivateMessageTouchEnd(e) {
     clearTimeout(longPressTimer);
-    if (e.currentTarget) {
-        e.currentTarget.classList.remove('no-select');
-    }
+    e.currentTarget.classList.remove('no-select');
 }
 
 function copyToClipboard(text, button) {  
@@ -8360,504 +8678,6 @@ function initSocket() {
         }
     });
 }
-
-// ===== OPTIMIZED: Update showContainer function =====
-function showContainer(containerId) {
-    console.log('🔄 Showing container:', containerId);
-    
-    // Hide all containers
-    document.querySelectorAll('.main-chat-interface').forEach(container => {
-        container.style.display = 'none';
-    });
-    
-    // Hide all info containers
-    document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container, .profile-container').forEach(container => {
-        container.style.display = 'none';
-    });
-    
-    // Hide all chat inputs
-    document.querySelectorAll('.chat-input').forEach(input => {
-        input.style.display = 'none';
-    });
-    
-    // Show the selected container
-    const container = document.getElementById(containerId);
-    if (container) {
-        container.style.display = 'block';
-        
-        // Show the appropriate chat input
-        if (containerId === 'chat' || containerId === 'private-ai') {
-            const chatInput = container.querySelector('.chat-input');
-            if (chatInput) chatInput.style.display = 'flex';
-        }
-        
-        // For private messages, only show users panel initially
-        if (containerId === 'private-messages') {
-            showUsersPanel();
-            initializePrivateMessaging();
-        }
-        
-        // Load profile data when showing profile container
-        if (containerId === 'profile') {
-            loadProfile();
-        }
-        
-        // Initialize secret code if showing that container
-        if (containerId === 'secret-code') {
-            resetSecretCodeForm();
-            initializeSecretCodeVerification();
-        }
-        
-        // Initialize SQL editor if showing that container
-        if (containerId === 'sql-editor-container') {
-            if (!hasVerifiedCode()) {
-                showError('Access denied. Please verify the secret code first.');
-                showContainer('secret-code');
-                return;
-            }
-            initializeSQLEditor();
-        }
-        
-        // MODIFIED: Initialize posts if showing that container
-        if (containerId === 'posts') {
-            initializePosts();
-        }
-        
-        // FIXED: Attach event listeners to existing messages when switching to chat container
-        if (containerId === 'chat') {
-            setTimeout(() => {
-                attachEventListenersToAllMessages();
-            }, 100);
-        }
-    }
-    
-    // Show overlay for non-chat containers
-    const overlay = document.getElementById('overlay');
-    if (overlay) {
-        if (containerId === 'chat' || containerId === 'private-ai' || containerId === 'private-messages' || containerId === 'posts') {
-            overlay.style.display = 'none';
-        } else {
-            overlay.style.display = 'block';
-        }
-    }
-    
-    // Handle button visibility based on container
-    if (containerId === 'chat') {
-        console.log('Showing main chat container');
-        // Re-initialize scroll button for main chat
-        setTimeout(() => {
-            initializeButtons();
-            setTimeout(() => {
-                forceScrollToBottom('chat-container');
-                updateScrollState();
-            }, 200);
-        }, 100);
-        
-        // Show main chat scroll button, hide private AI button
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'flex';
-            updateScrollState();
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    } else if (containerId === 'private-ai') {
-        // Show private AI button, hide main chat scroll button
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'flex';
-            handlePrivateScroll();
-        }
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        // Attach scroll event for private container
-        if (privateContainer) {
-            privateContainer.addEventListener('scroll', throttle(handlePrivateScroll, 100));
-            setTimeout(handlePrivateScroll, 100);
-            setTimeout(() => forceScrollToBottom('private-ai-container'), 200);
-        }
-    } else if (containerId === 'private-messages') {
-        // Hide both buttons for private messages
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    } else if (containerId === 'posts') {
-        // Hide both buttons for posts feed
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    } else {
-        // For other containers, hide both buttons
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    }
-
-    // Close dropdown menu when switching containers
-    const dropdown = document.getElementById('dropdown');
-    if (dropdown) dropdown.style.display = 'none';
-    
-    const kebabDropdown = document.querySelector('.kebab-dropdown');
-    if (kebabDropdown) kebabDropdown.classList.remove('active');
-}
-
-function hideContainer(containerId) {
-    console.log('🔄 Hiding container:', containerId);
-    const container = document.getElementById(containerId);
-    if (container) container.style.display = 'none';
-    
-    const overlay = document.getElementById('overlay');
-    if (overlay) overlay.style.display = 'none';
-    
-    // Close all menus when hiding any container
-    const dropdown = document.getElementById('dropdown');
-    if (dropdown) dropdown.style.display = 'none';
-    
-    const kebabDropdown = document.querySelector('.kebab-dropdown');
-    if (kebabDropdown) kebabDropdown.classList.remove('active');
-    
-    // Show chat container and input after closing any section
-    showContainer('chat');
-}
-
-// ===== OPTIMIZED MESSAGE FUNCTIONS =====
-async function sendMessage() {
-    if (isSending || isProcessingCommand) return;
-    isSending = true;
-    
-    const content = elements.messageInput.value.trim();
-    const username = currentUserSession?.username;
-    
-    if (!content || !username) {
-        isSending = false;
-        return showError('Please enter both username and message');
-    }
-
-    // Check for duplicate message in main chat
-    const messageKey = `main-${username}-${content}`;
-    if (lastSentMessages.main[messageKey] && 
-        Date.now() - lastSentMessages.main[messageKey] < 3000) {
-        console.log('Duplicate message prevented in main chat');
-        isSending = false;
-        return;
-    }
-    
-    // Track this message
-    lastSentMessages.main[messageKey] = Date.now();
-
-    // Bad word filtering
-    const lowerContent = content.toLowerCase();
-    if (badWords.some(word => lowerContent.includes(word))) {
-        if (!warnedUsers[username]) {
-            warnedUsers[username] = true;
-            isSending = false;
-            return showError('Warning: bad word detected! If you repeat, you will be banned.');
-        } else {
-            bannedUsers[username] = Date.now() + BAN_DURATION;
-            showError('You used bad words again. Account deleted and banned.');
-            isSending = false;
-            setTimeout(() => {
-                logout();
-            }, 2000);
-            return;
-        }
-    }
-
-    // Spam protection
-    const now = Date.now();
-    if (bannedUsers[username] && bannedUsers[username] > now) {
-        isSending = false;
-        return showError(`You're banned. Wait ${Math.ceil((bannedUsers[username] - now) / 1000)}s.`);
-    }
-    
-    if (!spamTracker[username]) {
-        spamTracker[username] = [];
-    }
-    spamTracker[username].push(now);
-    spamTracker[username] = spamTracker[username].filter(ts => now - ts <= SPAM_WINDOW);
-    
-    if (spamTracker[username].length > SPAM_LIMIT) {
-        bannedUsers[username] = now + BAN_DURATION;
-        isSending = false;
-        return showError("You're banned for spamming.");
-    }
-
-    try {
-        elements.sendButton.disabled = true;
-        elements.sendButton.classList.remove('enabled');
-        
-        const payload = { 
-            content, 
-            username, 
-            reply_to: replyToText || null 
-        };
-        
-        // Send message to server via HTTP
-        const token = localStorage.getItem('auth_token');
-        const response = await fetch('/api/messages', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': token ? `Bearer ${token}` : ''
-            },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) throw new Error('Failed to send message');
-
-        // Display message immediately for the sender
-        displayMessage(content, 'sent', replyToText, username, null, true);
-        
-        // Clear input immediately for better UX
-        elements.messageInput.value = '';
-        autoResize(elements.messageInput);
-        clearReply();
-
-        // Only get AI response if it's NOT a command
-        const PREFIX = '!';
-        if (!content.startsWith(PREFIX)) {
-            fetchChatResponse(content);
-        }
-        
-    } catch (error) {
-        showError(error.message);
-        
-        // Remove from tracking on error
-        delete lastSentMessages.main[messageKey];
-    } finally {
-        setTimeout(() => {
-            isSending = false;
-            const hasText = elements.messageInput.value.trim().length > 0;
-            elements.sendButton.disabled = !hasText;
-            elements.sendButton.classList.toggle('enabled', hasText);
-        }, 500);
-    }
-}
-
-async function sendPrivateMessage() {
-    const input = document.getElementById('private-user-input');
-    if (!input) return;
-    
-    const content = input.value.trim();
-    if (!content) return;
-
-    // Display user message immediately
-    displayPrivateMessage(content, 'sent');
-    input.value = '';
-    autoResize(input);
-
-    // Disable send button after sending
-    elements.privateSendButton.disabled = true;
-    elements.privateSendButton.classList.remove('enabled');
-
-    try {
-        // Get AI response directly
-        await fetchPrivateAIResponse(content);
-    } catch (error) {
-        console.error('Error sending private message:', error);
-        showError('Could not process your private message. Please try again.');
-    }
-
-    // Re-enable send button after processing
-    setTimeout(() => {
-        const hasText = input.value.trim().length > 0;
-        elements.privateSendButton.disabled = !hasText;
-        elements.privateSendButton.classList.toggle('enabled', hasText);
-    }, 1000);
-}
-
-// ===== MODIFIED: MESSAGE DISPLAY FUNCTIONS WITH SERVER PROFILE FETCHING =====
-function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${sender}`;
-    if (messageId) messageDiv.dataset.id = messageId;
-    messageDiv.dataset.content = text;
-    messageDiv.dataset.username = username;
-    messageDiv.dataset.timestamp = Date.now();
-
-    // Only create avatar for received messages
-    if (sender === 'received') {
-        const avatarDiv = document.createElement('div');
-        avatarDiv.className = 'avatar';
-        
-        // MODIFIED: Use getAvatarUrl function which now fetches from server
-        const avatarUrl = getAvatarUrl(username);
-        const img = new Image();
-        img.src = avatarUrl;
-        img.alt = "avatar";
-        img.loading = "lazy";
-        
-        // Fetch and update avatar from server in background
-        setTimeout(() => {
-            updateAvatarFromServer(username, img);
-        }, 100);
-        
-        avatarDiv.appendChild(img);
-        
-        // Add click event to show user profile
-        avatarDiv.onclick = (e) => {
-            e.stopPropagation();
-            showUserProfile(username);
-        };
-        
-        messageDiv.appendChild(avatarDiv);
-
-        const messageBody = document.createElement('div');
-        messageBody.className = 'message-body';
-        
-        // Username with status indicator
-        const usernameDiv = document.createElement('div');
-        usernameDiv.className = 'username';
-        
-        // Add click event to username to show user profile
-        usernameDiv.onclick = (e) => {
-            e.stopPropagation();
-            showUserProfile(username);
-        };
-        
-        const statusIndicator = document.createElement('span');
-        statusIndicator.className = 'user-status-indicator online';
-        usernameDiv.appendChild(document.createTextNode(username));
-        usernameDiv.appendChild(statusIndicator);
-        messageBody.appendChild(usernameDiv);
-
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'content';
-        if (repliedTo) {
-            const replyBubble = document.createElement('div');
-            replyBubble.className = 'reply-preview';
-            replyBubble.textContent = repliedTo;
-            contentDiv.appendChild(replyBubble);
-        }
-
-        const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
-        const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
-        const imageMatches = [...text.matchAll(imagePattern)];
-        const audioMatches = [...text.matchAll(audioPattern)];
-        let modifiedText = text;
-        [...imageMatches, ...audioMatches].forEach(match => {
-            modifiedText = modifiedText.replace(match[0], '');
-        });
-        modifiedText = modifiedText.trim();
-        
-        if (modifiedText) {
-            const textDiv = document.createElement('div');
-            textDiv.textContent = modifiedText;
-            contentDiv.appendChild(textDiv);
-        }
-
-        // Use lazy loading for images
-        imageMatches.forEach(match => {
-            const img = new Image();
-            img.src = match[0];
-            img.alt = "image";
-            img.loading = "lazy";
-            img.style.maxWidth = "100%";
-            img.style.height = "auto";
-            img.style.borderRadius = "8px";
-            img.style.marginTop = "5px";
-            contentDiv.appendChild(img);
-        });
-
-        audioMatches.forEach(match => {
-            const audio = document.createElement('audio');
-            audio.controls = true;
-            audio.src = match[0];
-            contentDiv.appendChild(audio);
-        });
-        
-        messageBody.appendChild(contentDiv);
-        messageDiv.appendChild(messageBody);
-    } else {
-        // For sent messages - simpler structure without avatar/username
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'content';
-        if (repliedTo) {
-            const replyBubble = document.createElement('div');
-            replyBubble.className = 'reply-preview';
-            replyBubble.textContent = repliedTo;
-            contentDiv.appendChild(replyBubble);
-        }
-        const textDiv = document.createElement('div');
-        textDiv.textContent = text;
-        contentDiv.appendChild(textDiv);
-        messageDiv.appendChild(contentDiv);
-    }
-    
-    return messageDiv;
-}
-
-function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
-    if (!elements.chatContainer) return;
-    
-    // Check if message already exists to prevent duplicates
-    const existingMessage = document.querySelector(`[data-id="${messageId}"]`);
-    if (existingMessage) {
-        console.log('⚠️ Message already exists, skipping:', messageId);
-        return;
-    }
-    
-    const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId);
-    
-    // FIXED: Use the new function to attach event listeners
-    attachMessageEventListeners(messageDiv);
-
-    // Always append new messages to the bottom
-    elements.chatContainer.appendChild(messageDiv);
-    
-    // Only scroll if it's a new message and we're at the bottom
-    if (isNew && isAtBottom) {
-        requestAnimationFrame(() => {
-            elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
-        });
-    }
-
-    // Update scroll state
-    updateScrollState();
-}
-
-function displayPrivateMessage(text, sender, repliedTo = null, username = 'Private AI', messageId = null) {
-    const container = document.getElementById('private-ai-container');
-    if (!container) return;
-    
-    const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId);
-    
-    // Add event listeners for private messages
-    messageDiv.addEventListener('touchstart', handlePrivateMessageTouchStart);
-    messageDiv.addEventListener('touchend', handlePrivateMessageTouchEnd);
-    messageDiv.addEventListener('touchmove', handlePrivateMessageTouchMove);
-    messageDiv.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        showPrivateMessageContextMenu(e, messageDiv);
-    });
-
-    // Append to container
-    container.appendChild(messageDiv);
-
-    // Scroll to bottom
-    requestAnimationFrame(() => {
-        container.scrollTop = container.scrollHeight;
-    });
-}
-
-// ===== YOUR EXISTING CODE CONTINUES BELOW =====
 // --- CUT HERE ---
 // Update online users lists
 function updateOnlineUsersList(onlineUsers) {
