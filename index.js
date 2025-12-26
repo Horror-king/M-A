@@ -1685,13 +1685,13 @@ app.post('/api/messages', async (req, res) => {
   }
 });
 
-// ===== FIXED: DELETE messages endpoint - PROPER HARD DELETE =====
+// ===== FIXED: DELETE messages endpoint - USING NEW FUNCTION NAMES =====
 app.delete('/api/messages/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     const username = req.user.username;
     
-    console.log('🗑️ Deleting message (HARD DELETE):', { id, username });
+    console.log('🗑️ Deleting message with new function names:', { id, username });
     
     // First check if the message exists
     const { data: message, error: fetchError } = await supabase
@@ -1711,7 +1711,10 @@ app.delete('/api/messages/:id', verifyToken, async (req, res) => {
     // Check if already deleted
     if (message.deleted) {
       console.log('⚠️ Message already marked as deleted');
-      // Still delete it permanently
+      return res.status(400).json({ 
+        success: false,
+        error: "Message is already deleted" 
+      });
     }
     
     // Check ownership
@@ -1722,19 +1725,29 @@ app.delete('/api/messages/:id', verifyToken, async (req, res) => {
       });
     }
     
-    // ⚠️ CRITICAL FIX: HARD DELETE instead of soft delete
-    // This permanently removes the message from the database
-    const { error: deleteError } = await supabase
-      .from('chatter')
-      .delete()
-      .eq('id', id);
+    // ⚠️ CRITICAL FIX: USE THE NEW FUNCTION NAME - soft_delete_chatter
+    const { error: softDeleteError } = await supabase.rpc('soft_delete_chatter', {
+      message_id: parseInt(id),
+      deleted_by_user: username
+    });
     
-    if (deleteError) {
-      console.error('❌ Hard delete failed:', deleteError);
-      throw new Error("Failed to permanently delete message");
+    if (softDeleteError) {
+      console.error('❌ Soft delete failed with function:', softDeleteError);
+      
+      // If soft delete fails, try hard delete with the new function name
+      console.log('🔄 Trying hard delete with new function...');
+      const { error: hardDeleteError } = await supabase.rpc('hard_delete_chatter', {
+        message_id: parseInt(id),
+        deleted_by_user: username
+      });
+      
+      if (hardDeleteError) {
+        console.error('❌ Hard delete failed with function:', hardDeleteError);
+        throw new Error("Failed to delete message using both functions");
+      }
     }
     
-    console.log('✅ Message PERMANENTLY deleted:', id);
+    console.log('✅ Message deleted using new function:', id);
     
     // Broadcast deletion via Socket.io so all clients update
     io.emit('message-deleted', id);
@@ -1744,7 +1757,7 @@ app.delete('/api/messages/:id', verifyToken, async (req, res) => {
     
     res.status(200).json({ 
       success: true,
-      message: "Message permanently deleted"
+      message: "Message deleted successfully"
     });
     
   } catch (error) {
@@ -1820,7 +1833,7 @@ app.get('/api/private/conversations', async (req, res) => {
   }
 });
 
-// Get messages between two users - FIXED (Fixed the quote issue here)
+// Get messages between two users - FIXED
 app.get('/api/private/messages/:username', async (req, res) => {
   try {
     const { username } = req.params;
@@ -2001,13 +2014,13 @@ app.put('/api/private/messages/read', async (req, res) => {
   }
 });
 
-// Delete private message
+// Delete private message - USING NEW FUNCTION NAMES
 app.delete('/api/private/messages/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     const username = req.user.username;
     
-    console.log('🗑️ Deleting private message:', { id, username });
+    console.log('🗑️ Deleting private message with new function:', { id, username });
     
     // First check if the message exists
     const { data: message, error: fetchError } = await supabase
@@ -2026,25 +2039,25 @@ app.delete('/api/private/messages/:id', verifyToken, async (req, res) => {
       return res.status(403).json({ error: "You can only delete your own messages" });
     }
     
-    // Try soft delete first
-    const { error: updateError } = await supabase
-      .from('private_messages')
-      .update({ deleted: true })
-      .eq('id', id);
+    // ⚠️ CRITICAL FIX: USE THE NEW FUNCTION NAME - soft_delete_private_message_func
+    const { error: softDeleteError } = await supabase.rpc('soft_delete_private_message_func', {
+      message_id: id,
+      deleted_by_user: username
+    });
     
-    if (updateError) {
-      console.log('⚠️ Soft delete failed, trying hard delete...');
+    if (softDeleteError) {
+      console.log('⚠️ Soft delete failed with function, trying hard delete...');
       
-      // Try hard delete
-      const { error: deleteError } = await supabase
-        .from('private_messages')
-        .delete()
-        .eq('id', id);
+      // Try hard delete with the new function name
+      const { error: hardDeleteError } = await supabase.rpc('hard_delete_private_message_func', {
+        message_id: id,
+        deleted_by_user: username
+      });
       
-      if (deleteError) throw deleteError;
+      if (hardDeleteError) throw hardDeleteError;
     }
     
-    console.log('✅ Private message deleted:', id);
+    console.log('✅ Private message deleted using new function:', id);
     
     // Broadcast deletion via Socket.io
     io.emit('private-message-deleted', { 
@@ -2444,13 +2457,13 @@ app.get('/api/posts/user/:username', async (req, res) => {
   }
 });
 
-// Delete a post (only by author)
-app.delete('/api/posts/:postId', async (req, res) => {
+// Delete a post (only by author) - USING NEW FUNCTION NAMES
+app.delete('/api/posts/:postId', verifyToken, async (req, res) => {
   try {
     const { postId } = req.params;
-    const { username } = req.body; // Current user trying to delete
+    const username = req.user.username; // Current user trying to delete
 
-    console.log('🗑️ Deleting post:', { postId, username });
+    console.log('🗑️ Deleting post with new function:', { postId, username });
 
     if (!username) {
       return res.status(400).json({ error: "Username is required" });
@@ -2467,28 +2480,96 @@ app.delete('/api/posts/:postId', async (req, res) => {
       return res.status(404).json({ error: "Post not found" });
     }
 
-    if (post.author_username !== username) {
+    if (post.author_username !== username && username !== 'admin') {
       return res.status(403).json({ error: "You can only delete your own posts" });
     }
 
-    // Delete the post (cascade will delete comments and likes)
-    const { error: deleteError } = await supabase
-      .from('posts')
-      .delete()
-      .eq('id', postId);
+    // ⚠️ CRITICAL FIX: USE THE NEW FUNCTION NAME - soft_delete_post_func
+    const { error: deleteError } = await supabase.rpc('soft_delete_post_func', {
+      post_id: postId,
+      deleted_by_user: username
+    });
 
     if (deleteError) {
-      console.error('❌ Error deleting post:', deleteError);
-      return res.status(500).json({ error: "Failed to delete post: " + deleteError.message });
+      console.error('❌ Soft delete post failed with function:', deleteError);
+      
+      // Try hard delete with the new function name
+      const { error: hardDeleteError } = await supabase.rpc('hard_delete_post_func', {
+        post_id: postId,
+        deleted_by_user: username
+      });
+      
+      if (hardDeleteError) {
+        console.error('❌ Hard delete post failed with function:', hardDeleteError);
+        return res.status(500).json({ error: "Failed to delete post: " + hardDeleteError.message });
+      }
     }
 
-    console.log('✅ Post deleted successfully');
+    console.log('✅ Post deleted successfully using new function');
 
     res.json({ success: true, message: "Post deleted successfully" });
 
   } catch (error) {
     console.error('❌ Error deleting post:', error);
     res.status(500).json({ error: "Failed to delete post: " + error.message });
+  }
+});
+
+// Delete a post comment - USING NEW FUNCTION NAMES
+app.delete('/api/posts/:postId/comments/:commentId', verifyToken, async (req, res) => {
+  try {
+    const { postId, commentId } = req.params;
+    const username = req.user.username;
+
+    console.log('🗑️ Deleting post comment with new function:', { commentId, username });
+
+    if (!username) {
+      return res.status(400).json({ error: "Username is required" });
+    }
+
+    // First, verify the comment exists and user is the author
+    const { data: comment, error: commentError } = await supabase
+      .from('post_comments')
+      .select('author_username')
+      .eq('id', commentId)
+      .single();
+
+    if (commentError || !comment) {
+      return res.status(404).json({ error: "Comment not found" });
+    }
+
+    if (comment.author_username !== username && username !== 'admin') {
+      return res.status(403).json({ error: "You can only delete your own comments" });
+    }
+
+    // ⚠️ CRITICAL FIX: USE THE NEW FUNCTION NAME - soft_delete_post_comment_func
+    const { error: deleteError } = await supabase.rpc('soft_delete_post_comment_func', {
+      comment_id: commentId,
+      deleted_by_user: username
+    });
+
+    if (deleteError) {
+      console.error('❌ Soft delete comment failed with function:', deleteError);
+      
+      // Try hard delete with the new function name
+      const { error: hardDeleteError } = await supabase.rpc('hard_delete_post_comment_func', {
+        comment_id: commentId,
+        deleted_by_user: username
+      });
+      
+      if (hardDeleteError) {
+        console.error('❌ Hard delete comment failed with function:', hardDeleteError);
+        return res.status(500).json({ error: "Failed to delete comment: " + hardDeleteError.message });
+      }
+    }
+
+    console.log('✅ Post comment deleted successfully using new function');
+
+    res.json({ success: true, message: "Comment deleted successfully" });
+
+  } catch (error) {
+    console.error('❌ Error deleting post comment:', error);
+    res.status(500).json({ error: "Failed to delete comment: " + error.message });
   }
 });
 
@@ -3410,13 +3491,13 @@ app.post('/upload', upload.single('image'), async (req, res) => {
   }
 });
 
-// DELETE messages (legacy endpoint) - FIXED: Use soft delete
+// DELETE messages (legacy endpoint) - FIXED: USING NEW FUNCTION NAMES
 app.delete('/messages/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     const username = req.user.username;
     
-    console.log('🗑️ Deleting message (legacy):', { id, username });
+    console.log('🗑️ Deleting message (legacy) with new function:', { id, username });
     
     // First check if the message exists
     const { data: message, error: fetchError } = await supabase
@@ -3435,25 +3516,25 @@ app.delete('/messages/:id', verifyToken, async (req, res) => {
       return res.status(403).json({ error: "You can only delete your own messages" });
     }
     
-    // Try soft delete first (update deleted flag)
-    const { error: updateError } = await supabase
-      .from('chatter')
-      .update({ deleted: true })
-      .eq('id', id);
+    // ⚠️ CRITICAL FIX: USE THE NEW FUNCTION NAME - soft_delete_chatter
+    const { error: softDeleteError } = await supabase.rpc('soft_delete_chatter', {
+      message_id: parseInt(id),
+      deleted_by_user: username
+    });
     
-    if (updateError) {
-      console.log('⚠️ Soft delete failed, trying hard delete...');
+    if (softDeleteError) {
+      console.log('⚠️ Soft delete failed with function, trying hard delete...');
       
-      // Try hard delete
-      const { error: deleteError } = await supabase
-        .from('chatter')
-        .delete()
-        .eq('id', id);
+      // Try hard delete with the new function name
+      const { error: hardDeleteError } = await supabase.rpc('hard_delete_chatter', {
+        message_id: parseInt(id),
+        deleted_by_user: username
+      });
       
-      if (deleteError) throw deleteError;
+      if (hardDeleteError) throw hardDeleteError;
     }
     
-    console.log('✅ Message deleted (legacy):', id);
+    console.log('✅ Message deleted (legacy) using new function:', id);
     
     // Broadcast deletion via Socket.io
     io.emit('message-deleted', id);
@@ -4220,8 +4301,12 @@ server.listen(port, () => {
   console.log(`🔐 Password hashing: SIMPLE HASH (basic implementation)`);
   console.log(`🌐 Cross-browser compatibility: ENABLED`);
   console.log(`📱 OPERA FIX: Using polling transport for real-time updates with limited data`);
+  console.log(`🔄 UPDATED DELETION FUNCTIONS:`);
+  console.log(`   ✅ Chatter: soft_delete_chatter() / hard_delete_chatter()`);
+  console.log(`   ✅ Private Messages: soft_delete_private_message_func() / hard_delete_private_message_func()`);
+  console.log(`   ✅ Posts: soft_delete_post_func() / hard_delete_post_func()`);
+  console.log(`   ✅ Post Comments: soft_delete_post_comment_func() / hard_delete_post_comment_func()`);
   
-  // NEW: Added missing endpoints
   console.log(`🤖 NEW: POST /api/ai/private - Private AI endpoint`);
   console.log(`🤖 NEW: POST /api/ai/chat - Main AI chat endpoint`);
   console.log(`💬 NEW: GET /api/private/conversations - Get conversations`);
@@ -4229,8 +4314,6 @@ server.listen(port, () => {
   console.log(`💬 NEW: POST /api/private/messages - Send private message`);
   console.log(`💬 NEW: PUT /api/private/messages/read - Mark as read`);
   console.log(`💬 NEW: GET /api/private/unread - Get unread count`);
-  console.log(`🔍 NEW: GET /api/debug/private-messages-structure - Debug table structure`);
-  
   console.log(`🔍 NEW: GET /debug-private-messages - Debug private messages table`);
   console.log(`🧪 NEW: GET /test-private-messages - Test private message creation (GET)`);
   console.log(`🧪 NEW: POST /test-private-messages - Test private message creation (POST)`);
@@ -4248,27 +4331,28 @@ server.listen(port, () => {
   console.log(`📨 MESSAGES ENDPOINTS:`);
   console.log(`   GET /api/messages - Get messages (client-compatible)`);
   console.log(`   POST /api/messages - Send message (client-compatible)`);
-  console.log(`   DELETE /api/messages/:id - Delete message (client-compatible)`);
+  console.log(`   DELETE /api/messages/:id - Delete message (client-compatible) [USES NEW FUNCTION]`);
   console.log(`📝 POSTS SYSTEM: ENABLED via Supabase`);
   console.log(`   GET /api/create-posts-table - Check posts table (NEW!)`);
   console.log(`   POST /api/create-posts-table - Create posts table if needed`);
   console.log(`   GET /api/posts - Get all posts with comments and likes`);
   console.log(`   POST /api/posts - Create a new post`);
   console.log(`   POST /api/posts/:postId/comments - Add a comment to a post`);
+  console.log(`   DELETE /api/posts/:postId/comments/:commentId - Delete post comment [USES NEW FUNCTION]`);
   console.log(`   POST /api/posts/:postId/like - Like/unlike a post`);
   console.log(`   GET /api/posts/user/:username - Get posts for a specific user`);
-  console.log(`   DELETE /api/posts/:postId - Delete a post (author only)`);
+  console.log(`   DELETE /api/posts/:postId - Delete a post (author only) [USES NEW FUNCTION]`);
   console.log(`🧪 Test Supabase (GET): http://localhost:${port}/test-supabase`);
   console.log(`🧪 Test Message (POST): http://localhost:${port}/test-message`);
   console.log(`🔍 Debug ALL Commands: http://localhost:${port}/debug-all-commands`);
   console.log(`🔍 Debug Private Messages: http://localhost:${port}/debug-private-messages`);
-  console.log(`🔍 Debug Table Structure: http://localhost:${port}/api/debug/private-messages-structure`);
   console.log(`📝 Test Posts Table: http://localhost:${port}/api/create-posts-table`);
   console.log(`🎯 PREFIX-FREE USAGE IN PRIVATE AI:`);
   console.log(`   "hello" → automatically becomes "!ai hello"`);
   console.log(`   "help" → automatically becomes "!help"`);
   console.log(`   "ai tell me a joke" → automatically becomes "!ai tell me a joke"`);
   console.log(`   "!ping" → works normally (prefix already present)`);
+  console.log(`🔄 IMPORTANT: All deletion endpoints now use the new function names from SQL schema`);
 
   if (isRender && renderExternalUrl) {
     console.log(`🌐 Render External URL: ${renderExternalUrl}`);
@@ -4337,6 +4421,7 @@ app.use((req, res) => {
         'GET /api/posts',
         'POST /api/posts',
         'POST /api/posts/:postId/comments',
+        'DELETE /api/posts/:postId/comments/:commentId',
         'POST /api/posts/:postId/like',
         'GET /api/posts/user/:username',
         'DELETE /api/posts/:postId'
