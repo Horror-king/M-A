@@ -4568,7 +4568,8 @@ async function likePost(postId) {
         showError('Failed to like post. Liking locally.');
         
         // Fallback: Like post locally
-        likePostLocally(postId);
+            likePostLocally(postId);
+        }
     }
 }
 
@@ -4720,7 +4721,7 @@ function updateCommentsUI(postId) {
                         <div class="comment-content">
                             <div class="comment-author">${userProfile.displayName || (comment.author_username || comment.author)}</div>
                             <div class="comment-text">${escapeHtml(comment.content || comment.text)}</div>
-                        </div>
+                    </div>
                     `;
                     
                     commentsList.appendChild(commentElement);
@@ -5157,16 +5158,19 @@ function showContainer(containerId) {
     if (kebabDropdown) kebabDropdown.classList.remove('active');
 }
 
+// --- CUT HERE ---
 // ===== FIXED: CONTEXT MENU FUNCTION WITH DELETE OPTION =====
 function showMessageContextMenu(e, message) {
-    // FIXED: Get the message element properly if null
+    // FIXED: Check if message exists before accessing dataset
     if (!message) {
-        console.log('⚠️ Message element is null, trying to find it from event...');
-        message = e.currentTarget || e.target.closest('.message');
-        if (!message) {
-            console.error('❌ Cannot find message element');
-            return;
-        }
+        console.error('Message element is null');
+        return;
+    }
+    
+    // ADDED: Additional check if message is still in the DOM
+    if (!document.body.contains(message)) {
+        console.error('Message element is not in DOM anymore');
+        return;
     }
     
     const messageText = message.dataset?.content || message.getAttribute('data-content') || '';
@@ -5174,7 +5178,6 @@ function showMessageContextMenu(e, message) {
     const messageUsername = message.dataset?.username || message.getAttribute('data-username');
     const currentUser = currentUserSession?.username;
     
-    // Remove any existing context menus
     document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());
 
     const contextMenu = document.createElement('div');
@@ -5211,20 +5214,9 @@ function showMessageContextMenu(e, message) {
         deleteButton.onclick = async () => {
             if (confirm('Are you sure you want to delete this message?')) {
                 try {
-                    // Find message element by ID if available
-                    let messageElement = message;
-                    if (messageId) {
-                        const foundElement = document.querySelector(`[data-id="${messageId}"]`);
-                        if (foundElement) {
-                            messageElement = foundElement;
-                        }
-                    }
-                    
-                    if (messageElement) {
-                        // Visual feedback
-                        messageElement.style.opacity = '0.5';
-                        messageElement.style.transition = 'opacity 0.3s';
-                    }
+                    // Remove from UI immediately for better UX
+                    message.style.opacity = '0.5';
+                    message.style.transition = 'opacity 0.3s';
                     
                     // Only try server delete if we have an ID
                     if (messageId) {
@@ -5245,16 +5237,10 @@ function showMessageContextMenu(e, message) {
                             const data = await response.json();
                             console.log('✅ Server delete successful:', data);
                             
-                            // Remove message from UI
+                            // Fade out and remove message
                             setTimeout(() => {
-                                if (messageElement && messageElement.parentNode) {
-                                    messageElement.remove();
-                                } else if (messageId) {
-                                    // Try to find and remove by ID
-                                    const elementToRemove = document.querySelector(`[data-id="${messageId}"]`);
-                                    if (elementToRemove) {
-                                        elementToRemove.remove();
-                                    }
+                                if (message && message.parentNode) {
+                                    message.remove();
                                 }
                                 showSuccess('Message deleted successfully!');
                                 
@@ -5266,25 +5252,24 @@ function showMessageContextMenu(e, message) {
                         } else {
                             const errorData = await response.json().catch(() => ({ error: 'Delete failed' }));
                             console.error('Delete error response:', errorData);
-                            
-                            // Revert visual feedback
-                            if (messageElement) {
-                                messageElement.style.opacity = '1';
-                            }
-                            
                             throw new Error(errorData.error || `Delete failed: ${response.status}`);
                         }
                     } else {
                         // No ID available (local message)
                         setTimeout(() => {
-                            if (messageElement && messageElement.parentNode) {
-                                messageElement.remove();
-                                showSuccess('Message removed');
+                            if (message && message.parentNode) {
+                                message.remove();
                             }
+                            showSuccess('Message removed');
                         }, 300);
                     }
                 } catch (err) {
                     console.error('❌ Delete error:', err);
+                    
+                    // Revert message appearance if server delete failed
+                    if (message) {
+                        message.style.opacity = '1';
+                    }
                     showError('Failed to delete message from server: ' + err.message);
                 }
             }
@@ -5297,29 +5282,27 @@ function showMessageContextMenu(e, message) {
     
     // Close menu when clicking elsewhere
     setTimeout(() => {
-        const closeMenuHandler = function() {
+        document.addEventListener('click', function closeMenu() {
             if (contextMenu && contextMenu.parentNode) {
                 contextMenu.remove();
             }
-            document.removeEventListener('click', closeMenuHandler);
-            document.removeEventListener('touchstart', closeMenuHandler);
-        };
-        
-        document.addEventListener('click', closeMenuHandler, { once: true });
-        document.addEventListener('touchstart', closeMenuHandler, { once: true });
+            document.removeEventListener('click', closeMenu);
+        }, { once: true });
     }, 0);
 }
 
 // ===== FIXED: PRIVATE MESSAGE CONTEXT MENU WITH DELETE =====
 function showPrivateMessageContextMenu(e, message) {
-    // FIXED: Get the message element properly if null
+    // FIXED: Check if message exists before accessing dataset
     if (!message) {
-        console.log('⚠️ Private message element is null, trying to find it from event...');
-        message = e.currentTarget || e.target.closest('.message');
-        if (!message) {
-            console.error('❌ Cannot find private message element');
-            return;
-        }
+        console.error('Private message element is null');
+        return;
+    }
+    
+    // ADDED: Additional check if message is still in the DOM
+    if (!document.body.contains(message)) {
+        console.error('Private message element is not in DOM anymore');
+        return;
     }
     
     const messageText = message.dataset?.content || message.getAttribute('data-content') || '';
@@ -5364,20 +5347,9 @@ function showPrivateMessageContextMenu(e, message) {
         deleteButton.onclick = async () => {
             if (confirm('Delete this private message?')) {
                 try {
-                    // Find message element by ID if available
-                    let messageElement = message;
-                    if (messageId) {
-                        const foundElement = document.querySelector(`[data-id="${messageId}"]`);
-                        if (foundElement) {
-                            messageElement = foundElement;
-                        }
-                    }
-                    
-                    if (messageElement) {
-                        // Visual feedback
-                        messageElement.style.opacity = '0.5';
-                        messageElement.style.transition = 'opacity 0.3s';
-                    }
+                    // Fade out message
+                    message.style.opacity = '0.5';
+                    message.style.transition = 'opacity 0.3s';
                     
                     // Only try server delete if we have an ID
                     if (messageId) {
@@ -5398,16 +5370,10 @@ function showPrivateMessageContextMenu(e, message) {
                             const data = await response.json();
                             console.log('✅ Private message delete successful:', data);
                             
-                            // Remove message from UI
+                            // Fade out and remove message
                             setTimeout(() => {
-                                if (messageElement && messageElement.parentNode) {
-                                    messageElement.remove();
-                                } else if (messageId) {
-                                    // Try to find and remove by ID
-                                    const elementToRemove = document.querySelector(`[data-id="${messageId}"]`);
-                                    if (elementToRemove) {
-                                        elementToRemove.remove();
-                                    }
+                                if (message && message.parentNode) {
+                                    message.remove();
                                 }
                                 showSuccess('Private message deleted');
                                 
@@ -5418,25 +5384,22 @@ function showPrivateMessageContextMenu(e, message) {
                             }, 300);
                         } else {
                             const error = await response.json().catch(() => ({ error: 'Delete failed' }));
-                            
-                            // Revert visual feedback
-                            if (messageElement) {
-                                messageElement.style.opacity = '1';
-                            }
-                            
                             throw new Error(error.error || 'Delete failed');
                         }
                     } else {
                         // No ID available
                         setTimeout(() => {
-                            if (messageElement && messageElement.parentNode) {
-                                messageElement.remove();
-                                showSuccess('Message removed');
+                            if (message && message.parentNode) {
+                                message.remove();
                             }
+                            showSuccess('Message removed');
                         }, 300);
                     }
                 } catch (err) {
                     console.error('❌ Delete error:', err);
+                    if (message) {
+                        message.style.opacity = '1';
+                    }
                     showError('Message removed locally. Server delete failed: ' + err.message);
                 }
             }
@@ -5449,16 +5412,12 @@ function showPrivateMessageContextMenu(e, message) {
     
     // Close menu when clicking elsewhere
     setTimeout(() => {
-        const closeMenuHandler = function() {
+        document.addEventListener('click', function closeMenu() {
             if (contextMenu && contextMenu.parentNode) {
                 contextMenu.remove();
             }
-            document.removeEventListener('click', closeMenuHandler);
-            document.removeEventListener('touchstart', closeMenuHandler);
-        };
-        
-        document.addEventListener('click', closeMenuHandler, { once: true });
-        document.addEventListener('touchstart', closeMenuHandler, { once: true });
+            document.removeEventListener('click', closeMenu);
+        }, { once: true });
     }, 0);
 }
 
@@ -6860,7 +6819,10 @@ function handleTouchStart(e) {
     e.currentTarget.classList.add('no-select');
     longPressTimer = setTimeout(() => {
         isLongPress = true;
-        showMessageContextMenu(e, e.currentTarget);
+        // Check if element still exists before showing context menu
+        if (e.currentTarget && document.body.contains(e.currentTarget)) {
+            showMessageContextMenu(e, e.currentTarget);
+        }
     }, 500);
 }
 
@@ -6879,7 +6841,10 @@ function handlePrivateMessageTouchStart(e) {
     e.currentTarget.classList.add('no-select');
     longPressTimer = setTimeout(() => {
         isLongPress = true;
-        showPrivateMessageContextMenu(e, e.currentTarget);
+        // Check if element still exists before showing context menu
+        if (e.currentTarget && document.body.contains(e.currentTarget)) {
+            showPrivateMessageContextMenu(e, e.currentTarget);
+        }
     }, 500);
 }
 
@@ -8721,7 +8686,7 @@ function initSocket() {
             console.log('✅ Removing deleted message from UI:', messageId);
             messageElement.style.opacity = '0.5';
             setTimeout(() => {
-                if (messageElement.parentNode) {
+                if (messageElement && messageElement.parentNode) {
                     messageElement.remove();
                 }
             }, 300);
@@ -8743,7 +8708,7 @@ function initSocket() {
             console.log('✅ Removing deleted private message from UI:', messageId);
             messageElement.style.opacity = '0.5';
             setTimeout(() => {
-                if (messageElement.parentNode) {
+                if (messageElement && messageElement.parentNode) {
                     messageElement.remove();
                 }
             }, 300);
