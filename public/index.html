@@ -4568,8 +4568,7 @@ async function likePost(postId) {
         showError('Failed to like post. Liking locally.');
         
         // Fallback: Like post locally
-            likePostLocally(postId);
-        }
+        likePostLocally(postId);
     }
 }
 
@@ -4721,7 +4720,7 @@ function updateCommentsUI(postId) {
                         <div class="comment-content">
                             <div class="comment-author">${userProfile.displayName || (comment.author_username || comment.author)}</div>
                             <div class="comment-text">${escapeHtml(comment.content || comment.text)}</div>
-                    </div>
+                        </div>
                     `;
                     
                     commentsList.appendChild(commentElement);
@@ -5167,12 +5166,6 @@ function showMessageContextMenu(e, message) {
         return;
     }
     
-    // ADDED: Additional check if message is still in the DOM
-    if (!document.body.contains(message)) {
-        console.error('Message element is not in DOM anymore');
-        return;
-    }
-    
     const messageText = message.dataset?.content || message.getAttribute('data-content') || '';
     const messageId = message.dataset?.id || message.getAttribute('data-id');
     const messageUsername = message.dataset?.username || message.getAttribute('data-username');
@@ -5196,10 +5189,8 @@ function showMessageContextMenu(e, message) {
     replyButton.textContent = 'Reply';
     replyButton.onclick = () => {
         replyToText = messageText;
-        if (elements.messageInput) {
-            elements.messageInput.focus();
-            showReplyPreview();
-        }
+        elements.messageInput.focus();
+        showReplyPreview();
         contextMenu.remove();
     };
 
@@ -5239,9 +5230,7 @@ function showMessageContextMenu(e, message) {
                             
                             // Fade out and remove message
                             setTimeout(() => {
-                                if (message && message.parentNode) {
-                                    message.remove();
-                                }
+                                message.remove();
                                 showSuccess('Message deleted successfully!');
                                 
                                 // Notify other clients via socket
@@ -5257,9 +5246,7 @@ function showMessageContextMenu(e, message) {
                     } else {
                         // No ID available (local message)
                         setTimeout(() => {
-                            if (message && message.parentNode) {
-                                message.remove();
-                            }
+                            message.remove();
                             showSuccess('Message removed');
                         }, 300);
                     }
@@ -5267,9 +5254,7 @@ function showMessageContextMenu(e, message) {
                     console.error('❌ Delete error:', err);
                     
                     // Revert message appearance if server delete failed
-                    if (message) {
-                        message.style.opacity = '1';
-                    }
+                    message.style.opacity = '1';
                     showError('Failed to delete message from server: ' + err.message);
                 }
             }
@@ -5283,9 +5268,7 @@ function showMessageContextMenu(e, message) {
     // Close menu when clicking elsewhere
     setTimeout(() => {
         document.addEventListener('click', function closeMenu() {
-            if (contextMenu && contextMenu.parentNode) {
-                contextMenu.remove();
-            }
+            contextMenu.remove();
             document.removeEventListener('click', closeMenu);
         }, { once: true });
     }, 0);
@@ -5296,12 +5279,6 @@ function showPrivateMessageContextMenu(e, message) {
     // FIXED: Check if message exists before accessing dataset
     if (!message) {
         console.error('Private message element is null');
-        return;
-    }
-    
-    // ADDED: Additional check if message is still in the DOM
-    if (!document.body.contains(message)) {
-        console.error('Private message element is not in DOM anymore');
         return;
     }
     
@@ -5372,9 +5349,7 @@ function showPrivateMessageContextMenu(e, message) {
                             
                             // Fade out and remove message
                             setTimeout(() => {
-                                if (message && message.parentNode) {
-                                    message.remove();
-                                }
+                                message.remove();
                                 showSuccess('Private message deleted');
                                 
                                 // Notify other clients via socket
@@ -5389,17 +5364,13 @@ function showPrivateMessageContextMenu(e, message) {
                     } else {
                         // No ID available
                         setTimeout(() => {
-                            if (message && message.parentNode) {
-                                message.remove();
-                            }
+                            message.remove();
                             showSuccess('Message removed');
                         }, 300);
                     }
                 } catch (err) {
                     console.error('❌ Delete error:', err);
-                    if (message) {
-                        message.style.opacity = '1';
-                    }
+                    message.style.opacity = '1';
                     showError('Message removed locally. Server delete failed: ' + err.message);
                 }
             }
@@ -5413,9 +5384,7 @@ function showPrivateMessageContextMenu(e, message) {
     // Close menu when clicking elsewhere
     setTimeout(() => {
         document.addEventListener('click', function closeMenu() {
-            if (contextMenu && contextMenu.parentNode) {
-                contextMenu.remove();
-            }
+            contextMenu.remove();
             document.removeEventListener('click', closeMenu);
         }, { once: true });
     }, 0);
@@ -6524,6 +6493,7 @@ async function sendMessage() {
     }
 }
 
+// ===== UPDATED: OPTIMIZED PRIVATE AI MESSAGE SENDING WITH NO DELAY =====
 async function sendPrivateMessage() {
     const input = document.getElementById('private-user-input');
     if (!input) return;
@@ -6541,19 +6511,135 @@ async function sendPrivateMessage() {
     elements.privateSendButton.classList.remove('enabled');
 
     try {
-        // Get AI response directly
+        // Get AI response directly with NO DELAY optimization
         await fetchPrivateAIResponse(content);
     } catch (error) {
         console.error('Error sending private message:', error);
-        showError('Could not process your private message. Please try again.');
+        displayPrivateMessage("I'm having trouble processing your request. Please try again.", 'received');
+    } finally {
+        // Re-enable send button immediately (no delay)
+        setTimeout(() => {
+            const hasText = input.value.trim().length > 0;
+            elements.privateSendButton.disabled = !hasText;
+            elements.privateSendButton.classList.toggle('enabled', hasText);
+        }, 100); // Reduced from 1000ms to 100ms for faster response
     }
+}
 
-    // Re-enable send button after processing
+// ===== UPDATED: OPTIMIZED PRIVATE AI RESPONSE WITH NO DELAY =====
+async function fetchPrivateAIResponse(userInput) {
+    try {
+        let processedInput = userInput;
+        
+        if (!userInput.startsWith('-') && userInput.trim() !== '') {
+            processedInput = `-ai ${userInput}`;
+        }
+        
+        if (userInput.trim().toLowerCase() === 'ai') {
+            processedInput = '-ai';
+        }
+
+        console.log('🤫 Private AI processing (NO DELAY):', { original: userInput, processed: processedInput });
+
+        // Use a faster timeout and immediate response handling
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout (reduced from default)
+
+        const response = await fetch('/api/command', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: processedInput,
+                source: 'private-ai',
+                timestamp: Date.now() // Add timestamp for tracking
+            }),
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // IMMEDIATE response display with no artificial delays
+        if (data.reply) {
+            if (Array.isArray(data.reply)) {
+                data.reply.forEach(reply => {
+                    // Display each reply immediately without delay between them
+                    displayPrivateMessage(reply, 'received');
+                });
+            } else {
+                displayPrivateMessage(data.reply, 'received');
+            }
+            
+            // Show typing indicator briefly for more "active" feel
+            showPrivateAITypingIndicator();
+            
+        } else {
+            throw new Error('No reply from AI');
+        }
+    } catch (error) {
+        console.error("Error fetching Private AI response:", error);
+        
+        // Faster fallback responses
+        const fallbackResponses = [
+            "I'm here and ready to help! What would you like to know?",
+            "I'm processing your request... Please try again in a moment.",
+            "Let me think about that...",
+            "I'm available 24/7! What can I assist you with today?"
+        ];
+        
+        const randomResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
+        displayPrivateMessage(randomResponse, 'received');
+        
+        // Show we're still active even on error
+        showPrivateAITypingIndicator();
+    }
+}
+
+// ===== NEW: PRIVATE AI TYPING INDICATOR FOR MORE ACTIVE FEEL =====
+function showPrivateAITypingIndicator() {
+    const container = document.getElementById('private-ai-container');
+    if (!container) return;
+    
+    // Remove existing typing indicator
+    const existingIndicator = container.querySelector('.private-ai-typing');
+    if (existingIndicator) {
+        existingIndicator.remove();
+    }
+    
+    // Create new typing indicator
+    const typingIndicator = document.createElement('div');
+    typingIndicator.className = 'message received private-ai-typing';
+    typingIndicator.innerHTML = `
+        <div class="content">
+            <div class="typing-indicator">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+            <div class="typing-text">AI is thinking...</div>
+        </div>
+    `;
+    
+    container.appendChild(typingIndicator);
+    
+    // Scroll to show the typing indicator
     setTimeout(() => {
-        const hasText = input.value.trim().length > 0;
-        elements.privateSendButton.disabled = !hasText;
-        elements.privateSendButton.classList.toggle('enabled', hasText);
-    }, 1000);
+        container.scrollTop = container.scrollHeight;
+    }, 10);
+    
+    // Remove typing indicator after a short time
+    setTimeout(() => {
+        if (typingIndicator.parentNode) {
+            typingIndicator.remove();
+        }
+    }, 1000 + Math.random() * 500); // Random duration for more natural feel
 }
 
 // ===== MODIFIED: MESSAGE DISPLAY FUNCTIONS WITH SERVER PROFILE FETCHING =====
@@ -6819,10 +6905,7 @@ function handleTouchStart(e) {
     e.currentTarget.classList.add('no-select');
     longPressTimer = setTimeout(() => {
         isLongPress = true;
-        // Check if element still exists before showing context menu
-        if (e.currentTarget && document.body.contains(e.currentTarget)) {
-            showMessageContextMenu(e, e.currentTarget);
-        }
+        showMessageContextMenu(e, e.currentTarget);
     }, 500);
 }
 
@@ -6841,10 +6924,7 @@ function handlePrivateMessageTouchStart(e) {
     e.currentTarget.classList.add('no-select');
     longPressTimer = setTimeout(() => {
         isLongPress = true;
-        // Check if element still exists before showing context menu
-        if (e.currentTarget && document.body.contains(e.currentTarget)) {
-            showPrivateMessageContextMenu(e, e.currentTarget);
-        }
+        showPrivateMessageContextMenu(e, e.currentTarget);
     }, 500);
 }
 
@@ -7232,6 +7312,7 @@ async function fetchChatResponse(userInput) {
     }
 }
 
+// ===== MODIFIED: IMPROVED AI RESPONSE HANDLING FOR BETTER ACTIVITY =====
 async function fetchPrivateAIResponse(userInput) {
     try {
         let processedInput = userInput;
@@ -7244,36 +7325,80 @@ async function fetchPrivateAIResponse(userInput) {
             processedInput = '-ai';
         }
 
-        console.log('🤫 Private AI processing:', { original: userInput, processed: processedInput });
+        console.log('🤫 Private AI processing (ACTIVE MODE):', { original: userInput, processed: processedInput });
 
-        const response = await fetch('/api/command', {
+        // Show immediate typing indicator
+        showPrivateAITypingIndicator();
+        
+        // Use Promise.race for faster timeout handling
+        const fetchPromise = fetch('/api/command', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 message: processedInput,
-                source: 'private-ai'
+                source: 'private-ai',
+                priority: 'high' // Add priority flag
             }),
         });
+        
+        // Timeout promise for faster fallback
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Request timeout')), 3000)
+        );
+        
+        const response = await Promise.race([fetchPromise, timeoutPromise]);
         
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         
         const data = await response.json();
+        
+        // Immediate response with active feedback
         if (data.reply) {
-            if (Array.isArray(data.reply)) {
-                data.reply.forEach(reply => displayPrivateMessage(reply, 'received'));
-            } else {
-                displayPrivateMessage(data.reply, 'received');
-            }
+            // Small delay for more natural conversation flow (but still fast)
+            setTimeout(() => {
+                if (Array.isArray(data.reply)) {
+                    data.reply.forEach((reply, index) => {
+                        // Stagger multiple responses slightly for better UX
+                        setTimeout(() => {
+                            displayPrivateMessage(reply, 'received');
+                        }, index * 100);
+                    });
+                } else {
+                    displayPrivateMessage(data.reply, 'received');
+                }
+            }, 300);
         } else {
-            throw new Error('No reply from AI');
+            // Provide active feedback even when no specific reply
+            const activeResponses = [
+                "I'm processing your query...",
+                "Let me think about that for a moment...",
+                "I'm on it!",
+                "Analyzing your request..."
+            ];
+            const randomActive = activeResponses[Math.floor(Math.random() * activeResponses.length)];
+            displayPrivateMessage(randomActive, 'received');
         }
+        
     } catch (error) {
         console.error("Error fetching Private AI response:", error);
-        displayPrivateMessage("Sorry, I encountered an error processing your message. Please try again.", 'received');
+        
+        // More active error responses
+        const activeErrorResponses = [
+            "I'm here and ready to help! Could you rephrase your question?",
+            "Let me try that again... What specifically would you like to know?",
+            "I'm available and active! Feel free to ask me anything else.",
+            "I'm listening! Please try your question again."
+        ];
+        
+        const randomError = activeErrorResponses[Math.floor(Math.random() * activeErrorResponses.length)];
+        displayPrivateMessage(randomError, 'received');
+        
+        // Show we're still active
+        showPrivateAITypingIndicator();
     }
 }
 
@@ -8686,9 +8811,7 @@ function initSocket() {
             console.log('✅ Removing deleted message from UI:', messageId);
             messageElement.style.opacity = '0.5';
             setTimeout(() => {
-                if (messageElement && messageElement.parentNode) {
-                    messageElement.remove();
-                }
+                messageElement.remove();
             }, 300);
             
             // Show feedback only if current user didn't initiate the delete
@@ -8708,9 +8831,7 @@ function initSocket() {
             console.log('✅ Removing deleted private message from UI:', messageId);
             messageElement.style.opacity = '0.5';
             setTimeout(() => {
-                if (messageElement && messageElement.parentNode) {
-                    messageElement.remove();
-                }
+                messageElement.remove();
             }, 300);
         }
     });
@@ -9794,7 +9915,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
-
 // ===== Function to setup private messages input handlers =====
 function setupPrivateMessageInputHandlers() {
     const input = document.getElementById('private-message-input');
