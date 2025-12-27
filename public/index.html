@@ -5157,12 +5157,11 @@ function showContainer(containerId) {
     if (kebabDropdown) kebabDropdown.classList.remove('active');
 }
 
-// --- CUT HERE ---
 // ===== FIXED: CONTEXT MENU FUNCTION WITH DELETE OPTION =====
 function showMessageContextMenu(e, message) {
-    // FIXED: Check if message exists before accessing dataset
-    if (!message) {
-        console.error('Message element is null');
+    // FIXED: Check if message exists and is a valid DOM element
+    if (!message || !message.dataset) {
+        console.error('Message element is null or invalid');
         return;
     }
     
@@ -5171,6 +5170,7 @@ function showMessageContextMenu(e, message) {
     const messageUsername = message.dataset?.username || message.getAttribute('data-username');
     const currentUser = currentUserSession?.username;
     
+    // Remove any existing context menus
     document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());
 
     const contextMenu = document.createElement('div');
@@ -5197,7 +5197,7 @@ function showMessageContextMenu(e, message) {
     contextMenu.appendChild(copyButton);
     contextMenu.appendChild(replyButton);
 
-    // ===== FIXED: DELETE BUTTON LOGIC - PROPER PERSISTENCE =====
+    // ===== FIXED: DELETE BUTTON LOGIC WITH BETTER ERROR HANDLING =====
     if (message.classList.contains('sent') || currentUser === 'admin') {
         const deleteButton = document.createElement('button');
         deleteButton.textContent = 'Delete';
@@ -5206,8 +5206,10 @@ function showMessageContextMenu(e, message) {
             if (confirm('Are you sure you want to delete this message?')) {
                 try {
                     // Remove from UI immediately for better UX
-                    message.style.opacity = '0.5';
-                    message.style.transition = 'opacity 0.3s';
+                    if (message && message.style) {
+                        message.style.opacity = '0.5';
+                        message.style.transition = 'opacity 0.3s';
+                    }
                     
                     // Only try server delete if we have an ID
                     if (messageId) {
@@ -5230,7 +5232,9 @@ function showMessageContextMenu(e, message) {
                             
                             // Fade out and remove message
                             setTimeout(() => {
-                                message.remove();
+                                if (message && message.parentNode) {
+                                    message.remove();
+                                }
                                 showSuccess('Message deleted successfully!');
                                 
                                 // Notify other clients via socket
@@ -5246,7 +5250,9 @@ function showMessageContextMenu(e, message) {
                     } else {
                         // No ID available (local message)
                         setTimeout(() => {
-                            message.remove();
+                            if (message && message.parentNode) {
+                                message.remove();
+                            }
                             showSuccess('Message removed');
                         }, 300);
                     }
@@ -5254,7 +5260,9 @@ function showMessageContextMenu(e, message) {
                     console.error('❌ Delete error:', err);
                     
                     // Revert message appearance if server delete failed
-                    message.style.opacity = '1';
+                    if (message && message.style) {
+                        message.style.opacity = '1';
+                    }
                     showError('Failed to delete message from server: ' + err.message);
                 }
             }
@@ -5267,18 +5275,21 @@ function showMessageContextMenu(e, message) {
     
     // Close menu when clicking elsewhere
     setTimeout(() => {
-        document.addEventListener('click', function closeMenu() {
-            contextMenu.remove();
-            document.removeEventListener('click', closeMenu);
-        }, { once: true });
+        const closeMenuHandler = function() {
+            if (contextMenu && contextMenu.parentNode) {
+                contextMenu.remove();
+            }
+            document.removeEventListener('click', closeMenuHandler);
+        };
+        document.addEventListener('click', closeMenuHandler);
     }, 0);
 }
 
 // ===== FIXED: PRIVATE MESSAGE CONTEXT MENU WITH DELETE =====
 function showPrivateMessageContextMenu(e, message) {
-    // FIXED: Check if message exists before accessing dataset
-    if (!message) {
-        console.error('Private message element is null');
+    // FIXED: Check if message exists and is a valid DOM element
+    if (!message || !message.dataset) {
+        console.error('Private message element is null or invalid');
         return;
     }
     
@@ -5316,7 +5327,7 @@ function showPrivateMessageContextMenu(e, message) {
     contextMenu.appendChild(copyButton);
     contextMenu.appendChild(replyButton);
 
-    // ===== FIXED: DELETE BUTTON FOR PRIVATE MESSAGES =====
+    // ===== FIXED: DELETE BUTTON FOR PRIVATE MESSAGES WITH BETTER ERROR HANDLING =====
     if (message.classList.contains('sent')) {
         const deleteButton = document.createElement('button');
         deleteButton.textContent = 'Delete';
@@ -5325,8 +5336,10 @@ function showPrivateMessageContextMenu(e, message) {
             if (confirm('Delete this private message?')) {
                 try {
                     // Fade out message
-                    message.style.opacity = '0.5';
-                    message.style.transition = 'opacity 0.3s';
+                    if (message && message.style) {
+                        message.style.opacity = '0.5';
+                        message.style.transition = 'opacity 0.3s';
+                    }
                     
                     // Only try server delete if we have an ID
                     if (messageId) {
@@ -5349,7 +5362,9 @@ function showPrivateMessageContextMenu(e, message) {
                             
                             // Fade out and remove message
                             setTimeout(() => {
-                                message.remove();
+                                if (message && message.parentNode) {
+                                    message.remove();
+                                }
                                 showSuccess('Private message deleted');
                                 
                                 // Notify other clients via socket
@@ -5364,13 +5379,17 @@ function showPrivateMessageContextMenu(e, message) {
                     } else {
                         // No ID available
                         setTimeout(() => {
-                            message.remove();
+                            if (message && message.parentNode) {
+                                message.remove();
+                            }
                             showSuccess('Message removed');
                         }, 300);
                     }
                 } catch (err) {
                     console.error('❌ Delete error:', err);
-                    message.style.opacity = '1';
+                    if (message && message.style) {
+                        message.style.opacity = '1';
+                    }
                     showError('Message removed locally. Server delete failed: ' + err.message);
                 }
             }
@@ -5383,10 +5402,13 @@ function showPrivateMessageContextMenu(e, message) {
     
     // Close menu when clicking elsewhere
     setTimeout(() => {
-        document.addEventListener('click', function closeMenu() {
-            contextMenu.remove();
-            document.removeEventListener('click', closeMenu);
-        }, { once: true });
+        const closeMenuHandler = function() {
+            if (contextMenu && contextMenu.parentNode) {
+                contextMenu.remove();
+            }
+            document.removeEventListener('click', closeMenuHandler);
+        };
+        document.addEventListener('click', closeMenuHandler);
     }, 0);
 }
 
@@ -8811,7 +8833,9 @@ function initSocket() {
             console.log('✅ Removing deleted message from UI:', messageId);
             messageElement.style.opacity = '0.5';
             setTimeout(() => {
-                messageElement.remove();
+                if (messageElement.parentNode) {
+                    messageElement.remove();
+                }
             }, 300);
             
             // Show feedback only if current user didn't initiate the delete
@@ -8831,7 +8855,9 @@ function initSocket() {
             console.log('✅ Removing deleted private message from UI:', messageId);
             messageElement.style.opacity = '0.5';
             setTimeout(() => {
-                messageElement.remove();
+                if (messageElement.parentNode) {
+                    messageElement.remove();
+                }
             }, 300);
         }
     });
@@ -9915,6 +9941,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
 // ===== Function to setup private messages input handlers =====
 function setupPrivateMessageInputHandlers() {
     const input = document.getElementById('private-message-input');
