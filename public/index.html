@@ -5157,6 +5157,7 @@ function showContainer(containerId) {
     if (kebabDropdown) kebabDropdown.classList.remove('active');
 }
 
+// --- CUT HERE ---
 // ===== MODIFIED: CONTEXT MENU FUNCTION WITH DELETE OPTION - FIXED =====
 function showMessageContextMenu(e, message) {
     const messageText = message.dataset.content || '';
@@ -7689,7 +7690,7 @@ function setupTypingHandlers() {
     // Setup typing handlers
     console.log('⌨️ Setting up typing handlers');
 }
-// --- CUT HERE ---
+
 // ✅ OPTIMIZED: AI Response function
 async function fetchChatResponse(userInput) {
     if (isProcessingCommand) {
@@ -10559,69 +10560,6 @@ document.addEventListener('click', function (e) {
         openZoom(e.target.src);
     }
 });
-
-// ===== PERFORMANCE OPTIMIZATIONS =====
-
-// Throttle function to limit how often a function can be called
-function throttle(func, limit) {
-    let inThrottle;
-    return function() {
-        const args = arguments;
-        const context = this;
-        if (!inThrottle) {
-            func.apply(context, args);
-            inThrottle = true;
-            setTimeout(() => inThrottle = false, limit);
-        }
-    }
-}
-
-// Debounce function to delay function execution
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
-
-// Batch DOM updates for better performance
-let renderQueue = [];
-let isRendering = false;
-
-function batchMessageRender(messages, renderFunction) {
-    if (!messages.length) return;
-    
-    renderQueue = renderQueue.concat(messages);
-    
-    if (!isRendering) {
-        isRendering = true;
-        requestAnimationFrame(() => {
-            const fragment = document.createDocumentFragment();
-            const batch = renderQueue.splice(0, 50); // Render 50 messages at once
-            
-            batch.forEach(message => {
-                const messageDiv = renderFunction(message);
-                if (messageDiv) fragment.appendChild(messageDiv);
-            });
-            
-            elements.chatContainer.appendChild(fragment);
-            
-            if (renderQueue.length > 0) {
-                isRendering = false;
-                batchMessageRender([], renderFunction);
-            } else {
-                isRendering = false;
-                // Scroll to bottom after rendering
-                setTimeout(() => forceScrollToBottom('chat-container'), 50);
-            }
-        });
-    }
-}
     </script>
 </body>
 </html>
