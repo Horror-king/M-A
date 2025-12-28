@@ -1895,7 +1895,7 @@ app.get('/api/private/unread', async (req, res) => {
   }
 });
 
-// Mark messages as read - FIXED
+// Mark messages as read - FIXED (corrected the string syntax error here)
 app.put('/api/private/messages/read', async (req, res) => {
   try {
     const { sender_username, receiver_username } = req.body;
@@ -1913,7 +1913,7 @@ app.put('/api/private/messages/read', async (req, res) => {
 
     if (error) {
       console.error('❌ Database error marking messages as read:', error);
-      return res.status(500).json({ error: 'Database error: " + error.message });
+      return res.status(500).json({ error: 'Database error: ' + error.message });
     }
 
     res.json({ success: true });
