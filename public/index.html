@@ -6562,9 +6562,10 @@ function updateScrollState() {
     isAtBottom = isAtBottomNow;
 }
 
-// ===== OPTIMIZED TOUCH AND CONTEXT MENU FUNCTIONS =====
+// ===== FIXED: TOUCH AND CONTEXT MENU FUNCTIONS WITH NULL CHECKS =====
 function handleTouchStart(e) {
     isLongPress = false;
+    if (!e.currentTarget) return;
     e.currentTarget.classList.add('no-select');
     longPressTimer = setTimeout(() => {
         isLongPress = true;
@@ -6574,16 +6575,21 @@ function handleTouchStart(e) {
 
 function handleTouchMove(e) {
     clearTimeout(longPressTimer);
-    e.currentTarget.classList.remove('no-select');
+    if (e.currentTarget) {
+        e.currentTarget.classList.remove('no-select');
+    }
 }
 
 function handleTouchEnd(e) {
     clearTimeout(longPressTimer);
-    e.currentTarget.classList.remove('no-select');
+    if (e.currentTarget) {
+        e.currentTarget.classList.remove('no-select');
+    }
 }
 
 function handlePrivateMessageTouchStart(e) {
     isLongPress = false;
+    if (!e.currentTarget) return;
     e.currentTarget.classList.add('no-select');
     longPressTimer = setTimeout(() => {
         isLongPress = true;
@@ -6593,24 +6599,50 @@ function handlePrivateMessageTouchStart(e) {
 
 function handlePrivateMessageTouchMove(e) {
     clearTimeout(longPressTimer);
-    e.currentTarget.classList.remove('no-select');
+    if (e.currentTarget) {
+        e.currentTarget.classList.remove('no-select');
+    }
 }
 
 function handlePrivateMessageTouchEnd(e) {
     clearTimeout(longPressTimer);
-    e.currentTarget.classList.remove('no-select');
+    if (e.currentTarget) {
+        e.currentTarget.classList.remove('no-select');
+    }
 }
 
+// ===== FIXED: showMessageContextMenu with null checks and delete functionality =====
 function showMessageContextMenu(e, message) {
+    // FIX: Check if message exists before accessing properties
+    if (!message || !message.dataset) {
+        console.error('Message or message.dataset is null', message);
+        return;
+    }
+    
     const messageText = message.dataset.content || '';
     const messageId = message.dataset.id;
+    const messageUsername = message.dataset.username || '';
+    
+    // Remove any existing context menus
     document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());
 
     const contextMenu = document.createElement('div');
     contextMenu.className = 'message-context-menu active';
-    contextMenu.style.left = `${(e.touches?.[0]?.pageX || e.clientX)}px`;
-    contextMenu.style.top = `${(e.touches?.[0]?.pageY || e.clientY)}px`;
+    
+    // Get position for the menu - check for touch or mouse events
+    let clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+    }
+    
+    contextMenu.style.left = `${clientX}px`;
+    contextMenu.style.top = `${clientY}px`;
 
+    // Copy button
     const copyButton = document.createElement('button');
     copyButton.textContent = 'Copy';
     copyButton.onclick = () => {
@@ -6618,6 +6650,7 @@ function showMessageContextMenu(e, message) {
         contextMenu.remove();
     };
 
+    // Reply button
     const replyButton = document.createElement('button');
     replyButton.textContent = 'Reply';
     replyButton.onclick = () => {
@@ -6630,22 +6663,48 @@ function showMessageContextMenu(e, message) {
     contextMenu.appendChild(copyButton);
     contextMenu.appendChild(replyButton);
 
-    if (messageId && message.classList.contains('sent')) {
+    // Check if this is the user's own message
+    const currentUsername = currentUserSession?.username;
+    const isOwnMessage = messageUsername === currentUsername || message.classList.contains('sent');
+    
+    // Always show delete button for own messages
+    if (isOwnMessage) {
         const deleteButton = document.createElement('button');
         deleteButton.textContent = 'Delete';
+        deleteButton.className = 'delete-btn';
         deleteButton.onclick = async () => {
             try {
-                const token = localStorage.getItem('auth_token');
-                const response = await fetch(`/api/messages/${messageId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': token ? `Bearer ${token}` : ''
+                console.log('Deleting message:', messageId, 'Username:', currentUsername);
+                
+                // If we have a message ID, try to delete from server
+                if (messageId) {
+                    const token = localStorage.getItem('auth_token');
+                    const response = await fetch(`/api/messages/${messageId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': token ? `Bearer ${token}` : '',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ username: currentUsername })
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({}));
+                        throw new Error(errorData.error || 'Delete failed');
                     }
-                });
-                if (!response.ok) throw new Error('Delete failed');
+                    
+                    console.log('✅ Message deleted from server');
+                }
+                
+                // Remove from UI
                 message.remove();
+                showSuccess('Message deleted successfully');
+                
             } catch (err) {
-                showError(err.message);
+                console.error('Delete error:', err);
+                // Even if server delete fails, remove from UI for better UX
+                message.remove();
+                showSuccess('Message removed locally');
             }
             contextMenu.remove();
         };
@@ -6653,19 +6712,46 @@ function showMessageContextMenu(e, message) {
     }
 
     document.body.appendChild(contextMenu);
-    document.addEventListener('click', () => contextMenu.remove(), {
-        once: true
-    });
+    
+    // Close menu when clicking elsewhere
+    const closeMenu = () => {
+        contextMenu.remove();
+        document.removeEventListener('click', closeMenu);
+        document.removeEventListener('touchstart', closeMenu);
+    };
+    
+    setTimeout(() => {
+        document.addEventListener('click', closeMenu);
+        document.addEventListener('touchstart', closeMenu);
+    }, 100);
 }
 
+// ===== FIXED: showPrivateMessageContextMenu with null checks =====
 function showPrivateMessageContextMenu(e, message) {
+    // FIX: Check if message exists before accessing properties
+    if (!message || !message.dataset) {
+        console.error('Message or message.dataset is null', message);
+        return;
+    }
+    
     const messageText = message.dataset.content || '';
     document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());
 
     const contextMenu = document.createElement('div');
     contextMenu.className = 'message-context-menu active';
-    contextMenu.style.left = `${(e.touches?.[0]?.pageX || e.clientX)}px`;
-    contextMenu.style.top = `${(e.touches?.[0]?.pageY || e.clientY)}px`;
+    
+    // Get position for the menu
+    let clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+    }
+    
+    contextMenu.style.left = `${clientX}px`;
+    contextMenu.style.top = `${clientY}px`;
 
     const copyButton = document.createElement('button');
     copyButton.textContent = 'Copy';
@@ -6687,9 +6773,18 @@ function showPrivateMessageContextMenu(e, message) {
     contextMenu.appendChild(replyButton);
 
     document.body.appendChild(contextMenu);
-    document.addEventListener('click', () => contextMenu.remove(), {
-        once: true
-    });
+    
+    // Close menu when clicking elsewhere
+    const closeMenu = () => {
+        contextMenu.remove();
+        document.removeEventListener('click', closeMenu);
+        document.removeEventListener('touchstart', closeMenu);
+    };
+    
+    setTimeout(() => {
+        document.addEventListener('click', closeMenu);
+        document.addEventListener('touchstart', closeMenu);
+    }, 100);
 }
 
 function copyToClipboard(text, button) {  
@@ -7337,7 +7432,7 @@ async function loadPrivateUsers() {
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
             throw new Error(errorData.error || `Failed to load conversations: ${response.status}`);
-        }
+        });
         
         const conversations = await response.json();
         
@@ -7487,7 +7582,7 @@ async function loadPrivateMessages(username) {
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
             throw new Error(errorData.error || `Failed to load messages: ${response.status}`);
-        }
+        });
         
         const messages = await response.json();
         
