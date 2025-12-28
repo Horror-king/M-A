@@ -5158,6 +5158,7 @@ function showContainer(containerId) {
 }
 
 // --- CUT HERE ---
+// --- CUT HERE ---
 // ... REST OF YOUR EXISTING CODE CONTINUES EXACTLY AS BEFORE ...
 // ===== YOUR EXISTING CODE CONTINUES BELOW =====
 
@@ -7432,7 +7433,7 @@ async function loadPrivateUsers() {
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
             throw new Error(errorData.error || `Failed to load conversations: ${response.status}`);
-        });
+        }
         
         const conversations = await response.json();
         
@@ -7582,7 +7583,7 @@ async function loadPrivateMessages(username) {
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
             throw new Error(errorData.error || `Failed to load messages: ${response.status}`);
-        });
+        }
         
         const messages = await response.json();
         
@@ -9731,6 +9732,13 @@ document.addEventListener('click', function (e) {
         openZoom(e.target.src);
     }
 });
- </script>
+
+// ===== FIXED: Initialize posts function (if it exists) =====
+function initializePosts() {
+    // This function would be implemented when you add a posts/feed feature
+    console.log('Initializing posts feed...');
+    // Implementation would go here
+}
+    </script>
 </body>
 </html>
