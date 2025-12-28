@@ -1595,7 +1595,7 @@ app.get('/api/messages', async (req, res) => {
   }
 });
 
-// POST messages endpoint that client expects
+// POST messages endpoint that client expects - FIXED: Return message with ID immediately
 app.post('/api/messages', async (req, res) => {
   try {
     const { content, username, image_url, reply_to } = req.body;
@@ -1913,14 +1913,14 @@ app.put('/api/private/messages/read', async (req, res) => {
 
     if (error) {
       console.error('❌ Database error marking messages as read:', error);
-      return res.status(500).json({ error: 'Database error: ' + error.message });
+      return res.status(500).json({ error: 'Database error: " + error.message });
     }
 
     res.json({ success: true });
 
   } catch (error) {
     console.error('❌ Error marking messages as read:', error);
-    res.status(500).json({ error: 'Failed to mark messages as read: ' + error.message });
+    res.status(500).json({ error: "Failed to mark messages as read: " + error.message });
   }
 });
 
@@ -4016,6 +4016,92 @@ setInterval(() => {
   }
 }, 30000); // Check every 30 seconds
 
+// ===== NEW ENDPOINT: Get message by ID =====
+app.get('/api/messages/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const { data, error } = await supabase
+      .from('chatter')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      console.error('❌ Error fetching message:', error);
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    res.json(data);
+  } catch (error) {
+    console.error('❌ Error in get message by ID:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ===== NEW ENDPOINT: Update message =====
+app.put('/api/messages/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { content } = req.body;
+
+    if (!content) {
+      return res.status(400).json({ error: 'Content is required' });
+    }
+
+    const { data, error } = await supabase
+      .from('chatter')
+      .update({ 
+        content: content,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select();
+
+    if (error) {
+      console.error('❌ Error updating message:', error);
+      return res.status(500).json({ error: 'Failed to update message' });
+    }
+
+    // Broadcast update to all clients
+    io.emit('message-updated', data[0]);
+    
+    res.json(data[0]);
+  } catch (error) {
+    console.error('❌ Error in update message:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ===== NEW SOCKET.IO EVENT: Message updates =====
+io.on('connection', (socket) => {
+  // ... existing socket code ...
+
+  // Listen for message updates
+  socket.on('update-message', async (data) => {
+    try {
+      const { id, content } = data;
+      
+      const { data: updatedMessage, error } = await supabase
+        .from('chatter')
+        .update({ 
+          content: content,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select();
+
+      if (error) throw error;
+
+      // Broadcast update to all clients
+      io.emit('message-updated', updatedMessage[0]);
+    } catch (error) {
+      console.error('❌ Error updating message via socket:', error);
+      socket.emit('message-update-error', { error: 'Failed to update message' });
+    }
+  });
+});
+
 // Start server
 server.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
@@ -4063,6 +4149,8 @@ server.listen(port, () => {
   console.log(`   GET /api/messages - Get messages (client-compatible)`);
   console.log(`   POST /api/messages - Send message (client-compatible)`);
   console.log(`   DELETE /api/messages/:id - Delete message (client-compatible)`);
+  console.log(`   GET /api/messages/:id - Get message by ID (NEW!)`);
+  console.log(`   PUT /api/messages/:id - Update message (NEW!)`);
   console.log(`📝 POSTS SYSTEM: ENABLED via Supabase`);
   console.log(`   GET /api/create-posts-table - Check posts table (NEW!)`);
   console.log(`   POST /api/create-posts-table - Create posts table if needed`);
