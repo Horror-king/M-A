@@ -5157,7 +5157,6 @@ function showContainer(containerId) {
     if (kebabDropdown) kebabDropdown.classList.remove('active');
 }
 
-// --- CUT HERE ---
 // ===== MODIFIED: CONTEXT MENU FUNCTION WITH DELETE OPTION - FIXED =====
 function showMessageContextMenu(e, message) {
     const messageText = message.dataset.content || '';
@@ -7690,7 +7689,7 @@ function setupTypingHandlers() {
     // Setup typing handlers
     console.log('⌨️ Setting up typing handlers');
 }
-
+// --- CUT HERE ---
 // ✅ OPTIMIZED: AI Response function
 async function fetchChatResponse(userInput) {
     if (isProcessingCommand) {
