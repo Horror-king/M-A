@@ -4180,6 +4180,8 @@ function setupCreatePostBox() {
     const postsContainer = document.getElementById('posts-container');
     if (!postsContainer) {
         console.error('Posts container not found');
+        // Create posts container if it doesn't exist
+        createPostsContainer();
         return;
     }
     
@@ -4235,8 +4237,27 @@ function setupCreatePostBox() {
     console.log('✅ Create post box setup complete');
 }
 
-// --- CUT HERE ---
-// --- CUT HERE ---
+// Create posts container if it doesn't exist
+function createPostsContainer() {
+    const postsSection = document.getElementById('posts');
+    if (!postsSection) return;
+    
+    // Create posts container
+    const postsContainer = document.createElement('div');
+    postsContainer.id = 'posts-container';
+    postsContainer.className = 'posts-container';
+    
+    // Create posts list
+    const postsList = document.createElement('div');
+    postsList.id = 'posts-list';
+    postsList.className = 'posts-list';
+    
+    postsContainer.appendChild(postsList);
+    postsSection.appendChild(postsContainer);
+    
+    console.log('✅ Posts container created');
+}
+
 // NEW: Function to detect and convert image URLs in text
 function processContentWithImages(content) {
     if (!content) return '';
@@ -4307,6 +4328,8 @@ function renderPosts() {
     const postsContainer = document.getElementById('posts-container');
     if (!postsContainer) {
         console.error('Posts container not found');
+        // Try to create it
+        createPostsContainer();
         return;
     }
     
@@ -5052,6 +5075,8 @@ function showContainer(containerId) {
         // FIXED: Enhanced posts initialization - ensure create post box is always visible
         if (containerId === 'posts') {
             console.log('📝 Initializing posts feed...');
+            // Create posts container if it doesn't exist
+            createPostsContainer();
             // Force re-initialization of create post box
             initializePosts();
             
@@ -6017,7 +6042,16 @@ function showContainer(containerId) {
         
         // MODIFIED: Initialize posts if showing that container
         if (containerId === 'posts') {
+            console.log('📝 Initializing posts feed...');
+            createPostsContainer();
             initializePosts();
+            
+            setTimeout(() => {
+                const createPostBox = document.querySelector('.create-post-box');
+                if (!createPostBox) {
+                    setupCreatePostBox();
+                }
+            }, 100);
         }
     }
     
@@ -9855,13 +9889,6 @@ document.addEventListener('click', function (e) {
         openZoom(e.target.src);
     }
 });
-
-// ===== FIXED: Initialize posts function (if it exists) =====
-function initializePosts() {
-    // This function would be implemented when you add a posts/feed feature
-    console.log('Initializing posts feed...');
-    // Implementation would go here
-}
 
 // --- END OF JAVASCRIPT CODE ---
 </script>
