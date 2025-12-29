@@ -1595,7 +1595,8 @@ app.get('/api/messages', async (req, res) => {
   }
 });
 
-// POST messages endpoint that client expects - FIXED: Return message with ID immediately
+// --- CUT HERE ---
+// POST messages endpoint - FIXED: Return message with ID immediately
 app.post('/api/messages', async (req, res) => {
   try {
     const { content, username, image_url, reply_to } = req.body;
@@ -1616,7 +1617,8 @@ app.post('/api/messages', async (req, res) => {
       content: (content && content.trim() !== '') ? content.trim() : '',
       username: username.trim(),
       image_url: image_url || '',
-      reply_to: reply_to || ''
+      reply_to: reply_to || '',
+      created_at: new Date().toISOString()  // ADD THIS LINE
     };
 
     console.log('📝 Inserting message to Supabase via API:', insertData);
@@ -1634,7 +1636,8 @@ app.post('/api/messages', async (req, res) => {
         console.log('🔄 Retrying with minimal fields...');
         const minimalData = {
           content: (content && content.trim() !== '') ? content.trim() : 'Message',
-          username: username.trim()
+          username: username.trim(),
+          created_at: new Date().toISOString()  // ADD THIS LINE TOO
         };
         
         const { data: retryData, error: retryError } = await supabase
@@ -4273,3 +4276,5 @@ process.on('uncaughtException', (err) => {
 
 // Export for testing
 module.exports = { app, server, io, supabase };
+
+
