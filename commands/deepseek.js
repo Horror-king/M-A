@@ -1,98 +1,64 @@
 const axios = require('axios');
 
-// Simple in-memory conversation store
-const conversationMemory = new Map();
-
 module.exports = {
   config: {
     name: 'deepseek',
-    aliases: ['ds', 'seek'],
-    version: '2.0.0',
+    aliases: ['ds', 'si'],
+    version: '1.0.2',
     author: 'Hassan',
     role: 0,
     category: 'ai',
     shortDescription: {
-      en: 'Chat with DeepSeek AI (memory enabled).'
+      en: 'Ask DeepSeek AI a question.'
     },
     longDescription: {
-      en: 'DeepSeek AI with conversation memory, system prompt, and markdown formatting.'
+      en: 'Uses DeepSeek API to generate AI responses from prompts.'
     },
     guide: {
-      en: '{pn} deepseek <your message>'
+      en: '{pn} deepseek <your prompt>'
     }
   },
 
-  onStart: async function ({ message, args, event }) {
+  onStart: async function ({ message, args }) {
     try {
       const prompt = args.join(' ').trim();
 
       if (!prompt) {
         return message.reply(
           '❌ Usage:\n' +
-          'deepseek <your message>\n\n' +
+          'deepseek <your prompt>\n\n' +
           'Example:\n' +
-          'deepseek Explain JavaScript promises'
+          'deepseek What is artificial intelligence?'
         );
       }
 
-      const userId = event.senderID;
-
-      // Initialize memory if not exists
-      if (!conversationMemory.has(userId)) {
-        conversationMemory.set(userId, []);
-      }
-
-      const memory = conversationMemory.get(userId);
-
-      // System prompt (role definition)
-      const systemPrompt =
-        'You are DeepSeek AI, a helpful, intelligent, and polite assistant. ' +
-        'Explain things clearly, use markdown formatting when helpful, ' +
-        'and keep responses concise but informative.';
-
-      // Build conversation context
-      let context = systemPrompt + '\n\n';
-
-      memory.forEach(turn => {
-        context += `User: ${turn.user}\nAI: ${turn.ai}\n`;
-      });
-
-      context += `User: ${prompt}\nAI:`;
-
       const apiUrl =
-        `https://fahim-api-demo.onrender.com/deepseek/v1?prompt=${encodeURIComponent(context)}`;
+        `https://fahim-api-demo.onrender.com/deepseek/v1?prompt=${encodeURIComponent(prompt)}`;
 
       const response = await axios.get(apiUrl, {
         timeout: 20000
       });
 
-      if (!response.data || !response.data.result) {
+      // ✅ STRICT result handling
+      if (!response.data || typeof response.data.result !== 'string') {
         return message.reply('❌ Invalid response from DeepSeek API.');
       }
 
-      let aiReply = response.data.result.trim();
+      let reply = response.data.result.trim();
 
-      // Save memory (limit to last 5 turns)
-      memory.push({
-        user: prompt,
-        ai: aiReply
-      });
-
-      if (memory.length > 5) {
-        memory.shift();
-      }
-
-      // Limit long messages
-      if (aiReply.length > 3500) {
-        aiReply = aiReply.substring(0, 3500) + '\n\n*…response truncated*';
+      // Prevent very long messages
+      if (reply.length > 3500) {
+        reply = reply.slice(0, 3500) + '\n\n...response truncated';
       }
 
       return message.reply(
-        `🐋 **DeepSeek AI**\n\n${aiReply}`
+        `🐋 **DeepSeek AI Response:**\n\n${reply}`
       );
 
     } catch (error) {
-      return message.reply(`⚠️ DeepSeek Error: ${error.message}`);
+      return message.reply(
+        `⚠️ DeepSeek Error: ${error.response?.status || ''} ${error.message}`
+      );
     }
   }
 };
