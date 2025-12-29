@@ -5158,7 +5158,6 @@ function showContainer(containerId) {
 }
 
 // --- CUT HERE ---
-// --- CUT HERE ---
 // ... REST OF YOUR EXISTING CODE CONTINUES EXACTLY AS BEFORE ...
 // ===== YOUR EXISTING CODE CONTINUES BELOW =====
 
@@ -6109,8 +6108,6 @@ function showContainer(containerId) {
     if (kebabDropdown) kebabDropdown.classList.remove('active');
 }
 
-// --- CUT HERE ---
-
 function hideContainer(containerId) {
     console.log('🔄 Hiding container:', containerId);
     const container = document.getElementById(containerId);
@@ -6130,7 +6127,7 @@ function hideContainer(containerId) {
     showContainer('chat');
 }
 
-// ===== OPTIMIZED MESSAGE FUNCTIONS =====
+// ===== MODIFIED: sendMessage function to save message and get ID =====
 async function sendMessage() {
     if (isSending || isProcessingCommand) return;
     isSending = true;
@@ -6213,10 +6210,16 @@ async function sendMessage() {
             body: JSON.stringify(payload)
         });
 
-        if (!response.ok) throw new Error('Failed to send message');
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || 'Failed to send message');
+        }
 
-        // Display message immediately for the sender
-        displayMessage(content, 'sent', replyToText, username, null, true);
+        // Get the saved message with ID from server
+        const savedMessage = await response.json();
+        
+        // Display message with the actual ID from server
+        displayMessage(savedMessage.content, 'sent', savedMessage.reply_to, savedMessage.username, savedMessage.id, true);
         
         // Clear input immediately for better UX
         elements.messageInput.value = '';
@@ -6654,7 +6657,7 @@ function handlePrivateMessageTouchEnd(e) {
     }
 }
 
-// ===== FIXED: showMessageContextMenu with improved element finding =====
+// ===== MODIFIED: showMessageContextMenu with better ID handling =====
 function showMessageContextMenu(e, message) {
     // If message is null, try to find the message element from the event target
     if (!message || !message.classList || !message.classList.contains('message')) {
@@ -6671,6 +6674,15 @@ function showMessageContextMenu(e, message) {
     const messageId = message.dataset.id;
     const messageUsername = message.dataset.username || '';
     
+    // Check if message has a valid ID
+    if (!messageId || messageId === 'undefined' || messageId === 'null') {
+        console.error('Message has no ID, cannot delete:', message);
+        showError('Cannot delete message: No message ID found. Please refresh and try again.');
+        return;
+    }
+    
+    console.log('Deleting message:', messageId, 'Username:', messageUsername);
+
     // Remove any existing context menus
     document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());
 
@@ -6733,25 +6745,23 @@ function showMessageContextMenu(e, message) {
             try {
                 console.log('Deleting message:', messageId, 'Username:', currentUsername);
                 
-                // If we have a message ID, try to delete from server
-                if (messageId) {
-                    const token = localStorage.getItem('auth_token');
-                    const response = await fetch(`/api/messages/${messageId}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'Authorization': token ? `Bearer ${token}` : '',
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ username: currentUsername })
-                    });
-                    
-                    if (!response.ok) {
-                        const errorData = await response.json().catch(() => ({}));
-                        throw new Error(errorData.error || 'Delete failed');
-                    }
-                    
-                    console.log('✅ Message deleted from server');
+                // Delete from server
+                const token = localStorage.getItem('auth_token');
+                const response = await fetch(`/api/messages/${messageId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': token ? `Bearer ${token}` : '',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username: currentUsername })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || 'Delete failed');
                 }
+                
+                console.log('✅ Message deleted from server');
                 
                 // Remove from UI
                 message.remove();
@@ -8616,7 +8626,7 @@ function renderMessages(messages, isFirstLoad = false) {
     setTimeout(updateScrollState, 0);
 }
 
-// ===== MODIFIED: OPTIMIZED SOCKET INITIALIZATION WITH MESSAGE LISTENERS =====
+// ===== MODIFIED: Socket.io handler to update message IDs =====
 function initSocket() {
     console.log('🔌 Initializing socket connection...');
     
@@ -8649,21 +8659,34 @@ function initSocket() {
         const isOwnMessage = message.username === currentUserSession?.username;
         const isAIResponse = message.username === 'AI' || message.username === 'Bot';
         
-        if (!isOwnMessage || isAIResponse) {
-            const existingMessage = document.querySelector(`[data-id="${message.id}"]`);
-            if (!existingMessage) {
-                displayMessage(
-                    message.content, 
-                    isOwnMessage ? 'sent' : 'received', 
-                    message.reply_to, 
-                    message.username, 
-                    message.id, 
-                    true
-                );
-                
-                if (document.visibilityState !== 'visible' && !isOwnMessage) {
-                    showNotification(message.username, message.content);
+        // Check if we already have this message displayed (without ID)
+        if (isOwnMessage) {
+            // Find messages from this user without an ID and update them
+            const userMessages = document.querySelectorAll(`.message[data-username="${message.username}"]:not([data-id]), .message.sent:not([data-id])`);
+            userMessages.forEach(msg => {
+                if (msg.dataset.content === message.content && !msg.dataset.id) {
+                    // Update the message with the ID
+                    msg.dataset.id = message.id;
+                    msg.setAttribute('data-id', message.id);
+                    console.log('✅ Updated message with ID:', message.id);
                 }
+            });
+        }
+        
+        // Only display if we don't already have it
+        const existingMessage = document.querySelector(`[data-id="${message.id}"]`);
+        if (!existingMessage && (!isOwnMessage || isAIResponse)) {
+            displayMessage(
+                message.content, 
+                isOwnMessage ? 'sent' : 'received', 
+                message.reply_to, 
+                message.username, 
+                message.id, 
+                true
+            );
+            
+            if (document.visibilityState !== 'visible' && !isOwnMessage) {
+                showNotification(message.username, message.content);
             }
         }
     });
@@ -8672,6 +8695,16 @@ function initSocket() {
     socket.on('chat-messages', (messages) => {
         console.log('📨 Received message history:', messages.length, 'messages');
         renderMessages(messages, true);
+    });
+
+    // Listen for message deletions
+    socket.on('message-deleted', (messageId) => {
+        console.log('🗑️ Message deleted via socket:', messageId);
+        const messageElement = document.querySelector(`[data-id="${messageId}"]`);
+        if (messageElement) {
+            messageElement.remove();
+            showSuccess('Message deleted (by another user)');
+        }
     });
 
     // User status updates
@@ -8724,6 +8757,23 @@ function initSocket() {
             clearInterval(window.socketFallback);
         }
     });
+}
+
+// ===== NEW: Helper function to ensure message has ID before deletion =====
+function ensureMessageHasId(messageElement) {
+    if (!messageElement.dataset.id || messageElement.dataset.id === 'undefined' || messageElement.dataset.id === 'null') {
+        // Try to find if this message exists on server by content and username
+        const content = messageElement.dataset.content;
+        const username = messageElement.dataset.username;
+        
+        if (content && username) {
+            console.log('🔍 Message missing ID, searching by content:', content.substring(0, 50));
+            // In a real app, you might want to query the server for this message
+            // For now, we'll return null which will prevent deletion
+            return null;
+        }
+    }
+    return messageElement.dataset.id;
 }
 
 // Update online users lists
