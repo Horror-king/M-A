@@ -4092,7 +4092,7 @@
     </div>
 <script>
 // --- CUT HERE ---
-      // Posts functionality for client-side
+// Posts functionality for client-side
 let posts = [];
 let lastUpdateTimestamp = null;
 let currentPostMedia = [];
@@ -4175,7 +4175,7 @@ async function pollForPostUpdates() {
     }
 }
 
-// Setup Facebook-style create post box - FIXED: Ensure it's always visible
+// FIXED: Setup Facebook-style create post box - Fixed DOM insertion issue
 function setupCreatePostBox() {
     const postsContainer = document.getElementById('posts-container');
     if (!postsContainer) {
@@ -4226,12 +4226,18 @@ function setupCreatePostBox() {
         </div>
     `;
     
-    // Insert at the top of posts container - FIXED: Ensure proper placement
-    const postsList = document.getElementById('posts-list');
-    if (postsList) {
+    // FIXED: Insert at the top of posts container - Fixed the DOM insertion
+    const postsList = postsContainer.querySelector('#posts-list');
+    if (postsList && postsList.parentNode === postsContainer) {
         postsContainer.insertBefore(createPostBox, postsList);
     } else {
+        // If posts-list doesn't exist or isn't a direct child, create it
+        const postsListNew = document.createElement('div');
+        postsListNew.id = 'posts-list';
+        postsListNew.className = 'posts-list';
         postsContainer.appendChild(createPostBox);
+        postsContainer.appendChild(postsListNew);
+        console.log('✅ Created posts-list and added create post box');
     }
     
     console.log('✅ Create post box setup complete');
