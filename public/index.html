@@ -4090,8 +4090,112 @@
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
+// --- CUT HERE ---
 <script>
 // --- CUT HERE ---
+
+// Opera Mini compatible messaging functions
+class OperaMiniMessenger {
+  constructor() {
+    this.clientId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    this.isOperaMini = navigator.userAgent.includes('Opera Mini') || 
+                       navigator.userAgent.includes('Opera Mobi');
+    this.pollingInterval = null;
+    this.lastMessageId = null;
+  }
+
+  // Send message (works on Opera Mini)
+  async sendMessage(content, username) {
+    try {
+      const response = await fetch('/api/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: content,
+          username: username,
+          image_url: '',
+          reply_to: ''
+        })
+      });
+      
+      if (this.isOperaMini) {
+        // Minimal response handling for Opera Mini
+        const data = await response.json();
+        if (data.id) {
+          return { success: true, id: data.id };
+        }
+      } else {
+        return await response.json();
+      }
+    } catch (error) {
+      console.error('Send message error:', error);
+      return { error: 'Failed to send message' };
+    }
+  }
+
+  // Delete message instantly (works on Opera Mini)
+  async deleteMessage(messageId) {
+    try {
+      const response = await fetch(`/api/messages/${messageId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (this.isOperaMini) {
+        const data = await response.json();
+        return data.s === 1; // success check
+      } else {
+        const data = await response.json();
+        return data.success;
+      }
+    } catch (error) {
+      console.error('Delete message error:', error);
+      return false;
+    }
+  }
+
+  // Start long-polling for Opera Mini real-time updates
+  startPolling(onMessage, onDelete) {
+    if (!this.isOperaMini) return;
+    
+    const poll = async () => {
+      try {
+        const response = await fetch(`/api/opera-poll?clientId=${this.clientId}`);
+        const data = await response.json();
+        
+        if (data.type === 'new-message') {
+          onMessage(data.data);
+        } else if (data.type === 'message-deleted') {
+          onDelete(data.data);
+        }
+        
+        // Continue polling
+        this.pollingInterval = setTimeout(() => poll(), 1000);
+      } catch (error) {
+        // Retry on error
+        console.log('Polling error, retrying...');
+        this.pollingInterval = setTimeout(() => poll(), 3000);
+      }
+    };
+    
+    poll();
+  }
+
+  // Stop polling
+  stopPolling() {
+    if (this.pollingInterval) {
+      clearTimeout(this.pollingInterval);
+    }
+  }
+}
+
+// Create Opera Mini messenger instance
+const operaMessenger = new OperaMiniMessenger();
+
 // Posts functionality for client-side
 let posts = [];
 let lastUpdateTimestamp = null;
@@ -5188,9 +5292,397 @@ function showContainer(containerId) {
     if (kebabDropdown) kebabDropdown.classList.remove('active');
 }
 
-// --- CUT HERE ---
-// ... REST OF YOUR EXISTING CODE CONTINUES EXACTLY AS BEFORE ...
-// ===== YOUR EXISTING CODE CONTINUES BELOW =====
+// MODIFIED: sendMessage function to use OperaMiniMessenger when on Opera Mini
+async function sendMessage() {
+    if (isSending || isProcessingCommand) return;
+    isSending = true;
+    
+    const content = elements.messageInput.value.trim();
+    const username = currentUserSession?.username;
+    
+    if (!content || !username) {
+        isSending = false;
+        return showError('Please enter both username and message');
+    }
+
+    // Check for duplicate message in main chat
+    const messageKey = `main-${username}-${content}`;
+    if (lastSentMessages.main[messageKey] && 
+        Date.now() - lastSentMessages.main[messageKey] < 3000) {
+        console.log('Duplicate message prevented in main chat');
+        isSending = false;
+        return;
+    }
+    
+    // Track this message
+    lastSentMessages.main[messageKey] = Date.now();
+
+    // Bad word filtering
+    const lowerContent = content.toLowerCase();
+    if (badWords.some(word => lowerContent.includes(word))) {
+        if (!warnedUsers[username]) {
+            warnedUsers[username] = true;
+            isSending = false;
+            return showError('Warning: bad word detected! If you repeat, you will be banned.');
+        } else {
+            bannedUsers[username] = Date.now() + BAN_DURATION;
+            showError('You used bad words again. Account deleted and banned.');
+            isSending = false;
+            setTimeout(() => {
+                logout();
+            }, 2000);
+            return;
+        }
+    }
+
+    // Spam protection
+    const now = Date.now();
+    if (bannedUsers[username] && bannedUsers[username] > now) {
+        isSending = false;
+        return showError(`You're banned. Wait ${Math.ceil((bannedUsers[username] - now) / 1000)}s.`);
+    }
+    
+    if (!spamTracker[username]) {
+        spamTracker[username] = [];
+    }
+    spamTracker[username].push(now);
+    spamTracker[username] = spamTracker[username].filter(ts => now - ts <= SPAM_WINDOW);
+    
+    if (spamTracker[username].length > SPAM_LIMIT) {
+        bannedUsers[username] = now + BAN_DURATION;
+        isSending = false;
+        return showError("You're banned for spamming.");
+    }
+
+    try {
+        elements.sendButton.disabled = true;
+        elements.sendButton.classList.remove('enabled');
+        
+        const payload = { 
+            content, 
+            username, 
+            reply_to: replyToText || null 
+        };
+        
+        // Use OperaMiniMessenger for Opera Mini, otherwise use regular fetch
+        let savedMessage;
+        if (operaMessenger.isOperaMini) {
+            const result = await operaMessenger.sendMessage(content, username);
+            if (result.error) {
+                throw new Error(result.error);
+            }
+            // Create a simple message object for Opera Mini
+            savedMessage = {
+                content: content,
+                username: username,
+                reply_to: replyToText || null,
+                id: result.id || Date.now().toString()
+            };
+        } else {
+            // Original fetch code for non-Opera Mini browsers
+            const token = localStorage.getItem('auth_token');
+            const response = await fetch('/api/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': token ? `Bearer ${token}` : ''
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Failed to send message');
+            }
+
+            // Get the saved message with ID from server
+            savedMessage = await response.json();
+        }
+        
+        // Display message with the actual ID from server
+        displayMessage(savedMessage.content, 'sent', savedMessage.reply_to, savedMessage.username, savedMessage.id, true);
+        
+        // Clear input immediately for better UX
+        elements.messageInput.value = '';
+        autoResize(elements.messageInput);
+        clearReply();
+
+        // Only get AI response if it's NOT a command
+        const PREFIX = '!';
+        if (!content.startsWith(PREFIX)) {
+            fetchChatResponse(content);
+        }
+        
+    } catch (error) {
+        showError(error.message);
+        
+        // Remove from tracking on error
+        delete lastSentMessages.main[messageKey];
+    } finally {
+        setTimeout(() => {
+            isSending = false;
+            const hasText = elements.messageInput.value.trim().length > 0;
+            elements.sendButton.disabled = !hasText;
+            elements.sendButton.classList.toggle('enabled', hasText);
+        }, 500);
+    }
+}
+
+// MODIFIED: deleteMessage function in context menu to use OperaMiniMessenger
+async function deleteMessageContext(messageId, username) {
+    try {
+        console.log('Deleting message:', messageId, 'Username:', username);
+        
+        let success;
+        
+        // Use OperaMiniMessenger for Opera Mini
+        if (operaMessenger.isOperaMini) {
+            success = await operaMessenger.deleteMessage(messageId);
+        } else {
+            // Original delete code for non-Opera Mini browsers
+            const token = localStorage.getItem('auth_token');
+            const response = await fetch(`/api/messages/${messageId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': token ? `Bearer ${token}` : '',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username: username })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Delete failed');
+            }
+            
+            const data = await response.json();
+            success = data.success;
+        }
+        
+        if (success) {
+            console.log('✅ Message deleted successfully');
+            return true;
+        } else {
+            throw new Error('Delete failed');
+        }
+        
+    } catch (err) {
+        console.error('Delete error:', err);
+        return false;
+    }
+}
+
+// MODIFIED: initSocket function to start Opera Mini polling
+function initSocket() {
+    console.log('🔌 Initializing socket connection...');
+    
+    // Start Opera Mini polling if needed
+    if (operaMessenger.isOperaMini) {
+        console.log('📱 Opera Mini detected, starting polling...');
+        operaMessenger.startPolling(
+            (message) => {
+                // Handle new message
+                const isOwnMessage = message.username === currentUserSession?.username;
+                const isAIResponse = message.username === 'AI' || message.username === 'Bot';
+                
+                if (!isOwnMessage || isAIResponse) {
+                    displayMessage(
+                        message.content, 
+                        isOwnMessage ? 'sent' : 'received', 
+                        message.reply_to, 
+                        message.username, 
+                        message.id, 
+                        true
+                    );
+                    
+                    if (document.visibilityState !== 'visible' && !isOwnMessage) {
+                        showNotification(message.username, message.content);
+                    }
+                }
+            },
+            (messageId) => {
+                // Handle deleted message
+                console.log('🗑️ Message deleted via polling:', messageId);
+                const messageElement = document.querySelector(`[data-id="${messageId}"]`);
+                if (messageElement) {
+                    messageElement.remove();
+                    showSuccess('Message deleted (by another user)');
+                }
+            }
+        );
+        
+        // Also load initial messages via polling
+        setTimeout(() => loadMessages(), 1000);
+        return;
+    }
+    
+    // Original Socket.io code for non-Opera Mini browsers
+    socket = io({
+        transports: ['polling', 'websocket'],
+        upgrade: false,
+        forceNew: true,
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 20000
+    });
+    
+    socket.on('connect', () => {
+        console.log('✅ Socket connected');
+        const username = currentUserSession?.username;
+        if (username) {
+            socket.emit('user-online', username);
+        }
+        
+        // Add touch listeners to existing messages after socket connects
+        setTimeout(addTouchListenersToExistingMessages, 1000);
+    });
+
+    // Listen for new messages in real-time
+    socket.on('new-message', (message) => {
+        console.log('💬 New message received via socket:', message);
+        
+        const isOwnMessage = message.username === currentUserSession?.username;
+        const isAIResponse = message.username === 'AI' || message.username === 'Bot';
+        
+        // Check if we already have this message displayed (without ID)
+        if (isOwnMessage) {
+            // Find messages from this user without an ID and update them
+            const userMessages = document.querySelectorAll(`.message[data-username="${message.username}"]:not([data-id]), .message.sent:not([data-id])`);
+            userMessages.forEach(msg => {
+                if (msg.dataset.content === message.content && !msg.dataset.id) {
+                    // Update the message with the ID
+                    msg.dataset.id = message.id;
+                    msg.setAttribute('data-id', message.id);
+                    console.log('✅ Updated message with ID:', message.id);
+                }
+            });
+        }
+        
+        // Only display if we don't already have it
+        const existingMessage = document.querySelector(`[data-id="${message.id}"]`);
+        if (!existingMessage && (!isOwnMessage || isAIResponse)) {
+            displayMessage(
+                message.content, 
+                isOwnMessage ? 'sent' : 'received', 
+                message.reply_to, 
+                message.username, 
+                message.id, 
+                true
+            );
+            
+            if (document.visibilityState !== 'visible' && !isOwnMessage) {
+                showNotification(message.username, message.content);
+            }
+        }
+    });
+
+    // Listen for message history when first connecting
+    socket.on('chat-messages', (messages) => {
+        console.log('📨 Received message history:', messages.length, 'messages');
+        renderMessages(messages, true);
+    });
+
+    // Listen for message deletions
+    socket.on('message-deleted', (messageId) => {
+        console.log('🗑️ Message deleted via socket:', messageId);
+        const messageElement = document.querySelector(`[data-id="${messageId}"]`);
+        if (messageElement) {
+            messageElement.remove();
+            showSuccess('Message deleted (by another user)');
+        }
+    });
+
+    // User status updates
+    socket.on('user-status-change', (data) => {
+        console.log('👤 User status change:', data);
+        onlineUsers = data.onlineUsers || [];
+        updateOnlineUsersList(onlineUsers);
+        updateUserStatusIndicator(data.username, data.status);
+    });
+
+    // Typing events
+    socket.on('user-typing-start', (data) => {
+        console.log('⌨️ User started typing:', data.username);
+        showTypingIndicator(data.username);
+    });
+
+    socket.on('user-typing-stop', (data) => {
+        console.log('💤 User stopped typing:', data.username);
+        hideTypingIndicator(data.username);
+    });
+
+    socket.on('disconnect', (reason) => {
+        console.log('🔌 Socket disconnected:', reason);
+    });
+
+    socket.on('connect_error', (error) => {
+        console.error('❌ Socket connection error:', error);
+        // Fallback to HTTP polling if Socket.IO fails
+        if (!window.socketFallback) {
+            window.socketFallback = setInterval(() => {
+                loadMessages();
+            }, 3000);
+            console.log('🔄 Using HTTP polling fallback');
+        }
+    });
+
+    // Send heartbeat every 2 minutes to stay online
+    const heartbeatInterval = setInterval(() => {
+        const username = currentUserSession?.username;
+        if (username && socket.connected) {
+            socket.emit('user-online', username);
+            console.log('💓 Heartbeat sent - keeping user online');
+        }
+    }, 120000); // 2 minutes
+
+    // Cleanup interval on page unload
+    window.addEventListener('beforeunload', () => {
+        clearInterval(heartbeatInterval);
+        if (window.socketFallback) {
+            clearInterval(window.socketFallback);
+        }
+        // Stop Opera Mini polling if active
+        if (operaMessenger) {
+            operaMessenger.stopPolling();
+        }
+    });
+}
+
+// MODIFIED: Update the delete button handler in showMessageContextMenu
+// In the delete button creation section, replace the onclick handler:
+const deleteButton = document.createElement('button');
+deleteButton.textContent = 'Delete';
+deleteButton.className = 'delete-btn';
+deleteButton.onclick = async () => {
+    try {
+        console.log('Deleting message:', messageId, 'Username:', currentUsername);
+        
+        // Use the unified deleteMessageContext function
+        const success = await deleteMessageContext(messageId, currentUsername);
+        
+        if (success) {
+            console.log('✅ Message deleted successfully');
+            
+            // Remove from UI
+            message.remove();
+            showSuccess('Message deleted successfully');
+            
+        } else {
+            throw new Error('Delete failed');
+        }
+        
+    } catch (err) {
+        console.error('Delete error:', err);
+        // Even if server delete fails, remove from UI for better UX
+        message.remove();
+        showSuccess('Message removed locally');
+    }
+    contextMenu.remove();
+};
+
+// The rest of your existing code continues exactly as before...
 
 // NEW: Welcome screen animation function
 function animateWelcomeText() {
@@ -5233,10 +5725,6 @@ function animateWelcomeText() {
         }, 500);
     }, 2500); // Total animation time: 2.5 seconds
 }
-
-// --- CUT HERE ---
-// ... THE REST OF YOUR CODE REMAINS EXACTLY THE SAME ...
-// --- CUT HERE ---
 
 // NEW: Function to initialize main app when user is already logged in
 function initializeMainApp() {
@@ -5404,7 +5892,6 @@ function batchMessageRender(messages, renderFunction) {
     }
 }
 
-// --- CUT HERE ---
 // ===== YOUR EXISTING VARIABLES AND FUNCTIONS =====
 
 let isLogin = true;
@@ -5981,7 +6468,6 @@ function autoResize(textarea) {
     }
 }
 
-// --- CUT HERE ---
 // Helper function to escape HTML
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -6165,126 +6651,6 @@ function hideContainer(containerId) {
     
     // Show chat container and input after closing any section
     showContainer('chat');
-}
-
-// ===== MODIFIED: sendMessage function to save message and get ID =====
-async function sendMessage() {
-    if (isSending || isProcessingCommand) return;
-    isSending = true;
-    
-    const content = elements.messageInput.value.trim();
-    const username = currentUserSession?.username;
-    
-    if (!content || !username) {
-        isSending = false;
-        return showError('Please enter both username and message');
-    }
-
-    // Check for duplicate message in main chat
-    const messageKey = `main-${username}-${content}`;
-    if (lastSentMessages.main[messageKey] && 
-        Date.now() - lastSentMessages.main[messageKey] < 3000) {
-        console.log('Duplicate message prevented in main chat');
-        isSending = false;
-        return;
-    }
-    
-    // Track this message
-    lastSentMessages.main[messageKey] = Date.now();
-
-    // Bad word filtering
-    const lowerContent = content.toLowerCase();
-    if (badWords.some(word => lowerContent.includes(word))) {
-        if (!warnedUsers[username]) {
-            warnedUsers[username] = true;
-            isSending = false;
-            return showError('Warning: bad word detected! If you repeat, you will be banned.');
-        } else {
-            bannedUsers[username] = Date.now() + BAN_DURATION;
-            showError('You used bad words again. Account deleted and banned.');
-            isSending = false;
-            setTimeout(() => {
-                logout();
-            }, 2000);
-            return;
-        }
-    }
-
-    // Spam protection
-    const now = Date.now();
-    if (bannedUsers[username] && bannedUsers[username] > now) {
-        isSending = false;
-        return showError(`You're banned. Wait ${Math.ceil((bannedUsers[username] - now) / 1000)}s.`);
-    }
-    
-    if (!spamTracker[username]) {
-        spamTracker[username] = [];
-    }
-    spamTracker[username].push(now);
-    spamTracker[username] = spamTracker[username].filter(ts => now - ts <= SPAM_WINDOW);
-    
-    if (spamTracker[username].length > SPAM_LIMIT) {
-        bannedUsers[username] = now + BAN_DURATION;
-        isSending = false;
-        return showError("You're banned for spamming.");
-    }
-
-    try {
-        elements.sendButton.disabled = true;
-        elements.sendButton.classList.remove('enabled');
-        
-        const payload = { 
-            content, 
-            username, 
-            reply_to: replyToText || null 
-        };
-        
-        // Send message to server via HTTP
-        const token = localStorage.getItem('auth_token');
-        const response = await fetch('/api/messages', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': token ? `Bearer ${token}` : ''
-            },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || 'Failed to send message');
-        }
-
-        // Get the saved message with ID from server
-        const savedMessage = await response.json();
-        
-        // Display message with the actual ID from server
-        displayMessage(savedMessage.content, 'sent', savedMessage.reply_to, savedMessage.username, savedMessage.id, true);
-        
-        // Clear input immediately for better UX
-        elements.messageInput.value = '';
-        autoResize(elements.messageInput);
-        clearReply();
-
-        // Only get AI response if it's NOT a command
-        const PREFIX = '!';
-        if (!content.startsWith(PREFIX)) {
-            fetchChatResponse(content);
-        }
-        
-    } catch (error) {
-        showError(error.message);
-        
-        // Remove from tracking on error
-        delete lastSentMessages.main[messageKey];
-    } finally {
-        setTimeout(() => {
-            isSending = false;
-            const hasText = elements.messageInput.value.trim().length > 0;
-            elements.sendButton.disabled = !hasText;
-            elements.sendButton.classList.toggle('enabled', hasText);
-        }, 500);
-    }
 }
 
 async function sendPrivateMessage() {
@@ -6785,27 +7151,19 @@ function showMessageContextMenu(e, message) {
             try {
                 console.log('Deleting message:', messageId, 'Username:', currentUsername);
                 
-                // Delete from server
-                const token = localStorage.getItem('auth_token');
-                const response = await fetch(`/api/messages/${messageId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': token ? `Bearer ${token}` : '',
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ username: currentUsername })
-                });
+                // Delete from server using unified function
+                const success = await deleteMessageContext(messageId, currentUsername);
                 
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.error || 'Delete failed');
+                if (success) {
+                    console.log('✅ Message deleted from server');
+                    
+                    // Remove from UI
+                    message.remove();
+                    showSuccess('Message deleted successfully');
+                    
+                } else {
+                    throw new Error('Delete failed');
                 }
-                
-                console.log('✅ Message deleted from server');
-                
-                // Remove from UI
-                message.remove();
-                showSuccess('Message deleted successfully');
                 
             } catch (err) {
                 console.error('Delete error:', err);
@@ -7148,6 +7506,11 @@ function logout() {
         socket.emit('user-offline', username);
         // Disconnect socket
         socket.disconnect();
+    }
+    
+    // Stop Opera Mini polling if active
+    if (operaMessenger) {
+        operaMessenger.stopPolling();
     }
     
     // Clear user session from both storage locations
@@ -8664,156 +9027,6 @@ function renderMessages(messages, isFirstLoad = false) {
     
     // Update scroll state after rendering messages
     setTimeout(updateScrollState, 0);
-}
-
-// ===== MODIFIED: Socket.io handler to update message IDs =====
-function initSocket() {
-    console.log('🔌 Initializing socket connection...');
-    
-    socket = io({
-        transports: ['polling', 'websocket'],
-        upgrade: false,
-        forceNew: true,
-        reconnection: true,
-        reconnectionAttempts: 10,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        timeout: 20000
-    });
-    
-    socket.on('connect', () => {
-        console.log('✅ Socket connected');
-        const username = currentUserSession?.username;
-        if (username) {
-            socket.emit('user-online', username);
-        }
-        
-        // Add touch listeners to existing messages after socket connects
-        setTimeout(addTouchListenersToExistingMessages, 1000);
-    });
-
-    // Listen for new messages in real-time
-    socket.on('new-message', (message) => {
-        console.log('💬 New message received via socket:', message);
-        
-        const isOwnMessage = message.username === currentUserSession?.username;
-        const isAIResponse = message.username === 'AI' || message.username === 'Bot';
-        
-        // Check if we already have this message displayed (without ID)
-        if (isOwnMessage) {
-            // Find messages from this user without an ID and update them
-            const userMessages = document.querySelectorAll(`.message[data-username="${message.username}"]:not([data-id]), .message.sent:not([data-id])`);
-            userMessages.forEach(msg => {
-                if (msg.dataset.content === message.content && !msg.dataset.id) {
-                    // Update the message with the ID
-                    msg.dataset.id = message.id;
-                    msg.setAttribute('data-id', message.id);
-                    console.log('✅ Updated message with ID:', message.id);
-                }
-            });
-        }
-        
-        // Only display if we don't already have it
-        const existingMessage = document.querySelector(`[data-id="${message.id}"]`);
-        if (!existingMessage && (!isOwnMessage || isAIResponse)) {
-            displayMessage(
-                message.content, 
-                isOwnMessage ? 'sent' : 'received', 
-                message.reply_to, 
-                message.username, 
-                message.id, 
-                true
-            );
-            
-            if (document.visibilityState !== 'visible' && !isOwnMessage) {
-                showNotification(message.username, message.content);
-            }
-        }
-    });
-
-    // Listen for message history when first connecting
-    socket.on('chat-messages', (messages) => {
-        console.log('📨 Received message history:', messages.length, 'messages');
-        renderMessages(messages, true);
-    });
-
-    // Listen for message deletions
-    socket.on('message-deleted', (messageId) => {
-        console.log('🗑️ Message deleted via socket:', messageId);
-        const messageElement = document.querySelector(`[data-id="${messageId}"]`);
-        if (messageElement) {
-            messageElement.remove();
-            showSuccess('Message deleted (by another user)');
-        }
-    });
-
-    // User status updates
-    socket.on('user-status-change', (data) => {
-        console.log('👤 User status change:', data);
-        onlineUsers = data.onlineUsers || [];
-        updateOnlineUsersList(onlineUsers);
-        updateUserStatusIndicator(data.username, data.status);
-    });
-
-    // Typing events
-    socket.on('user-typing-start', (data) => {
-        console.log('⌨️ User started typing:', data.username);
-        showTypingIndicator(data.username);
-    });
-
-    socket.on('user-typing-stop', (data) => {
-        console.log('💤 User stopped typing:', data.username);
-        hideTypingIndicator(data.username);
-    });
-
-    socket.on('disconnect', (reason) => {
-        console.log('🔌 Socket disconnected:', reason);
-    });
-
-    socket.on('connect_error', (error) => {
-        console.error('❌ Socket connection error:', error);
-        // Fallback to HTTP polling if Socket.IO fails
-        if (!window.socketFallback) {
-            window.socketFallback = setInterval(() => {
-                loadMessages();
-            }, 3000);
-            console.log('🔄 Using HTTP polling fallback');
-        }
-    });
-
-    // Send heartbeat every 2 minutes to stay online
-    const heartbeatInterval = setInterval(() => {
-        const username = currentUserSession?.username;
-        if (username && socket.connected) {
-            socket.emit('user-online', username);
-            console.log('💓 Heartbeat sent - keeping user online');
-        }
-    }, 120000); // 2 minutes
-
-    // Cleanup interval on page unload
-    window.addEventListener('beforeunload', () => {
-        clearInterval(heartbeatInterval);
-        if (window.socketFallback) {
-            clearInterval(window.socketFallback);
-        }
-    });
-}
-
-// ===== NEW: Helper function to ensure message has ID before deletion =====
-function ensureMessageHasId(messageElement) {
-    if (!messageElement.dataset.id || messageElement.dataset.id === 'undefined' || messageElement.dataset.id === 'null') {
-        // Try to find if this message exists on server by content and username
-        const content = messageElement.dataset.content;
-        const username = messageElement.dataset.username;
-        
-        if (content && username) {
-            console.log('🔍 Message missing ID, searching by content:', content.substring(0, 50));
-            // In a real app, you might want to query the server for this message
-            // For now, we'll return null which will prevent deletion
-            return null;
-        }
-    }
-    return messageElement.dataset.id;
 }
 
 // Update online users lists
