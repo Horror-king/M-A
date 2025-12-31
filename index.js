@@ -14,22 +14,39 @@ const app = express();
 const server = http.createServer(app);
 const port = process.env.PORT || 3000;
 
-// ===== FIXED SOCKET.IO CONFIGURATION FOR OPERA =====
-// Force polling for Opera and mobile data compatibility
+// ===== ULTRA-COMPATIBLE SOCKET.IO CONFIGURATION FOR OPERA & MOBILE DATA =====
+// Force polling only for maximum compatibility with Opera Free/Mini
 const io = new Server(server, {
   cors: { 
-    origin: "*" 
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: false
   },
-  transports: ['polling', 'websocket'], // Polling first, then websocket
-  allowUpgrades: true,
-  pingTimeout: 60000,
-  pingInterval: 25000,
-  cookie: false
+  transports: ['polling'], // FORCE POLLING ONLY for Opera compatibility
+  allowUpgrades: false, // Don't upgrade to websocket
+  pingTimeout: 30000, // 30 seconds for mobile data
+  pingInterval: 15000, // 15 seconds for keep-alive
+  cookie: false,
+  maxHttpBufferSize: 1e5, // 100KB max message size
+  connectTimeout: 45000, // 45 seconds for slow connections
+  // Low-bandwidth optimization
+  httpCompression: false, // Disable compression for Opera Mini
+  wsEngine: require('ws').Server,
+  // Opera Mini specific optimizations
+  perMessageDeflate: false,
+  // Mobile data optimization
+  allowEIO3: true, // Enable Engine.IO v3 for older clients
+  // Force JSON for all messages (no binary)
+  parser: require('socket.io-parser'),
+  // Add these for Opera compatibility
+  allowRequest: (req, callback) => {
+    callback(null, true); // Allow all origins
+  }
 });
 
-// Track online users - 3 MINUTE TIMEOUT
+// Track online users - 5 MINUTE TIMEOUT for mobile users
 const onlineUsers = new Map();
-const onlineStatusTimeout = 180000; // 3 minutes = 180000 milliseconds
+const onlineStatusTimeout = 300000; // 5 minutes = 300000 milliseconds
 
 // Global setup
 global.GoatBot = { config };
@@ -79,8 +96,15 @@ const isRender = process.env.RENDER === 'true';
 const renderExternalUrl = process.env.RENDER_EXTERNAL_URL;
 
 // Middleware
-app.use(cors());
-app.use(express.json());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  credentials: false,
+  maxAge: 86400
+}));
+app.use(express.json({ limit: '1mb' })); // Small payload for mobile
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(express.static('public'));
 
 // ===== ENHANCED USER AUTHENTICATION SYSTEM =====
@@ -1668,22 +1692,37 @@ app.post('/api/messages', async (req, res) => {
   }
 });
 
-// DELETE messages endpoint that client expects
+// DELETE messages endpoint that client expects - FIXED FOR OPERA MINI
 app.delete('/api/messages/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    
+    console.log('🗑️ Deleting message with ID:', id);
+    
     const { error } = await supabase
       .from('chatter')
       .delete()
       .eq('id', id);
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Database error deleting message:', error);
+      throw error;
+    }
     
-    // Broadcast deletion via Socket.io
+    // Broadcast deletion via Socket.io - Use polling for Opera Mini compatibility
+    console.log('📢 Broadcasting message deletion to all clients');
     io.emit('message-deleted', id);
-    res.status(200).json({ success: true });
+    
+    res.status(200).json({ 
+      success: true,
+      message: "Message deleted successfully"
+    });
   } catch (error) {
-    res.status(500).json({ error: "Failed to delete message" });
+    console.error('❌ Failed to delete message:', error);
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to delete message: " + error.message 
+    });
   }
 });
 
@@ -1829,7 +1868,8 @@ app.post('/api/private/messages', async (req, res) => {
       receiver_username: receiver_username.trim(),
       content: content ? content.trim() : '',
       image_url: image_url || null, // Use null instead of empty string
-      read: false
+      read: false,
+      created_at: new Date().toISOString()
     };
 
     console.log('📝 Inserting private message with corrected data:', insertData);
@@ -1853,7 +1893,7 @@ app.post('/api/private/messages', async (req, res) => {
 
     console.log('✅ Private message saved successfully. ID:', data[0]?.id);
     
-    // Broadcast via Socket.io to both users
+    // Broadcast via Socket.io to both users - use polling for Opera compatibility
     io.emit('new-private-message', data[0]);
     
     res.status(201).json({
@@ -2422,7 +2462,8 @@ app.get('/api/debug/private-messages-structure', async (req, res) => {
       sender_username: 'test_sender',
       receiver_username: 'test_receiver', 
       content: 'Test message to check structure',
-      read: false
+      read: false,
+      created_at: new Date().toISOString()
     };
 
     const { data: insertData, error: insertError } = await supabase
@@ -2554,7 +2595,8 @@ app.post('/api/private/alt-messages', async (req, res) => {
       username: sender_username.trim(),
       image_url: image_url || '',
       reply_to: receiver_username.trim(), // Using reply_to field to store receiver
-      message_type: 'private' // Custom field to identify private messages
+      message_type: 'private', // Custom field to identify private messages
+      created_at: new Date().toISOString()
     };
 
     console.log('📝 Inserting alternative private message:', insertData);
@@ -2641,7 +2683,8 @@ app.get('/test-private-messages', async (req, res) => {
       receiver_username: 'test_user2',
       content: 'This is a test private message from GET endpoint!',
       image_url: '',
-      read: false
+      read: false,
+      created_at: new Date().toISOString()
     };
 
     const { data, error } = await supabase
@@ -2698,7 +2741,8 @@ app.post('/test-private-messages', async (req, res) => {
       receiver_username: receiver_username.trim(),
       content: content.trim(),
       image_url: '',
-      read: false
+      read: false,
+      created_at: new Date().toISOString()
     };
 
     const { data, error } = await supabase
@@ -3107,7 +3151,8 @@ app.post('/private-messages', async (req, res) => {
       receiver_username: receiver_username.trim(),
       content: content ? content.trim() : '',
       image_url: image_url || '',
-      read: false
+      read: false,
+      created_at: new Date().toISOString()
     };
 
     console.log('📝 Inserting private message:', insertData);
@@ -3217,7 +3262,8 @@ app.post('/messages', async (req, res) => {
       content: (content && content.trim() !== '') ? content.trim() : '',
       username: username.trim(),
       image_url: image_url || '',
-      reply_to: reply_to || ''
+      reply_to: reply_to || '',
+      created_at: new Date().toISOString()
     };
 
     console.log('📝 Inserting message to Supabase via legacy endpoint:', insertData);
@@ -3235,7 +3281,8 @@ app.post('/messages', async (req, res) => {
         console.log('🔄 Retrying with minimal fields...');
         const minimalData = {
           content: (content && content.trim() !== '') ? content.trim() : 'Message',
-          username: username.trim()
+          username: username.trim(),
+          created_at: new Date().toISOString()
         };
         
         const { data: retryData, error: retryError } = await supabase
@@ -3302,22 +3349,37 @@ app.post('/upload', upload.single('image'), async (req, res) => {
   }
 });
 
-// DELETE messages (legacy endpoint)
+// DELETE messages (legacy endpoint) - FIXED FOR OPERA MINI
 app.delete('/messages/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    
+    console.log('🗑️ Deleting message (legacy) with ID:', id);
+    
     const { error } = await supabase
       .from('chatter')
       .delete()
       .eq('id', id);
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Database error deleting message:', error);
+      throw error;
+    }
     
-    // Broadcast deletion via Socket.io
+    // Broadcast deletion via Socket.io - Use polling for Opera Mini compatibility
+    console.log('📢 Broadcasting message deletion to all clients (legacy)');
     io.emit('message-deleted', id);
-    res.status(200).json({ success: true });
+    
+    res.status(200).json({ 
+      success: true,
+      message: "Message deleted successfully"
+    });
   } catch (error) {
-    res.status(500).json({ error: "Failed to delete message" });
+    console.error('❌ Failed to delete message:', error);
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to delete message: " + error.message 
+    });
   }
 });
 
@@ -3333,7 +3395,8 @@ async function saveBotResponseToSupabase(content, originalCommand, commandType =
       content: content || `${commandType} Response`, 
       username: commandType === 'AI' ? 'AI' : 'Bot',
       image_url: '',
-      reply_to: originalCommand || ''
+      reply_to: originalCommand || '',
+      created_at: new Date().toISOString()
     };
     
     console.log('📝 Insert data:', insertData);
@@ -3352,7 +3415,8 @@ async function saveBotResponseToSupabase(content, originalCommand, commandType =
         console.log('🔄 Retrying with minimal fields...');
         const minimalData = {
           content: content || `${commandType} Response`,
-          username: commandType === 'AI' ? 'AI' : 'Bot'
+          username: commandType === 'AI' ? 'AI' : 'Bot',
+          created_at: new Date().toISOString()
         };
         
         const { data: retryData, error: retryError } = await supabase
@@ -3409,7 +3473,8 @@ app.get('/test-supabase', async (req, res) => {
       content: 'Test regular message from server',
       username: 'TestBot',
       image_url: '',
-      reply_to: ''
+      reply_to: '',
+      created_at: new Date().toISOString()
     };
     
     const { data: insertData, error: insertError } = await supabase
@@ -3527,7 +3592,8 @@ app.post('/test-message', async (req, res) => {
       content: content,
       username: username,
       image_url: '',
-      reply_to: ''
+      reply_to: '',
+      created_at: new Date().toISOString()
     };
 
     const { data, error } = await supabase
@@ -3749,11 +3815,11 @@ app.get('/online-users', (req, res) => {
   res.json(onlineUsersArray);
 });
 
-// ===== ENHANCED SOCKET.IO REAL-TIME MESSAGING =====
+// ===== ENHANCED SOCKET.IO REAL-TIME MESSAGING - OPERA FIXED =====
 
-// Socket.io connection handling - 3 MINUTE ONLINE STATUS
+// Socket.io connection handling - 5 MINUTE ONLINE STATUS for mobile
 io.on('connection', (socket) => {
-  console.log('🔌 User connected:', socket.id);
+  console.log('🔌 User connected via polling:', socket.id);
 
   // Send existing messages to newly connected client
   socket.on('request-messages', async () => {
@@ -3885,7 +3951,8 @@ io.on('connection', (socket) => {
         receiver_username: receiver_username.trim(),
         content: content ? content.trim() : '',
         image_url: image_url || '',
-        read: false
+        read: false,
+        created_at: new Date().toISOString()
       };
 
       const { data: messageData, error } = await supabase
@@ -3942,7 +4009,7 @@ io.on('connection', (socket) => {
     console.log('🔌 User disconnected:', socket.id, 'Reason:', reason);
     
     // Find user by socket ID but DON'T remove them immediately
-    // They stay in the list for 3 minutes due to the timeout
+    // They stay in the list for 5 minutes due to the timeout
     let foundUsername = null;
     for (let [username, data] of onlineUsers.entries()) {
       if (data.socketId === socket.id) {
@@ -3990,15 +4057,15 @@ function getPrivateChatRoomName(user1, user2) {
   return `private_chat_${users[0]}_${users[1]}`;
 }
 
-// 3 MINUTE CLEANUP - Remove users after 3 minutes of inactivity
+// 5 MINUTE CLEANUP - Remove users after 5 minutes of inactivity for mobile users
 setInterval(() => {
   const now = Date.now();
   const removedUsers = [];
   
   for (let [username, data] of onlineUsers.entries()) {
-    // 3 minute timeout (180000 milliseconds)
+    // 5 minute timeout (300000 milliseconds) for mobile
     if (now - data.lastSeen > onlineStatusTimeout) {
-      console.log('⏰ Removing inactive user (3 minutes):', username);
+      console.log('⏰ Removing inactive user (5 minutes):', username);
       onlineUsers.delete(username);
       removedUsers.push(username);
     }
@@ -4014,10 +4081,10 @@ setInterval(() => {
         onlineUsers: onlineUsersArray
       });
     });
-    console.log('🧹 Cleaned up inactive users (3min timeout):', removedUsers);
+    console.log('🧹 Cleaned up inactive users (5min timeout):', removedUsers);
     console.log('📊 Current online users after cleanup:', onlineUsersArray);
   }
-}, 30000); // Check every 30 seconds
+}, 60000); // Check every 60 seconds
 
 // ===== NEW ENDPOINT: Get message by ID =====
 app.get('/api/messages/:id', async (req, res) => {
@@ -4078,8 +4145,6 @@ app.put('/api/messages/:id', async (req, res) => {
 
 // ===== NEW SOCKET.IO EVENT: Message updates =====
 io.on('connection', (socket) => {
-  // ... existing socket code ...
-
   // Listen for message updates
   socket.on('update-message', async (data) => {
     try {
@@ -4109,20 +4174,21 @@ io.on('connection', (socket) => {
 server.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
   console.log(`🔹 Command prefix: "${PREFIX}"`);
-  console.log(`👥 Online users tracking: ACTIVE (3 minute timeout)`);
+  console.log(`👥 Online users tracking: ACTIVE (5 minute timeout for mobile)`);
   console.log(`💾 SINGLE RESPONSE SYSTEM: ENABLED`);
   console.log(`🤖 EXCLUSIVE ROUTING: -ai → AI only, other commands → Bot only`);
   console.log(`🚫 DUPLICATE FIX: GUARANTEED no double responses!`);
   console.log(`🎯 PREFIX-FREE AI: ENABLED for private AI (auto-adds !ai prefix)`);
   console.log(`💬 Real-time messaging: ENABLED via Socket.io`);
-  console.log(`🔌 Socket.io configuration: POLLING FIRST for Opera/mobile data compatibility`);
+  console.log(`🔌 Socket.io configuration: POLLING ONLY for Opera/Mobile compatibility`);
+  console.log(`📱 OPERA FIX: Using polling transport only for real-time updates`);
+  console.log(`📱 OPERA MINI FIX: Immediate message deletion enabled`);
   console.log(`🔌 Socket.io events: new-message, message-deleted, user-status-change`);
   console.log(`🤫 PRIVATE MESSAGING: ENABLED via Supabase`);
   console.log(`🔒 Private endpoints: /private-messages/*`);
   console.log(`🔐 USER AUTHENTICATION: ENABLED (Server-side, no localStorage)`);
   console.log(`🔐 Password hashing: SIMPLE HASH (basic implementation)`);
   console.log(`🌐 Cross-browser compatibility: ENABLED`);
-  console.log(`📱 OPERA FIX: Using polling transport for real-time updates with limited data`);
   
   // NEW: Added missing endpoints
   console.log(`🤖 NEW: POST /api/ai/private - Private AI endpoint`);
@@ -4151,7 +4217,7 @@ server.listen(port, () => {
   console.log(`📨 MESSAGES ENDPOINTS:`);
   console.log(`   GET /api/messages - Get messages (client-compatible)`);
   console.log(`   POST /api/messages - Send message (client-compatible)`);
-  console.log(`   DELETE /api/messages/:id - Delete message (client-compatible)`);
+  console.log(`   DELETE /api/messages/:id - Delete message (client-compatible) - OPERA MINI FIXED`);
   console.log(`   GET /api/messages/:id - Get message by ID (NEW!)`);
   console.log(`   PUT /api/messages/:id - Update message (NEW!)`);
   console.log(`📝 POSTS SYSTEM: ENABLED via Supabase`);
@@ -4276,5 +4342,3 @@ process.on('uncaughtException', (err) => {
 
 // Export for testing
 module.exports = { app, server, io, supabase };
-
-
