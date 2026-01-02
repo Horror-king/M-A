@@ -3473,36 +3473,7 @@
     .comment-input {
         gap: 8px;
     }
-    /* Add this to your existing CSS */
-.avatar, .avatar img {
-    width: 28px !important;
-    height: 28px !important;
-    border-radius: 50% !important;
-    object-fit: cover !important;
-    display: block !important;
-}
-
-.message img:not(.avatar img) {
-    max-width: 100% !important;
-    height: auto !important;
-    border-radius: 10px !important;
-    object-fit: contain !important;
-    display: block !important;
-}
-
-/* For PDF generation - ensure images don't get resized */
-@media print {
-    .avatar, .avatar img {
-        width: 28px !important;
-        height: 28px !important;
-        border-radius: 50% !important;
-    }
     
-    .message img:not(.avatar img) {
-        max-width: 100% !important;
-        height: auto !important;
-    }
-}
     .comment-input input {
         padding: 8px 12px;
         font-size: 13px;
@@ -7365,8 +7336,35 @@ function toggleTheme() {
     }
 }
 
-// --- CUT HERE ---
-// MODIFIED: exportChatPDF function to preserve image sizes and avatar circles
+function clearChat() {
+    const chatContainer = document.getElementById('chat-container');
+    if (chatContainer) {
+        chatContainer.innerHTML = '';
+    }
+    const dropdown = document.querySelector('.kebab-dropdown');
+    if (dropdown) {
+        dropdown.classList.remove('active');
+    }
+}
+
+function exportChat() {
+    const chatContainer = document.getElementById('chat-container');
+    if (!chatContainer) return;
+    
+    const messages = chatContainer.innerText;
+    const blob = new Blob([messages], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'chat-export.txt';
+    a.click();
+    window.URL.revokeObjectURL(url);
+    const dropdown = document.querySelector('.kebab-dropdown');
+    if (dropdown) {
+        dropdown.classList.remove('active');
+    }
+}
+
 function exportChatPDF() {
     const chatContainer = document.getElementById('chat-container');
     if (!chatContainer) return;
@@ -7382,7 +7380,7 @@ function exportChatPDF() {
     downloadingAlert.textContent = 'Preparing download, please wait...';
     downloadingAlert.style.position = 'fixed';
     downloadingAlert.style.top = '20px';
-    downloadingStyle.left = '50%';
+    downloadingAlert.style.left = '50%';
     downloadingAlert.style.transform = 'translateX(-50%)';
     downloadingAlert.style.padding = '10px 20px';
     downloadingAlert.style.backgroundColor = '#333';
@@ -7406,46 +7404,29 @@ function exportChatPDF() {
 
             originalImage.onload = () => {
                 try {
-                    // Store original styles to restore later
-                    const originalStyles = {
-                        display: img.style.display,
-                        width: img.style.width,
-                        height: img.style.height,
-                        maxWidth: img.style.maxWidth,
-                        maxHeight: img.style.maxHeight,
-                        borderRadius: img.style.borderRadius,
-                        objectFit: img.style.objectFit
-                    };
+                    // Store original display style to restore later
+                    const originalDisplay = img.style.display;
+                    const originalWidth = img.style.width;
+                    const originalHeight = img.style.height;
 
-                    // FIXED: Use natural dimensions for images to prevent shrinking
-                    if (img.classList.contains('avatar') || img.closest('.avatar')) {
-                        // For avatar images, preserve circle shape and size
-                        img.style.borderRadius = '50%';
-                        img.style.objectFit = 'cover';
-                        img.style.width = '28px'; // Original avatar size
-                        img.style.height = '28px';
-                        img.style.maxWidth = '28px';
-                        img.style.maxHeight = '28px';
-                    } else {
-                        // For message images, use original dimensions or a reasonable size
-                        img.style.maxWidth = '100%';
-                        img.style.width = 'auto';
-                        img.style.height = 'auto';
-                        img.style.objectFit = 'contain';
-                        img.style.borderRadius = '10px'; // Original message image border radius
-                    }
+                    // Temporarily make image visible and full size for capture
+                    img.style.display = 'block';
+                    img.style.width = 'auto';
+                    img.style.height = 'auto';
+                    img.style.maxWidth = 'none';
+                    img.style.maxHeight = 'none';
 
                     canvas.width = originalImage.naturalWidth;
                     canvas.height = originalImage.naturalHeight;
                     context.drawImage(originalImage, 0, 0);
 
-                    const dataURL = canvas.toDataURL('image/jpeg', 1.0);
+                    const dataURL = canvas.toDataURL('image/png');
                     img.src = dataURL;
 
                     // Restore original styles
-                    Object.keys(originalStyles).forEach(key => {
-                        img.style[key] = originalStyles[key] || '';
-                    });
+                    img.style.display = originalDisplay;
+                    img.style.width = originalWidth;
+                    img.style.height = originalHeight;
 
                     resolve();
                 } catch (error) {
@@ -7474,34 +7455,7 @@ function exportChatPDF() {
                 scrollX: 0,
                 scrollY: 0,
                 windowWidth: document.documentElement.scrollWidth,
-                windowHeight: document.documentElement.scrollHeight,
-                // FIXED: Preserve CSS styles properly
-                backgroundColor: '#ffffff',
-                logging: false,
-                // IMPORTANT: This prevents images from being resized
-                ignoreElements: function(element) {
-                    return false;
-                },
-                onclone: function(clonedDoc) {
-                    // FIXED: Ensure avatar images keep their circle shape
-                    const avatars = clonedDoc.querySelectorAll('.avatar img, .message .avatar img');
-                    avatars.forEach(avatar => {
-                        avatar.style.borderRadius = '50%';
-                        avatar.style.objectFit = 'cover';
-                        avatar.style.width = '28px';
-                        avatar.style.height = '28px';
-                    });
-                    
-                    // FIXED: Ensure message images don't shrink
-                    const messageImages = clonedDoc.querySelectorAll('.message img:not(.avatar img)');
-                    messageImages.forEach(img => {
-                        img.style.maxWidth = '100%';
-                        img.style.width = 'auto';
-                        img.style.height = 'auto';
-                        img.style.objectFit = 'contain';
-                        img.style.borderRadius = '10px';
-                    });
-                }
+                windowHeight: document.documentElement.scrollHeight
             },
             jsPDF: { 
                 unit: 'mm',
@@ -7515,8 +7469,13 @@ function exportChatPDF() {
             }
         };
 
-        // FIXED: Don't modify image styles here - let the onclone handler do it
-        // This was the main issue - we were overriding the styles before PDF generation
+        // Temporarily modify image styles for PDF generation
+        const allImages = clone.querySelectorAll('img');
+        allImages.forEach(img => {
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            img.style.display = 'block';
+        });
 
         html2pdf().set(opt).from(clone).save().then(() => {
             downloadingAlert.remove();
@@ -7528,7 +7487,6 @@ function exportChatPDF() {
         dropdown.classList.remove('active');
     });
 }
-// Eding of pdf
 
 function showSettings() {
     alert('Settings panel coming soon!');
