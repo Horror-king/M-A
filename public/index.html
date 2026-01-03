@@ -7365,6 +7365,7 @@ function exportChat() {
     }
 }
 
+// ===== MODIFIED: EXPORT CHAT PDF FUNCTION - FIXED FOR IMAGES AND AVATARS =====
 function exportChatPDF() {
     const chatContainer = document.getElementById('chat-container');
     if (!chatContainer) return;
@@ -7390,12 +7391,38 @@ function exportChatPDF() {
     downloadingAlert.style.zIndex = '9999';
     document.body.appendChild(downloadingAlert);
 
+    // Fix for avatars: Ensure they are displayed as circles
+    const avatarImages = clone.querySelectorAll('.avatar img');
+    avatarImages.forEach(img => {
+        // Ensure avatar images are displayed as circles
+        img.style.borderRadius = '50%';
+        img.style.width = '40px';
+        img.style.height = '40px';
+        img.style.objectFit = 'cover';
+        img.style.display = 'block';
+    });
+
+    // Fix for message images: Ensure they maintain aspect ratio
+    const messageImages = clone.querySelectorAll('.message img:not(.avatar img)');
+    messageImages.forEach(img => {
+        img.style.maxWidth = '100%';
+        img.style.height = 'auto';
+        img.style.borderRadius = '8px';
+        img.style.display = 'block';
+    });
+
     // Find all images and replace src with base64
     const images = clone.querySelectorAll('img');
     const promises = [];
 
     images.forEach(img => {
         const promise = new Promise((resolve, reject) => {
+            // Skip if already data URL
+            if (img.src.startsWith('data:')) {
+                resolve();
+                return;
+            }
+
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
             const originalImage = new Image();
@@ -7408,25 +7435,23 @@ function exportChatPDF() {
                     const originalDisplay = img.style.display;
                     const originalWidth = img.style.width;
                     const originalHeight = img.style.height;
+                    const originalBorderRadius = img.style.borderRadius;
+                    const originalObjectFit = img.style.objectFit;
 
-                    // Temporarily make image visible and full size for capture
-                    img.style.display = 'block';
-                    img.style.width = 'auto';
-                    img.style.height = 'auto';
-                    img.style.maxWidth = 'none';
-                    img.style.maxHeight = 'none';
-
+                    // Set canvas dimensions
                     canvas.width = originalImage.naturalWidth;
                     canvas.height = originalImage.naturalHeight;
                     context.drawImage(originalImage, 0, 0);
 
-                    const dataURL = canvas.toDataURL('image/png');
+                    const dataURL = canvas.toDataURL('image/jpeg', 0.9);
                     img.src = dataURL;
 
                     // Restore original styles
                     img.style.display = originalDisplay;
                     img.style.width = originalWidth;
                     img.style.height = originalHeight;
+                    img.style.borderRadius = originalBorderRadius;
+                    img.style.objectFit = originalObjectFit;
 
                     resolve();
                 } catch (error) {
@@ -7439,6 +7464,11 @@ function exportChatPDF() {
                 console.error('Error loading image:', img.src);
                 resolve();
             };
+            
+            // Set a timeout in case image never loads
+            setTimeout(() => {
+                resolve();
+            }, 5000);
         });
         promises.push(promise);
     });
@@ -7447,7 +7477,7 @@ function exportChatPDF() {
         const opt = {
             margin: 10,
             filename: 'chat-export.pdf',
-            image: { type: 'jpeg', quality: 1 },
+            image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { 
                 scale: 2,
                 useCORS: true,
@@ -7455,7 +7485,9 @@ function exportChatPDF() {
                 scrollX: 0,
                 scrollY: 0,
                 windowWidth: document.documentElement.scrollWidth,
-                windowHeight: document.documentElement.scrollHeight
+                windowHeight: document.documentElement.scrollHeight,
+                backgroundColor: '#ffffff',
+                logging: false
             },
             jsPDF: { 
                 unit: 'mm',
@@ -7469,22 +7501,41 @@ function exportChatPDF() {
             }
         };
 
-        // Temporarily modify image styles for PDF generation
-        const allImages = clone.querySelectorAll('img');
-        allImages.forEach(img => {
-            img.style.maxWidth = '100%';
-            img.style.height = 'auto';
-            img.style.display = 'block';
-        });
+        // Add styles to ensure proper rendering
+        const style = document.createElement('style');
+        style.textContent = `
+            .avatar img {
+                border-radius: 50% !important;
+                width: 40px !important;
+                height: 40px !important;
+                object-fit: cover !important;
+                display: block !important;
+            }
+            .message img:not(.avatar img) {
+                max-width: 100% !important;
+                height: auto !important;
+                border-radius: 8px !important;
+                display: block !important;
+            }
+            .message {
+                page-break-inside: avoid !important;
+            }
+        `;
+        clone.appendChild(style);
 
         html2pdf().set(opt).from(clone).save().then(() => {
             downloadingAlert.remove();
         }).catch((error) => {
             console.error('Error generating PDF:', error);
             downloadingAlert.remove();
+            showError('Failed to generate PDF. Please try again.');
         });
 
         dropdown.classList.remove('active');
+    }).catch((error) => {
+        console.error('Error processing images:', error);
+        downloadingAlert.remove();
+        showError('Failed to process images for PDF.');
     });
 }
 
