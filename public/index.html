@@ -7338,11 +7338,12 @@ function toggleTheme() {
 
 // --- CUT HERE ---
 
+// --- CUT HERE ---
+
 function clearChat() {
     const chatContainer = document.getElementById('chat-container');
-    if (chatContainer) {
-        chatContainer.innerHTML = '';
-    }
+    if (chatContainer) chatContainer.innerHTML = '';
+
     const dropdown = document.querySelector('.kebab-dropdown');
     if (dropdown) dropdown.classList.remove('active');
 }
@@ -7351,19 +7352,15 @@ function exportChat() {
     const chatContainer = document.getElementById('chat-container');
     if (!chatContainer) return;
 
-    const messages = chatContainer.innerText;
-    const blob = new Blob([messages], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
+    const blob = new Blob([chatContainer.innerText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
 
     const a = document.createElement('a');
     a.href = url;
     a.download = 'chat-export.txt';
     a.click();
 
-    window.URL.revokeObjectURL(url);
-
-    const dropdown = document.querySelector('.kebab-dropdown');
-    if (dropdown) dropdown.classList.remove('active');
+    URL.revokeObjectURL(url);
 }
 
 function exportChatPDF() {
@@ -7373,40 +7370,47 @@ function exportChatPDF() {
     const dropdown = document.querySelector('.kebab-dropdown');
     if (dropdown) dropdown.classList.remove('active');
 
+    // 🔹 Clone chat
     const clone = chatContainer.cloneNode(true);
 
-    // 🔒 IMPORTANT: Preserve all image styles
-    clone.querySelectorAll('img').forEach(img => {
-        img.style.objectFit = 'cover';
-        img.style.maxWidth = img.style.maxWidth || 'unset';
-        img.style.height = img.style.height || 'auto';
+    // 🔹 Create hidden wrapper (CRITICAL FIX)
+    const wrapper = document.createElement('div');
+    wrapper.style.position = 'fixed';
+    wrapper.style.left = '-9999px';
+    wrapper.style.top = '0';
+    wrapper.style.width = chatContainer.offsetWidth + 'px';
+    wrapper.style.background = '#fff';
+    wrapper.appendChild(clone);
+    document.body.appendChild(wrapper);
 
-        // Preserve circular avatars
-        const computedRadius = window.getComputedStyle(img).borderRadius;
-        if (computedRadius) {
-            img.style.borderRadius = computedRadius;
-        }
+    // 🔒 Preserve images exactly
+    clone.querySelectorAll('img').forEach(img => {
+        const style = window.getComputedStyle(img);
+        img.style.width = style.width;
+        img.style.height = style.height;
+        img.style.objectFit = style.objectFit || 'cover';
+        img.style.borderRadius = style.borderRadius;
+        img.style.maxWidth = 'unset';
     });
 
-    // Download alert
-    const downloadingAlert = document.createElement('div');
-    downloadingAlert.textContent = 'Preparing PDF, please wait...';
-    downloadingAlert.style.cssText = `
+    // 🔔 Download alert
+    const alertBox = document.createElement('div');
+    alertBox.textContent = 'Preparing PDF, please wait...';
+    alertBox.style.cssText = `
         position:fixed;
         top:20px;
         left:50%;
         transform:translateX(-50%);
-        padding:10px 20px;
         background:#333;
         color:#fff;
+        padding:10px 20px;
         border-radius:8px;
-        z-index:9999;
-        font-size:16px;
+        z-index:10000;
     `;
-    document.body.appendChild(downloadingAlert);
+    document.body.appendChild(alertBox);
 
-    const opt = {
-        margin: [10, 10, 10, 10],
+    const options = {
+        margin: 10,
         filename: 'chat-export.pdf',
         image: { type: 'png', quality: 1 },
         html2canvas: {
@@ -7421,19 +7425,23 @@ function exportChatPDF() {
             format: 'a4',
             orientation: 'portrait'
         },
-        pagebreak: {
-            mode: ['avoid-all', 'css']
-        }
+        pagebreak: { mode: ['avoid-all', 'css'] }
     };
 
+    // ✅ Generate PDF
     html2pdf()
-        .set(opt)
+        .set(options)
         .from(clone)
         .save()
-        .then(() => downloadingAlert.remove())
+        .then(() => {
+            alertBox.remove();
+            wrapper.remove(); // cleanup
+        })
         .catch(err => {
-            console.error('PDF export error:', err);
-            downloadingAlert.remove();
+            console.error('PDF download failed:', err);
+            alertBox.remove();
+            wrapper.remove();
+            alert('PDF download failed. Check console.');
         });
 }
 
