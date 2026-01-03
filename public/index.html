@@ -7336,217 +7336,115 @@ function toggleTheme() {
     }
 }
 
+// --- CUT HERE ---
+
 function clearChat() {
     const chatContainer = document.getElementById('chat-container');
     if (chatContainer) {
         chatContainer.innerHTML = '';
     }
     const dropdown = document.querySelector('.kebab-dropdown');
-    if (dropdown) {
-        dropdown.classList.remove('active');
-    }
+    if (dropdown) dropdown.classList.remove('active');
 }
 
 function exportChat() {
     const chatContainer = document.getElementById('chat-container');
     if (!chatContainer) return;
-    
+
     const messages = chatContainer.innerText;
     const blob = new Blob([messages], { type: 'text/plain' });
     const url = window.URL.createObjectURL(blob);
+
     const a = document.createElement('a');
     a.href = url;
     a.download = 'chat-export.txt';
     a.click();
+
     window.URL.revokeObjectURL(url);
+
     const dropdown = document.querySelector('.kebab-dropdown');
-    if (dropdown) {
-        dropdown.classList.remove('active');
-    }
+    if (dropdown) dropdown.classList.remove('active');
 }
 
-// ===== MODIFIED: EXPORT CHAT PDF FUNCTION - FIXED FOR IMAGES AND AVATARS =====
 function exportChatPDF() {
     const chatContainer = document.getElementById('chat-container');
     if (!chatContainer) return;
-    
+
     const dropdown = document.querySelector('.kebab-dropdown');
-    if (!dropdown) return;
+    if (dropdown) dropdown.classList.remove('active');
 
     const clone = chatContainer.cloneNode(true);
 
-    // Show downloading alert
+    // 🔒 IMPORTANT: Preserve all image styles
+    clone.querySelectorAll('img').forEach(img => {
+        img.style.objectFit = 'cover';
+        img.style.maxWidth = img.style.maxWidth || 'unset';
+        img.style.height = img.style.height || 'auto';
+
+        // Preserve circular avatars
+        const computedRadius = window.getComputedStyle(img).borderRadius;
+        if (computedRadius) {
+            img.style.borderRadius = computedRadius;
+        }
+    });
+
+    // Download alert
     const downloadingAlert = document.createElement('div');
-    downloadingAlert.id = 'downloading-alert';
-    downloadingAlert.textContent = 'Preparing download, please wait...';
-    downloadingAlert.style.position = 'fixed';
-    downloadingAlert.style.top = '20px';
-    downloadingAlert.style.left = '50%';
-    downloadingAlert.style.transform = 'translateX(-50%)';
-    downloadingAlert.style.padding = '10px 20px';
-    downloadingAlert.style.backgroundColor = '#333';
-    downloadingAlert.style.color = '#fff';
-    downloadingAlert.style.fontSize = '16px';
-    downloadingAlert.style.borderRadius = '8px';
-    downloadingAlert.style.zIndex = '9999';
+    downloadingAlert.textContent = 'Preparing PDF, please wait...';
+    downloadingAlert.style.cssText = `
+        position:fixed;
+        top:20px;
+        left:50%;
+        transform:translateX(-50%);
+        padding:10px 20px;
+        background:#333;
+        color:#fff;
+        border-radius:8px;
+        z-index:9999;
+        font-size:16px;
+    `;
     document.body.appendChild(downloadingAlert);
 
-    // Fix for avatars: Ensure they are displayed as circles
-    const avatarImages = clone.querySelectorAll('.avatar img');
-    avatarImages.forEach(img => {
-        // Ensure avatar images are displayed as circles
-        img.style.borderRadius = '50%';
-        img.style.width = '40px';
-        img.style.height = '40px';
-        img.style.objectFit = 'cover';
-        img.style.display = 'block';
-    });
+    const opt = {
+        margin: [10, 10, 10, 10],
+        filename: 'chat-export.pdf',
+        image: { type: 'png', quality: 1 },
+        html2canvas: {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            scrollX: 0,
+            scrollY: 0
+        },
+        jsPDF: {
+            unit: 'mm',
+            format: 'a4',
+            orientation: 'portrait'
+        },
+        pagebreak: {
+            mode: ['avoid-all', 'css']
+        }
+    };
 
-    // Fix for message images: Ensure they maintain aspect ratio
-    const messageImages = clone.querySelectorAll('.message img:not(.avatar img)');
-    messageImages.forEach(img => {
-        img.style.maxWidth = '100%';
-        img.style.height = 'auto';
-        img.style.borderRadius = '8px';
-        img.style.display = 'block';
-    });
-
-    // Find all images and replace src with base64
-    const images = clone.querySelectorAll('img');
-    const promises = [];
-
-    images.forEach(img => {
-        const promise = new Promise((resolve, reject) => {
-            // Skip if already data URL
-            if (img.src.startsWith('data:')) {
-                resolve();
-                return;
-            }
-
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            const originalImage = new Image();
-            originalImage.crossOrigin = 'anonymous';
-            originalImage.src = img.src;
-
-            originalImage.onload = () => {
-                try {
-                    // Store original display style to restore later
-                    const originalDisplay = img.style.display;
-                    const originalWidth = img.style.width;
-                    const originalHeight = img.style.height;
-                    const originalBorderRadius = img.style.borderRadius;
-                    const originalObjectFit = img.style.objectFit;
-
-                    // Set canvas dimensions
-                    canvas.width = originalImage.naturalWidth;
-                    canvas.height = originalImage.naturalHeight;
-                    context.drawImage(originalImage, 0, 0);
-
-                    const dataURL = canvas.toDataURL('image/jpeg', 0.9);
-                    img.src = dataURL;
-
-                    // Restore original styles
-                    img.style.display = originalDisplay;
-                    img.style.width = originalWidth;
-                    img.style.height = originalHeight;
-                    img.style.borderRadius = originalBorderRadius;
-                    img.style.objectFit = originalObjectFit;
-
-                    resolve();
-                } catch (error) {
-                    console.error('Error converting image:', error);
-                    resolve();
-                }
-            };
-
-            originalImage.onerror = () => {
-                console.error('Error loading image:', img.src);
-                resolve();
-            };
-            
-            // Set a timeout in case image never loads
-            setTimeout(() => {
-                resolve();
-            }, 5000);
-        });
-        promises.push(promise);
-    });
-
-    Promise.all(promises).then(() => {
-        const opt = {
-            margin: 10,
-            filename: 'chat-export.pdf',
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { 
-                scale: 2,
-                useCORS: true,
-                allowTaint: true,
-                scrollX: 0,
-                scrollY: 0,
-                windowWidth: document.documentElement.scrollWidth,
-                windowHeight: document.documentElement.scrollHeight,
-                backgroundColor: '#ffffff',
-                logging: false
-            },
-            jsPDF: { 
-                unit: 'mm',
-                format: 'a4',
-                orientation: 'portrait',
-                hotfixes: ['px_scaling'] 
-            },
-            pagebreak: { 
-                mode: ['avoid-all', 'css', 'legacy'],
-                before: '.page-break' 
-            }
-        };
-
-        // Add styles to ensure proper rendering
-        const style = document.createElement('style');
-        style.textContent = `
-            .avatar img {
-                border-radius: 50% !important;
-                width: 40px !important;
-                height: 40px !important;
-                object-fit: cover !important;
-                display: block !important;
-            }
-            .message img:not(.avatar img) {
-                max-width: 100% !important;
-                height: auto !important;
-                border-radius: 8px !important;
-                display: block !important;
-            }
-            .message {
-                page-break-inside: avoid !important;
-            }
-        `;
-        clone.appendChild(style);
-
-        html2pdf().set(opt).from(clone).save().then(() => {
+    html2pdf()
+        .set(opt)
+        .from(clone)
+        .save()
+        .then(() => downloadingAlert.remove())
+        .catch(err => {
+            console.error('PDF export error:', err);
             downloadingAlert.remove();
-        }).catch((error) => {
-            console.error('Error generating PDF:', error);
-            downloadingAlert.remove();
-            showError('Failed to generate PDF. Please try again.');
         });
-
-        dropdown.classList.remove('active');
-    }).catch((error) => {
-        console.error('Error processing images:', error);
-        downloadingAlert.remove();
-        showError('Failed to process images for PDF.');
-    });
 }
 
 function showSettings() {
     alert('Settings panel coming soon!');
     const dropdown = document.querySelector('.kebab-dropdown');
-    if (dropdown) {
-        dropdown.classList.remove('active');
-    }
+    if (dropdown) dropdown.classList.remove('active');
 }
 
+// --- END OF PDF JAVASCRIPT ---
+// --- CUT HERE ---
 // ===== ENHANCED LOGOUT FUNCTION =====
 function logout() {
     const username = currentUserSession?.username;
