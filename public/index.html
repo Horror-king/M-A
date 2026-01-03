@@ -7336,6 +7336,8 @@ function toggleTheme() {
     }
 }
 
+// --- CUT HERE ---
+
 function clearChat() {
     const chatContainer = document.getElementById('chat-container');
     if (chatContainer) chatContainer.innerHTML = '';
@@ -7343,15 +7345,13 @@ function clearChat() {
     const dropdown = document.querySelector('.kebab-dropdown');
     if (dropdown) dropdown.classList.remove('active');
 }
-// ===== FIXED: EXPORT CHAT PDF FUNCTION - PRESERVES ORIGINAL IMAGE STYLES =====
+// ===== REVISED: EXPORT CHAT PDF FUNCTION - PRESERVES EXACT VISUAL APPEARANCE =====
 function exportChatPDF() {
     const chatContainer = document.getElementById('chat-container');
     if (!chatContainer) return;
     
     const dropdown = document.querySelector('.kebab-dropdown');
     if (!dropdown) return;
-
-    const clone = chatContainer.cloneNode(true);
 
     // Show downloading alert
     const downloadingAlert = document.createElement('div');
@@ -7369,253 +7369,329 @@ function exportChatPDF() {
     downloadingAlert.style.zIndex = '9999';
     document.body.appendChild(downloadingAlert);
 
-    // Store original computed styles for ALL images
-    const originalImages = chatContainer.querySelectorAll('img');
-    const cloneImages = clone.querySelectorAll('img');
-    const originalStyles = [];
+    // Create a temporary container that will preserve ALL styles
+    const tempContainer = document.createElement('div');
+    tempContainer.id = 'temp-pdf-container';
+    tempContainer.style.position = 'fixed';
+    tempContainer.style.left = '-9999px';
+    tempContainer.style.top = '0';
+    tempContainer.style.width = chatContainer.scrollWidth + 'px';
+    tempContainer.style.padding = '20px';
+    tempContainer.style.backgroundColor = '#ffffff';
     
-    // Capture original computed styles
-    originalImages.forEach((img, index) => {
-        if (index < cloneImages.length) {
-            const computed = window.getComputedStyle(img);
-            originalStyles.push({
-                borderRadius: computed.borderRadius,
-                width: img.style.width || computed.width,
-                height: img.style.height || computed.height,
-                maxWidth: computed.maxWidth,
-                maxHeight: computed.maxHeight,
-                objectFit: computed.objectFit,
-                display: computed.display,
-                margin: computed.margin,
-                padding: computed.padding,
-                // Check if it's an avatar by parent class
-                isAvatar: img.closest('.avatar') !== null
-            });
+    // IMPORTANT: Copy ALL stylesheets to the temp container
+    const allStyles = document.querySelectorAll('style, link[rel="stylesheet"]');
+    allStyles.forEach(style => {
+        if (style.tagName === 'STYLE') {
+            const newStyle = document.createElement('style');
+            newStyle.textContent = style.textContent;
+            tempContainer.appendChild(newStyle);
         }
     });
 
-    // Apply original styles to clone BEFORE image conversion
-    cloneImages.forEach((img, index) => {
-        if (index < originalStyles.length) {
-            const style = originalStyles[index];
+    // Clone the chat container WITH all child elements and their computed styles
+    const clonedChat = chatContainer.cloneNode(true);
+    
+    // Get ALL computed styles and apply them as inline styles
+    function copyComputedStyles(source, target) {
+        if (!source || !target) return;
+        
+        // Copy computed styles for this element
+        const computed = window.getComputedStyle(source);
+        
+        // List of style properties to copy (excluding position, display, etc. that affect layout)
+        const styleProps = [
+            'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height',
+            'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+            'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+            'border', 'border-top', 'border-right', 'border-bottom', 'border-left',
+            'border-radius', 'border-width', 'border-style', 'border-color',
+            'background', 'background-color', 'background-image',
+            'color', 'font-size', 'font-family', 'font-weight', 'line-height',
+            'text-align', 'vertical-align',
+            'display', 'position', 'top', 'left', 'right', 'bottom',
+            'float', 'clear',
+            'flex', 'flex-direction', 'flex-wrap', 'justify-content', 'align-items', 'align-content',
+            'grid', 'grid-template-columns', 'grid-template-rows',
+            'box-sizing', 'overflow', 'overflow-x', 'overflow-y',
+            'z-index', 'opacity', 'visibility',
+            'transform', 'transition'
+        ];
+        
+        styleProps.forEach(prop => {
+            const value = computed.getPropertyValue(prop);
+            if (value && value !== 'none' && value !== 'auto' && !value.includes('calc(')) {
+                target.style.setProperty(prop, value, 'important');
+            }
+        });
+        
+        // SPECIAL HANDLING FOR IMAGES
+        if (source.tagName === 'IMG') {
+            // Preserve natural dimensions
+            if (source.naturalWidth && source.naturalHeight) {
+                target.style.width = source.naturalWidth + 'px';
+                target.style.height = source.naturalHeight + 'px';
+                target.style.objectFit = 'contain';
+            }
             
-            // For avatars: Force circular shape
-            if (style.isAvatar) {
-                img.style.borderRadius = '50%';
-                img.style.width = '40px';
-                img.style.height = '40px';
-                img.style.objectFit = 'cover';
-                img.style.display = 'block';
-            } else {
-                // For message images: Use original styles
-                img.style.borderRadius = style.borderRadius;
-                img.style.width = style.width;
-                img.style.height = style.height;
-                img.style.maxWidth = style.maxWidth;
-                img.style.maxHeight = style.maxHeight;
-                img.style.objectFit = style.objectFit || 'contain';
-                img.style.display = style.display;
-                img.style.margin = style.margin;
-                img.style.padding = style.padding;
+            // Check if it's an avatar
+            const isAvatar = source.closest('.avatar') || 
+                           source.parentElement?.classList?.contains('avatar') ||
+                           source.className.includes('avatar');
+            
+            if (isAvatar) {
+                // Force circular avatar
+                target.style.borderRadius = '50%';
+                target.style.width = '40px';
+                target.style.height = '40px';
+                target.style.objectFit = 'cover';
+                target.style.display = 'block';
+                target.style.marginRight = '10px';
             }
         }
-    });
-
-    // Find all images and convert to base64 with ORIGINAL dimensions
-    const images = clone.querySelectorAll('img');
+        
+        // Copy children recursively
+        for (let i = 0; i < source.children.length && i < target.children.length; i++) {
+            copyComputedStyles(source.children[i], target.children[i]);
+        }
+    }
+    
+    // Apply computed styles to the clone
+    copyComputedStyles(chatContainer, clonedChat);
+    
+    // Add inline styles to ensure everything is preserved
+    const inlineStyles = `
+        /* Reset all images to original size */
+        img {
+            max-width: none !important;
+            max-height: none !important;
+            width: auto !important;
+            height: auto !important;
+            object-fit: contain !important;
+            display: inline-block !important;
+            vertical-align: middle !important;
+        }
+        
+        /* Avatar specific */
+        .avatar img {
+            border-radius: 50% !important;
+            width: 40px !important;
+            height: 40px !important;
+            object-fit: cover !important;
+            display: block !important;
+            flex-shrink: 0 !important;
+        }
+        
+        /* Message container */
+        .message {
+            display: flex !important;
+            align-items: flex-start !important;
+            margin-bottom: 10px !important;
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+        }
+        
+        /* Message body */
+        .message-body {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: flex-start !important;
+        }
+        
+        /* Content styling */
+        .content {
+            max-width: 70% !important;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+        }
+        
+        /* Sent messages */
+        .message.sent {
+            justify-content: flex-end !important;
+            flex-direction: row-reverse !important;
+        }
+        
+        /* Received messages */
+        .message.received {
+            justify-content: flex-start !important;
+        }
+        
+        /* Username styling */
+        .username {
+            font-weight: bold !important;
+            margin-bottom: 4px !important;
+        }
+        
+        /* Force white background for PDF */
+        body {
+            background: white !important;
+        }
+    `;
+    
+    const styleElement = document.createElement('style');
+    styleElement.textContent = inlineStyles;
+    
+    // Add everything to temp container
+    tempContainer.appendChild(styleElement);
+    tempContainer.appendChild(clonedChat);
+    document.body.appendChild(tempContainer);
+    
+    // Convert images to base64 with EXACT dimensions
+    const images = clonedChat.querySelectorAll('img');
     const promises = [];
-
+    
     images.forEach(img => {
-        const promise = new Promise((resolve, reject) => {
+        const promise = new Promise((resolve) => {
             // Skip if already data URL
             if (img.src.startsWith('data:')) {
                 resolve();
                 return;
             }
-
+            
             const originalImage = new Image();
             originalImage.crossOrigin = 'anonymous';
             originalImage.src = img.src;
-
-            originalImage.onload = () => {
+            
+            originalImage.onload = function() {
                 try {
-                    // Get natural dimensions
-                    const naturalWidth = originalImage.naturalWidth;
-                    const naturalHeight = originalImage.naturalHeight;
-                    
-                    // Create canvas with NATURAL dimensions (not current display dimensions)
                     const canvas = document.createElement('canvas');
-                    const context = canvas.getContext('2d');
+                    const ctx = canvas.getContext('2d');
                     
-                    // Set canvas to natural size
-                    canvas.width = naturalWidth;
-                    canvas.height = naturalHeight;
+                    // Use EXACT natural dimensions
+                    canvas.width = originalImage.naturalWidth;
+                    canvas.height = originalImage.naturalHeight;
                     
-                    // Preserve aspect ratio
-                    context.drawImage(originalImage, 0, 0, naturalWidth, naturalHeight);
+                    // Draw image maintaining aspect ratio
+                    ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
                     
-                    // Convert to high quality JPEG
-                    const dataURL = canvas.toDataURL('image/jpeg', 0.95);
+                    // Convert to PNG for better quality
+                    const dataURL = canvas.toDataURL('image/png');
                     
-                    // Keep original style properties
-                    const originalDisplay = img.style.display;
-                    const originalWidth = img.style.width;
-                    const originalHeight = img.style.height;
-                    const originalBorderRadius = img.style.borderRadius;
-                    const originalObjectFit = img.style.objectFit;
-                    const originalMaxWidth = img.style.maxWidth;
-                    const originalMaxHeight = img.style.maxHeight;
+                    // Store original styles
+                    const originalStyle = img.getAttribute('style') || '';
                     
-                    // Update image source
+                    // Update src
                     img.src = dataURL;
                     
-                    // PRESERVE ORIGINAL STYLING after setting data URL
-                    img.style.display = originalDisplay;
-                    img.style.width = originalWidth;
-                    img.style.height = originalHeight;
-                    img.style.borderRadius = originalBorderRadius;
-                    img.style.objectFit = originalObjectFit;
-                    img.style.maxWidth = originalMaxWidth;
-                    img.style.maxHeight = originalMaxHeight;
+                    // RE-APPLY all original styles
+                    img.setAttribute('style', originalStyle);
                     
-                    // Force repaint for style changes
-                    img.style.opacity = '0.99';
+                    // For avatars, ensure circle
+                    const isAvatar = img.closest('.avatar') || 
+                                    img.parentElement?.classList?.contains('avatar') ||
+                                    img.className.includes('avatar');
+                    
+                    if (isAvatar) {
+                        img.style.borderRadius = '50%';
+                        img.style.width = '40px';
+                        img.style.height = '40px';
+                        img.style.objectFit = 'cover';
+                    } else {
+                        // For regular images, maintain natural aspect ratio
+                        img.style.maxWidth = '100%';
+                        img.style.height = 'auto';
+                        img.style.objectFit = 'contain';
+                    }
                     
                     resolve();
                 } catch (error) {
                     console.error('Error converting image:', error);
-                    resolve(); // Resolve anyway to continue
+                    resolve();
                 }
             };
-
-            originalImage.onerror = () => {
-                console.error('Error loading image:', img.src);
-                resolve(); // Resolve anyway to continue
+            
+            originalImage.onerror = function() {
+                console.error('Failed to load image:', img.src);
+                resolve();
             };
             
-            // Set timeout in case image never loads
-            setTimeout(() => {
-                resolve();
-            }, 3000);
+            // Timeout after 2 seconds
+            setTimeout(() => resolve(), 2000);
         });
+        
         promises.push(promise);
     });
-
+    
+    // Wait for all images to process
     Promise.all(promises).then(() => {
-        // Add a style tag to the clone to preserve all styles during PDF generation
-        const style = document.createElement('style');
-        style.textContent = `
-            /* AVATAR STYLES - MUST PRESERVE CIRCLE SHAPE */
-            .avatar img {
-                border-radius: 50% !important;
-                width: 40px !important;
-                height: 40px !important;
-                object-fit: cover !important;
-                display: block !important;
-            }
-            
-            /* MESSAGE IMAGE STYLES - PRESERVE ASPECT RATIO */
-            .message img:not(.avatar img) {
-                max-width: 100% !important;
-                height: auto !important;
-                object-fit: contain !important;
-                display: block !important;
-                border-radius: 8px !important;
-            }
-            
-            /* FORCE IMAGES TO KEEP THEIR ORIGINAL STYLES */
-            img {
-                max-width: none !important;
-                max-height: none !important;
-            }
-            
-            /* PREVENT PAGE BREAKS INSIDE MESSAGES */
-            .message {
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
-            }
-            
-            /* MAINTAIN ORIGINAL LAYOUT */
-            .message-body {
-                display: flex !important;
-                flex-direction: row !important;
-                align-items: flex-start !important;
-            }
-        `;
-        clone.appendChild(style);
-
-        const opt = {
-            margin: 10,
-            filename: 'chat-export.pdf',
-            image: { 
-                type: 'jpeg', 
-                quality: 1.0  // Maximum quality
-            },
-            html2canvas: { 
-                scale: 3,  // Higher scale for better quality
-                useCORS: true,
-                allowTaint: true,
-                scrollX: 0,
-                scrollY: 0,
-                windowWidth: document.documentElement.scrollWidth,
-                windowHeight: document.documentElement.scrollHeight,
-                backgroundColor: '#ffffff',
-                logging: false,
-                // IMPORTANT: Use the original element's dimensions
-                width: chatContainer.scrollWidth,
-                height: chatContainer.scrollHeight,
-                // Preserve computed styles
-                ignoreElements: (element) => {
-                    return false; // Don't ignore anything
+        // Wait a bit for styles to apply
+        setTimeout(() => {
+            const opt = {
+                margin: 10,
+                filename: 'chat-export-' + new Date().toISOString().split('T')[0] + '.pdf',
+                image: { 
+                    type: 'png', 
+                    quality: 1.0
                 },
-                onclone: function(clonedDoc) {
-                    // Additional styling in the cloned document
-                    const allImages = clonedDoc.querySelectorAll('img');
-                    allImages.forEach(img => {
-                        // Force preserve original dimensions
-                        if (!img.style.width && img.naturalWidth) {
-                            img.style.width = img.naturalWidth + 'px';
-                        }
-                        if (!img.style.height && img.naturalHeight) {
-                            img.style.height = img.naturalHeight + 'px';
-                        }
+                html2canvas: { 
+                    scale: 2, // Use 2 for balance of quality and file size
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: '#ffffff',
+                    logging: false,
+                    // Use the temp container's dimensions
+                    width: tempContainer.scrollWidth,
+                    height: tempContainer.scrollHeight,
+                    // Preserve exact appearance
+                    onclone: function(clonedDocument) {
+                        // Apply all our inline styles to the cloned document
+                        const style = clonedDocument.createElement('style');
+                        style.textContent = inlineStyles;
+                        clonedDocument.head.appendChild(style);
                         
-                        // Check if avatar and apply circle
-                        if (img.closest('.avatar')) {
-                            img.style.borderRadius = '50%';
-                            img.style.width = '40px';
-                            img.style.height = '40px';
-                            img.style.objectFit = 'cover';
-                        }
-                    });
+                        // Ensure all images have their styles
+                        const clonedImages = clonedDocument.querySelectorAll('img');
+                        clonedImages.forEach(img => {
+                            // Reapply avatar styles
+                            const isAvatar = img.closest('.avatar') || 
+                                           img.parentElement?.classList?.contains('avatar') ||
+                                           img.className.includes('avatar');
+                            
+                            if (isAvatar) {
+                                img.style.borderRadius = '50%';
+                                img.style.width = '40px';
+                                img.style.height = '40px';
+                                img.style.objectFit = 'cover';
+                            } else {
+                                img.style.maxWidth = '100%';
+                                img.style.height = 'auto';
+                                img.style.objectFit = 'contain';
+                            }
+                        });
+                    }
+                },
+                jsPDF: { 
+                    unit: 'mm',
+                    format: 'a4',
+                    orientation: 'portrait',
+                    hotfixes: ['px_scaling']
+                },
+                pagebreak: { 
+                    mode: ['avoid-all', 'css', 'legacy'],
+                    before: '.message' // Try to keep messages together
                 }
-            },
-            jsPDF: { 
-                unit: 'mm',
-                format: 'a4',
-                orientation: 'portrait',
-                hotfixes: ['px_scaling'] 
-            },
-            pagebreak: { 
-                mode: ['avoid-all', 'css', 'legacy'],
-                before: '.page-break' 
-            }
-        };
-
-        html2pdf().set(opt).from(clone).save().then(() => {
-            downloadingAlert.remove();
-            showSuccess('PDF downloaded successfully!');
-        }).catch((error) => {
-            console.error('Error generating PDF:', error);
-            downloadingAlert.remove();
-            showError('Failed to generate PDF: ' + error.message);
-        });
-
-        dropdown.classList.remove('active');
+            };
+            
+            // Generate PDF
+            html2pdf().set(opt).from(tempContainer).save().then(() => {
+                // Cleanup
+                document.body.removeChild(tempContainer);
+                downloadingAlert.remove();
+                showSuccess('PDF downloaded successfully!');
+            }).catch((error) => {
+                console.error('Error generating PDF:', error);
+                document.body.removeChild(tempContainer);
+                downloadingAlert.remove();
+                showError('Failed to generate PDF. Please try again.');
+            });
+            
+            dropdown.classList.remove('active');
+        }, 500); // Give time for images to render
     }).catch((error) => {
         console.error('Error processing images:', error);
+        document.body.removeChild(tempContainer);
         downloadingAlert.remove();
-        showError('Failed to process images for PDF: ' + error.message);
+        showError('Failed to process images for PDF.');
     });
 }
 // --- CUT HERE ---
