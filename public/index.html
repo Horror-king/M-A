@@ -4090,6 +4090,7 @@
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
+// --- CUT HERE ---
 <script>
 // --- CUT HERE ---
 
@@ -7336,22 +7337,43 @@ function toggleTheme() {
     }
 }
 
-// --- CUT HERE ---
-
 function clearChat() {
     const chatContainer = document.getElementById('chat-container');
-    if (chatContainer) chatContainer.innerHTML = '';
-
+    if (chatContainer) {
+        chatContainer.innerHTML = '';
+    }
     const dropdown = document.querySelector('.kebab-dropdown');
-    if (dropdown) dropdown.classList.remove('active');
+    if (dropdown) {
+        dropdown.classList.remove('active');
+    }
 }
-// ===== REVISED: EXPORT CHAT PDF FUNCTION - PRESERVES EXACT VISUAL APPEARANCE =====
+
+function exportChat() {
+    const chatContainer = document.getElementById('chat-container');
+    if (!chatContainer) return;
+    
+    const messages = chatContainer.innerText;
+    const blob = new Blob([messages], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'chat-export.txt';
+    a.click();
+    window.URL.revokeObjectURL(url);
+    const dropdown = document.querySelector('.kebab-dropdown');
+    if (dropdown) {
+        dropdown.classList.remove('active');
+    }
+}
+
 function exportChatPDF() {
     const chatContainer = document.getElementById('chat-container');
     if (!chatContainer) return;
     
     const dropdown = document.querySelector('.kebab-dropdown');
     if (!dropdown) return;
+
+    const clone = chatContainer.cloneNode(true);
 
     // Show downloading alert
     const downloadingAlert = document.createElement('div');
@@ -7369,332 +7391,112 @@ function exportChatPDF() {
     downloadingAlert.style.zIndex = '9999';
     document.body.appendChild(downloadingAlert);
 
-    // Create a temporary container that will preserve ALL styles
-    const tempContainer = document.createElement('div');
-    tempContainer.id = 'temp-pdf-container';
-    tempContainer.style.position = 'fixed';
-    tempContainer.style.left = '-9999px';
-    tempContainer.style.top = '0';
-    tempContainer.style.width = chatContainer.scrollWidth + 'px';
-    tempContainer.style.padding = '20px';
-    tempContainer.style.backgroundColor = '#ffffff';
-    
-    // IMPORTANT: Copy ALL stylesheets to the temp container
-    const allStyles = document.querySelectorAll('style, link[rel="stylesheet"]');
-    allStyles.forEach(style => {
-        if (style.tagName === 'STYLE') {
-            const newStyle = document.createElement('style');
-            newStyle.textContent = style.textContent;
-            tempContainer.appendChild(newStyle);
-        }
-    });
-
-    // Clone the chat container WITH all child elements and their computed styles
-    const clonedChat = chatContainer.cloneNode(true);
-    
-    // Get ALL computed styles and apply them as inline styles
-    function copyComputedStyles(source, target) {
-        if (!source || !target) return;
-        
-        // Copy computed styles for this element
-        const computed = window.getComputedStyle(source);
-        
-        // List of style properties to copy (excluding position, display, etc. that affect layout)
-        const styleProps = [
-            'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height',
-            'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
-            'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
-            'border', 'border-top', 'border-right', 'border-bottom', 'border-left',
-            'border-radius', 'border-width', 'border-style', 'border-color',
-            'background', 'background-color', 'background-image',
-            'color', 'font-size', 'font-family', 'font-weight', 'line-height',
-            'text-align', 'vertical-align',
-            'display', 'position', 'top', 'left', 'right', 'bottom',
-            'float', 'clear',
-            'flex', 'flex-direction', 'flex-wrap', 'justify-content', 'align-items', 'align-content',
-            'grid', 'grid-template-columns', 'grid-template-rows',
-            'box-sizing', 'overflow', 'overflow-x', 'overflow-y',
-            'z-index', 'opacity', 'visibility',
-            'transform', 'transition'
-        ];
-        
-        styleProps.forEach(prop => {
-            const value = computed.getPropertyValue(prop);
-            if (value && value !== 'none' && value !== 'auto' && !value.includes('calc(')) {
-                target.style.setProperty(prop, value, 'important');
-            }
-        });
-        
-        // SPECIAL HANDLING FOR IMAGES
-        if (source.tagName === 'IMG') {
-            // Preserve natural dimensions
-            if (source.naturalWidth && source.naturalHeight) {
-                target.style.width = source.naturalWidth + 'px';
-                target.style.height = source.naturalHeight + 'px';
-                target.style.objectFit = 'contain';
-            }
-            
-            // Check if it's an avatar
-            const isAvatar = source.closest('.avatar') || 
-                           source.parentElement?.classList?.contains('avatar') ||
-                           source.className.includes('avatar');
-            
-            if (isAvatar) {
-                // Force circular avatar
-                target.style.borderRadius = '50%';
-                target.style.width = '40px';
-                target.style.height = '40px';
-                target.style.objectFit = 'cover';
-                target.style.display = 'block';
-                target.style.marginRight = '10px';
-            }
-        }
-        
-        // Copy children recursively
-        for (let i = 0; i < source.children.length && i < target.children.length; i++) {
-            copyComputedStyles(source.children[i], target.children[i]);
-        }
-    }
-    
-    // Apply computed styles to the clone
-    copyComputedStyles(chatContainer, clonedChat);
-    
-    // Add inline styles to ensure everything is preserved
-    const inlineStyles = `
-        /* Reset all images to original size */
-        img {
-            max-width: none !important;
-            max-height: none !important;
-            width: auto !important;
-            height: auto !important;
-            object-fit: contain !important;
-            display: inline-block !important;
-            vertical-align: middle !important;
-        }
-        
-        /* Avatar specific */
-        .avatar img {
-            border-radius: 50% !important;
-            width: 40px !important;
-            height: 40px !important;
-            object-fit: cover !important;
-            display: block !important;
-            flex-shrink: 0 !important;
-        }
-        
-        /* Message container */
-        .message {
-            display: flex !important;
-            align-items: flex-start !important;
-            margin-bottom: 10px !important;
-            break-inside: avoid !important;
-            page-break-inside: avoid !important;
-        }
-        
-        /* Message body */
-        .message-body {
-            display: flex !important;
-            flex-direction: column !important;
-            align-items: flex-start !important;
-        }
-        
-        /* Content styling */
-        .content {
-            max-width: 70% !important;
-            word-wrap: break-word !important;
-            overflow-wrap: break-word !important;
-        }
-        
-        /* Sent messages */
-        .message.sent {
-            justify-content: flex-end !important;
-            flex-direction: row-reverse !important;
-        }
-        
-        /* Received messages */
-        .message.received {
-            justify-content: flex-start !important;
-        }
-        
-        /* Username styling */
-        .username {
-            font-weight: bold !important;
-            margin-bottom: 4px !important;
-        }
-        
-        /* Force white background for PDF */
-        body {
-            background: white !important;
-        }
-    `;
-    
-    const styleElement = document.createElement('style');
-    styleElement.textContent = inlineStyles;
-    
-    // Add everything to temp container
-    tempContainer.appendChild(styleElement);
-    tempContainer.appendChild(clonedChat);
-    document.body.appendChild(tempContainer);
-    
-    // Convert images to base64 with EXACT dimensions
-    const images = clonedChat.querySelectorAll('img');
+    // Find all images and replace src with base64
+    const images = clone.querySelectorAll('img');
     const promises = [];
-    
+
     images.forEach(img => {
-        const promise = new Promise((resolve) => {
-            // Skip if already data URL
-            if (img.src.startsWith('data:')) {
-                resolve();
-                return;
-            }
-            
+        const promise = new Promise((resolve, reject) => {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
             const originalImage = new Image();
             originalImage.crossOrigin = 'anonymous';
             originalImage.src = img.src;
-            
-            originalImage.onload = function() {
+
+            originalImage.onload = () => {
                 try {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    
-                    // Use EXACT natural dimensions
+                    // Store original display style to restore later
+                    const originalDisplay = img.style.display;
+                    const originalWidth = img.style.width;
+                    const originalHeight = img.style.height;
+
+                    // Temporarily make image visible and full size for capture
+                    img.style.display = 'block';
+                    img.style.width = 'auto';
+                    img.style.height = 'auto';
+                    img.style.maxWidth = 'none';
+                    img.style.maxHeight = 'none';
+
                     canvas.width = originalImage.naturalWidth;
                     canvas.height = originalImage.naturalHeight;
-                    
-                    // Draw image maintaining aspect ratio
-                    ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
-                    
-                    // Convert to PNG for better quality
+                    context.drawImage(originalImage, 0, 0);
+
                     const dataURL = canvas.toDataURL('image/png');
-                    
-                    // Store original styles
-                    const originalStyle = img.getAttribute('style') || '';
-                    
-                    // Update src
                     img.src = dataURL;
-                    
-                    // RE-APPLY all original styles
-                    img.setAttribute('style', originalStyle);
-                    
-                    // For avatars, ensure circle
-                    const isAvatar = img.closest('.avatar') || 
-                                    img.parentElement?.classList?.contains('avatar') ||
-                                    img.className.includes('avatar');
-                    
-                    if (isAvatar) {
-                        img.style.borderRadius = '50%';
-                        img.style.width = '40px';
-                        img.style.height = '40px';
-                        img.style.objectFit = 'cover';
-                    } else {
-                        // For regular images, maintain natural aspect ratio
-                        img.style.maxWidth = '100%';
-                        img.style.height = 'auto';
-                        img.style.objectFit = 'contain';
-                    }
-                    
+
+                    // Restore original styles
+                    img.style.display = originalDisplay;
+                    img.style.width = originalWidth;
+                    img.style.height = originalHeight;
+
                     resolve();
                 } catch (error) {
                     console.error('Error converting image:', error);
                     resolve();
                 }
             };
-            
-            originalImage.onerror = function() {
-                console.error('Failed to load image:', img.src);
+
+            originalImage.onerror = () => {
+                console.error('Error loading image:', img.src);
                 resolve();
             };
-            
-            // Timeout after 2 seconds
-            setTimeout(() => resolve(), 2000);
         });
-        
         promises.push(promise);
     });
-    
-    // Wait for all images to process
+
     Promise.all(promises).then(() => {
-        // Wait a bit for styles to apply
-        setTimeout(() => {
-            const opt = {
-                margin: 10,
-                filename: 'chat-export-' + new Date().toISOString().split('T')[0] + '.pdf',
-                image: { 
-                    type: 'png', 
-                    quality: 1.0
-                },
-                html2canvas: { 
-                    scale: 2, // Use 2 for balance of quality and file size
-                    useCORS: true,
-                    allowTaint: true,
-                    backgroundColor: '#ffffff',
-                    logging: false,
-                    // Use the temp container's dimensions
-                    width: tempContainer.scrollWidth,
-                    height: tempContainer.scrollHeight,
-                    // Preserve exact appearance
-                    onclone: function(clonedDocument) {
-                        // Apply all our inline styles to the cloned document
-                        const style = clonedDocument.createElement('style');
-                        style.textContent = inlineStyles;
-                        clonedDocument.head.appendChild(style);
-                        
-                        // Ensure all images have their styles
-                        const clonedImages = clonedDocument.querySelectorAll('img');
-                        clonedImages.forEach(img => {
-                            // Reapply avatar styles
-                            const isAvatar = img.closest('.avatar') || 
-                                           img.parentElement?.classList?.contains('avatar') ||
-                                           img.className.includes('avatar');
-                            
-                            if (isAvatar) {
-                                img.style.borderRadius = '50%';
-                                img.style.width = '40px';
-                                img.style.height = '40px';
-                                img.style.objectFit = 'cover';
-                            } else {
-                                img.style.maxWidth = '100%';
-                                img.style.height = 'auto';
-                                img.style.objectFit = 'contain';
-                            }
-                        });
-                    }
-                },
-                jsPDF: { 
-                    unit: 'mm',
-                    format: 'a4',
-                    orientation: 'portrait',
-                    hotfixes: ['px_scaling']
-                },
-                pagebreak: { 
-                    mode: ['avoid-all', 'css', 'legacy'],
-                    before: '.message' // Try to keep messages together
-                }
-            };
-            
-            // Generate PDF
-            html2pdf().set(opt).from(tempContainer).save().then(() => {
-                // Cleanup
-                document.body.removeChild(tempContainer);
-                downloadingAlert.remove();
-                showSuccess('PDF downloaded successfully!');
-            }).catch((error) => {
-                console.error('Error generating PDF:', error);
-                document.body.removeChild(tempContainer);
-                downloadingAlert.remove();
-                showError('Failed to generate PDF. Please try again.');
-            });
-            
-            dropdown.classList.remove('active');
-        }, 500); // Give time for images to render
-    }).catch((error) => {
-        console.error('Error processing images:', error);
-        document.body.removeChild(tempContainer);
-        downloadingAlert.remove();
-        showError('Failed to process images for PDF.');
+        const opt = {
+            margin: 10,
+            filename: 'chat-export.pdf',
+            image: { type: 'jpeg', quality: 1 },
+            html2canvas: { 
+                scale: 2,
+                useCORS: true,
+                allowTaint: true,
+                scrollX: 0,
+                scrollY: 0,
+                windowWidth: document.documentElement.scrollWidth,
+                windowHeight: document.documentElement.scrollHeight
+            },
+            jsPDF: { 
+                unit: 'mm',
+                format: 'a4',
+                orientation: 'portrait',
+                hotfixes: ['px_scaling'] 
+            },
+            pagebreak: { 
+                mode: ['avoid-all', 'css', 'legacy'],
+                before: '.page-break' 
+            }
+        };
+
+        // Temporarily modify image styles for PDF generation
+        const allImages = clone.querySelectorAll('img');
+        allImages.forEach(img => {
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            img.style.display = 'block';
+        });
+
+        html2pdf().set(opt).from(clone).save().then(() => {
+            downloadingAlert.remove();
+        }).catch((error) => {
+            console.error('Error generating PDF:', error);
+            downloadingAlert.remove();
+        });
+
+        dropdown.classList.remove('active');
     });
 }
-// --- CUT HERE ---
+
+function showSettings() {
+    alert('Settings panel coming soon!');
+    const dropdown = document.querySelector('.kebab-dropdown');
+    if (dropdown) {
+        dropdown.classList.remove('active');
+    }
+}
+
 // ===== ENHANCED LOGOUT FUNCTION =====
 function logout() {
     const username = currentUserSession?.username;
