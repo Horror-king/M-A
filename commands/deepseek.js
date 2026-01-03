@@ -19,29 +19,40 @@ module.exports = {
     }
   },
 
-  onStart: async function ({ message, args }) {
+  onStart: async function ({ api, event, args, message }) {
     try {
       const prompt = args.join(' ').trim();
 
       if (!prompt) {
-        return message.reply(
+        return api.sendMessage(
           '❌ Usage:\n' +
-          'deepseek <your prompt>\n\n' +
+          '!deepseek <your prompt>\n\n' +
           'Example:\n' +
-          'deepseek What is artificial intelligence?'
+          '!deepseek What is artificial intelligence?',
+          event.threadID,
+          event.messageID
         );
       }
 
-      const apiUrl =
-        `https://fahim-api-demo.onrender.com/deepseek/v1?prompt=${encodeURIComponent(prompt)}`;
+      // Show typing indicator
+      api.sendTypingIndicator(event.threadID, true);
+
+      const apiUrl = `https://fahim-api-demo.onrender.com/deepseek/v1?prompt=${encodeURIComponent(prompt)}`;
 
       const response = await axios.get(apiUrl, {
-        timeout: 20000
+        timeout: 30000, // 30 seconds timeout
+        headers: {
+          'User-Agent': 'GoatBot/1.0'
+        }
       });
 
-      // ✅ STRICT result handling
+      // STRICT result handling
       if (!response.data || typeof response.data.result !== 'string') {
-        return message.reply('❌ Invalid response from DeepSeek API.');
+        return api.sendMessage(
+          '❌ Invalid response from DeepSeek API. Received: ' + JSON.stringify(response.data).substring(0, 200),
+          event.threadID,
+          event.messageID
+        );
       }
 
       let reply = response.data.result.trim();
@@ -51,13 +62,31 @@ module.exports = {
         reply = reply.slice(0, 3500) + '\n\n...response truncated';
       }
 
-      return message.reply(
-        `🐋 **DeepSeek AI Response:**\n\n${reply}`
+      return api.sendMessage(
+        `🐋 **DeepSeek AI Response:**\n\n${reply}`,
+        event.threadID,
+        event.messageID
       );
 
     } catch (error) {
-      return message.reply(
-        `⚠️ DeepSeek Error: ${error.response?.status || ''} ${error.message}`
+      console.error('❌ DeepSeek Command Error:', error);
+      
+      let errorMessage = '⚠️ DeepSeek Error: ';
+      
+      if (error.response) {
+        errorMessage += `${error.response.status} ${error.response.statusText || 'Request failed'}`;
+      } else if (error.code === 'ECONNABORTED') {
+        errorMessage += 'Request timeout. The API is taking too long to respond.';
+      } else if (error.message) {
+        errorMessage += error.message;
+      } else {
+        errorMessage += 'Unknown error occurred.';
+      }
+      
+      return api.sendMessage(
+        errorMessage,
+        event.threadID,
+        event.messageID
       );
     }
   }
