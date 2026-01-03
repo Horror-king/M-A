@@ -7336,97 +7336,288 @@ function toggleTheme() {
     }
 }
 
-// --- CUT HERE ---
-// --- CUT HERE ---
-
 function clearChat() {
     const chatContainer = document.getElementById('chat-container');
     if (chatContainer) chatContainer.innerHTML = '';
+
+    const dropdown = document.querySelector('.kebab-dropdown');
+    if (dropdown) dropdown.classList.remove('active');
 }
-
-function exportChat() {
-    const chatContainer = document.getElementById('chat-container');
-    if (!chatContainer) return;
-
-    const blob = new Blob([chatContainer.innerText], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'chat-export.txt';
-    a.click();
-
-    URL.revokeObjectURL(url);
-}
-
+// ===== FIXED: EXPORT CHAT PDF FUNCTION - PRESERVES ORIGINAL IMAGE STYLES =====
 function exportChatPDF() {
     const chatContainer = document.getElementById('chat-container');
     if (!chatContainer) return;
-
-    /* ------------------ CREATE VISIBLE CLONE ------------------ */
-    const wrapper = document.createElement('div');
-    wrapper.style.position = 'fixed';
-    wrapper.style.left = '0';
-    wrapper.style.top = '0';
-    wrapper.style.width = chatContainer.scrollWidth + 'px';
-    wrapper.style.background = '#ffffff';
-    wrapper.style.zIndex = '-1';
-    wrapper.style.opacity = '0';
+    
+    const dropdown = document.querySelector('.kebab-dropdown');
+    if (!dropdown) return;
 
     const clone = chatContainer.cloneNode(true);
-    wrapper.appendChild(clone);
-    document.body.appendChild(wrapper);
 
-    /* ------------------ FIX IMAGE STYLES ------------------ */
-    clone.querySelectorAll('img').forEach(img => {
-        const cs = window.getComputedStyle(img);
-        img.style.width = cs.width;
-        img.style.height = cs.height;
-        img.style.maxWidth = cs.maxWidth;
-        img.style.objectFit = cs.objectFit || 'cover';
-        img.style.borderRadius = cs.borderRadius;
-        img.style.display = 'inline-block';
+    // Show downloading alert
+    const downloadingAlert = document.createElement('div');
+    downloadingAlert.id = 'downloading-alert';
+    downloadingAlert.textContent = 'Preparing download, please wait...';
+    downloadingAlert.style.position = 'fixed';
+    downloadingAlert.style.top = '20px';
+    downloadingAlert.style.left = '50%';
+    downloadingAlert.style.transform = 'translateX(-50%)';
+    downloadingAlert.style.padding = '10px 20px';
+    downloadingAlert.style.backgroundColor = '#333';
+    downloadingAlert.style.color = '#fff';
+    downloadingAlert.style.fontSize = '16px';
+    downloadingAlert.style.borderRadius = '8px';
+    downloadingAlert.style.zIndex = '9999';
+    document.body.appendChild(downloadingAlert);
+
+    // Store original computed styles for ALL images
+    const originalImages = chatContainer.querySelectorAll('img');
+    const cloneImages = clone.querySelectorAll('img');
+    const originalStyles = [];
+    
+    // Capture original computed styles
+    originalImages.forEach((img, index) => {
+        if (index < cloneImages.length) {
+            const computed = window.getComputedStyle(img);
+            originalStyles.push({
+                borderRadius: computed.borderRadius,
+                width: img.style.width || computed.width,
+                height: img.style.height || computed.height,
+                maxWidth: computed.maxWidth,
+                maxHeight: computed.maxHeight,
+                objectFit: computed.objectFit,
+                display: computed.display,
+                margin: computed.margin,
+                padding: computed.padding,
+                // Check if it's an avatar by parent class
+                isAvatar: img.closest('.avatar') !== null
+            });
+        }
     });
 
-    /* ------------------ PDF OPTIONS ------------------ */
-    const opt = {
-        margin: 10,
-        filename: 'chat-export.pdf',
-        image: { type: 'png', quality: 1 },
-        html2canvas: {
-            scale: 2,
-            useCORS: true,
-            backgroundColor: '#ffffff',
-            windowWidth: wrapper.scrollWidth,
-            windowHeight: wrapper.scrollHeight
-        },
-        jsPDF: {
-            unit: 'mm',
-            format: 'a4',
-            orientation: 'portrait'
+    // Apply original styles to clone BEFORE image conversion
+    cloneImages.forEach((img, index) => {
+        if (index < originalStyles.length) {
+            const style = originalStyles[index];
+            
+            // For avatars: Force circular shape
+            if (style.isAvatar) {
+                img.style.borderRadius = '50%';
+                img.style.width = '40px';
+                img.style.height = '40px';
+                img.style.objectFit = 'cover';
+                img.style.display = 'block';
+            } else {
+                // For message images: Use original styles
+                img.style.borderRadius = style.borderRadius;
+                img.style.width = style.width;
+                img.style.height = style.height;
+                img.style.maxWidth = style.maxWidth;
+                img.style.maxHeight = style.maxHeight;
+                img.style.objectFit = style.objectFit || 'contain';
+                img.style.display = style.display;
+                img.style.margin = style.margin;
+                img.style.padding = style.padding;
+            }
         }
-    };
+    });
 
-    /* ------------------ EXPORT IMPORTANT FIX ------------------ */
-    html2pdf()
-        .set(opt)
-        .from(wrapper)   // ✅ MUST EXPORT WRAPPER
-        .save()
-        .then(() => {
-            wrapper.remove();
-        })
-        .catch(err => {
-            console.error('PDF ERROR:', err);
-            wrapper.remove();
-            alert('PDF export failed. Check console.');
+    // Find all images and convert to base64 with ORIGINAL dimensions
+    const images = clone.querySelectorAll('img');
+    const promises = [];
+
+    images.forEach(img => {
+        const promise = new Promise((resolve, reject) => {
+            // Skip if already data URL
+            if (img.src.startsWith('data:')) {
+                resolve();
+                return;
+            }
+
+            const originalImage = new Image();
+            originalImage.crossOrigin = 'anonymous';
+            originalImage.src = img.src;
+
+            originalImage.onload = () => {
+                try {
+                    // Get natural dimensions
+                    const naturalWidth = originalImage.naturalWidth;
+                    const naturalHeight = originalImage.naturalHeight;
+                    
+                    // Create canvas with NATURAL dimensions (not current display dimensions)
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    
+                    // Set canvas to natural size
+                    canvas.width = naturalWidth;
+                    canvas.height = naturalHeight;
+                    
+                    // Preserve aspect ratio
+                    context.drawImage(originalImage, 0, 0, naturalWidth, naturalHeight);
+                    
+                    // Convert to high quality JPEG
+                    const dataURL = canvas.toDataURL('image/jpeg', 0.95);
+                    
+                    // Keep original style properties
+                    const originalDisplay = img.style.display;
+                    const originalWidth = img.style.width;
+                    const originalHeight = img.style.height;
+                    const originalBorderRadius = img.style.borderRadius;
+                    const originalObjectFit = img.style.objectFit;
+                    const originalMaxWidth = img.style.maxWidth;
+                    const originalMaxHeight = img.style.maxHeight;
+                    
+                    // Update image source
+                    img.src = dataURL;
+                    
+                    // PRESERVE ORIGINAL STYLING after setting data URL
+                    img.style.display = originalDisplay;
+                    img.style.width = originalWidth;
+                    img.style.height = originalHeight;
+                    img.style.borderRadius = originalBorderRadius;
+                    img.style.objectFit = originalObjectFit;
+                    img.style.maxWidth = originalMaxWidth;
+                    img.style.maxHeight = originalMaxHeight;
+                    
+                    // Force repaint for style changes
+                    img.style.opacity = '0.99';
+                    
+                    resolve();
+                } catch (error) {
+                    console.error('Error converting image:', error);
+                    resolve(); // Resolve anyway to continue
+                }
+            };
+
+            originalImage.onerror = () => {
+                console.error('Error loading image:', img.src);
+                resolve(); // Resolve anyway to continue
+            };
+            
+            // Set timeout in case image never loads
+            setTimeout(() => {
+                resolve();
+            }, 3000);
         });
-}
+        promises.push(promise);
+    });
 
-function showSettings() {
-    alert('Settings panel coming soon!');
-}
+    Promise.all(promises).then(() => {
+        // Add a style tag to the clone to preserve all styles during PDF generation
+        const style = document.createElement('style');
+        style.textContent = `
+            /* AVATAR STYLES - MUST PRESERVE CIRCLE SHAPE */
+            .avatar img {
+                border-radius: 50% !important;
+                width: 40px !important;
+                height: 40px !important;
+                object-fit: cover !important;
+                display: block !important;
+            }
+            
+            /* MESSAGE IMAGE STYLES - PRESERVE ASPECT RATIO */
+            .message img:not(.avatar img) {
+                max-width: 100% !important;
+                height: auto !important;
+                object-fit: contain !important;
+                display: block !important;
+                border-radius: 8px !important;
+            }
+            
+            /* FORCE IMAGES TO KEEP THEIR ORIGINAL STYLES */
+            img {
+                max-width: none !important;
+                max-height: none !important;
+            }
+            
+            /* PREVENT PAGE BREAKS INSIDE MESSAGES */
+            .message {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            
+            /* MAINTAIN ORIGINAL LAYOUT */
+            .message-body {
+                display: flex !important;
+                flex-direction: row !important;
+                align-items: flex-start !important;
+            }
+        `;
+        clone.appendChild(style);
 
-// --- END OF PDF JAVASCRIPT ---
+        const opt = {
+            margin: 10,
+            filename: 'chat-export.pdf',
+            image: { 
+                type: 'jpeg', 
+                quality: 1.0  // Maximum quality
+            },
+            html2canvas: { 
+                scale: 3,  // Higher scale for better quality
+                useCORS: true,
+                allowTaint: true,
+                scrollX: 0,
+                scrollY: 0,
+                windowWidth: document.documentElement.scrollWidth,
+                windowHeight: document.documentElement.scrollHeight,
+                backgroundColor: '#ffffff',
+                logging: false,
+                // IMPORTANT: Use the original element's dimensions
+                width: chatContainer.scrollWidth,
+                height: chatContainer.scrollHeight,
+                // Preserve computed styles
+                ignoreElements: (element) => {
+                    return false; // Don't ignore anything
+                },
+                onclone: function(clonedDoc) {
+                    // Additional styling in the cloned document
+                    const allImages = clonedDoc.querySelectorAll('img');
+                    allImages.forEach(img => {
+                        // Force preserve original dimensions
+                        if (!img.style.width && img.naturalWidth) {
+                            img.style.width = img.naturalWidth + 'px';
+                        }
+                        if (!img.style.height && img.naturalHeight) {
+                            img.style.height = img.naturalHeight + 'px';
+                        }
+                        
+                        // Check if avatar and apply circle
+                        if (img.closest('.avatar')) {
+                            img.style.borderRadius = '50%';
+                            img.style.width = '40px';
+                            img.style.height = '40px';
+                            img.style.objectFit = 'cover';
+                        }
+                    });
+                }
+            },
+            jsPDF: { 
+                unit: 'mm',
+                format: 'a4',
+                orientation: 'portrait',
+                hotfixes: ['px_scaling'] 
+            },
+            pagebreak: { 
+                mode: ['avoid-all', 'css', 'legacy'],
+                before: '.page-break' 
+            }
+        };
+
+        html2pdf().set(opt).from(clone).save().then(() => {
+            downloadingAlert.remove();
+            showSuccess('PDF downloaded successfully!');
+        }).catch((error) => {
+            console.error('Error generating PDF:', error);
+            downloadingAlert.remove();
+            showError('Failed to generate PDF: ' + error.message);
+        });
+
+        dropdown.classList.remove('active');
+    }).catch((error) => {
+        console.error('Error processing images:', error);
+        downloadingAlert.remove();
+        showError('Failed to process images for PDF: ' + error.message);
+    });
+}
 // --- CUT HERE ---
 // ===== ENHANCED LOGOUT FUNCTION =====
 function logout() {
