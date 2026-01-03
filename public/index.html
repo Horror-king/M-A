@@ -7337,15 +7337,11 @@ function toggleTheme() {
 }
 
 // --- CUT HERE ---
-
 // --- CUT HERE ---
 
 function clearChat() {
     const chatContainer = document.getElementById('chat-container');
     if (chatContainer) chatContainer.innerHTML = '';
-
-    const dropdown = document.querySelector('.kebab-dropdown');
-    if (dropdown) dropdown.classList.remove('active');
 }
 
 function exportChat() {
@@ -7367,49 +7363,33 @@ function exportChatPDF() {
     const chatContainer = document.getElementById('chat-container');
     if (!chatContainer) return;
 
-    const dropdown = document.querySelector('.kebab-dropdown');
-    if (dropdown) dropdown.classList.remove('active');
-
-    // 🔹 Clone chat
-    const clone = chatContainer.cloneNode(true);
-
-    // 🔹 Create hidden wrapper (CRITICAL FIX)
+    /* ------------------ CREATE VISIBLE CLONE ------------------ */
     const wrapper = document.createElement('div');
     wrapper.style.position = 'fixed';
-    wrapper.style.left = '-9999px';
+    wrapper.style.left = '0';
     wrapper.style.top = '0';
-    wrapper.style.width = chatContainer.offsetWidth + 'px';
-    wrapper.style.background = '#fff';
+    wrapper.style.width = chatContainer.scrollWidth + 'px';
+    wrapper.style.background = '#ffffff';
+    wrapper.style.zIndex = '-1';
+    wrapper.style.opacity = '0';
+
+    const clone = chatContainer.cloneNode(true);
     wrapper.appendChild(clone);
     document.body.appendChild(wrapper);
 
-    // 🔒 Preserve images exactly
+    /* ------------------ FIX IMAGE STYLES ------------------ */
     clone.querySelectorAll('img').forEach(img => {
-        const style = window.getComputedStyle(img);
-        img.style.width = style.width;
-        img.style.height = style.height;
-        img.style.objectFit = style.objectFit || 'cover';
-        img.style.borderRadius = style.borderRadius;
-        img.style.maxWidth = 'unset';
+        const cs = window.getComputedStyle(img);
+        img.style.width = cs.width;
+        img.style.height = cs.height;
+        img.style.maxWidth = cs.maxWidth;
+        img.style.objectFit = cs.objectFit || 'cover';
+        img.style.borderRadius = cs.borderRadius;
+        img.style.display = 'inline-block';
     });
 
-    // 🔔 Download alert
-    const alertBox = document.createElement('div');
-    alertBox.textContent = 'Preparing PDF, please wait...';
-    alertBox.style.cssText = `
-        position:fixed;
-        top:20px;
-        left:50%;
-        transform:translateX(-50%);
-        background:#333;
-        color:#fff;
-        padding:10px 20px;
-        border-radius:8px;
-        z-index:10000;
-    `;
-    document.body.appendChild(alertBox);
-
-    const options = {
+    /* ------------------ PDF OPTIONS ------------------ */
+    const opt = {
         margin: 10,
         filename: 'chat-export.pdf',
         image: { type: 'png', quality: 1 },
@@ -7417,38 +7397,33 @@ function exportChatPDF() {
             scale: 2,
             useCORS: true,
             backgroundColor: '#ffffff',
-            scrollX: 0,
-            scrollY: 0
+            windowWidth: wrapper.scrollWidth,
+            windowHeight: wrapper.scrollHeight
         },
         jsPDF: {
             unit: 'mm',
             format: 'a4',
             orientation: 'portrait'
-        },
-        pagebreak: { mode: ['avoid-all', 'css'] }
+        }
     };
 
-    // ✅ Generate PDF
+    /* ------------------ EXPORT IMPORTANT FIX ------------------ */
     html2pdf()
-        .set(options)
-        .from(clone)
+        .set(opt)
+        .from(wrapper)   // ✅ MUST EXPORT WRAPPER
         .save()
         .then(() => {
-            alertBox.remove();
-            wrapper.remove(); // cleanup
+            wrapper.remove();
         })
         .catch(err => {
-            console.error('PDF download failed:', err);
-            alertBox.remove();
+            console.error('PDF ERROR:', err);
             wrapper.remove();
-            alert('PDF download failed. Check console.');
+            alert('PDF export failed. Check console.');
         });
 }
 
 function showSettings() {
     alert('Settings panel coming soon!');
-    const dropdown = document.querySelector('.kebab-dropdown');
-    if (dropdown) dropdown.classList.remove('active');
 }
 
 // --- END OF PDF JAVASCRIPT ---
