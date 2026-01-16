@@ -3093,6 +3093,7 @@
             display: flex;
             flex-direction: column;
             height: 100vh;
+            overflow: hidden;
         }
 
         .posts-header {
@@ -3124,16 +3125,17 @@
         .posts-main-container {
             display: flex;
             flex-direction: column;
-            flex: 1;
+            height: calc(100vh - 60px); /* Header height */
             overflow: hidden;
         }
 
-        /* Create post box - FIXED AT TOP (not in scrollable area) */
+        /* Create post box - FIXED AT TOP */
         .create-post-box-container {
             background: #f0f2f5;
             padding: 15px;
             border-bottom: 1px solid #e4e6eb;
             flex-shrink: 0;
+            z-index: 5;
         }
 
         .create-post-box {
@@ -3211,11 +3213,26 @@
             font-size: 16px;
         }
 
-        /* Scrollable posts container */
-        .posts-container {
+        /* Scrollable posts container - FIXED SCROLLING ISSUE */
+        .posts-container-wrapper {
             flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .posts-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
             overflow-y: auto;
             padding: 0;
+        }
+
+        .posts-list {
+            min-height: 100%;
+            padding-bottom: 20px;
         }
 
         /* Post cards */
@@ -3223,10 +3240,9 @@
             background: white;
             border-radius: 10px;
             padding: 15px;
-            margin-bottom: 15px;
+            margin: 15px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
             border: 1px solid #e4e6eb;
-            margin: 15px 15px;
         }
 
         .post-header {
@@ -3485,7 +3501,7 @@
             color: #65676b;
             background: white;
             border-radius: 10px;
-            margin: 15px 0;
+            margin: 15px;
             display: none;
         }
 
@@ -3936,21 +3952,22 @@
         <a href="#" onclick="logout()" style="color: #ff4444;">Logout</a>
     </div>
 
-    <!-- UPDATED: Posts Container with new structure -->
+    <!-- UPDATED: Posts Container with FIXED SCROLLING -->
     <div id="posts" class="main-chat-interface container" style="display: none;">
         <div class="posts-header">
             <h2>Community Posts</h2>
         </div>
         
-        <!-- NEW STRUCTURE: Create post box container (FIXED AT TOP) -->
+        <!-- FIXED: New structure for proper scrolling -->
         <div class="posts-main-container">
             <div id="create-post-box-container" class="create-post-box-container">
                 <!-- Facebook-style create post box will be inserted here by JavaScript -->
             </div>
             
-            <!-- Scrollable posts container -->
-            <div class="posts-container" id="posts-container">
-                <!-- Posts will be loaded here -->
+            <div class="posts-container-wrapper">
+                <div class="posts-container" id="posts-container">
+                    <!-- Posts will be loaded here -->
+                </div>
             </div>
         </div>
         
@@ -5146,6 +5163,12 @@ function createPostsContainer() {
     const postsSection = document.getElementById('posts');
     if (!postsSection) return;
     
+    // Remove existing structure if any
+    const existingMainContainer = postsSection.querySelector('.posts-main-container');
+    if (existingMainContainer) {
+        existingMainContainer.remove();
+    }
+    
     // Create main container
     const mainContainer = document.createElement('div');
     mainContainer.className = 'posts-main-container';
@@ -5155,31 +5178,18 @@ function createPostsContainer() {
     createPostBoxContainer.id = 'create-post-box-container';
     createPostBoxContainer.className = 'create-post-box-container';
     
+    // Create posts container wrapper
+    const postsContainerWrapper = document.createElement('div');
+    postsContainerWrapper.className = 'posts-container-wrapper';
+    
     // Create posts container (scrollable)
     const postsContainer = document.createElement('div');
     postsContainer.id = 'posts-container';
     postsContainer.className = 'posts-container';
     
-    // Create posts list
-    const postsList = document.createElement('div');
-    postsList.id = 'posts-list';
-    postsList.className = 'posts-list';
-    
-    postsContainer.appendChild(postsList);
+    postsContainerWrapper.appendChild(postsContainer);
     mainContainer.appendChild(createPostBoxContainer);
-    mainContainer.appendChild(postsContainer);
-    
-    // Find existing posts container and replace it
-    const existingContainer = postsSection.querySelector('.posts-container');
-    if (existingContainer) {
-        existingContainer.remove();
-    }
-    
-    // Remove any existing main container
-    const existingMainContainer = postsSection.querySelector('.posts-main-container');
-    if (existingMainContainer) {
-        existingMainContainer.remove();
-    }
+    mainContainer.appendChild(postsContainerWrapper);
     
     postsSection.appendChild(mainContainer);
     console.log('✅ Posts container structure created');
@@ -5260,11 +5270,11 @@ function renderPosts() {
         return;
     }
     
-    // Find or create posts list container
-    let postsList = document.getElementById('posts-list');
+    // Create posts list if it doesn't exist
+    let postsList = postsContainer.querySelector('.posts-list');
     if (!postsList) {
         postsList = document.createElement('div');
-        postsList.id = 'posts-list';
+        postsList.className = 'posts-list';
         postsContainer.appendChild(postsList);
     }
     
@@ -5282,6 +5292,11 @@ function renderPosts() {
         const postElement = createPostElement(post);
         postsList.appendChild(postElement);
     });
+    
+    // Force scroll to top after rendering
+    setTimeout(() => {
+        postsContainer.scrollTop = 0;
+    }, 50);
 }
 
 // UPDATED: Create post element with image URL detection
@@ -5765,12 +5780,15 @@ function sharePost(postId) {
 
 // Add post to feed (for real-time updates)
 function addPostToFeed(post) {
-    const postsList = document.getElementById('posts-list');
-    if (!postsList) return;
+    const postsContainer = document.getElementById('posts-container');
+    if (!postsContainer) return;
     
-    // Remove no-posts message if it exists
-    const noPosts = postsList.querySelector('.no-posts');
-    if (noPosts) noPosts.remove();
+    let postsList = postsContainer.querySelector('.posts-list');
+    if (!postsList) {
+        postsList = document.createElement('div');
+        postsList.className = 'posts-list';
+        postsContainer.appendChild(postsList);
+    }
     
     // Check if post already exists
     const existingPost = document.querySelector(`[data-post-id="${post.id}"]`);
@@ -5781,7 +5799,7 @@ function addPostToFeed(post) {
     postsList.insertBefore(postElement, postsList.firstChild);
     
     // Scroll to top to show new post
-    postsList.scrollTop = 0;
+    postsContainer.scrollTop = 0;
 }
 
 // Generate unique post ID
