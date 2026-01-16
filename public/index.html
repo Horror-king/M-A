@@ -1,4 +1,5 @@
-<!DOCTYPE html>
+// --- CUT HERE ---
+ <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
@@ -3086,12 +3087,14 @@
             border-radius: 0;
             z-index: 1;
         }
- 
-      // --- CUT HERE ---
         /* ===== FIXED POSTS FEED STYLES ===== */
         #posts {
             background: #f0f2f5;
             padding: 0;
+            position: relative;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
         .posts-header {
@@ -3104,6 +3107,7 @@
             position: sticky;
             top: 50px;
             z-index: 10;
+            flex-shrink: 0;
         }
 
         .posts-header h2 {
@@ -3119,24 +3123,27 @@
         }
 
         .posts-container {
-            padding: 0; /* CHANGED: Remove padding to make create post box start from top */
-            max-height: calc(100vh - 150px);
+            padding: 0;
+            height: calc(100vh - 50px); /* Adjust height to fill viewport */
             overflow-y: auto;
+            display: flex;
+            flex-direction: column;
         }
 
-        /* Facebook-style create post box - UPDATED TO START FROM TOP */
+        /* Facebook-style create post box - FIXED TO START FROM TOP */
         .create-post-box {
             background: white;
-            border-radius: 0; /* CHANGED: Remove border radius for top alignment */
+            border-radius: 0;
             padding: 15px;
             margin-bottom: 15px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
             border: 1px solid #e4e6eb;
             cursor: pointer;
             transition: background-color 0.2s;
-            border-top: none; /* CHANGED: Remove top border */
-            border-left: none; /* CHANGED: Remove side borders */
+            border-top: none;
+            border-left: none;
             border-right: none;
+            flex-shrink: 0;
         }
 
         .create-post-box:hover {
@@ -3212,7 +3219,7 @@
             margin-bottom: 15px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
             border: 1px solid #e4e6eb;
-            margin: 0 15px 15px 15px; /* ADDED: Add horizontal margin */
+            margin: 0 15px 15px 15px;
         }
 
         .post-header {
@@ -3475,6 +3482,12 @@
             display: none; /* CHANGED: Hide by default */
         }
 
+        /* Posts list styling */
+        .posts-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
         /* Post Modal Styles */
         .post-modal {
             position: fixed;
@@ -3667,9 +3680,11 @@
         @media (max-width: 768px) {
             .posts-header {
                 padding: 12px 15px;
+                top: 0;
             }
             
             .posts-container {
+                height: calc(100vh - 50px);
                 padding: 0;
             }
             
@@ -3931,8 +3946,7 @@
         
         <div class="posts-container" id="posts-container">
             <!-- Facebook-style create post box will be inserted here by JavaScript -->
-            <!-- Posts will be loaded here -->
-            <!-- REMOVED: "No posts yet" message from here -->
+            <!-- Posts list will be inserted here -->
         </div>
         
         <!-- Create Post Modal -->
@@ -4433,6 +4447,7 @@
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
+
 <script>
 // Opera Mini compatible messaging functions
 class OperaMiniMessenger {
@@ -5120,21 +5135,10 @@ function setupCreatePostBox() {
         </div>
     `;
     
-    // FIXED: Insert at the top of posts container - Fixed the DOM insertion
-    const postsList = postsContainer.querySelector('#posts-list');
-    if (postsList && postsList.parentNode === postsContainer) {
-        postsContainer.insertBefore(createPostBox, postsList);
-    } else {
-        // If posts-list doesn't exist or isn't a direct child, create it
-        const postsListNew = document.createElement('div');
-        postsListNew.id = 'posts-list';
-        postsListNew.className = 'posts-list';
-        postsContainer.appendChild(createPostBox);
-        postsContainer.appendChild(postsListNew);
-        console.log('✅ Created posts-list and added create post box');
-    }
+    // Insert create post box at the beginning of posts container
+    postsContainer.insertBefore(createPostBox, postsContainer.firstChild);
     
-    console.log('✅ Create post box setup complete');
+    console.log('✅ Create post box setup complete - now visible at the top');
 }
 
 // Create posts container if it doesn't exist
@@ -5238,7 +5242,15 @@ function renderPosts() {
     if (!postsList) {
         postsList = document.createElement('div');
         postsList.id = 'posts-list';
-        postsContainer.appendChild(postsList);
+        postsList.className = 'posts-list';
+        
+        // Insert posts list after create post box
+        const createPostBox = postsContainer.querySelector('.create-post-box');
+        if (createPostBox) {
+            postsContainer.insertBefore(postsList, createPostBox.nextSibling);
+        } else {
+            postsContainer.appendChild(postsList);
+        }
     }
     
     postsList.innerHTML = '';
@@ -5741,10 +5753,6 @@ function sharePost(postId) {
 function addPostToFeed(post) {
     const postsList = document.getElementById('posts-list');
     if (!postsList) return;
-    
-    // Remove no-posts message if it exists
-    const noPosts = postsList.querySelector('.no-posts');
-    if (noPosts) noPosts.remove();
     
     // Check if post already exists
     const existingPost = document.querySelector(`[data-post-id="${post.id}"]`);
@@ -6699,7 +6707,6 @@ function batchMessageRender(messages, renderFunction) {
         });
     }
 }
-
 // --- CUT HERE ---
 // --- CUT HERE ---
 
