@@ -3086,18 +3086,7 @@
             border-radius: 0;
             z-index: 1;
         }
-        /* ===== PREVENT HORIZONTAL SCROLLING ===== */
-        html, body {
-            overflow-x: hidden;
-            width: 100%;
-            position: relative;
-            touch-action: pan-y; /* Only allow vertical panning */
-        }
-        
-        /* Disable horizontal scrolling globally */
-        * {
-            max-width: 100%;
-        }
+// --- CUT HERE ---
         
         /* ===== FIXED POSTS FEED STYLES ===== */
         #posts {
@@ -3107,8 +3096,6 @@
             flex-direction: column;
             height: 100vh;
             overflow: hidden;
-            position: relative;
-            touch-action: pan-y;
         }
 
         .posts-header {
@@ -3122,7 +3109,6 @@
             top: 0;
             z-index: 10;
             flex-shrink: 0;
-            touch-action: pan-y;
         }
 
         .posts-header h2 {
@@ -3137,25 +3123,21 @@
             display: none !important;
         }
 
-        /* Main container for posts - SCROLLABLE */
+        /* Main posts container - scrollable area */
         .posts-main-container {
+            flex: 1;
+            overflow-y: auto;
+            background: #f0f2f5;
             display: flex;
             flex-direction: column;
-            height: calc(100vh - 60px); /* Header height */
-            overflow-y: auto;
-            overflow-x: hidden; /* Prevent horizontal scroll */
-            touch-action: pan-y;
-            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
         }
 
-        /* Create post box - NOT STICKY, scrolls with content */
+        /* Create post box - INSIDE SCROLLABLE AREA (like Facebook) */
         .create-post-box-container {
             background: #f0f2f5;
             padding: 15px;
             border-bottom: 1px solid #e4e6eb;
             flex-shrink: 0;
-            z-index: 1; /* Lower z-index to scroll */
-            touch-action: pan-y;
         }
 
         .create-post-box {
@@ -3166,7 +3148,6 @@
             border: 1px solid #e4e6eb;
             cursor: pointer;
             transition: background-color 0.2s;
-            touch-action: pan-y;
         }
 
         .create-post-box:hover {
@@ -3208,7 +3189,6 @@
             padding-top: 10px;
             border-top: 1px solid #e4e6eb;
             margin-top: 10px;
-            touch-action: pan-y;
         }
 
         .create-post-action {
@@ -3225,7 +3205,6 @@
             color: #65676b;
             font-size: 14px;
             transition: background 0.3s ease;
-            touch-action: pan-y;
         }
 
         .create-post-action:hover {
@@ -3236,20 +3215,17 @@
             font-size: 16px;
         }
 
-        /* Posts container - prevent horizontal overflow */
+        /* Posts container - scrollable content */
         .posts-container {
             padding: 0;
-            overflow-x: hidden;
-            touch-action: pan-y;
+            flex: 1;
         }
 
         .posts-list {
             padding-bottom: 20px;
-            overflow-x: hidden;
-            touch-action: pan-y;
         }
 
-        /* Post cards - prevent horizontal overflow */
+        /* Post cards */
         .post-card {
             background: white;
             border-radius: 10px;
@@ -3257,9 +3233,6 @@
             margin: 15px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
             border: 1px solid #e4e6eb;
-            overflow: hidden; /* Prevent content from overflowing */
-            touch-action: pan-y;
-            position: relative;
         }
 
         .post-header {
@@ -3278,8 +3251,6 @@
 
         .post-author-info {
             flex: 1;
-            min-width: 0; /* Allow text to truncate */
-            overflow: hidden;
         }
 
         .post-author-name {
@@ -3287,9 +3258,6 @@
             color: #1c1e21;
             margin-bottom: 2px;
             font-size: 15px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
 
         .post-meta {
@@ -3298,7 +3266,6 @@
             display: flex;
             align-items: center;
             gap: 5px;
-            flex-wrap: wrap;
         }
 
         .post-content {
@@ -3307,16 +3274,12 @@
             margin-bottom: 15px;
             white-space: pre-wrap;
             font-size: 15px;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            max-width: 100%;
         }
 
         .post-media {
             margin: 15px 0;
             border-radius: 8px;
             overflow: hidden;
-            max-width: 100%;
         }
 
         .post-media img {
@@ -3325,15 +3288,12 @@
             object-fit: cover;
             border-radius: 8px;
             cursor: pointer;
-            max-width: 100%;
-            height: auto;
         }
 
         .post-media video {
             width: 100%;
             max-height: 400px;
             border-radius: 8px;
-            max-width: 100%;
         }
 
         .post-stats {
@@ -3343,7 +3303,6 @@
             border-bottom: 1px solid #e4e6eb;
             color: #65676b;
             font-size: 14px;
-            flex-wrap: wrap;
         }
 
         .post-likes, .post-comments-count {
@@ -3361,7 +3320,6 @@
             display: flex;
             gap: 5px;
             padding: 5px 0;
-            touch-action: pan-y;
         }
 
         .post-action {
@@ -3379,7 +3337,6 @@
             transition: all 0.3s ease;
             font-size: 14px;
             font-weight: 500;
-            touch-action: pan-y;
         }
 
         .post-action:hover {
@@ -3396,8 +3353,6 @@
             margin: 15px -15px -15px -15px;
             padding: 15px;
             display: none;
-            overflow: hidden;
-            touch-action: pan-y;
         }
 
         .post-comments.show-comments {
@@ -3442,7 +3397,6 @@
             max-height: 300px;
             overflow-y: auto;
             margin-bottom: 12px;
-            overflow-x: hidden;
         }
 
         .comment {
@@ -3452,7 +3406,6 @@
             padding: 8px;
             border-radius: 8px;
             transition: background-color 0.2s;
-            overflow: hidden;
         }
 
         .comment:hover {
@@ -3473,8 +3426,6 @@
             padding: 10px;
             border-radius: 15px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-            min-width: 0;
-            overflow: hidden;
         }
 
         .comment-author {
@@ -3482,18 +3433,12 @@
             font-size: 13px;
             color: #1c1e21;
             margin-bottom: 4px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
 
         .comment-text {
             color: #1c1e21;
             font-size: 14px;
             line-height: 1.3;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            max-width: 100%;
         }
 
         .no-comments {
@@ -3519,7 +3464,6 @@
             font-size: 14px;
             outline: none;
             transition: border-color 0.2s;
-            max-width: 100%;
         }
 
         .comment-input input:focus {
@@ -3535,7 +3479,6 @@
             cursor: pointer;
             font-size: 14px;
             transition: background 0.2s;
-            flex-shrink: 0;
         }
 
         .comment-input button:hover {
@@ -3635,7 +3578,6 @@
             margin-bottom: 10px;
             outline: none;
             font-family: inherit;
-            max-width: 100%;
         }
 
         #post-content:focus {
@@ -3656,7 +3598,6 @@
             padding: 10px;
             border: 1px solid #e4e6eb;
             border-radius: 8px;
-            flex-wrap: wrap;
         }
 
         .post-action-btn {
@@ -3673,7 +3614,6 @@
             gap: 8px;
             transition: all 0.3s ease;
             font-size: 14px;
-            min-width: 0;
         }
 
         .post-action-btn:hover {
@@ -3685,14 +3625,12 @@
             border-radius: 8px;
             overflow: hidden;
             position: relative;
-            max-width: 100%;
         }
 
         .media-preview-item {
             position: relative;
             border-radius: 8px;
             overflow: hidden;
-            max-width: 100%;
         }
 
         .media-preview-item img,
@@ -3700,7 +3638,6 @@
             width: 100%;
             max-height: 200px;
             object-fit: cover;
-            max-width: 100%;
         }
 
         .remove-media {
@@ -3744,38 +3681,6 @@
 
         .submit-post-btn:not(:disabled):hover {
             background: #365899;
-        }
-
-        /* Post image container styles */
-        .post-image-container {
-            margin: 10px 0;
-            border-radius: 8px;
-            overflow: hidden;
-            max-width: 100%;
-            position: relative;
-        }
-
-        .post-image-container img {
-            width: 100%;
-            height: auto;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: transform 0.2s ease;
-            display: block;
-            max-width: 100%;
-        }
-
-        .post-image-container img:hover {
-            transform: scale(1.02);
-        }
-
-        /* Post text content styling */
-        .post-text-content {
-            margin-bottom: 10px;
-            line-height: 1.4;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            max-width: 100%;
         }
 
         /* Responsive design for posts */
@@ -3835,14 +3740,6 @@
             .create-post-action i {
                 font-size: 14px;
             }
-            
-            /* Prevent horizontal scrolling on mobile */
-            body {
-                overflow-x: hidden;
-                position: fixed;
-                width: 100%;
-                height: 100%;
-            }
         }
 
         @media (max-width: 480px) {
@@ -3900,88 +3797,69 @@
                 font-size: 13px;
             }
             
+            .post-image-container {
+                margin: 10px 0;
+                border-radius: 8px;
+                overflow: hidden;
+                max-width: 100%;
+            }
+
+            .post-image-container img {
+                width: 100%;
+                max-width: 500px;
+                height: auto;
+                border-radius: 8px;
+                cursor: pointer;
+                transition: transform 0.2s ease;
+            }
+
+            .post-image-container img:hover {
+                transform: scale(1.02);
+            }
+
+            .post-media {
+                margin: 10px 0;
+            }
+
+            .post-media video {
+                width: 100%;
+                max-width: 500px;
+                border-radius: 8px;
+            }
+            
+            .message img, .avatar img, .online-user-avatar img {
+                content-visibility: auto;
+                contain-intrinsic-size: 50px;
+            }
+
+            .chat-messages, .private-chat-messages {
+                will-change: transform;
+                backface-visibility: hidden;
+                transform: translateZ(0);
+            }
+
+            /* Reduce repaints for scrollable containers */
+            #chat-container, #private-ai-container, #private-chat-messages {
+                transform: translateZ(0);
+            }
+            
+            .post-text-content {
+                margin-bottom: 10px;
+                line-height: 1.4;
+            }
+            
             .comment-input button {
                 padding: 8px 12px;
                 font-size: 13px;
-            }
-            
-            /* Enhanced mobile touch handling */
-            .posts-main-container {
-                -webkit-overflow-scrolling: touch;
-                overscroll-behavior-y: contain;
-            }
-            
-            /* Prevent text selection on swipe */
-            .post-card, .create-post-box, .post-action, .create-post-action {
-                -webkit-user-select: none;
-                -moz-user-select: none;
-                -ms-user-select: none;
-                user-select: none;
-            }
-        }
-
-        /* Style for create post action icons */
-        .create-post-action i.fa-image {
-            color: #45bd62;
-        }
-        
-        .create-post-action i.fa-video {
-            color: #f5533d;
-        }
-        
-        .create-post-action i.fa-map-marker-alt {
-            color: #f7b928;
-        }
-        
-        /* Style for post action icons */
-        .post-action.like i {
-            color: #65676b;
-        }
-        
-        .post-action.like:hover i {
-            color: #4267B2;
-        }
-        
-        .post-action i.fa-comment {
-            color: #65676b;
-        }
-        
-        .post-action:hover i.fa-comment {
-            color: #45bd62;
-        }
-        
-        .post-action i.fa-share-square {
-            color: #65676b;
-        }
-        
-        .post-action:hover i.fa-share-square {
-            color: #f5533d;
-        }
-        
-        /* Post stats icons */
-        .post-likes i {
-            color: #4267B2;
-        }
-        
-        /* Touch device optimizations */
-        @media (hover: none) and (pointer: coarse) {
-            .post-action:hover, .create-post-action:hover {
-                background: none;
-            }
-            
-            .post-action:active, .create-post-action:active {
-                background: #f0f2f5;
             }
         }
     </style>
 </head>
 <body>
-    <!-- NEW: Welcome screen with animated text -->
+    <!-- Welcome screen with animated text -->
     <div class="welcome-screen" id="welcome-screen">
         <div class="animated-logo">
-            <div class="animated-text" id="animated-text">
-                <!-- Letters will be added by JavaScript -->
-            </div>
+            <div class="animated-text" id="animated-text"></div>
         </div>
         <div class="subtitle">Your smart messaging companion</div>
         <div class="loading-bar">
@@ -4062,18 +3940,20 @@
         <a href="#" onclick="logout()" style="color: #ff4444;">Logout</a>
     </div>
 
-    <!-- UPDATED: Posts Container with FACEBOOK-STYLE SCROLLING -->
+    <!-- UPDATED: Posts Container with everything scrollable together (like Facebook) -->
     <div id="posts" class="main-chat-interface container" style="display: none;">
         <div class="posts-header">
             <h2>Community Posts</h2>
         </div>
         
-        <!-- FIXED: Facebook-style scrolling - everything moves together -->
+        <!-- SCROLLABLE AREA containing both create post box and posts -->
         <div class="posts-main-container">
+            <!-- Create post box container - INSIDE scrollable area -->
             <div id="create-post-box-container" class="create-post-box-container">
                 <!-- Facebook-style create post box will be inserted here by JavaScript -->
             </div>
             
+            <!-- Posts container -->
             <div class="posts-container" id="posts-container">
                 <!-- Posts will be loaded here -->
             </div>
@@ -4117,6 +3997,7 @@
             </div>
         </div>
     </div>
+
 
     <!-- NEW: All Users Container -->
     <div id="all-users" class="main-chat-interface container" style="display: none;">
@@ -5129,10 +5010,7 @@ function startAllUsersRefresh() {
         }
     }, 30000);
 }
-
-// ===== POSTS FUNCTIONALITY =====
-
-// Variables for posts
+// Posts functionality for client-side
 let posts = [];
 let lastUpdateTimestamp = null;
 let currentPostMedia = [];
@@ -5152,37 +5030,6 @@ function initializePosts() {
             addPostToFeed(post);
         });
     }
-    
-    // Add touch event listeners to prevent horizontal swiping
-    setupTouchHandling();
-}
-
-// Setup touch handling to prevent horizontal swiping
-function setupTouchHandling() {
-    const postsContainer = document.querySelector('.posts-main-container');
-    if (!postsContainer) return;
-    
-    let startX = 0;
-    let startY = 0;
-    
-    postsContainer.addEventListener('touchstart', function(e) {
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-    }, { passive: true });
-    
-    postsContainer.addEventListener('touchmove', function(e) {
-        if (!e.touches || e.touches.length === 0) return;
-        
-        const currentX = e.touches[0].clientX;
-        const currentY = e.touches[0].clientY;
-        const diffX = Math.abs(currentX - startX);
-        const diffY = Math.abs(currentY - startY);
-        
-        // If horizontal movement is more than vertical movement, prevent it
-        if (diffX > diffY) {
-            e.preventDefault();
-        }
-    }, { passive: false });
 }
 
 // Load posts from server
@@ -5246,7 +5093,7 @@ async function pollForPostUpdates() {
     }
 }
 
-// FIXED: Setup Facebook-style create post box with proper icons
+// FIXED: Setup Facebook-style create post box
 function setupCreatePostBox() {
     const createPostBoxContainer = document.getElementById('create-post-box-container');
     if (!createPostBoxContainer) {
@@ -5267,10 +5114,10 @@ function setupCreatePostBox() {
     
     const userProfile = getUserProfile(currentUser);
     
-    // Create Facebook-style create post box with proper icons
+    // Create Facebook-style create post box
     const createPostBox = document.createElement('div');
     createPostBox.className = 'create-post-box';
-    createPostBox.onclick = openCreatePostModal; // Make entire box clickable
+    createPostBox.onclick = openCreatePostModal;
     
     createPostBox.innerHTML = `
         <div class="create-post-header">
@@ -5296,7 +5143,7 @@ function setupCreatePostBox() {
     `;
     
     createPostBoxContainer.appendChild(createPostBox);
-    console.log('✅ Create post box setup complete with icons');
+    console.log('✅ Create post box setup complete');
 }
 
 // Create posts container if it doesn't exist
@@ -5310,7 +5157,7 @@ function createPostsContainer() {
         existingMainContainer.remove();
     }
     
-    // Create main container
+    // Create main scrollable container
     const mainContainer = document.createElement('div');
     mainContainer.className = 'posts-main-container';
     
@@ -5319,7 +5166,7 @@ function createPostsContainer() {
     createPostBoxContainer.id = 'create-post-box-container';
     createPostBoxContainer.className = 'create-post-box-container';
     
-    // Create posts container (scrollable)
+    // Create posts container
     const postsContainer = document.createElement('div');
     postsContainer.id = 'posts-container';
     postsContainer.className = 'posts-container';
@@ -5331,32 +5178,7 @@ function createPostsContainer() {
     console.log('✅ Posts container structure created');
 }
 
-// NEW: Function to detect and convert multiple image URLs in text
-function processContentForMultipleImages(content) {
-    if (!content) return { text: '', images: [] };
-    
-    // Regular expression to match image URLs
-    const imageUrlRegex = /(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|bmp|webp|svg))(\?[^\s]*)?/gi;
-    
-    const images = [];
-    let textContent = content;
-    
-    // Find all image URLs
-    let match;
-    while ((match = imageUrlRegex.exec(content)) !== null) {
-        const fullUrl = match[0];
-        images.push(fullUrl);
-        // Replace the URL with a marker in text content
-        textContent = textContent.replace(fullUrl, ` [IMAGE_${images.length - 1}] `);
-    }
-    
-    return {
-        text: escapeHtml(textContent).replace(/\[IMAGE_(\d+)\]/g, ''),
-        images: images
-    };
-}
-
-// Render all posts with proper formatting
+// Render all posts
 function renderPosts() {
     const postsContainer = document.getElementById('posts-container');
     if (!postsContainer) {
@@ -5366,26 +5188,24 @@ function renderPosts() {
         return;
     }
     
-    // Create posts list if it doesn't exist
-    let postsList = postsContainer.querySelector('.posts-list');
-    if (!postsList) {
-        postsList = document.createElement('div');
-        postsList.className = 'posts-list';
-        postsContainer.appendChild(postsList);
-    }
-    
-    postsList.innerHTML = '';
+    // Clear existing content
+    postsContainer.innerHTML = '';
     
     if (posts.length === 0) {
-        // Show a message when there are no posts
-        postsList.innerHTML = `
-            <div class="no-posts" style="display: block;">
+        // Show "no posts" message
+        postsContainer.innerHTML = `
+            <div class="no-posts">
                 <i class="fas fa-newspaper" style="font-size: 48px; color: #ddd; margin-bottom: 15px;"></i>
                 <p>No posts yet. Be the first to share something!</p>
             </div>
         `;
         return;
     }
+    
+    // Create posts list container
+    const postsList = document.createElement('div');
+    postsList.className = 'posts-list';
+    postsContainer.appendChild(postsList);
     
     // Sort posts by timestamp (newest first)
     const sortedPosts = [...posts].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -5396,7 +5216,7 @@ function renderPosts() {
     });
 }
 
-// UPDATED: Create post element with proper formatting and icons
+// UPDATED: Create post element with image URL detection
 function createPostElement(post) {
     const postDiv = document.createElement('div');
     postDiv.className = 'post-card';
@@ -5407,10 +5227,6 @@ function createPostElement(post) {
     
     // Process content to detect and display images
     const processedContent = processContentForMultipleImages(post.content);
-    
-    // Check if user liked the post
-    const userLiked = post.userLiked || (post.likes && post.likes.includes(currentUserSession?.username));
-    const likeIconClass = userLiked ? 'fas fa-thumbs-up' : 'far fa-thumbs-up';
     
     postDiv.innerHTML = `
         <div class="post-header">
@@ -5446,7 +5262,7 @@ function createPostElement(post) {
         ` : ''}
         <div class="post-stats">
             <div class="post-likes" onclick="likePost('${post.id}')">
-                <i class="fas fa-thumbs-up"></i> ${post.likesCount || post.likes || 0}
+                <i class="fas fa-thumbs-up"></i> ${post.likes || 0}
             </div>
             <div class="post-comments-count" onclick="toggleComments('${post.id}')">
                 ${post.comments ? post.comments.length : 0} comments
@@ -5454,7 +5270,7 @@ function createPostElement(post) {
         </div>
         <div class="post-actions">
             <button class="post-action like" onclick="likePost('${post.id}')">
-                <i class="${likeIconClass}"></i> Like
+                <i class="${post.userLiked ? 'fas' : 'far'} fa-thumbs-up"></i> Like
             </button>
             <button class="post-action" onclick="toggleComments('${post.id}')">
                 <i class="far fa-comment"></i> Comment
@@ -5491,577 +5307,7 @@ function createPostElement(post) {
     return postDiv;
 }
 
-// Create a new post
-async function createPost() {
-    const content = document.getElementById('post-content').value.trim();
-    const author = currentUserSession?.username;
-    
-    if (!author) {
-        showError('You must be logged in to create a post');
-        return;
-    }
-    
-    if (!content && currentPostMedia.length === 0) {
-        showError('Post content cannot be empty');
-        return;
-    }
-    
-    try {
-        const postData = {
-            author_username: author,
-            content: content
-        };
-        
-        // Add media if present
-        if (currentPostMedia.length > 0) {
-            postData.media = currentPostMedia[0];
-        }
-        
-        const response = await fetch('/api/posts', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
-            },
-            body: JSON.stringify(postData)
-        });
-        
-        if (response.ok) {
-            const newPost = await response.json();
-            
-            // Add to local posts array
-            posts.unshift(newPost);
-            renderPosts();
-            
-            // Also save to localStorage as backup
-            savePostsToLocalStorage();
-            
-            // Close modal and reset form
-            closeCreatePostModal();
-            showSuccess('Post published successfully!');
-        } else {
-            const error = await response.json();
-            showError(error.error || 'Failed to create post');
-            
-            // Fallback: Create post locally
-            createPostLocally(content, author);
-        }
-    } catch (error) {
-        console.error('Error creating post:', error);
-        showError('Failed to create post. Saving locally.');
-        
-        // Fallback: Create post locally
-        createPostLocally(content, author);
-    }
-}
-
-// Fallback: Create post locally
-function createPostLocally(content, author) {
-    const newPost = {
-        id: generatePostId(),
-        author: author,
-        content: content,
-        media: currentPostMedia.length > 0 ? currentPostMedia[0] : null,
-        timestamp: new Date().toISOString(),
-        likesCount: 0,
-        comments: []
-    };
-    
-    // Add to posts array
-    posts.unshift(newPost);
-    
-    // Save to localStorage
-    savePostsToLocalStorage();
-    
-    // Add to feed
-    addPostToFeed(newPost);
-    
-    // Close modal
-    closeCreatePostModal();
-    
-    // Show success message
-    showSuccess('Post published locally!');
-}
-
-// Save posts to localStorage
-function savePostsToLocalStorage() {
-    localStorage.setItem('messageMatePosts', JSON.stringify(posts));
-}
-
-// Like a post
-async function likePost(postId) {
-    const username = currentUserSession?.username;
-    
-    if (!username) {
-        showError('You must be logged in to like posts');
-        return;
-    }
-    
-    try {
-        const response = await fetch(`/api/posts/${postId}/like`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
-            },
-            body: JSON.stringify({ username })
-        });
-        
-        if (response.ok) {
-            const result = await response.json();
-            
-            // Update local post data
-            const postIndex = posts.findIndex(p => p.id === postId);
-            if (postIndex >= 0) {
-                posts[postIndex].likesCount = result.likesCount;
-                posts[postIndex].userLiked = result.userLiked;
-                
-                // Update UI
-                updatePostLikesUI(postId, result.likesCount, result.userLiked);
-                
-                // Save to localStorage
-                savePostsToLocalStorage();
-            }
-        } else {
-            const error = await response.json();
-            showError(error.error || 'Failed to like post');
-            
-            // Fallback: Like post locally
-            likePostLocally(postId);
-        }
-    } catch (error) {
-        console.error('Error liking post:', error);
-        showError('Failed to like post. Liking locally.');
-        
-        // Fallback: Like post locally
-        likePostLocally(postId);
-    }
-}
-
-// Fallback: Like post locally
-function likePostLocally(postId) {
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
-    
-    // Toggle like
-    if (!post.likesCount) post.likesCount = 0;
-    post.likesCount += 1;
-    post.userLiked = true;
-    
-    // Update localStorage
-    savePostsToLocalStorage();
-    
-    // Update UI
-    updatePostLikesUI(postId, post.likesCount, true);
-    
-    // Show animation or feedback
-    showSuccess('Liked!');
-}
-
-// Update post likes UI
-function updatePostLikesUI(postId, likesCount, userLiked) {
-    const postElement = document.querySelector(`[data-post-id="${postId}"]`);
-    if (postElement) {
-        const likesElement = postElement.querySelector('.post-likes');
-        const likeButton = postElement.querySelector('.post-action.like i');
-        
-        if (likesElement) {
-            likesElement.innerHTML = `<i class="fas fa-thumbs-up"></i> ${likesCount}`;
-        }
-        
-        if (likeButton) {
-            likeButton.className = userLiked ? 'fas fa-thumbs-up' : 'far fa-thumbs-up';
-        }
-    }
-}
-
-// Add comment to post
-async function addComment(postId, text) {
-    const username = currentUserSession?.username;
-    
-    if (!username) {
-        showError('You must be logged in to comment');
-        return;
-    }
-    
-    try {
-        const response = await fetch(`/api/posts/${postId}/comments`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
-            },
-            body: JSON.stringify({
-                author_username: username,
-                content: text
-            })
-        });
-        
-        if (response.ok) {
-            const newComment = await response.json();
-            
-            // Update local post data
-            const postIndex = posts.findIndex(p => p.id === postId);
-            if (postIndex >= 0) {
-                if (!posts[postIndex].comments) {
-                    posts[postIndex].comments = [];
-                }
-                posts[postIndex].comments.push(newComment);
-                
-                // Update UI
-                updateCommentsUI(postId);
-                
-                // Save to localStorage
-                savePostsToLocalStorage();
-            }
-        } else {
-            const error = await response.json();
-            showError(error.error || 'Failed to add comment');
-            
-            // Fallback: Add comment locally
-            addCommentLocally(postId, text, username);
-        }
-    } catch (error) {
-        console.error('Error adding comment:', error);
-        showError('Failed to add comment. Adding locally.');
-        
-        // Fallback: Add comment locally
-        addCommentLocally(postId, text, username);
-    }
-}
-
-// Fallback: Add comment locally
-function addCommentLocally(postId, text, username) {
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
-    
-    // Initialize comments array if needed
-    if (!post.comments) post.comments = [];
-    
-    // Add new comment
-    const newComment = {
-        author: username,
-        text: text,
-        timestamp: new Date().toISOString()
-    };
-    
-    post.comments.push(newComment);
-    
-    // Update localStorage
-    savePostsToLocalStorage();
-    
-    // Update UI
-    updateCommentsUI(postId);
-}
-
-// Update comments UI
-function updateCommentsUI(postId) {
-    const postIndex = posts.findIndex(p => p.id === postId);
-    if (postIndex < 0) return;
-    
-    const post = posts[postIndex];
-    const postElement = document.querySelector(`[data-post-id="${postId}"]`);
-    
-    if (postElement) {
-        // Update comments count
-        const commentsCount = postElement.querySelector('.post-comments-count');
-        if (commentsCount) {
-            commentsCount.textContent = `${post.comments ? post.comments.length : 0} comments`;
-        }
-        
-        // Update comments list
-        const commentsList = document.getElementById(`comments-list-${postId}`);
-        if (commentsList) {
-            commentsList.innerHTML = '';
-            
-            if (post.comments && post.comments.length > 0) {
-                post.comments.forEach(comment => {
-                    const commentElement = document.createElement('div');
-                    commentElement.className = 'comment';
-                    
-                    const userProfile = getUserProfile(comment.author_username || comment.author);
-                    
-                    commentElement.innerHTML = `
-                        <img class="comment-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/32?u=${comment.author_username || comment.author}`}" alt="${comment.author_username || comment.author}">
-                        <div class="comment-content">
-                            <div class="comment-author">${userProfile.displayName || (comment.author_username || comment.author)}</div>
-                            <div class="comment-text">${escapeHtml(comment.content || comment.text)}</div>
-                        </div>
-                    `;
-                    
-                    commentsList.appendChild(commentElement);
-                });
-            } else {
-                commentsList.innerHTML = '<div class="no-comments">No comments yet</div>';
-            }
-        }
-        
-        // Ensure comments section is visible when adding a comment
-        const commentsSection = document.getElementById(`comments-${postId}`);
-        if (commentsSection) {
-            commentsSection.style.display = 'block';
-        }
-    }
-}
-
-// Toggle comments visibility (like Facebook)
-function toggleComments(postId) {
-    const commentsSection = document.getElementById(`comments-${postId}`);
-    const commentInput = document.getElementById(`comment-input-${postId}`);
-    
-    if (commentsSection) {
-        if (commentsSection.style.display === 'none') {
-            // Show comments
-            commentsSection.style.display = 'block';
-            
-            // Focus the comment input after a short delay
-            setTimeout(() => {
-                if (commentInput) {
-                    commentInput.focus();
-                }
-            }, 100);
-        } else {
-            // Hide comments
-            commentsSection.style.display = 'none';
-        }
-    }
-}
-
-// Close comments section
-function closeComments(postId) {
-    const commentsSection = document.getElementById(`comments-${postId}`);
-    if (commentsSection) {
-        commentsSection.style.display = 'none';
-    }
-}
-
-// Add comment from input
-function addCommentFromInput(postId) {
-    const postElement = document.querySelector(`[data-post-id="${postId}"]`);
-    if (!postElement) return;
-    
-    const input = document.getElementById(`comment-input-${postId}`);
-    const text = input.value.trim();
-    
-    if (text) {
-        addComment(postId, text);
-        input.value = '';
-    }
-}
-
-// Handle comment keypress
-function handleCommentKeypress(event, postId) {
-    if (event.key === 'Enter') {
-        const input = event.target;
-        const text = input.value.trim();
-        
-        if (text) {
-            addComment(postId, text);
-            input.value = '';
-        }
-    }
-}
-
-// Share a post
-function sharePost(postId) {
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
-    
-    // In a real app, this would open a share dialog
-    // For now, we'll just copy the post content to clipboard
-    const shareText = `${post.author}: ${post.content}`;
-    
-    navigator.clipboard.writeText(shareText).then(() => {
-        showSuccess('Post content copied to clipboard!');
-    }).catch(err => {
-        console.error('Failed to copy: ', err);
-        showError('Failed to share post');
-    });
-}
-
-// Add post to feed (for real-time updates)
-function addPostToFeed(post) {
-    const postsContainer = document.getElementById('posts-container');
-    if (!postsContainer) return;
-    
-    let postsList = postsContainer.querySelector('.posts-list');
-    if (!postsList) {
-        postsList = document.createElement('div');
-        postsList.className = 'posts-list';
-        postsContainer.appendChild(postsList);
-    }
-    
-    // Check if post already exists
-    const existingPost = document.querySelector(`[data-post-id="${post.id}"]`);
-    if (existingPost) return;
-    
-    // Add to beginning of feed
-    const postElement = createPostElement(post);
-    postsList.insertBefore(postElement, postsList.firstChild);
-}
-
-// Generate unique post ID
-function generatePostId() {
-    return 'post_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-}
-
-// Open create post modal
-function openCreatePostModal() {
-    const modal = document.getElementById('create-post-modal');
-    if (modal) {
-        modal.style.display = 'flex';
-        
-        // Set author info
-        const currentUser = currentUserSession?.username;
-        if (currentUser) {
-            const userProfile = getUserProfile(currentUser);
-            document.getElementById('post-author-avatar').src = userProfile.avatar || `https://i.pravatar.cc/50?u=${currentUser}`;
-            document.getElementById('post-author-name').textContent = userProfile.displayName || currentUser;
-        }
-        
-        // Reset form
-        document.getElementById('post-content').value = '';
-        document.getElementById('post-char-count').textContent = '0';
-        document.getElementById('post-media-preview').innerHTML = '';
-        document.getElementById('submit-post-btn').disabled = true;
-        currentPostMedia = [];
-    }
-}
-
-// Close create post modal
-function closeCreatePostModal() {
-    const modal = document.getElementById('create-post-modal');
-    if (modal) {
-        modal.style.display = 'none';
-    }
-}
-
-// Setup post input handlers
-function setupPostInputHandlers() {
-    const postContent = document.getElementById('post-content');
-    
-    if (postContent) {
-        postContent.addEventListener('input', function() {
-            const charCount = this.value.length;
-            document.getElementById('post-char-count').textContent = charCount;
-            
-            // Enable/disable submit button
-            const submitBtn = document.getElementById('submit-post-btn');
-            if (submitBtn) {
-                submitBtn.disabled = charCount === 0 && currentPostMedia.length === 0;
-            }
-        });
-    }
-    
-    // Close modal when clicking outside
-    const modal = document.getElementById('create-post-modal');
-    if (modal) {
-        modal.addEventListener('click', function(e) {
-            if (e.target === modal) {
-                closeCreatePostModal();
-            }
-        });
-    }
-}
-
-// Media upload functions (simplified for demo)
-function openImageUpload() {
-    // In a real app, this would open a file picker
-    // For demo purposes, we'll use a placeholder
-    const imageUrl = prompt('Enter image URL (for demo purposes):');
-    if (imageUrl) {
-        addMediaToPost('image', imageUrl);
-    }
-}
-
-function openVideoUpload() {
-    // In a real app, this would open a file picker
-    // For demo purposes, we'll use a placeholder
-    const videoUrl = prompt('Enter video URL (for demo purposes):');
-    if (videoUrl) {
-        addMediaToPost('video', videoUrl);
-    }
-}
-
-function openLocationShare() {
-    // This would use the Geolocation API in a real app
-    alert('Location sharing would be implemented here in a real app');
-}
-
-// Add media to post
-function addMediaToPost(type, url) {
-    // For simplicity, we'll only allow one media item per post
-    currentPostMedia = [{ type, url }];
-    
-    const previewContainer = document.getElementById('post-media-preview');
-    if (previewContainer) {
-        previewContainer.innerHTML = `
-            <div class="media-preview-item">
-                ${type === 'image' ? 
-                    `<img src="${url}" alt="Preview">` : 
-                    `<video controls><source src="${url}" type="video/mp4">Your browser does not support the video tag.</video>`
-                }
-                <button class="remove-media" onclick="removeMedia()">×</button>
-            </div>
-        `;
-    }
-    
-    // Enable submit button if there's media
-    const submitBtn = document.getElementById('submit-post-btn');
-    if (submitBtn) {
-        submitBtn.disabled = false;
-    }
-}
-
-// Remove media from post
-function removeMedia() {
-    currentPostMedia = [];
-    const previewContainer = document.getElementById('post-media-preview');
-    if (previewContainer) {
-        previewContainer.innerHTML = '';
-    }
-    
-    // Disable submit button if no content
-    const content = document.getElementById('post-content').value.trim();
-    const submitBtn = document.getElementById('submit-post-btn');
-    if (submitBtn && !content) {
-        submitBtn.disabled = true;
-    }
-}
-
-// Utility functions
-function formatPostTime(timestamp) {
-    const now = new Date();
-    const postTime = new Date(timestamp);
-    const diffMs = now - postTime;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-    
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    
-    return postTime.toLocaleDateString();
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-function getUserProfile(username) {
-    const profiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
-    return profiles[username] || { 
-        username: username,
-        displayName: username,
-        avatar: `https://i.pravatar.cc/50?u=${username}`
-    };
-}
-
-// FIXED: Enhanced showContainer function for posts and all users
+// FIXED: Enhanced showContainer function for posts
 function showContainer(containerId) {
     console.log('🔄 Showing container:', containerId);
     
@@ -6119,7 +5365,7 @@ function showContainer(containerId) {
             initializeSQLEditor();
         }
         
-        // FIXED: Enhanced posts initialization - ensure create post box is always visible
+        // FIXED: Enhanced posts initialization - now everything scrolls together
         if (containerId === 'posts') {
             console.log('📝 Initializing posts feed...');
             // Create posts container if it doesn't exist
@@ -6127,7 +5373,7 @@ function showContainer(containerId) {
             // Force re-initialization of create post box
             initializePosts();
             
-            // Double-check the create post box is visible
+            // Double-check everything is set up
             setTimeout(() => {
                 const createPostBox = document.querySelector('.create-post-box');
                 if (!createPostBox) {
@@ -6139,6 +5385,12 @@ function showContainer(containerId) {
                 
                 // Ensure posts are rendered
                 renderPosts();
+                
+                // Scroll to top initially
+                const mainContainer = document.querySelector('.posts-main-container');
+                if (mainContainer) {
+                    mainContainer.scrollTop = 0;
+                }
             }, 100);
         }
         
@@ -6251,6 +5503,9 @@ function showContainer(containerId) {
     if (kebabDropdown) kebabDropdown.classList.remove('active');
 }
 
+// The rest of your JavaScript functions remain exactly the same...
+// (Like the rest of your existing JavaScript code)
+// --- CUT HERE ---
 // MODIFIED: sendMessage function to use OperaMiniMessenger when on Opera Mini
 async function sendMessage() {
     if (isSending || isProcessingCommand) return;
@@ -6608,6 +5863,38 @@ function initSocket() {
         }
     });
 }
+
+// MODIFIED: Update the delete button handler in showMessageContextMenu
+// In the delete button creation section, replace the onclick handler:
+const deleteButton = document.createElement('button');
+deleteButton.textContent = 'Delete';
+deleteButton.className = 'delete-btn';
+deleteButton.onclick = async () => {
+    try {
+        console.log('Deleting message:', messageId, 'Username:', currentUsername);
+        
+        // Use the unified deleteMessageContext function
+        const success = await deleteMessageContext(messageId, currentUsername);
+        
+        if (success) {
+            console.log('✅ Message deleted successfully');
+            
+            // Remove from UI
+            message.remove();
+            showSuccess('Message deleted successfully');
+            
+        } else {
+            throw new Error('Delete failed');
+        }
+        
+    } catch (err) {
+        console.error('Delete error:', err);
+        // Even if server delete fails, remove from UI for better UX
+        message.remove();
+        showSuccess('Message removed locally');
+    }
+    contextMenu.remove();
+};
 
 // NEW: Welcome screen animation function
 function animateWelcomeText() {
