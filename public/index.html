@@ -3086,8 +3086,6 @@
             border-radius: 0;
             z-index: 1;
         }
-// --- CUT HERE ---
-        
         /* ===== FIXED POSTS FEED STYLES ===== */
         #posts {
             background: #f0f2f5;
@@ -3123,21 +3121,22 @@
             display: none !important;
         }
 
-        /* Main posts container - scrollable area */
+        /* Main container for posts - SCROLLABLE */
         .posts-main-container {
-            flex: 1;
-            overflow-y: auto;
-            background: #f0f2f5;
             display: flex;
             flex-direction: column;
+            height: calc(100vh - 60px); /* Header height */
+            overflow-y: auto; /* Changed to auto for scrolling */
+            overflow-x: hidden; /* Prevent horizontal scrolling */
         }
 
-        /* Create post box - INSIDE SCROLLABLE AREA (like Facebook) */
+        /* Create post box - NOT STICKY, scrolls with content */
         .create-post-box-container {
             background: #f0f2f5;
             padding: 15px;
             border-bottom: 1px solid #e4e6eb;
             flex-shrink: 0;
+            z-index: 1; /* Lower z-index to scroll */
         }
 
         .create-post-box {
@@ -3215,14 +3214,18 @@
             font-size: 16px;
         }
 
-        /* Posts container - scrollable content */
+        /* REMOVED: .posts-container-wrapper and .posts-container absolute positioning */
+        /* Now everything scrolls together */
         .posts-container {
             padding: 0;
-            flex: 1;
+            width: 100%;
+            overflow-x: hidden; /* Prevent horizontal scrolling */
         }
 
         .posts-list {
             padding-bottom: 20px;
+            max-width: 100%;
+            overflow-x: hidden; /* Prevent horizontal scrolling */
         }
 
         /* Post cards */
@@ -3233,6 +3236,10 @@
             margin: 15px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
             border: 1px solid #e4e6eb;
+            max-width: 100%;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            word-break: break-word;
         }
 
         .post-header {
@@ -3251,6 +3258,7 @@
 
         .post-author-info {
             flex: 1;
+            min-width: 0; /* Prevent flex item from overflowing */
         }
 
         .post-author-name {
@@ -3258,6 +3266,9 @@
             color: #1c1e21;
             margin-bottom: 2px;
             font-size: 15px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .post-meta {
@@ -3266,6 +3277,7 @@
             display: flex;
             align-items: center;
             gap: 5px;
+            flex-wrap: wrap;
         }
 
         .post-content {
@@ -3274,12 +3286,17 @@
             margin-bottom: 15px;
             white-space: pre-wrap;
             font-size: 15px;
+            max-width: 100%;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            word-break: break-word;
         }
 
         .post-media {
             margin: 15px 0;
             border-radius: 8px;
             overflow: hidden;
+            max-width: 100%;
         }
 
         .post-media img {
@@ -3288,38 +3305,28 @@
             object-fit: cover;
             border-radius: 8px;
             cursor: pointer;
+            max-width: 100%; /* Ensure images don't overflow */
         }
 
         .post-media video {
             width: 100%;
             max-height: 400px;
             border-radius: 8px;
+            max-width: 100%; /* Ensure videos don't overflow */
         }
 
+        /* REMOVED: Post stats (including likes) */
         .post-stats {
-            display: flex;
-            gap: 20px;
-            padding: 10px 0;
-            border-bottom: 1px solid #e4e6eb;
-            color: #65676b;
-            font-size: 14px;
+            display: none; /* Hide the entire stats section */
         }
 
-        .post-likes, .post-comments-count {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            cursor: pointer;
-        }
-
-        .post-likes:hover, .post-comments-count:hover {
-            text-decoration: underline;
-        }
-
+        /* UPDATED: Post actions - removed Like button */
         .post-actions {
             display: flex;
             gap: 5px;
             padding: 5px 0;
+            border-top: 1px solid #e4e6eb;
+            margin-top: 10px;
         }
 
         .post-action {
@@ -3353,6 +3360,8 @@
             margin: 15px -15px -15px -15px;
             padding: 15px;
             display: none;
+            max-width: 100%;
+            overflow-x: hidden; /* Prevent horizontal scrolling */
         }
 
         .post-comments.show-comments {
@@ -3397,6 +3406,7 @@
             max-height: 300px;
             overflow-y: auto;
             margin-bottom: 12px;
+            overflow-x: hidden; /* Prevent horizontal scrolling */
         }
 
         .comment {
@@ -3406,6 +3416,7 @@
             padding: 8px;
             border-radius: 8px;
             transition: background-color 0.2s;
+            max-width: 100%;
         }
 
         .comment:hover {
@@ -3426,6 +3437,10 @@
             padding: 10px;
             border-radius: 15px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            max-width: calc(100% - 42px); /* Account for avatar width + gap */
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            word-break: break-word;
         }
 
         .comment-author {
@@ -3433,12 +3448,18 @@
             font-size: 13px;
             color: #1c1e21;
             margin-bottom: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .comment-text {
             color: #1c1e21;
             font-size: 14px;
             line-height: 1.3;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            word-break: break-word;
         }
 
         .no-comments {
@@ -3452,6 +3473,7 @@
             display: flex;
             gap: 10px;
             align-items: center;
+            max-width: 100%;
         }
 
         .comment-input input {
@@ -3464,6 +3486,7 @@
             font-size: 14px;
             outline: none;
             transition: border-color 0.2s;
+            max-width: calc(100% - 80px); /* Account for button */
         }
 
         .comment-input input:focus {
@@ -3479,6 +3502,7 @@
             cursor: pointer;
             font-size: 14px;
             transition: background 0.2s;
+            flex-shrink: 0;
         }
 
         .comment-input button:hover {
@@ -3578,6 +3602,8 @@
             margin-bottom: 10px;
             outline: none;
             font-family: inherit;
+            max-width: 100%;
+            box-sizing: border-box;
         }
 
         #post-content:focus {
@@ -3625,12 +3651,14 @@
             border-radius: 8px;
             overflow: hidden;
             position: relative;
+            max-width: 100%;
         }
 
         .media-preview-item {
             position: relative;
             border-radius: 8px;
             overflow: hidden;
+            max-width: 100%;
         }
 
         .media-preview-item img,
@@ -3638,6 +3666,7 @@
             width: 100%;
             max-height: 200px;
             object-fit: cover;
+            max-width: 100%;
         }
 
         .remove-media {
@@ -3795,6 +3824,7 @@
             .comment-input input {
                 padding: 8px 12px;
                 font-size: 13px;
+                max-width: calc(100% - 70px);
             }
             
             .post-image-container {
@@ -3856,10 +3886,12 @@
     </style>
 </head>
 <body>
-    <!-- Welcome screen with animated text -->
+    <!-- NEW: Welcome screen with animated text -->
     <div class="welcome-screen" id="welcome-screen">
         <div class="animated-logo">
-            <div class="animated-text" id="animated-text"></div>
+            <div class="animated-text" id="animated-text">
+                <!-- Letters will be added by JavaScript -->
+            </div>
         </div>
         <div class="subtitle">Your smart messaging companion</div>
         <div class="loading-bar">
@@ -3940,20 +3972,18 @@
         <a href="#" onclick="logout()" style="color: #ff4444;">Logout</a>
     </div>
 
-    <!-- UPDATED: Posts Container with everything scrollable together (like Facebook) -->
+    <!-- UPDATED: Posts Container with FACEBOOK-STYLE SCROLLING -->
     <div id="posts" class="main-chat-interface container" style="display: none;">
         <div class="posts-header">
             <h2>Community Posts</h2>
         </div>
         
-        <!-- SCROLLABLE AREA containing both create post box and posts -->
+        <!-- FIXED: Facebook-style scrolling - everything moves together -->
         <div class="posts-main-container">
-            <!-- Create post box container - INSIDE scrollable area -->
             <div id="create-post-box-container" class="create-post-box-container">
                 <!-- Facebook-style create post box will be inserted here by JavaScript -->
             </div>
             
-            <!-- Posts container -->
             <div class="posts-container" id="posts-container">
                 <!-- Posts will be loaded here -->
             </div>
@@ -3997,7 +4027,6 @@
             </div>
         </div>
     </div>
-
 
     <!-- NEW: All Users Container -->
     <div id="all-users" class="main-chat-interface container" style="display: none;">
@@ -5010,6 +5039,7 @@ function startAllUsersRefresh() {
         }
     }, 30000);
 }
+
 // Posts functionality for client-side
 let posts = [];
 let lastUpdateTimestamp = null;
@@ -5093,7 +5123,7 @@ async function pollForPostUpdates() {
     }
 }
 
-// FIXED: Setup Facebook-style create post box
+// FIXED: Setup Facebook-style create post box - Now in separate container
 function setupCreatePostBox() {
     const createPostBoxContainer = document.getElementById('create-post-box-container');
     if (!createPostBoxContainer) {
@@ -5117,7 +5147,7 @@ function setupCreatePostBox() {
     // Create Facebook-style create post box
     const createPostBox = document.createElement('div');
     createPostBox.className = 'create-post-box';
-    createPostBox.onclick = openCreatePostModal;
+    createPostBox.onclick = openCreatePostModal; // Make entire box clickable
     
     createPostBox.innerHTML = `
         <div class="create-post-header">
@@ -5143,7 +5173,7 @@ function setupCreatePostBox() {
     `;
     
     createPostBoxContainer.appendChild(createPostBox);
-    console.log('✅ Create post box setup complete');
+    console.log('✅ Create post box setup complete in separate container');
 }
 
 // Create posts container if it doesn't exist
@@ -5157,7 +5187,7 @@ function createPostsContainer() {
         existingMainContainer.remove();
     }
     
-    // Create main scrollable container
+    // Create main container
     const mainContainer = document.createElement('div');
     mainContainer.className = 'posts-main-container';
     
@@ -5166,7 +5196,7 @@ function createPostsContainer() {
     createPostBoxContainer.id = 'create-post-box-container';
     createPostBoxContainer.className = 'create-post-box-container';
     
-    // Create posts container
+    // Create posts container (scrollable)
     const postsContainer = document.createElement('div');
     postsContainer.id = 'posts-container';
     postsContainer.className = 'posts-container';
@@ -5176,6 +5206,71 @@ function createPostsContainer() {
     
     postsSection.appendChild(mainContainer);
     console.log('✅ Posts container structure created');
+}
+
+// NEW: Function to detect and convert image URLs in text
+function processContentWithImages(content) {
+    if (!content) return '';
+    
+    // Regular expression to match image URLs
+    const imageUrlRegex = /(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|bmp|webp|svg))(\?[^\s]*)?/gi;
+    
+    // Split content by image URLs
+    const parts = content.split(imageUrlRegex);
+    
+    // If no images found, return original content
+    if (parts.length <= 1) {
+        return escapeHtml(content);
+    }
+    
+    let processedContent = '';
+    let isImage = false;
+    
+    for (let i = 0; i < parts.length; i++) {
+        if (parts[i] === undefined) continue;
+        
+        // Every 3rd part starting from index 1 is an image URL (due to regex groups)
+        if ((i % 3 === 1) && parts[i]) {
+            const imageUrl = parts[i] + (parts[i+1] || '') + (parts[i+2] || '');
+            processedContent += `<div class="post-content-image">
+                <img src="${escapeHtml(imageUrl)}" alt="Post image" onclick="openZoom('${escapeHtml(imageUrl)}')" loading="lazy">
+            </div>`;
+            // Skip the next two parts (file extension and query params)
+            i += 2;
+            isImage = true;
+        } else if (parts[i] && parts[i].trim()) {
+            // Regular text content
+            processedContent += `<div class="post-text-content">${escapeHtml(parts[i])}</div>`;
+            isImage = false;
+        }
+    }
+    
+    return processedContent;
+}
+
+// NEW: Function to detect and convert multiple image URLs in text
+function processContentForMultipleImages(content) {
+    if (!content) return { text: '', images: [] };
+    
+    // Regular expression to match image URLs
+    const imageUrlRegex = /(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|bmp|webp|svg))(\?[^\s]*)?/gi;
+    
+    const images = [];
+    let textContent = content;
+    
+    // Find all image URLs
+    let match;
+    while ((match = imageUrlRegex.exec(content)) !== null) {
+        const fullUrl = match[0];
+        images.push(fullUrl);
+        // Replace the URL with a marker in text content
+        textContent = textContent.replace(fullUrl, ` [IMAGE_${images.length - 1}] `);
+    }
+    
+    return {
+        text: escapeHtml(textContent).replace(/\[IMAGE_(\d+)\]/g, ''),
+        images: images
+    };
 }
 
 // Render all posts
@@ -5188,24 +5283,20 @@ function renderPosts() {
         return;
     }
     
-    // Clear existing content
-    postsContainer.innerHTML = '';
-    
-    if (posts.length === 0) {
-        // Show "no posts" message
-        postsContainer.innerHTML = `
-            <div class="no-posts">
-                <i class="fas fa-newspaper" style="font-size: 48px; color: #ddd; margin-bottom: 15px;"></i>
-                <p>No posts yet. Be the first to share something!</p>
-            </div>
-        `;
-        return;
+    // Create posts list if it doesn't exist
+    let postsList = postsContainer.querySelector('.posts-list');
+    if (!postsList) {
+        postsList = document.createElement('div');
+        postsList.className = 'posts-list';
+        postsContainer.appendChild(postsList);
     }
     
-    // Create posts list container
-    const postsList = document.createElement('div');
-    postsList.className = 'posts-list';
-    postsContainer.appendChild(postsList);
+    postsList.innerHTML = '';
+    
+    if (posts.length === 0) {
+        // REMOVED: "No posts yet" message - we don't show anything when there are no posts
+        return;
+    }
     
     // Sort posts by timestamp (newest first)
     const sortedPosts = [...posts].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -5216,7 +5307,7 @@ function renderPosts() {
     });
 }
 
-// UPDATED: Create post element with image URL detection
+// UPDATED: Create post element WITHOUT LIKE FUNCTIONALITY
 function createPostElement(post) {
     const postDiv = document.createElement('div');
     postDiv.className = 'post-card';
@@ -5260,18 +5351,9 @@ function createPostElement(post) {
                 }
             </div>
         ` : ''}
-        <div class="post-stats">
-            <div class="post-likes" onclick="likePost('${post.id}')">
-                <i class="fas fa-thumbs-up"></i> ${post.likes || 0}
-            </div>
-            <div class="post-comments-count" onclick="toggleComments('${post.id}')">
-                ${post.comments ? post.comments.length : 0} comments
-            </div>
-        </div>
+        <!-- REMOVED: Post stats section (including likes) -->
         <div class="post-actions">
-            <button class="post-action like" onclick="likePost('${post.id}')">
-                <i class="${post.userLiked ? 'fas' : 'far'} fa-thumbs-up"></i> Like
-            </button>
+            <!-- REMOVED: Like button -->
             <button class="post-action" onclick="toggleComments('${post.id}')">
                 <i class="far fa-comment"></i> Comment
             </button>
@@ -5307,7 +5389,484 @@ function createPostElement(post) {
     return postDiv;
 }
 
-// FIXED: Enhanced showContainer function for posts
+// Create a new post
+async function createPost() {
+    const content = document.getElementById('post-content').value.trim();
+    const author = currentUserSession?.username;
+    
+    if (!author) {
+        showError('You must be logged in to create a post');
+        return;
+    }
+    
+    if (!content && currentPostMedia.length === 0) {
+        showError('Post content cannot be empty');
+        return;
+    }
+    
+    try {
+        const postData = {
+            author_username: author,
+            content: content
+        };
+        
+        // Add media if present
+        if (currentPostMedia.length > 0) {
+            postData.media = currentPostMedia[0];
+        }
+        
+        const response = await fetch('/api/posts', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
+            },
+            body: JSON.stringify(postData)
+        });
+        
+        if (response.ok) {
+            const newPost = await response.json();
+            
+            // Add to local posts array
+            posts.unshift(newPost);
+            renderPosts();
+            
+            // Also save to localStorage as backup
+            savePostsToLocalStorage();
+            
+            // Close modal and reset form
+            closeCreatePostModal();
+            showSuccess('Post published successfully!');
+        } else {
+            const error = await response.json();
+            showError(error.error || 'Failed to create post');
+            
+            // Fallback: Create post locally
+            createPostLocally(content, author);
+        }
+    } catch (error) {
+        console.error('Error creating post:', error);
+        showError('Failed to create post. Saving locally.');
+        
+        // Fallback: Create post locally
+        createPostLocally(content, author);
+    }
+}
+
+// Fallback: Create post locally
+function createPostLocally(content, author) {
+    const newPost = {
+        id: generatePostId(),
+        author: author,
+        content: content,
+        media: currentPostMedia.length > 0 ? currentPostMedia[0] : null,
+        timestamp: new Date().toISOString(),
+        likes: 0,
+        comments: []
+    };
+    
+    // Add to posts array
+    posts.unshift(newPost);
+    
+    // Save to localStorage
+    savePostsToLocalStorage();
+    
+    // Add to feed
+    addPostToFeed(newPost);
+    
+    // Close modal
+    closeCreatePostModal();
+    
+    // Show success message
+    showSuccess('Post published locally!');
+}
+
+// Save posts to localStorage
+function savePostsToLocalStorage() {
+    localStorage.setItem('messageMatePosts', JSON.stringify(posts));
+}
+
+// REMOVED: likePost function completely
+// REMOVED: likePostLocally function completely
+// REMOVED: updatePostLikesUI function completely
+
+// Add comment to post
+async function addComment(postId, text) {
+    const username = currentUserSession?.username;
+    
+    if (!username) {
+        showError('You must be logged in to comment');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/posts/${postId}/comments`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
+            },
+            body: JSON.stringify({
+                author_username: username,
+                content: text
+            })
+        });
+        
+        if (response.ok) {
+            const newComment = await response.json();
+            
+            // Update local post data
+            const postIndex = posts.findIndex(p => p.id === postId);
+            if (postIndex >= 0) {
+                if (!posts[postIndex].comments) {
+                    posts[postIndex].comments = [];
+                }
+                posts[postIndex].comments.push(newComment);
+                
+                // Update UI
+                updateCommentsUI(postId);
+                
+                // Save to localStorage
+                savePostsToLocalStorage();
+            }
+        } else {
+            const error = await response.json();
+            showError(error.error || 'Failed to add comment');
+            
+            // Fallback: Add comment locally
+            addCommentLocally(postId, text, username);
+        }
+    } catch (error) {
+        console.error('Error adding comment:', error);
+        showError('Failed to add comment. Adding locally.');
+        
+        // Fallback: Add comment locally
+        addCommentLocally(postId, text, username);
+    }
+}
+
+// Fallback: Add comment locally
+function addCommentLocally(postId, text, username) {
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+    
+    // Initialize comments array if needed
+    if (!post.comments) post.comments = [];
+    
+    // Add new comment
+    const newComment = {
+        author: username,
+        text: text,
+        timestamp: new Date().toISOString()
+    };
+    
+    post.comments.push(newComment);
+    
+    // Update localStorage
+    savePostsToLocalStorage();
+    
+    // Update UI
+    updateCommentsUI(postId);
+}
+
+// Update comments UI
+function updateCommentsUI(postId) {
+    const postIndex = posts.findIndex(p => p.id === postId);
+    if (postIndex < 0) return;
+    
+    const post = posts[postIndex];
+    const postElement = document.querySelector(`[data-post-id="${postId}"]`);
+    
+    if (postElement) {
+        // Update comments list
+        const commentsList = document.getElementById(`comments-list-${postId}`);
+        if (commentsList) {
+            commentsList.innerHTML = '';
+            
+            if (post.comments && post.comments.length > 0) {
+                post.comments.forEach(comment => {
+                    const commentElement = document.createElement('div');
+                    commentElement.className = 'comment';
+                    
+                    const userProfile = getUserProfile(comment.author_username || comment.author);
+                    
+                    commentElement.innerHTML = `
+                        <img class="comment-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/32?u=${comment.author_username || comment.author}`}" alt="${comment.author_username || comment.author}">
+                        <div class="comment-content">
+                            <div class="comment-author">${userProfile.displayName || (comment.author_username || comment.author)}</div>
+                            <div class="comment-text">${escapeHtml(comment.content || comment.text)}</div>
+                        </div>
+                    `;
+                    
+                    commentsList.appendChild(commentElement);
+                });
+            } else {
+                commentsList.innerHTML = '<div class="no-comments">No comments yet</div>';
+            }
+        }
+        
+        // Ensure comments section is visible when adding a comment
+        const commentsSection = document.getElementById(`comments-${postId}`);
+        if (commentsSection) {
+            commentsSection.style.display = 'block';
+        }
+    }
+}
+
+// Toggle comments visibility (like Facebook)
+function toggleComments(postId) {
+    const commentsSection = document.getElementById(`comments-${postId}`);
+    const commentInput = document.getElementById(`comment-input-${postId}`);
+    
+    if (commentsSection) {
+        if (commentsSection.style.display === 'none') {
+            // Show comments
+            commentsSection.style.display = 'block';
+            
+            // Focus the comment input after a short delay
+            setTimeout(() => {
+                if (commentInput) {
+                    commentInput.focus();
+                }
+            }, 100);
+        } else {
+            // Hide comments
+            commentsSection.style.display = 'none';
+        }
+    }
+}
+
+// Close comments section
+function closeComments(postId) {
+    const commentsSection = document.getElementById(`comments-${postId}`);
+    if (commentsSection) {
+        commentsSection.style.display = 'none';
+    }
+}
+
+// Add comment from input
+function addCommentFromInput(postId) {
+    const postElement = document.querySelector(`[data-post-id="${postId}"]`);
+    if (!postElement) return;
+    
+    const input = document.getElementById(`comment-input-${postId}`);
+    const text = input.value.trim();
+    
+    if (text) {
+        addComment(postId, text);
+        input.value = '';
+    }
+}
+
+// Handle comment keypress
+function handleCommentKeypress(event, postId) {
+    if (event.key === 'Enter') {
+        const input = event.target;
+        const text = input.value.trim();
+        
+        if (text) {
+            addComment(postId, text);
+            input.value = '';
+        }
+    }
+}
+
+// Share a post
+function sharePost(postId) {
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+    
+    // In a real app, this would open a share dialog
+    // For now, we'll just copy the post content to clipboard
+    const shareText = `${post.author}: ${post.content}`;
+    
+    navigator.clipboard.writeText(shareText).then(() => {
+        showSuccess('Post content copied to clipboard!');
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+        showError('Failed to share post');
+    });
+}
+
+// Add post to feed (for real-time updates)
+function addPostToFeed(post) {
+    const postsContainer = document.getElementById('posts-container');
+    if (!postsContainer) return;
+    
+    let postsList = postsContainer.querySelector('.posts-list');
+    if (!postsList) {
+        postsList = document.createElement('div');
+        postsList.className = 'posts-list';
+        postsContainer.appendChild(postsList);
+    }
+    
+    // Check if post already exists
+    const existingPost = document.querySelector(`[data-post-id="${post.id}"]`);
+    if (existingPost) return;
+    
+    // Add to beginning of feed
+    const postElement = createPostElement(post);
+    postsList.insertBefore(postElement, postsList.firstChild);
+}
+
+// Generate unique post ID
+function generatePostId() {
+    return 'post_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+// Open create post modal
+function openCreatePostModal() {
+    const modal = document.getElementById('create-post-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        
+        // Set author info
+        const currentUser = currentUserSession?.username;
+        if (currentUser) {
+            const userProfile = getUserProfile(currentUser);
+            document.getElementById('post-author-avatar').src = userProfile.avatar || `https://i.pravatar.cc/50?u=${currentUser}`;
+            document.getElementById('post-author-name').textContent = userProfile.displayName || currentUser;
+        }
+        
+        // Reset form
+        document.getElementById('post-content').value = '';
+        document.getElementById('post-char-count').textContent = '0';
+        document.getElementById('post-media-preview').innerHTML = '';
+        document.getElementById('submit-post-btn').disabled = true;
+        currentPostMedia = [];
+    }
+}
+
+// Close create post modal
+function closeCreatePostModal() {
+    const modal = document.getElementById('create-post-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// Setup post input handlers
+function setupPostInputHandlers() {
+    const postContent = document.getElementById('post-content');
+    
+    if (postContent) {
+        postContent.addEventListener('input', function() {
+            const charCount = this.value.length;
+            document.getElementById('post-char-count').textContent = charCount;
+            
+            // Enable/disable submit button
+            const submitBtn = document.getElementById('submit-post-btn');
+            if (submitBtn) {
+                submitBtn.disabled = charCount === 0 && currentPostMedia.length === 0;
+            }
+        });
+    }
+    
+    // Close modal when clicking outside
+    const modal = document.getElementById('create-post-modal');
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                closeCreatePostModal();
+            }
+        });
+    }
+}
+
+// Media upload functions (simplified for demo)
+function openImageUpload() {
+    // In a real app, this would open a file picker
+    // For demo purposes, we'll use a placeholder
+    const imageUrl = prompt('Enter image URL (for demo purposes):');
+    if (imageUrl) {
+        addMediaToPost('image', imageUrl);
+    }
+}
+
+function openVideoUpload() {
+    // In a real app, this would open a file picker
+    // For demo purposes, we'll use a placeholder
+    const videoUrl = prompt('Enter video URL (for demo purposes):');
+    if (videoUrl) {
+        addMediaToPost('video', videoUrl);
+    }
+}
+
+function openLocationShare() {
+    // This would use the Geolocation API in a real app
+    alert('Location sharing would be implemented here in a real app');
+}
+
+// Add media to post
+function addMediaToPost(type, url) {
+    // For simplicity, we'll only allow one media item per post
+    currentPostMedia = [{ type, url }];
+    
+    const previewContainer = document.getElementById('post-media-preview');
+    if (previewContainer) {
+        previewContainer.innerHTML = `
+            <div class="media-preview-item">
+                ${type === 'image' ? 
+                    `<img src="${url}" alt="Preview">` : 
+                    `<video controls><source src="${url}" type="video/mp4">Your browser does not support the video tag.</video>`
+                }
+                <button class="remove-media" onclick="removeMedia()">×</button>
+            </div>
+        `;
+    }
+    
+    // Enable submit button if there's media
+    const submitBtn = document.getElementById('submit-post-btn');
+    if (submitBtn) {
+        submitBtn.disabled = false;
+    }
+}
+
+// Remove media from post
+function removeMedia() {
+    currentPostMedia = [];
+    const previewContainer = document.getElementById('post-media-preview');
+    if (previewContainer) {
+        previewContainer.innerHTML = '';
+    }
+    
+    // Disable submit button if no content
+    const content = document.getElementById('post-content').value.trim();
+    const submitBtn = document.getElementById('submit-post-btn');
+    if (submitBtn && !content) {
+        submitBtn.disabled = true;
+    }
+}
+
+// Utility functions
+function formatPostTime(timestamp) {
+    const now = new Date();
+    const postTime = new Date(timestamp);
+    const diffMs = now - postTime;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    
+    return postTime.toLocaleDateString();
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function getUserProfile(username) {
+    const profiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
+    return profiles[username] || { username: username };
+}
+
+// FIXED: Enhanced showContainer function for posts and all users
 function showContainer(containerId) {
     console.log('🔄 Showing container:', containerId);
     
@@ -5365,7 +5924,7 @@ function showContainer(containerId) {
             initializeSQLEditor();
         }
         
-        // FIXED: Enhanced posts initialization - now everything scrolls together
+        // FIXED: Enhanced posts initialization - ensure create post box is always visible
         if (containerId === 'posts') {
             console.log('📝 Initializing posts feed...');
             // Create posts container if it doesn't exist
@@ -5373,7 +5932,7 @@ function showContainer(containerId) {
             // Force re-initialization of create post box
             initializePosts();
             
-            // Double-check everything is set up
+            // Double-check the create post box is visible
             setTimeout(() => {
                 const createPostBox = document.querySelector('.create-post-box');
                 if (!createPostBox) {
@@ -5385,12 +5944,6 @@ function showContainer(containerId) {
                 
                 // Ensure posts are rendered
                 renderPosts();
-                
-                // Scroll to top initially
-                const mainContainer = document.querySelector('.posts-main-container');
-                if (mainContainer) {
-                    mainContainer.scrollTop = 0;
-                }
             }, 100);
         }
         
@@ -5503,9 +6056,6 @@ function showContainer(containerId) {
     if (kebabDropdown) kebabDropdown.classList.remove('active');
 }
 
-// The rest of your JavaScript functions remain exactly the same...
-// (Like the rest of your existing JavaScript code)
-// --- CUT HERE ---
 // MODIFIED: sendMessage function to use OperaMiniMessenger when on Opera Mini
 async function sendMessage() {
     if (isSending || isProcessingCommand) return;
