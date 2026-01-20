@@ -4073,6 +4073,102 @@ html, body {
     .post-content {
         font-size: 14px;
     }
+    /* FIX: All Users container should start at top without extra margin */
+#all-users.main-chat-interface {
+    margin-top: 0 !important;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* FIX: All Users header positioning */
+.all-users-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: white;
+    padding: 15px 20px;
+    border-bottom: 1px solid #e4e6eb;
+    margin: 0 !important;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* FIX: Adjust the search and filter to account for fixed header */
+.all-users-search-container {
+    padding: 15px;
+    background: white;
+    border-bottom: 1px solid #e4e6eb;
+    position: sticky;
+    top: 70px; /* Height of header + padding */
+    z-index: 90;
+}
+
+.filter-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    position: sticky;
+    top: 120px; /* Header + search container height */
+    background: white;
+    padding: 10px 15px;
+    z-index: 80;
+}
+
+/* FIX: Adjust the container for scrolling */
+.all-users-container {
+    padding: 15px;
+    height: calc(100vh - 180px); /* Adjust based on header heights */
+    overflow-y: auto;
+    overflow-x: hidden;
+    margin-top: 140px; /* Space for header, search, and filters */
+}
+
+/* FIX: Mobile responsive adjustments */
+@media (max-width: 768px) {
+    .all-users-header {
+        padding: 12px 15px;
+        top: 0;
+    }
+    
+    .all-users-search-container {
+        padding: 12px;
+        top: 60px; /* Adjusted for smaller header */
+    }
+    
+    .filter-buttons {
+        top: 105px; /* Adjusted for smaller elements */
+        padding: 8px 12px;
+    }
+    
+    .all-users-container {
+        height: calc(100vh - 150px);
+        margin-top: 120px;
+        padding: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .all-users-header h2 {
+        font-size: 1.1rem;
+    }
+    
+    .all-users-search-container {
+        padding: 10px;
+        top: 55px;
+    }
+    
+    .filter-buttons {
+        top: 95px;
+        padding: 6px 10px;
+    }
+    
+    .all-users-container {
+        height: calc(100vh - 130px);
+        margin-top: 110px;
+        padding: 8px;
+    }
     
     .post-action {
         padding: 6px;
