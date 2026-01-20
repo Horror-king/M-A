@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4796,6 +4795,9 @@ let allUsersList = [];
 let filteredUsers = [];
 let currentFilter = 'all';
 let currentSearchQuery = '';
+let isUsersLoaded = false; // Track if users are already loaded
+let usersLastLoadTime = 0; // Track when users were last loaded
+let usersRefreshInterval = null; // Store the refresh interval
 
 // Add this function to show all users on first visit
 function showAllUsersOnFirstVisit() {
@@ -4822,7 +4824,15 @@ function showAllUsersOnFirstVisit() {
 
 // Initialize all users functionality
 function initializeAllUsers() {
-    loadAllUsers();
+    // Only load users if they haven't been loaded yet or it's been more than 30 seconds
+    const now = Date.now();
+    if (!isUsersLoaded || (now - usersLastLoadTime) > 30000) {
+        loadAllUsers();
+    } else {
+        // Users are already loaded, just render them
+        console.log('👥 Users already loaded, skipping load');
+        renderAllUsers();
+    }
     setupAllUsersSearch();
     setupAllUsersFilters();
 }
@@ -4830,10 +4840,21 @@ function initializeAllUsers() {
 // Load all users from server
 async function loadAllUsers() {
     try {
+        // Check if we're already loading users
+        if (window.isLoadingUsers) {
+            console.log('👥 Already loading users, skipping duplicate request');
+            return;
+        }
+        
+        window.isLoadingUsers = true;
+        
         const container = document.getElementById('all-users-container');
         if (!container) return;
         
-        container.innerHTML = '<div class="no-users-found"><p>Loading users...</p></div>';
+        // Only show loading message if users aren't already loaded
+        if (!isUsersLoaded) {
+            container.innerHTML = '<div class="no-users-found"><p>Loading users...</p></div>';
+        }
         
         // Fetch all users from API
         const token = localStorage.getItem('auth_token');
@@ -4877,6 +4898,11 @@ async function loadAllUsers() {
                 updateUserStats(data.total_count || allUsersList.length, data.new_users || 0);
                 
                 filterUsers(currentFilter);
+                
+                // Mark as loaded and update timestamp
+                isUsersLoaded = true;
+                usersLastLoadTime = Date.now();
+                console.log('✅ Users loaded successfully at', new Date().toLocaleTimeString());
             } else {
                 // Fallback: Show sample users for demo
                 showSampleUsers();
@@ -4888,6 +4914,8 @@ async function loadAllUsers() {
     } catch (error) {
         console.error('Error loading all users:', error);
         showSampleUsers();
+    } finally {
+        window.isLoadingUsers = false;
     }
 }
 
@@ -5025,6 +5053,10 @@ function showSampleUsers() {
     }));
     
     filterUsers(currentFilter);
+    
+    // Mark as loaded
+    isUsersLoaded = true;
+    usersLastLoadTime = Date.now();
 }
 
 // Filter users based on criteria
@@ -5089,6 +5121,11 @@ function filterUsers(filterType) {
 function renderAllUsers() {
     const container = document.getElementById('all-users-container');
     if (!container) return;
+    
+    // Don't render if we're still loading for the first time
+    if (window.isLoadingUsers && !isUsersLoaded) {
+        return;
+    }
     
     if (filteredUsers.length === 0) {
         container.innerHTML = `
@@ -5288,13 +5325,28 @@ function openPrivateChatFromDirectory(username) {
     }, 100);
 }
 
-// Refresh all users list periodically
+// Refresh all users list periodically - but only if needed
 function startAllUsersRefresh() {
-    // Refresh every 30 seconds
-    setInterval(() => {
+    // Clear any existing interval first
+    if (usersRefreshInterval) {
+        clearInterval(usersRefreshInterval);
+    }
+    
+    // Refresh every 30 seconds, but only if users are loaded and container is visible
+    usersRefreshInterval = setInterval(() => {
         if (document.getElementById('all-users') && 
             document.getElementById('all-users').style.display === 'block') {
-            loadAllUsers();
+            
+            // Only refresh if users were loaded more than 30 seconds ago
+            const now = Date.now();
+            if (isUsersLoaded && (now - usersLastLoadTime) > 30000) {
+                console.log('🔄 Refreshing users after 30 seconds');
+                loadAllUsers();
+            } else if (!isUsersLoaded) {
+                // If users aren't loaded yet, try to load them
+                console.log('🔄 Users not loaded yet, trying to load now');
+                loadAllUsers();
+            }
         }
     }, 30000);
 }
@@ -6786,6 +6838,10 @@ function initSocket() {
         if (operaMessenger) {
             operaMessenger.stopPolling();
         }
+        // Clear users refresh interval
+        if (usersRefreshInterval) {
+            clearInterval(usersRefreshInterval);
+        }
     });
 }
 
@@ -6831,8 +6887,6 @@ window.addEventListener('load', function() {
         }
     }, 1500);
 });
-
-// --- CUT HERE ---
 
 // NEW: Welcome screen animation function
 function animateWelcomeText() {
@@ -11280,7 +11334,7 @@ document.addEventListener('click', function (e) {
         openZoom(e.target.src);
     }
 });
-
+aaa
 // --- END OF JAVASCRIPT CODE ---
 </script>
 </body>
