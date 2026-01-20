@@ -4685,6 +4685,7 @@ html, body {
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
+    // --- CUT HERE ---
 <script>
 // Opera Mini compatible messaging functions
 class OperaMiniMessenger {
@@ -4796,6 +4797,29 @@ let filteredUsers = [];
 let currentFilter = 'all';
 let currentSearchQuery = '';
 
+// Add this function to show all users on first visit
+function showAllUsersOnFirstVisit() {
+    // Check if it's the first visit
+    const hasVisitedBefore = localStorage.getItem('hasVisitedBefore');
+    
+    if (!hasVisitedBefore) {
+        console.log('👋 First time user detected, showing all users');
+        
+        // Mark as visited
+        localStorage.setItem('hasVisitedBefore', 'true');
+        
+        // Show the all-users container after a short delay
+        setTimeout(() => {
+            showContainer('all-users');
+            
+            // Show a welcome message
+            setTimeout(() => {
+                showSuccess('Welcome! Here are all the users who have signed up. You can browse and connect with them.');
+            }, 500);
+        }, 1000);
+    }
+}
+
 // Initialize all users functionality
 function initializeAllUsers() {
     loadAllUsers();
@@ -4822,32 +4846,41 @@ async function loadAllUsers() {
         });
         
         if (response.ok) {
-            allUsersList = await response.json();
-            
-            // Cache profiles
-            allUsersList.forEach(user => {
-                if (!profileCache[user.username]) {
-                    profileCache[user.username] = {
-                        username: user.username,
-                        firstname: user.firstname || '',
-                        lastname: user.lastname || '',
-                        bio: user.bio || '',
-                        age: user.age || '',
-                        gender: user.gender || '',
-                        location: user.location || '',
-                        interests: user.interests || '',
-                        avatar: user.avatar || `https://i.pravatar.cc/150?u=${user.username}`,
-                        display_name: user.display_name || user.username,
-                        status: user.status || 'offline',
-                        created_at: user.created_at || new Date().toISOString(),
-                        last_active: user.last_active || new Date().toISOString(),
-                        message_count: user.message_count || 0,
-                        post_count: user.post_count || 0
-                    };
-                }
-            });
-            
-            filterUsers(currentFilter);
+            const data = await response.json();
+            if (data.success && data.users) {
+                allUsersList = data.users;
+                
+                // Cache profiles
+                allUsersList.forEach(user => {
+                    if (!profileCache[user.username]) {
+                        profileCache[user.username] = {
+                            username: user.username,
+                            firstname: user.firstname || '',
+                            lastname: user.lastname || '',
+                            bio: user.bio || '',
+                            age: user.age || '',
+                            gender: user.gender || '',
+                            location: user.location || '',
+                            interests: user.interests || '',
+                            avatar: user.avatar || `https://i.pravatar.cc/150?u=${user.username}`,
+                            display_name: user.display_name || user.username,
+                            status: user.status || 'offline',
+                            created_at: user.created_at || new Date().toISOString(),
+                            last_active: user.last_active || new Date().toISOString(),
+                            message_count: user.message_count || 0,
+                            post_count: user.post_count || 0
+                        };
+                    }
+                });
+                
+                // Update stats display
+                updateUserStats(data.total_count || allUsersList.length, data.new_users || 0);
+                
+                filterUsers(currentFilter);
+            } else {
+                // Fallback: Show sample users for demo
+                showSampleUsers();
+            }
         } else {
             // Fallback: Show sample users for demo
             showSampleUsers();
@@ -4855,6 +4888,25 @@ async function loadAllUsers() {
     } catch (error) {
         console.error('Error loading all users:', error);
         showSampleUsers();
+    }
+}
+
+// Update user statistics display
+function updateUserStats(totalUsers, newUsers) {
+    const statsElement = document.getElementById('all-users-stats');
+    if (statsElement) {
+        statsElement.innerHTML = `
+            <div class="user-stat-item">
+                <i class="fas fa-users"></i>
+                <span>${totalUsers} Total Users</span>
+            </div>
+            ${newUsers > 0 ? `
+                <div class="user-stat-item new-users">
+                    <i class="fas fa-user-plus"></i>
+                    <span>${newUsers} New This Week</span>
+                </div>
+            ` : ''}
+        `;
     }
 }
 
@@ -5000,7 +5052,10 @@ function filterUsers(filterType) {
             // Show users created in last 7 days
             const weekAgo = new Date();
             weekAgo.setDate(weekAgo.getDate() - 7);
-            filtered = filtered.filter(user => new Date(user.created_at) > weekAgo);
+            filtered = filtered.filter(user => {
+                const userDate = new Date(user.created_at || user.join_date);
+                return userDate > weekAgo;
+            });
             break;
         case 'active':
             // Show users with most messages and posts
@@ -5062,7 +5117,7 @@ function createUserCard(user) {
     card.className = 'user-directory-card';
     
     // Calculate time since joined
-    const joinDate = new Date(user.created_at);
+    const joinDate = new Date(user.created_at || user.join_date);
     const now = new Date();
     const diffTime = Math.abs(now - joinDate);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -5096,11 +5151,17 @@ function createUserCard(user) {
     else if (activityScore > 20) activityLevel = 'Active';
     else if (activityScore > 5) activityLevel = 'Regular';
     
+    // Check if user is new (joined in last 7 days)
+    const isNewUser = diffDays <= 7;
+    
     card.innerHTML = `
-        <img src="${user.avatar || `https://i.pravatar.cc/150?u=${user.username}`}" 
-             alt="${user.display_name || user.username}" 
-             class="directory-user-avatar"
-             onerror="this.src='https://i.pravatar.cc/150?u=default'">
+        <div class="directory-user-header">
+            <img src="${user.avatar || `https://i.pravatar.cc/150?u=${user.username}`}" 
+                 alt="${user.display_name || user.username}" 
+                 class="directory-user-avatar"
+                 onerror="this.src='https://i.pravatar.cc/150?u=default'">
+            ${isNewUser ? '<span class="new-user-badge">NEW</span>' : ''}
+        </div>
         
         <div class="directory-user-info">
             <div class="directory-user-name">
@@ -5236,6 +5297,214 @@ function startAllUsersRefresh() {
             loadAllUsers();
         }
     }, 30000);
+}
+
+// Add this to the initialization code
+function onUserLoginSuccess(username) {
+    console.log('✅ User logged in successfully:', username);
+    
+    // Save to currentUserSession
+    currentUserSession = {
+        username: username,
+        token: localStorage.getItem('auth_token'),
+        isLoggedIn: true
+    };
+    
+    // Show success message
+    showSuccess(`Welcome back, ${username}!`);
+    
+    // Check if first visit and show all users
+    showAllUsersOnFirstVisit();
+}
+
+// Modify the showContainer function to check for first visit
+function showContainer(containerId) {
+    console.log('🔄 Showing container:', containerId);
+    
+    // Hide all containers
+    document.querySelectorAll('.main-chat-interface').forEach(container => {
+        container.style.display = 'none';
+    });
+    
+    // Hide all info containers (INCLUDING PROFILE CONTAINER)
+    document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container, .profile-container').forEach(container => {
+        container.style.display = 'none';
+    });
+    
+    // Hide all chat inputs
+    document.querySelectorAll('.chat-input').forEach(input => {
+        input.style.display = 'none';
+    });
+    
+    // Show the selected container
+    const container = document.getElementById(containerId);
+    if (container) {
+        container.style.display = 'block';
+        
+        // Show the appropriate chat input
+        if (containerId === 'chat' || containerId === 'private-ai') {
+            const chatInput = container.querySelector('.chat-input');
+            if (chatInput) chatInput.style.display = 'flex';
+        }
+        
+        // For private messages, only show users panel initially
+        if (containerId === 'private-messages') {
+            showUsersPanel();
+            initializePrivateMessaging();
+        }
+        
+        // Load profile data when showing profile container
+        if (containerId === 'profile') {
+            loadProfile();
+        }
+        
+        // Initialize secret code if showing that container
+        if (containerId === 'secret-code') {
+            resetSecretCodeForm();
+            initializeSecretCodeVerification();
+        }
+        
+        // Initialize SQL editor if showing that container
+        if (containerId === 'sql-editor-container') {
+            // Check if user has verified the secret code
+            if (!hasVerifiedCode()) {
+                showError('Access denied. Please verify the secret code first.');
+                showContainer('secret-code');
+                return;
+            }
+            initializeSQLEditor();
+        }
+        
+        // FIXED: Enhanced posts initialization - ensure create post box is always visible
+        if (containerId === 'posts') {
+            console.log('📝 Initializing posts feed...');
+            // Create posts container if it doesn't exist
+            createPostsContainer();
+            // Force re-initialization of create post box
+            initializePosts();
+            
+            // Double-check the create post box is visible
+            setTimeout(() => {
+                const createPostBox = document.querySelector('.create-post-box');
+                if (!createPostBox) {
+                    console.log('🔄 Create post box not found, re-creating...');
+                    setupCreatePostBox();
+                } else {
+                    console.log('✅ Create post box is visible');
+                }
+                
+                // Ensure posts are rendered
+                renderPosts();
+            }, 100);
+        }
+        
+        // NEW: Initialize all users when showing the all-users container
+        if (containerId === 'all-users') {
+            console.log('👥 Initializing all users directory...');
+            initializeAllUsers();
+            
+            // Start auto-refresh for online status updates
+            startAllUsersRefresh();
+        }
+    }
+    
+    // Show overlay for non-chat containers
+    const overlay = document.getElementById('overlay');
+    if (overlay) {
+        if (containerId === 'chat' || containerId === 'private-ai' || containerId === 'private-messages' || containerId === 'posts' || containerId === 'all-users') {
+            overlay.style.display = 'none';
+        } else {
+            overlay.style.display = 'block';
+        }
+    }
+    
+    // Handle button visibility based on container
+    if (containerId === 'chat') {
+        console.log('Showing main chat container');
+        // Re-initialize scroll button for main chat
+        setTimeout(() => {
+            initializeButtons();
+            // FIXED: Force scroll to bottom when switching to chat
+            setTimeout(() => {
+                forceScrollToBottom('chat-container');
+                updateScrollState();
+            }, 200);
+        }, 100);
+        
+        // Show main chat scroll button, hide private AI button
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'flex';
+            updateScrollState();
+        }
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.classList.remove('visible');
+        }
+    } else if (containerId === 'private-ai') {
+        // Show private AI button, hide main chat scroll button
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'flex';
+            handlePrivateScroll();
+        }
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'none';
+            scrollToBottomBtn.classList.remove('visible');
+        }
+        // Attach scroll event for private container
+        if (privateContainer) {
+            privateContainer.addEventListener('scroll', handlePrivateScroll);
+            setTimeout(handlePrivateScroll, 100);
+            // FIXED: Scroll to bottom when switching to private AI
+            setTimeout(() => forceScrollToBottom('private-ai-container'), 200);
+        }
+    } else if (containerId === 'private-messages') {
+        // Hide both buttons for private messages
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'none';
+            scrollToBottomBtn.classList.remove('visible');
+        }
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.classList.remove('visible');
+        }
+    } else if (containerId === 'posts') {
+        // Hide both buttons for posts feed
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'none';
+            scrollToBottomBtn.classList.remove('visible');
+        }
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.classList.remove('visible');
+        }
+    } else if (containerId === 'all-users') {
+        // Hide both buttons for all users directory
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'none';
+            scrollToBottomBtn.classList.remove('visible');
+        }
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.classList.remove('visible');
+        }
+    } else {
+        // For other containers, hide both buttons
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'none';
+            scrollToBottomBtn.classList.remove('visible');
+        }
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.classList.remove('visible');
+        }
+    }
+
+    // Close dropdown menu when switching containers
+    const dropdown = document.getElementById('dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    
+    const kebabDropdown = document.querySelector('.kebab-dropdown');
+    if (kebabDropdown) kebabDropdown.classList.remove('active');
 }
 
 // Posts functionality for client-side
@@ -6162,196 +6431,6 @@ function getUserProfile(username) {
     return profiles[username] || { username: username };
 }
 
-// FIXED: Enhanced showContainer function for posts and all users
-function showContainer(containerId) {
-    console.log('🔄 Showing container:', containerId);
-    
-    // Hide all containers
-    document.querySelectorAll('.main-chat-interface').forEach(container => {
-        container.style.display = 'none';
-    });
-    
-    // Hide all info containers (INCLUDING PROFILE CONTAINER)
-    document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container, .profile-container').forEach(container => {
-        container.style.display = 'none';
-    });
-    
-    // Hide all chat inputs
-    document.querySelectorAll('.chat-input').forEach(input => {
-        input.style.display = 'none';
-    });
-    
-    // Show the selected container
-    const container = document.getElementById(containerId);
-    if (container) {
-        container.style.display = 'block';
-        
-        // Show the appropriate chat input
-        if (containerId === 'chat' || containerId === 'private-ai') {
-            const chatInput = container.querySelector('.chat-input');
-            if (chatInput) chatInput.style.display = 'flex';
-        }
-        
-        // For private messages, only show users panel initially
-        if (containerId === 'private-messages') {
-            showUsersPanel();
-            initializePrivateMessaging();
-        }
-        
-        // Load profile data when showing profile container
-        if (containerId === 'profile') {
-            loadProfile();
-        }
-        
-        // Initialize secret code if showing that container
-        if (containerId === 'secret-code') {
-            resetSecretCodeForm();
-            initializeSecretCodeVerification();
-        }
-        
-        // Initialize SQL editor if showing that container
-        if (containerId === 'sql-editor-container') {
-            // Check if user has verified the secret code
-            if (!hasVerifiedCode()) {
-                showError('Access denied. Please verify the secret code first.');
-                showContainer('secret-code');
-                return;
-            }
-            initializeSQLEditor();
-        }
-        
-        // FIXED: Enhanced posts initialization - ensure create post box is always visible
-        if (containerId === 'posts') {
-            console.log('📝 Initializing posts feed...');
-            // Create posts container if it doesn't exist
-            createPostsContainer();
-            // Force re-initialization of create post box
-            initializePosts();
-            
-            // Double-check the create post box is visible
-            setTimeout(() => {
-                const createPostBox = document.querySelector('.create-post-box');
-                if (!createPostBox) {
-                    console.log('🔄 Create post box not found, re-creating...');
-                    setupCreatePostBox();
-                } else {
-                    console.log('✅ Create post box is visible');
-                }
-                
-                // Ensure posts are rendered
-                renderPosts();
-            }, 100);
-        }
-        
-        // NEW: Initialize all users when showing the all-users container
-        if (containerId === 'all-users') {
-            console.log('👥 Initializing all users directory...');
-            initializeAllUsers();
-            
-            // Start auto-refresh for online status updates
-            startAllUsersRefresh();
-        }
-    }
-    
-    // Show overlay for non-chat containers
-    const overlay = document.getElementById('overlay');
-    if (overlay) {
-        if (containerId === 'chat' || containerId === 'private-ai' || containerId === 'private-messages' || containerId === 'posts' || containerId === 'all-users') {
-            overlay.style.display = 'none';
-        } else {
-            overlay.style.display = 'block';
-        }
-    }
-    
-    // Handle button visibility based on container
-    if (containerId === 'chat') {
-        console.log('Showing main chat container');
-        // Re-initialize scroll button for main chat
-        setTimeout(() => {
-            initializeButtons();
-            // FIXED: Force scroll to bottom when switching to chat
-            setTimeout(() => {
-                forceScrollToBottom('chat-container');
-                updateScrollState();
-            }, 200);
-        }, 100);
-        
-        // Show main chat scroll button, hide private AI button
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'flex';
-            updateScrollState();
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    } else if (containerId === 'private-ai') {
-        // Show private AI button, hide main chat scroll button
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'flex';
-            handlePrivateScroll();
-        }
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        // Attach scroll event for private container
-        if (privateContainer) {
-            privateContainer.addEventListener('scroll', handlePrivateScroll);
-            setTimeout(handlePrivateScroll, 100);
-            // FIXED: Scroll to bottom when switching to private AI
-            setTimeout(() => forceScrollToBottom('private-ai-container'), 200);
-        }
-    } else if (containerId === 'private-messages') {
-        // Hide both buttons for private messages
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    } else if (containerId === 'posts') {
-        // Hide both buttons for posts feed
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    } else if (containerId === 'all-users') {
-        // Hide both buttons for all users directory
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    } else {
-        // For other containers, hide both buttons
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    }
-
-    // Close dropdown menu when switching containers
-    const dropdown = document.getElementById('dropdown');
-    if (dropdown) dropdown.style.display = 'none';
-    
-    const kebabDropdown = document.querySelector('.kebab-dropdown');
-    if (kebabDropdown) kebabDropdown.classList.remove('active');
-}
-
 // MODIFIED: sendMessage function to use OperaMiniMessenger when on Opera Mini
 async function sendMessage() {
     if (isSending || isProcessingCommand) return;
@@ -6741,6 +6820,19 @@ deleteButton.onclick = async () => {
     }
     contextMenu.remove();
 };
+
+// Initialize the first visit check when the page loads
+window.addEventListener('load', function() {
+    // Check for first visit after a short delay
+    setTimeout(() => {
+        const isLoggedIn = localStorage.getItem('auth_token') && localStorage.getItem('username');
+        if (isLoggedIn && !localStorage.getItem('hasVisitedBefore')) {
+            showAllUsersOnFirstVisit();
+        }
+    }, 1500);
+});
+
+// --- CUT HERE ---
 
 // NEW: Welcome screen animation function
 function animateWelcomeText() {
