@@ -1726,6 +1726,230 @@ app.delete('/api/messages/:id', async (req, res) => {
   }
 });
 
+// ===== GET ALL SIGNED-UP USERS =====
+
+// Get all users with their profiles (for user directory)
+app.get('/api/users/all', async (req, res) => {
+    try {
+        console.log('👥 Fetching all users for directory...');
+        
+        // Get all users from users table
+        const { data: users, error: usersError } = await supabase
+            .from('users')
+            .select('id, username, email, created_at, last_login')
+            .order('created_at', { ascending: false });
+        
+        if (usersError) {
+            console.error('❌ Error fetching users:', usersError);
+            return res.status(500).json({ 
+                success: false, 
+                error: "Failed to fetch users" 
+            });
+        }
+        
+        if (!users || users.length === 0) {
+            return res.json({
+                success: true,
+                users: [],
+                message: "No users found"
+            });
+        }
+        
+        // Get profiles for all users
+        const usernames = users.map(u => u.username);
+        const { data: profiles, error: profilesError } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .in('username', usernames);
+        
+        if (profilesError && profilesError.code !== '42P01') {
+            console.error('❌ Error fetching profiles:', profilesError);
+            // Continue with users even if profiles fail
+        }
+        
+        // Create a map of profiles by username for quick lookup
+        const profileMap = {};
+        if (profiles && profiles.length > 0) {
+            profiles.forEach(profile => {
+                profileMap[profile.username] = profile;
+            });
+        }
+        
+        // Combine user data with profile data
+        const allUsersData = users.map(user => {
+            const profile = profileMap[user.username] || {};
+            
+            return {
+                // User table fields
+                username: user.username,
+                email: user.email || '',
+                user_id: user.id,
+                created_at: user.created_at,
+                last_login: user.last_login,
+                
+                // Profile fields with defaults
+                firstname: profile.firstname || '',
+                lastname: profile.lastname || '',
+                bio: profile.bio || '',
+                age: profile.age || null,
+                gender: profile.gender || '',
+                location: profile.location || '',
+                interests: profile.interests || '',
+                avatar: profile.avatar_url || `https://i.pravatar.cc/150?u=${user.username}`,
+                display_name: profile.display_name || user.username,
+                status: 'offline', // Default status, could be enhanced with real-time tracking
+                
+                // Activity counts (to be populated)
+                message_count: 0, // Placeholder
+                post_count: 0, // Placeholder
+                
+                // Additional info
+                join_date: user.created_at,
+                is_new_user: isNewUser(user.created_at)
+            };
+        });
+        
+        console.log(`✅ Found ${allUsersData.length} users for directory`);
+        
+        // Now get message counts for each user
+        try {
+            const { data: messageCounts, error: msgError } = await supabase
+                .from('chatter')
+                .select('username')
+                .in('username', usernames);
+            
+            if (!msgError && messageCounts) {
+                // Count messages per user
+                const msgCountMap = {};
+                messageCounts.forEach(msg => {
+                    msgCountMap[msg.username] = (msgCountMap[msg.username] || 0) + 1;
+                });
+                
+                // Update user data with message counts
+                allUsersData.forEach(user => {
+                    user.message_count = msgCountMap[user.username] || 0;
+                });
+            }
+        } catch (msgCountError) {
+            console.log('⚠️ Could not fetch message counts:', msgCountError.message);
+        }
+        
+        // Get post counts for each user
+        try {
+            const { data: postCounts, error: postError } = await supabase
+                .from('posts')
+                .select('author_username')
+                .in('author_username', usernames);
+            
+            if (!postError && postCounts) {
+                // Count posts per user
+                const postCountMap = {};
+                postCounts.forEach(post => {
+                    postCountMap[post.author_username] = (postCountMap[post.author_username] || 0) + 1;
+                });
+                
+                // Update user data with post counts
+                allUsersData.forEach(user => {
+                    user.post_count = postCountMap[user.username] || 0;
+                });
+            }
+        } catch (postCountError) {
+            console.log('⚠️ Could not fetch post counts:', postCountError.message);
+        }
+        
+        // Count new users (joined in last 7 days)
+        const newUsersCount = allUsersData.filter(u => u.is_new_user).length;
+        
+        res.json({
+            success: true,
+            users: allUsersData,
+            total_count: allUsersData.length,
+            new_users: newUsersCount
+        });
+        
+    } catch (error) {
+        console.error('❌ Error in /api/users/all:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: "Failed to fetch users: " + error.message 
+        });
+    }
+});
+
+// Helper function to check if user is new (joined in last 7 days)
+function isNewUser(createdAt) {
+    if (!createdAt) return false;
+    
+    const joinDate = new Date(createdAt);
+    const now = new Date();
+    const diffTime = now - joinDate;
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    
+    return diffDays <= 7;
+}
+
+// Also add this endpoint for quick stats
+app.get('/api/users/stats', async (req, res) => {
+    try {
+        console.log('📊 Getting user statistics...');
+        
+        // Get total user count
+        const { count: totalUsers, error: countError } = await supabase
+            .from('users')
+            .select('*', { count: 'exact', head: true });
+        
+        if (countError) {
+            console.error('❌ Error counting users:', countError);
+            return res.status(500).json({ error: "Failed to get user stats" });
+        }
+        
+        // Get today's new users
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const { count: newUsersToday, error: newError } = await supabase
+            .from('users')
+            .select('*', { count: 'exact', head: true })
+            .gte('created_at', today.toISOString());
+        
+        if (newError) {
+            console.error('❌ Error counting new users:', newError);
+            return res.status(500).json({ error: "Failed to get new user stats" });
+        }
+        
+        // Get active users (logged in last 24 hours)
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        
+        const { count: activeUsers, error: activeError } = await supabase
+            .from('users')
+            .select('*', { count: 'exact', head: true })
+            .gte('last_login', yesterday.toISOString());
+        
+        if (activeError) {
+            console.error('❌ Error counting active users:', activeError);
+            return res.status(500).json({ error: "Failed to get active user stats" });
+        }
+        
+        res.json({
+            success: true,
+            stats: {
+                total_users: totalUsers || 0,
+                new_users_today: newUsersToday || 0,
+                active_users_last_24h: activeUsers || 0,
+                timestamp: new Date().toISOString()
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Error in /api/users/stats:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: "Failed to get user stats: " + error.message 
+        });
+    }
+});
+
 // ===== FIXED PRIVATE MESSAGES ENDPOINTS =====
 
 // Get conversations for the current user - FIXED
@@ -2847,7 +3071,7 @@ app.get('/debug-private-messages', async (req, res) => {
     console.error('❌ Debug error:', error);
     res.status(500).json({ 
       success: false, 
-      error: 'Debug error: ' + error.message 
+      error: 'Debug error: " + error.message 
     });
   }
 });
@@ -4199,6 +4423,8 @@ server.listen(port, () => {
   console.log(`💬 NEW: PUT /api/private/messages/read - Mark as read`);
   console.log(`💬 NEW: GET /api/private/unread - Get unread count`);
   console.log(`🔍 NEW: GET /api/debug/private-messages-structure - Debug table structure`);
+  console.log(`👥 NEW: GET /api/users/all - Get all signed-up users`);
+  console.log(`📊 NEW: GET /api/users/stats - Get user statistics`);
   
   console.log(`🔍 NEW: GET /debug-private-messages - Debug private messages table`);
   console.log(`🧪 NEW: GET /test-private-messages - Test private message creation (GET)`);
@@ -4240,6 +4466,9 @@ server.listen(port, () => {
   console.log(`   "help" → automatically becomes "!help"`);
   console.log(`   "ai tell me a joke" → automatically becomes "!ai tell me a joke"`);
   console.log(`   "!ping" → works normally (prefix already present)`);
+  console.log(`👋 FIRST VISIT FEATURE:`);
+  console.log(`   When a user joins for the first time, they will automatically see all signed-up users`);
+  console.log(`   This helps new users discover and connect with other members`);
 
   if (isRender && renderExternalUrl) {
     console.log(`🌐 Render External URL: ${renderExternalUrl}`);
@@ -4253,6 +4482,8 @@ server.listen(port, () => {
     console.log(`📝 Test Posts Table: ${renderExternalUrl}/api/create-posts-table`);
     console.log(`👤 Test Profile: ${renderExternalUrl}/api/test-profile`);
     console.log(`👤 Create Profiles Table: ${renderExternalUrl}/api/create-user-profiles-table`);
+    console.log(`👥 Get All Users: ${renderExternalUrl}/api/users/all`);
+    console.log(`📊 User Stats: ${renderExternalUrl}/api/users/stats`);
   }
 });
 
@@ -4302,6 +4533,10 @@ app.use((req, res) => {
         'POST /api/private/messages',
         'GET /api/private/unread',
         'PUT /api/private/messages/read'
+      ],
+      users: [
+        'GET /api/users/all',
+        'GET /api/users/stats'
       ],
       posts: [
         'GET /api/posts',
