@@ -1619,7 +1619,6 @@ app.get('/api/messages', async (req, res) => {
   }
 });
 
-// --- CUT HERE ---
 // POST messages endpoint - FIXED: Return message with ID immediately
 app.post('/api/messages', async (req, res) => {
   try {
@@ -3071,7 +3070,7 @@ app.get('/debug-private-messages', async (req, res) => {
     console.error('❌ Debug error:', error);
     res.status(500).json({ 
       success: false, 
-      error: 'Debug error: " + error.message 
+      error: 'Debug error: ' + error.message 
     });
   }
 });
