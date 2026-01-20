@@ -4795,9 +4795,9 @@ let allUsersList = [];
 let filteredUsers = [];
 let currentFilter = 'all';
 let currentSearchQuery = '';
-let isUsersLoaded = false; // Track if users are already loaded
-let usersLastLoadTime = 0; // Track when users were last loaded
-let usersRefreshInterval = null; // Store the refresh interval
+let isUsersLoaded = false;
+let usersLoadStarted = false; // Track if load has started
+let usersRefreshInterval = null;
 
 // Add this function to show all users on first visit
 function showAllUsersOnFirstVisit() {
@@ -4822,39 +4822,43 @@ function showAllUsersOnFirstVisit() {
     }
 }
 
-// Initialize all users functionality
+// Initialize all users functionality - IMMEDIATELY without delay
 function initializeAllUsers() {
-    // Only load users if they haven't been loaded yet or it's been more than 30 seconds
-    const now = Date.now();
-    if (!isUsersLoaded || (now - usersLastLoadTime) > 30000) {
-        loadAllUsers();
-    } else {
-        // Users are already loaded, just render them
-        console.log('👥 Users already loaded, skipping load');
-        renderAllUsers();
-    }
+    console.log('👥 Initializing all users directory...');
+    
+    // Render immediately - either cached users or empty state
+    renderAllUsers();
+    
+    // Setup UI components immediately
     setupAllUsersSearch();
     setupAllUsersFilters();
-}
-
-// Load all users from server
-async function loadAllUsers() {
-    try {
-        // Check if we're already loading users
-        if (window.isLoadingUsers) {
-            console.log('👥 Already loading users, skipping duplicate request');
-            return;
-        }
+    
+    // Start loading users in background if not already loaded
+    if (!isUsersLoaded && !usersLoadStarted) {
+        usersLoadStarted = true;
         
-        window.isLoadingUsers = true;
-        
+        // Show initial loading state
         const container = document.getElementById('all-users-container');
-        if (!container) return;
-        
-        // Only show loading message if users aren't already loaded
-        if (!isUsersLoaded) {
+        if (container && allUsersList.length === 0) {
             container.innerHTML = '<div class="no-users-found"><p>Loading users...</p></div>';
         }
+        
+        // Load users without blocking UI
+        setTimeout(() => {
+            loadAllUsers();
+        }, 50); // Tiny delay to ensure UI is rendered first
+    } else if (isUsersLoaded) {
+        // Users already loaded, just filter them
+        filterUsers(currentFilter);
+    }
+}
+
+// Load all users from server - OPTIMIZED for speed
+async function loadAllUsers() {
+    try {
+        console.log('🔄 Loading users from server...');
+        
+        const container = document.getElementById('all-users-container');
         
         // Fetch all users from API
         const token = localStorage.getItem('auth_token');
@@ -4863,12 +4867,15 @@ async function loadAllUsers() {
             headers: {
                 'Authorization': token ? `Bearer ${token}` : '',
                 'Content-Type': 'application/json'
-            }
+            },
+            // Add cache control for better performance
+            cache: 'no-cache'
         });
         
         if (response.ok) {
             const data = await response.json();
             if (data.success && data.users) {
+                console.log(`✅ Loaded ${data.users.length} users from server`);
                 allUsersList = data.users;
                 
                 // Cache profiles
@@ -4897,25 +4904,25 @@ async function loadAllUsers() {
                 // Update stats display
                 updateUserStats(data.total_count || allUsersList.length, data.new_users || 0);
                 
+                // Mark as loaded
+                isUsersLoaded = true;
+                
+                // Filter and render immediately
                 filterUsers(currentFilter);
                 
-                // Mark as loaded and update timestamp
-                isUsersLoaded = true;
-                usersLastLoadTime = Date.now();
-                console.log('✅ Users loaded successfully at', new Date().toLocaleTimeString());
+                console.log('✅ Users loaded and displayed successfully');
             } else {
-                // Fallback: Show sample users for demo
+                console.log('⚠️ Using sample users (server data format issue)');
                 showSampleUsers();
             }
         } else {
-            // Fallback: Show sample users for demo
+            console.log('⚠️ Using sample users (server error)');
             showSampleUsers();
         }
     } catch (error) {
         console.error('Error loading all users:', error);
+        console.log('⚠️ Using sample users (fetch error)');
         showSampleUsers();
-    } finally {
-        window.isLoadingUsers = false;
     }
 }
 
@@ -4938,8 +4945,11 @@ function updateUserStats(totalUsers, newUsers) {
     }
 }
 
-// Show sample users (for demo purposes)
+// Show sample users (for demo purposes) - OPTIMIZED
 function showSampleUsers() {
+    console.log('👥 Loading sample users...');
+    
+    // Create sample users array
     const sampleUsers = [
         {
             username: 'john_doe',
@@ -5052,14 +5062,19 @@ function showSampleUsers() {
         avatar: `https://i.pravatar.cc/150?u=${user.username}`
     }));
     
-    filterUsers(currentFilter);
+    // Update stats
+    updateUserStats(allUsersList.length, 2);
     
     // Mark as loaded
     isUsersLoaded = true;
-    usersLastLoadTime = Date.now();
+    
+    // Filter and render immediately
+    filterUsers(currentFilter);
+    
+    console.log('✅ Sample users loaded and displayed');
 }
 
-// Filter users based on criteria
+// Filter users based on criteria - OPTIMIZED
 function filterUsers(filterType) {
     currentFilter = filterType;
     
@@ -5117,17 +5132,13 @@ function filterUsers(filterType) {
     renderAllUsers();
 }
 
-// Render all users in the container
+// Render all users in the container - OPTIMIZED for immediate display
 function renderAllUsers() {
     const container = document.getElementById('all-users-container');
     if (!container) return;
     
-    // Don't render if we're still loading for the first time
-    if (window.isLoadingUsers && !isUsersLoaded) {
-        return;
-    }
-    
-    if (filteredUsers.length === 0) {
+    // If no users loaded yet and not loading, show empty state
+    if (filteredUsers.length === 0 && isUsersLoaded) {
         container.innerHTML = `
             <div class="no-users-found">
                 <i class="fas fa-users" style="font-size: 48px; color: #ddd; margin-bottom: 15px;"></i>
@@ -5140,12 +5151,33 @@ function renderAllUsers() {
         return;
     }
     
-    container.innerHTML = '';
-    
-    filteredUsers.forEach(user => {
-        const userCard = createUserCard(user);
-        container.appendChild(userCard);
-    });
+    // If users are loaded, show them immediately
+    if (filteredUsers.length > 0) {
+        container.innerHTML = '';
+        
+        // Render first few users immediately for instant display
+        const usersToRender = filteredUsers.slice(0, 8); // Render first 8 immediately
+        
+        usersToRender.forEach(user => {
+            const userCard = createUserCard(user);
+            container.appendChild(userCard);
+        });
+        
+        // If there are more users, render them in the background
+        if (filteredUsers.length > 8) {
+            setTimeout(() => {
+                const remainingUsers = filteredUsers.slice(8);
+                remainingUsers.forEach(user => {
+                    const userCard = createUserCard(user);
+                    container.appendChild(userCard);
+                });
+                console.log(`✅ Rendered all ${filteredUsers.length} users`);
+            }, 100);
+        } else {
+            console.log(`✅ Rendered ${filteredUsers.length} users`);
+        }
+    }
+    // If users are not loaded yet, keep the loading message
 }
 
 // Create user card element
@@ -5325,30 +5357,23 @@ function openPrivateChatFromDirectory(username) {
     }, 100);
 }
 
-// Refresh all users list periodically - but only if needed
+// Refresh all users list periodically - optimized
 function startAllUsersRefresh() {
     // Clear any existing interval first
     if (usersRefreshInterval) {
         clearInterval(usersRefreshInterval);
     }
     
-    // Refresh every 30 seconds, but only if users are loaded and container is visible
+    // Refresh every 60 seconds, but only if container is visible
     usersRefreshInterval = setInterval(() => {
         if (document.getElementById('all-users') && 
-            document.getElementById('all-users').style.display === 'block') {
+            document.getElementById('all-users').style.display === 'block' &&
+            isUsersLoaded) {
             
-            // Only refresh if users were loaded more than 30 seconds ago
-            const now = Date.now();
-            if (isUsersLoaded && (now - usersLastLoadTime) > 30000) {
-                console.log('🔄 Refreshing users after 30 seconds');
-                loadAllUsers();
-            } else if (!isUsersLoaded) {
-                // If users aren't loaded yet, try to load them
-                console.log('🔄 Users not loaded yet, trying to load now');
-                loadAllUsers();
-            }
+            console.log('🔄 Refreshing users data...');
+            loadAllUsers();
         }
-    }, 30000);
+    }, 60000); // 60 seconds
 }
 
 // Add this to the initialization code
@@ -5369,7 +5394,7 @@ function onUserLoginSuccess(username) {
     showAllUsersOnFirstVisit();
 }
 
-// Modify the showContainer function to check for first visit
+// Modify the showContainer function for immediate loading
 function showContainer(containerId) {
     console.log('🔄 Showing container:', containerId);
     
@@ -5450,7 +5475,7 @@ function showContainer(containerId) {
             }, 100);
         }
         
-        // NEW: Initialize all users when showing the all-users container
+        // NEW: Initialize all users when showing the all-users container - IMMEDIATELY
         if (containerId === 'all-users') {
             console.log('👥 Initializing all users directory...');
             initializeAllUsers();
