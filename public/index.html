@@ -1399,20 +1399,55 @@ html, body {
     cursor: pointer; /* ADDED: Make username clickable */
 }
 
+// --- IN THE CSS SECTION ---
+
+/* MODIFIED: Status indicator in messages - shows online dot or time ago when offline */
 .user-status-indicator {
+    font-size: 0.6rem;
+    display: inline-block;
+    margin-left: 5px;
+}
+
+.user-status-indicator.online {
+    color: #4CAF50;
+    font-weight: bold;
+}
+
+.user-status-indicator.online:before {
+    content: "● ";
+    color: #4CAF50;
+    font-size: 0.7rem;
+}
+
+.user-status-indicator.offline {
+    color: #999;
+}
+
+/* In the directory-user-status section */
+.directory-user-status .status-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
     display: inline-block;
+    margin-right: 5px;
 }
 
-.user-status-indicator.online {
-    background-color: #4CAF50;
-    box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
+.directory-user-status .status-dot.online {
+    background: #31a24c;
 }
 
-.user-status-indicator.offline {
-    background-color: #ccc;
+.directory-user-status .status-dot.offline {
+    background: #bcc0c4;
+}
+
+/* In user profile popup */
+.user-status-indicator.online-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #31a24c;
+    display: inline-block;
+    margin-right: 5px;
 }
 
 .user-status-indicator.away {
