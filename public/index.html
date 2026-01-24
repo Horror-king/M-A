@@ -7156,6 +7156,7 @@ function batchMessageRender(messages, renderFunction) {
     }
 }
 
+// --- CUT HERE ---
 // --- IN THE JAVASCRIPT SECTION ---
 
 // Add this variable to track user last seen times
@@ -7253,29 +7254,51 @@ const elements = {
 
 let replyToText = null;
 
-// ===== ADDED: FORMAT TIME AGO FUNCTION =====
-function formatTimeAgo(timestamp) {
-    if (!timestamp) return 'long time ago';
+// ===== NEW: INITIALIZE MAIN APP FUNCTION =====
+async function initializeMainApp() {
+    console.log('🚀 Initializing main app...');
     
-    const now = new Date();
-    const lastSeen = new Date(timestamp);
-    const diffMs = now - lastSeen;
-    const diffSec = Math.floor(diffMs / 1000);
-    const diffMin = Math.floor(diffSec / 60);
-    const diffHour = Math.floor(diffMin / 60);
-    const diffDay = Math.floor(diffHour / 24);
+    // Show chat container
+    showContainer('chat');
     
-    if (diffSec < 60) {
-        return `${diffSec}s ago`;
-    } else if (diffMin < 60) {
-        return `${diffMin}m ago`;
-    } else if (diffHour < 24) {
-        return `${diffHour}h ago`;
-    } else if (diffDay < 7) {
-        return `${diffDay}d ago`;
-    } else {
-        return lastSeen.toLocaleDateString();
+    // Show chat input
+    const chatInput = document.querySelector('.chat-input');
+    if (chatInput) chatInput.style.display = 'flex';
+    
+    // Update profile section
+    updateProfileSection();
+    
+    // Initialize socket connection
+    await initSocket();
+    
+    // Set up typing handlers
+    setupTypingHandlers();
+    setupTypingDetection();
+    setupTypingSocketEvents();
+    
+    // Add page event listeners
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
+    
+    // Enable SQL Editor access if already verified
+    if (hasVerifiedCode()) {
+        enableSQLEditorAccess();
     }
+    
+    // Initialize chat
+    initializeChat();
+    
+    // Load user profile
+    await loadProfile();
+    
+    // Initialize online panel toggle
+    initializeOnlinePanelToggle();
+    
+    // Load user panel preference
+    loadUserPanelPreference();
+    
+    console.log('✅ Main app initialized successfully');
 }
 
 // ===== MODIFIED: AVATAR URL HELPER FUNCTION =====
@@ -7572,7 +7595,7 @@ function updateSingleOnlineList(listElementId, countElementId, onlineUsersArray)
                     <div class="online-user-info">
                         <div class="online-user-name">${displayName}</div>
                         <div class="online-user-status">
-                            ${isOnline ? '' : formatTimeAgo(lastSeen)} <!-- REMOVED: 'Online' text -->
+                            ${isOnline ? '' : formatTimeAgo(lastSeen)}
                         </div>
                     </div>
                 `;
@@ -7585,7 +7608,7 @@ function updateSingleOnlineList(listElementId, countElementId, onlineUsersArray)
                     <div class="online-user-info">
                         <div class="online-user-name">${userObj.username}</div>
                         <div class="online-user-status">
-                            ${isOnline ? '' : formatTimeAgo(lastSeen)} <!-- REMOVED: 'Online' text -->
+                            ${isOnline ? '' : formatTimeAgo(lastSeen)}
                         </div>
                     </div>
                 `;
@@ -7609,31 +7632,161 @@ function updateSingleOnlineList(listElementId, countElementId, onlineUsersArray)
 
 // ===== MODIFIED: Update socket event handlers to track user last seen times =====
 function initSocket() {
-    // ... existing socket initialization code ...
-    
-    // Listen for user status changes
-    socket.on('user-status-change', (data) => {
-        console.log('👤 User status change:', data);
-        onlineUsers = data.onlineUsers || [];
-        
-        // Update last seen time for users who went offline
-        if (data.username && data.status === 'offline') {
-            userLastSeenTimes[data.username] = new Date().toISOString();
+    return new Promise((resolve, reject) => {
+        try {
+            // Initialize socket connection - FIXED: Use proper URL
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.host;
+            const socketUrl = `${protocol}//${host}`;
+            
+            console.log('🔌 Connecting to socket at:', socketUrl);
+            
+            // Create socket connection with polling transport for compatibility
+            socket = io(socketUrl, {
+                transports: ['polling', 'websocket'],
+                upgrade: true,
+                reconnection: true,
+                reconnectionAttempts: 5,
+                reconnectionDelay: 1000,
+                timeout: 20000
+            });
+            
+            // Socket connection event
+            socket.on('connect', () => {
+                console.log('✅ Socket connected successfully! Socket ID:', socket.id);
+                
+                // Send user online status immediately
+                const username = currentUserSession?.username;
+                if (username) {
+                    console.log('👤 Emitting user-online for:', username);
+                    socket.emit('user-online', username);
+                    
+                    // Also store in userLastSeenTimes
+                    userLastSeenTimes[username] = new Date().toISOString();
+                    localStorage.setItem('userLastSeenTimes', JSON.stringify(userLastSeenTimes));
+                }
+                
+                resolve();
+            });
+            
+            // Socket connection error
+            socket.on('connect_error', (error) => {
+                console.error('❌ Socket connection error:', error);
+                showError('Socket connection failed. Using fallback polling.');
+                
+                // Try to reconnect with polling only
+                setTimeout(() => {
+                    socket.io.opts.transports = ['polling'];
+                    socket.connect();
+                }, 1000);
+            });
+            
+            // Listen for user status changes
+            socket.on('user-status-change', (data) => {
+                console.log('👤 User status change:', data);
+                onlineUsers = data.onlineUsers || [];
+                
+                // Update last seen time for users who went offline
+                if (data.username && data.status === 'offline') {
+                    userLastSeenTimes[data.username] = new Date().toISOString();
+                }
+                
+                updateOnlineUsersList(onlineUsers);
+                updateUserStatusIndicator(data.username, data.status);
+            });
+            
+            // Listen for user last seen time updates
+            socket.on('user-last-seen', (data) => {
+                if (data.username && data.lastSeen) {
+                    userLastSeenTimes[data.username] = data.lastSeen;
+                    updateUserStatusIndicator(data.username, 'offline');
+                }
+            });
+            
+            // Listen for new messages
+            socket.on('new-message', (message) => {
+                console.log('📨 New message via socket:', message);
+                if (message && message.username) {
+                    const isOwn = message.username === currentUserSession?.username;
+                    displayMessage(
+                        message.content, 
+                        isOwn ? 'sent' : 'received', 
+                        message.reply_to, 
+                        message.username, 
+                        message.id,
+                        true
+                    );
+                }
+            });
+            
+            // Listen for message deletions
+            socket.on('message-deleted', (messageId) => {
+                console.log('🗑️ Message deleted via socket:', messageId);
+                const messageElement = document.querySelector(`[data-id="${messageId}"]`);
+                if (messageElement) {
+                    messageElement.remove();
+                }
+            });
+            
+            // Listen for message updates
+            socket.on('message-updated', (message) => {
+                console.log('✏️ Message updated via socket:', message.id);
+                const messageElement = document.querySelector(`[data-id="${message.id}"]`);
+                if (messageElement && message.content) {
+                    const contentElement = messageElement.querySelector('.content div');
+                    if (contentElement) {
+                        contentElement.textContent = message.content;
+                    }
+                }
+            });
+            
+            // Listen for typing indicators
+            socket.on('user-typing', (data) => {
+                if (data.username && data.username !== currentUserSession?.username) {
+                    if (data.isTyping) {
+                        showTypingIndicator(data.username);
+                    } else {
+                        hideTypingIndicator(data.username);
+                    }
+                }
+            });
+            
+            // Listen for private messages
+            socket.on('new-private-message', (message) => {
+                console.log('🤫 New private message via socket:', message);
+                handleNewPrivateMessage(message);
+            });
+            
+            // Request existing messages when connected
+            socket.once('connect', () => {
+                socket.emit('request-messages');
+            });
+            
+            // Handle disconnect
+            socket.on('disconnect', (reason) => {
+                console.log('🔌 Socket disconnected:', reason);
+                
+                // Update user status to away
+                const username = currentUserSession?.username;
+                if (username) {
+                    userLastSeenTimes[username] = new Date().toISOString();
+                    updateUserStatusIndicator(username, 'away');
+                }
+                
+                // Try to reconnect
+                if (reason === 'io server disconnect' || reason === 'transport close') {
+                    setTimeout(() => {
+                        console.log('🔄 Attempting to reconnect socket...');
+                        socket.connect();
+                    }, 1000);
+                }
+            });
+            
+        } catch (error) {
+            console.error('❌ Error initializing socket:', error);
+            reject(error);
         }
-        
-        updateOnlineUsersList(onlineUsers);
-        updateUserStatusIndicator(data.username, data.status);
     });
-    
-    // Listen for user last seen time updates
-    socket.on('user-last-seen', (data) => {
-        if (data.username && data.lastSeen) {
-            userLastSeenTimes[data.username] = data.lastSeen;
-            updateUserStatusIndicator(data.username, 'offline');
-        }
-    });
-    
-    // ... rest of socket initialization code ...
 }
 
 // ===== MODIFIED: Update user status indicator function =====
@@ -7907,18 +8060,19 @@ function setupTypingSocketEvents() {
     if (!socket) return;
     
     // Listen for typing start events
-    socket.on('user-typing-start', (data) => {
-        showTypingIndicator(data.username);
-    });
-    
-    // Listen for typing stop events
-    socket.on('user-typing-stop', (data) => {
-        hideTypingIndicator(data.username);
+    socket.on('user-typing', (data) => {
+        if (data.isTyping) {
+            showTypingIndicator(data.username);
+        } else {
+            hideTypingIndicator(data.username);
+        }
     });
     
     // Clean up typing indicators when user goes offline
-    socket.on('user-offline', (username) => {
-        hideTypingIndicator(username);
+    socket.on('user-status-change', (data) => {
+        if (data.status === 'offline') {
+            hideTypingIndicator(data.username);
+        }
     });
 }
 
@@ -7977,12 +8131,12 @@ async function handleAuth() {
                     token: data.token
                 });
                 
-                setTimeout(() => {
+                setTimeout(async () => {
                     loader.style.display = 'none';
                     document.getElementById('auth-container').style.display = 'none';
                     
                     // Use the new initializeMainApp function
-                    initializeMainApp();
+                    await initializeMainApp();
                 }, 500);
             } else {
                 throw new Error(data.error || 'Login failed');
@@ -9100,11 +9254,6 @@ function logout() {
         socket.emit('user-offline', username);
         // Disconnect socket
         socket.disconnect();
-    }
-    
-    // Stop Opera Mini polling if active
-    if (operaMessenger) {
-        operaMessenger.stopPolling();
     }
     
     // Clear user session from both storage locations
