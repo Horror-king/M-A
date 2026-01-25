@@ -1399,20 +1399,55 @@ html, body {
     cursor: pointer; /* ADDED: Make username clickable */
 }
 
+// --- IN THE CSS SECTION ---
+
+/* MODIFIED: Status indicator in messages - shows online dot or time ago when offline */
 .user-status-indicator {
+    font-size: 0.6rem;
+    display: inline-block;
+    margin-left: 5px;
+}
+
+.user-status-indicator.online {
+    color: #4CAF50;
+    font-weight: bold;
+}
+
+.user-status-indicator.online:before {
+    content: "● ";
+    color: #4CAF50;
+    font-size: 0.7rem;
+}
+
+.user-status-indicator.offline {
+    color: #999;
+}
+
+/* In the directory-user-status section */
+.directory-user-status .status-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
     display: inline-block;
+    margin-right: 5px;
 }
 
-.user-status-indicator.online {
-    background-color: #4CAF50;
-    box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
+.directory-user-status .status-dot.online {
+    background: #31a24c;
 }
 
-.user-status-indicator.offline {
-    background-color: #ccc;
+.directory-user-status .status-dot.offline {
+    background: #bcc0c4;
+}
+
+/* In user profile popup */
+.user-status-indicator.online-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #31a24c;
+    display: inline-block;
+    margin-right: 5px;
 }
 
 .user-status-indicator.away {
@@ -7120,8 +7155,11 @@ function batchMessageRender(messages, renderFunction) {
         });
     }
 }
-// --- CUT HERE ---
-// --- CUT HERE ---
+
+// --- IN THE JAVASCRIPT SECTION ---
+
+// Add this variable to track user last seen times
+let userLastSeenTimes = {};
 
 // ===== YOUR EXISTING VARIABLES AND FUNCTIONS =====
 
@@ -7215,6 +7253,31 @@ const elements = {
 
 let replyToText = null;
 
+// ===== ADDED: FORMAT TIME AGO FUNCTION =====
+function formatTimeAgo(timestamp) {
+    if (!timestamp) return 'long time ago';
+    
+    const now = new Date();
+    const lastSeen = new Date(timestamp);
+    const diffMs = now - lastSeen;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+    
+    if (diffSec < 60) {
+        return `${diffSec}s ago`;
+    } else if (diffMin < 60) {
+        return `${diffMin}m ago`;
+    } else if (diffHour < 24) {
+        return `${diffHour}h ago`;
+    } else if (diffDay < 7) {
+        return `${diffDay}d ago`;
+    } else {
+        return lastSeen.toLocaleDateString();
+    }
+}
+
 // ===== MODIFIED: AVATAR URL HELPER FUNCTION =====
 function getAvatarUrl(username) {
     if (!username) return `https://i.pravatar.cc/50?u=default`;
@@ -7237,7 +7300,25 @@ function getAvatarUrl(username) {
     return `https://i.pravatar.cc/50?u=${encodeURIComponent(username)}`;
 }
 
-// ===== NEW: FUNCTION TO FETCH PROFILE FROM SERVER =====
+// ===== MODIFIED: Function to create user status indicator =====
+function createUserStatusIndicator(username, isOnline, lastSeen) {
+    const indicator = document.createElement('span');
+    
+    if (isOnline) {
+        indicator.className = 'user-status-indicator online';
+        indicator.textContent = ''; // REMOVED: 'Online' text
+        indicator.title = 'Currently online';
+    } else {
+        indicator.className = 'user-status-indicator offline';
+        const timeAgo = formatTimeAgo(lastSeen);
+        indicator.textContent = timeAgo;
+        indicator.title = `Last seen ${timeAgo}`;
+    }
+    
+    return indicator;
+}
+
+// ===== MODIFIED: NEW FUNCTION TO FETCH PROFILE FROM SERVER =====
 async function fetchUserProfileFromServer(username) {
     if (!username) return null;
     
@@ -7271,8 +7352,15 @@ async function fetchUserProfileFromServer(username) {
                     interests: data.profile.interests || '',
                     avatar: data.profile.avatar || `https://i.pravatar.cc/150?u=${username}`,
                     display_name: data.profile.display_name || username,
-                    status: data.profile.status || 'offline'
+                    status: data.profile.status || 'offline',
+                    last_seen: data.profile.last_seen || userLastSeenTimes[username] || new Date().toISOString(),
+                    created_at: data.profile.created_at || new Date().toISOString()
                 };
+                
+                // Store last seen time
+                if (data.profile.last_seen && !userLastSeenTimes[username]) {
+                    userLastSeenTimes[username] = data.profile.last_seen;
+                }
                 
                 console.log(`✅ Profile fetched from server for: ${username}`);
                 return profileCache[username];
@@ -7291,7 +7379,9 @@ async function fetchUserProfileFromServer(username) {
             interests: '',
             avatar: `https://i.pravatar.cc/150?u=${username}`,
             display_name: username,
-            status: 'offline'
+            status: 'offline',
+            last_seen: userLastSeenTimes[username] || new Date(Date.now() - 86400000).toISOString(), // 1 day ago as default
+            created_at: new Date().toISOString()
         };
         
         profileCache[username] = defaultProfile;
@@ -7312,7 +7402,9 @@ async function fetchUserProfileFromServer(username) {
             interests: '',
             avatar: `https://i.pravatar.cc/150?u=${username}`,
             display_name: username,
-            status: 'offline'
+            status: 'offline',
+            last_seen: userLastSeenTimes[username] || new Date(Date.now() - 86400000).toISOString(),
+            created_at: new Date().toISOString()
         };
         
         profileCache[username] = defaultProfile;
@@ -7331,6 +7423,376 @@ async function updateAvatarFromServer(username, element) {
         console.error(`❌ Error updating avatar for ${username}:`, error);
     }
 }
+
+// ===== MODIFIED: Update createMessageElement function =====
+function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${sender}`;
+    if (messageId) messageDiv.dataset.id = messageId;
+    messageDiv.dataset.content = text;
+    messageDiv.dataset.username = username;
+    messageDiv.dataset.timestamp = Date.now();
+
+    if (sender === 'received') {
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'avatar';
+        
+        const avatarUrl = getAvatarUrl(username);
+        const img = new Image();
+        img.src = avatarUrl;
+        img.alt = "avatar";
+        img.loading = "lazy";
+        
+        avatarDiv.appendChild(img);
+        
+        // Add click event to show user profile
+        avatarDiv.onclick = (e) => {
+            e.stopPropagation();
+            showUserProfile(username);
+        };
+        
+        messageDiv.appendChild(avatarDiv);
+
+        const messageBody = document.createElement('div');
+        messageBody.className = 'message-body';
+        
+        const usernameDiv = document.createElement('div');
+        usernameDiv.className = 'username';
+        
+        // Add click event to username to show user profile
+        usernameDiv.onclick = (e) => {
+            e.stopPropagation();
+            showUserProfile(username);
+        };
+        
+        // Check if user is online
+        const isOnline = onlineUsers.includes(username);
+        const lastSeen = userLastSeenTimes[username];
+        const statusIndicator = createUserStatusIndicator(username, isOnline, lastSeen);
+        
+        usernameDiv.appendChild(document.createTextNode(username));
+        usernameDiv.appendChild(statusIndicator);
+        messageBody.appendChild(usernameDiv);
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'content';
+        if (repliedTo) {
+            const replyBubble = document.createElement('div');
+            replyBubble.className = 'reply-preview';
+            replyBubble.textContent = repliedTo;
+            contentDiv.appendChild(replyBubble);
+        }
+
+        const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
+        const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
+        const imageMatches = [...text.matchAll(imagePattern)];
+        const audioMatches = [...text.matchAll(audioPattern)];
+        let modifiedText = text;
+        [...imageMatches, ...audioMatches].forEach(match => {
+            modifiedText = modifiedText.replace(match[0], '');
+        });
+        modifiedText = modifiedText.trim();
+        
+        if (modifiedText) {
+            const textDiv = document.createElement('div');
+            textDiv.textContent = modifiedText;
+            contentDiv.appendChild(textDiv);
+        }
+
+        // Use lazy loading for images
+        imageMatches.forEach(match => {
+            const img = new Image();
+            img.src = match[0];
+            img.alt = "image";
+            img.loading = "lazy";
+            img.style.maxWidth = "100%";
+            img.style.height = "auto";
+            img.style.borderRadius = "8px";
+            img.style.marginTop = "5px";
+            contentDiv.appendChild(img);
+        });
+
+        audioMatches.forEach(match => {
+            const audio = document.createElement('audio');
+            audio.controls = true;
+            audio.src = match[0];
+            contentDiv.appendChild(audio);
+        });
+        
+        messageBody.appendChild(contentDiv);
+        messageDiv.appendChild(messageBody);
+    } else {
+        // For sent messages - simpler structure without avatar/username
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'content';
+        if (repliedTo) {
+            const replyBubble = document.createElement('div');
+            replyBubble.className = 'reply-preview';
+            replyBubble.textContent = repliedTo;
+            contentDiv.appendChild(replyBubble);
+        }
+        const textDiv = document.createElement('div');
+        textDiv.textContent = text;
+        contentDiv.appendChild(textDiv);
+        messageDiv.appendChild(contentDiv);
+    }
+    
+    return messageDiv;
+}
+
+// ===== MODIFIED: Update online users panel to show time ago for offline users =====
+function updateSingleOnlineList(listElementId, countElementId, onlineUsersArray) {
+    const onlineList = document.getElementById(listElementId);
+    const onlineCount = document.getElementById(countElementId);
+    
+    if (onlineList) {
+        onlineList.innerHTML = '';
+        
+        // Get current time for calculating last seen
+        const now = new Date();
+        
+        onlineUsersArray.forEach(user => {
+            const userElement = document.createElement('div');
+            userElement.className = 'online-user';
+            
+            // Check if user is online or offline
+            const isOnline = onlineUsers.includes(user.username || user);
+            const userObj = typeof user === 'string' ? { username: user } : user;
+            const lastSeen = userLastSeenTimes[userObj.username] || userObj.lastSeen;
+            
+            fetchUserProfileFromServer(userObj.username).then(profile => {
+                const avatarUrl = profile.avatar || getAvatarUrl(userObj.username);
+                const displayName = profile.display_name || userObj.username;
+                
+                userElement.innerHTML = `
+                    <div class="online-user-avatar">
+                        <img src="${avatarUrl}" alt="${displayName}" loading="lazy">
+                        ${isOnline ? '<div class="online-dot"></div>' : ''}
+                    </div>
+                    <div class="online-user-info">
+                        <div class="online-user-name">${displayName}</div>
+                        <div class="online-user-status">
+                            ${isOnline ? '' : formatTimeAgo(lastSeen)} <!-- REMOVED: 'Online' text -->
+                        </div>
+                    </div>
+                `;
+            }).catch(() => {
+                userElement.innerHTML = `
+                    <div class="online-user-avatar">
+                        <img src="${getAvatarUrl(userObj.username)}" alt="${userObj.username}" loading="lazy">
+                        ${isOnline ? '<div class="online-dot"></div>' : ''}
+                    </div>
+                    <div class="online-user-info">
+                        <div class="online-user-name">${userObj.username}</div>
+                        <div class="online-user-status">
+                            ${isOnline ? '' : formatTimeAgo(lastSeen)} <!-- REMOVED: 'Online' text -->
+                        </div>
+                    </div>
+                `;
+            });
+            
+            userElement.onclick = () => {
+                showUserProfile(userObj.username);
+            };
+            
+            onlineList.appendChild(userElement);
+        });
+    }
+    
+    if (onlineCount) {
+        onlineCount.textContent = onlineUsersArray.filter(user => {
+            const userObj = typeof user === 'string' ? { username: user } : user;
+            return onlineUsers.includes(userObj.username);
+        }).length;
+    }
+}
+
+// ===== MODIFIED: Update socket event handlers to track user last seen times =====
+function initSocket() {
+    // ... existing socket initialization code ...
+    
+    // Listen for user status changes
+    socket.on('user-status-change', (data) => {
+        console.log('👤 User status change:', data);
+        onlineUsers = data.onlineUsers || [];
+        
+        // Update last seen time for users who went offline
+        if (data.username && data.status === 'offline') {
+            userLastSeenTimes[data.username] = new Date().toISOString();
+        }
+        
+        updateOnlineUsersList(onlineUsers);
+        updateUserStatusIndicator(data.username, data.status);
+    });
+    
+    // Listen for user last seen time updates
+    socket.on('user-last-seen', (data) => {
+        if (data.username && data.lastSeen) {
+            userLastSeenTimes[data.username] = data.lastSeen;
+            updateUserStatusIndicator(data.username, 'offline');
+        }
+    });
+    
+    // ... rest of socket initialization code ...
+}
+
+// ===== MODIFIED: Update user status indicator function =====
+function updateUserStatusIndicator(username, status, lastSeen = null) {
+    // Update last seen time
+    if (status === 'offline' && !lastSeen) {
+        userLastSeenTimes[username] = new Date().toISOString();
+    } else if (lastSeen) {
+        userLastSeenTimes[username] = lastSeen;
+    }
+    
+    // Find all messages from this user and update their status
+    const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
+    userMessages.forEach(msg => {
+        let statusIndicator = msg.querySelector('.user-status-indicator');
+        if (!statusIndicator) {
+            statusIndicator = document.createElement('span');
+            statusIndicator.className = 'user-status-indicator';
+            const usernameDiv = msg.querySelector('.username');
+            if (usernameDiv) {
+                // Insert after username text
+                usernameDiv.appendChild(statusIndicator);
+            }
+        }
+        
+        if (status === 'online') {
+            statusIndicator.className = 'user-status-indicator online';
+            statusIndicator.textContent = ''; // REMOVED: 'Online' text
+            statusIndicator.title = 'Currently online';
+        } else {
+            statusIndicator.className = 'user-status-indicator offline';
+            const timeAgo = formatTimeAgo(userLastSeenTimes[username]);
+            statusIndicator.textContent = timeAgo;
+            statusIndicator.title = `Last seen ${timeAgo}`;
+        }
+    });
+    
+    // Update online users panel
+    updateOnlineUsersList(onlineUsers);
+}
+
+// ===== MODIFIED: Show user profile popup with last seen time =====
+async function showUserProfile(username) {
+    const popup = document.getElementById('user-profile-popup');
+    if (!popup) return;
+    
+    try {
+        // Fetch user profile from server
+        const profile = await fetchUserProfileFromServer(username);
+        
+        // Update popup content
+        document.getElementById('popup-avatar').src = profile.avatar || getAvatarUrl(username);
+        
+        // Set display name
+        let displayName = profile.display_name || username;
+        if (profile.firstname && profile.lastname) {
+            displayName = `${profile.firstname} ${profile.lastname}`;
+        } else if (profile.firstname) {
+            displayName = profile.firstname;
+        } else if (profile.lastname) {
+            displayName = profile.lastname;
+        }
+        document.getElementById('popup-username').textContent = displayName;
+        
+        // Set status (check if user is online)
+        const statusDot = document.getElementById('popup-status-dot');
+        const statusText = document.getElementById('popup-status-text');
+        const isOnline = onlineUsers.includes(username);
+        
+        if (isOnline) {
+            statusDot.className = 'user-status-indicator online-dot';
+            statusText.textContent = ''; // REMOVED: 'Online' text
+            statusText.style.color = '#31a24c';
+        } else {
+            statusDot.className = 'user-status-indicator online-dot offline';
+            const timeAgo = formatTimeAgo(profile.last_seen);
+            statusText.textContent = `Last seen ${timeAgo}`;
+            statusText.style.color = '#65676b';
+        }
+        
+        // Set bio
+        document.getElementById('popup-bio').textContent = profile.bio || 'No bio available';
+        
+        // Set details
+        document.getElementById('popup-age').textContent = profile.age || 'Not specified';
+        document.getElementById('popup-gender').textContent = profile.gender ? 
+            profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1) : 'Not specified';
+        document.getElementById('popup-location').textContent = profile.location || 'Not specified';
+        document.getElementById('popup-interests').textContent = profile.interests || 'Not specified';
+        
+        // Update message button
+        const messageBtn = document.getElementById('popup-message-btn');
+        const currentUser = currentUserSession?.username;
+        if (username === currentUser) {
+            messageBtn.style.display = 'none';
+        } else {
+            messageBtn.style.display = 'block';
+            messageBtn.onclick = () => {
+                hideUserProfile();
+                // Switch to private messages and open chat with this user
+                showContainer('private-messages');
+                setTimeout(() => {
+                    openPrivateChat(username);
+                }, 100);
+            };
+        }
+        
+        // Show popup
+        popup.style.display = 'flex';
+    } catch (error) {
+        console.error('Error loading user profile:', error);
+        // Fallback to basic profile display
+        const popup = document.getElementById('user-profile-popup');
+        if (popup) {
+            document.getElementById('popup-avatar').src = getAvatarUrl(username);
+            document.getElementById('popup-username').textContent = username;
+            
+            // Set status
+            const statusText = document.getElementById('popup-status-text');
+            const isOnline = onlineUsers.includes(username);
+            if (isOnline) {
+                statusText.textContent = ''; // REMOVED: 'Online' text
+                statusText.style.color = '#31a24c';
+            } else {
+                statusText.textContent = 'Offline';
+                statusText.style.color = '#65676b';
+            }
+            
+            document.getElementById('popup-bio').textContent = 'No bio available';
+            document.getElementById('popup-age').textContent = 'Not specified';
+            document.getElementById('popup-gender').textContent = 'Not specified';
+            document.getElementById('popup-location').textContent = 'Not specified';
+            document.getElementById('popup-interests').textContent = 'Not specified';
+            
+            const messageBtn = document.getElementById('popup-message-btn');
+            const currentUser = currentUserSession?.username;
+            if (username === currentUser) {
+                messageBtn.style.display = 'none';
+            } else {
+                messageBtn.style.display = 'block';
+            }
+            
+            popup.style.display = 'flex';
+        }
+    }
+}
+
+// ===== NEW: Add this function to periodically update last seen times =====
+function updateLastSeenTimes() {
+    // Update all offline users' status indicators
+    Object.keys(userLastSeenTimes).forEach(username => {
+        if (!onlineUsers.includes(username)) {
+            updateUserStatusIndicator(username, 'offline', userLastSeenTimes[username]);
+        }
+    });
+}
+
+// Call this periodically (every minute)
+setInterval(updateLastSeenTimes, 60000);
 
 // ===== OPTIMIZED TYPING INDICATOR FUNCTIONS =====
 function showTypingIndicator(username) {
@@ -7628,6 +8090,9 @@ function clearUserSession() {
     localStorage.removeItem('auth_token');
     // Clear profile cache on logout
     profileCache = {};
+    // Clear last seen times on logout
+    userLastSeenTimes = {};
+    localStorage.removeItem('userLastSeenTimes');
     console.log('✅ User session cleared');
 }
 
@@ -7933,127 +8398,6 @@ async function sendPrivateMessage() {
         elements.privateSendButton.disabled = !hasText;
         elements.privateSendButton.classList.toggle('enabled', hasText);
     }, 1000);
-}
-
-// ===== MODIFIED: MESSAGE DISPLAY FUNCTIONS WITH SERVER PROFILE FETCHING =====
-function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${sender}`;
-    if (messageId) messageDiv.dataset.id = messageId;
-    messageDiv.dataset.content = text;
-    messageDiv.dataset.username = username;
-    messageDiv.dataset.timestamp = Date.now();
-
-    // Only create avatar for received messages
-    if (sender === 'received') {
-        const avatarDiv = document.createElement('div');
-        avatarDiv.className = 'avatar';
-        
-        // MODIFIED: Use getAvatarUrl function which now fetches from server
-        const avatarUrl = getAvatarUrl(username);
-        const img = new Image();
-        img.src = avatarUrl;
-        img.alt = "avatar";
-        img.loading = "lazy";
-        
-        // Fetch and update avatar from server in background
-        setTimeout(() => {
-            updateAvatarFromServer(username, img);
-        }, 100);
-        
-        avatarDiv.appendChild(img);
-        
-        // Add click event to show user profile
-        avatarDiv.onclick = (e) => {
-            e.stopPropagation();
-            showUserProfile(username);
-        };
-        
-        messageDiv.appendChild(avatarDiv);
-
-        const messageBody = document.createElement('div');
-        messageBody.className = 'message-body';
-        
-        // Username with status indicator
-        const usernameDiv = document.createElement('div');
-        usernameDiv.className = 'username';
-        
-        // Add click event to username to show user profile
-        usernameDiv.onclick = (e) => {
-            e.stopPropagation();
-            showUserProfile(username);
-        };
-        
-        const statusIndicator = document.createElement('span');
-        statusIndicator.className = 'user-status-indicator online';
-        usernameDiv.appendChild(document.createTextNode(username));
-        usernameDiv.appendChild(statusIndicator);
-        messageBody.appendChild(usernameDiv);
-
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'content';
-        if (repliedTo) {
-            const replyBubble = document.createElement('div');
-            replyBubble.className = 'reply-preview';
-            replyBubble.textContent = repliedTo;
-            contentDiv.appendChild(replyBubble);
-        }
-
-        const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
-        const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
-        const imageMatches = [...text.matchAll(imagePattern)];
-        const audioMatches = [...text.matchAll(audioPattern)];
-        let modifiedText = text;
-        [...imageMatches, ...audioMatches].forEach(match => {
-            modifiedText = modifiedText.replace(match[0], '');
-        });
-        modifiedText = modifiedText.trim();
-        
-        if (modifiedText) {
-            const textDiv = document.createElement('div');
-            textDiv.textContent = modifiedText;
-            contentDiv.appendChild(textDiv);
-        }
-
-        // Use lazy loading for images
-        imageMatches.forEach(match => {
-            const img = new Image();
-            img.src = match[0];
-            img.alt = "image";
-            img.loading = "lazy";
-            img.style.maxWidth = "100%";
-            img.style.height = "auto";
-            img.style.borderRadius = "8px";
-            img.style.marginTop = "5px";
-            contentDiv.appendChild(img);
-        });
-
-        audioMatches.forEach(match => {
-            const audio = document.createElement('audio');
-            audio.controls = true;
-            audio.src = match[0];
-            contentDiv.appendChild(audio);
-        });
-        
-        messageBody.appendChild(contentDiv);
-        messageDiv.appendChild(messageBody);
-    } else {
-        // For sent messages - simpler structure without avatar/username
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'content';
-        if (repliedTo) {
-            const replyBubble = document.createElement('div');
-            replyBubble.className = 'reply-preview';
-            replyBubble.textContent = repliedTo;
-            contentDiv.appendChild(replyBubble);
-        }
-        const textDiv = document.createElement('div');
-        textDiv.textContent = text;
-        contentDiv.appendChild(textDiv);
-        messageDiv.appendChild(contentDiv);
-    }
-    
-    return messageDiv;
 }
 
 // ===== NEW FUNCTION: Add touch event listeners to message element =====
@@ -9088,7 +9432,6 @@ function initializePrivateMessaging() {
     loadUnreadCounts();
 }
 
-// --- CUT HERE ---
 // ===== ADDED: USER PANEL VISIBILITY FUNCTIONS =====
 function toggleUserPanel() {
     userPanelVisible = !userPanelVisible;
@@ -9273,7 +9616,7 @@ async function openPrivateChat(username) {
     
     // Set online status
     const isOnline = onlineUsers.includes(username);
-    document.getElementById('partner-status').textContent = isOnline ? 'Online' : 'Offline';
+    document.getElementById('partner-status').textContent = isOnline ? '' : formatTimeAgo(userLastSeenTimes[username] || profile?.last_seen);
     document.getElementById('partner-status').style.color = isOnline ? '#4CAF50' : '#65676b';
     
     // Show chat container and hide users panel
@@ -9980,92 +10323,6 @@ async function saveProfile() {
     }
 }
 
-// MODIFIED: Get user profile from server for popups
-async function showUserProfile(username) {
-    const popup = document.getElementById('user-profile-popup');
-    if (!popup) return;
-    
-    try {
-        // Fetch user profile from server
-        const profile = await fetchUserProfileFromServer(username);
-        
-        // Update popup content
-        document.getElementById('popup-avatar').src = profile.avatar || getAvatarUrl(username);
-        
-        // Set display name
-        let displayName = profile.display_name || username;
-        if (profile.firstname && profile.lastname) {
-            displayName = `${profile.firstname} ${profile.lastname}`;
-        } else if (profile.firstname) {
-            displayName = profile.firstname;
-        } else if (profile.lastname) {
-            displayName = profile.lastname;
-        }
-        document.getElementById('popup-username').textContent = displayName;
-        
-        // Set status (check if user is online)
-        const statusDot = document.getElementById('popup-status-dot');
-        const statusText = document.getElementById('popup-status-text');
-        const isOnline = onlineUsers.includes(username);
-        
-        statusDot.className = `user-status-indicator ${isOnline ? 'online' : 'offline'}`;
-        statusText.textContent = isOnline ? 'Online' : 'Offline';
-        
-        // Set bio
-        document.getElementById('popup-bio').textContent = profile.bio || 'No bio available';
-        
-        // Set details
-        document.getElementById('popup-age').textContent = profile.age || 'Not specified';
-        document.getElementById('popup-gender').textContent = profile.gender ? 
-            profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1) : 'Not specified';
-        document.getElementById('popup-location').textContent = profile.location || 'Not specified';
-        document.getElementById('popup-interests').textContent = profile.interests || 'Not specified';
-        
-        // Update message button
-        const messageBtn = document.getElementById('popup-message-btn');
-        const currentUser = currentUserSession?.username;
-        if (username === currentUser) {
-            messageBtn.style.display = 'none';
-        } else {
-            messageBtn.style.display = 'block';
-            messageBtn.onclick = () => {
-                hideUserProfile();
-                // Switch to private messages and open chat with this user
-                showContainer('private-messages');
-                setTimeout(() => {
-                    openPrivateChat(username);
-                }, 100);
-            };
-        }
-        
-        // Show popup
-        popup.style.display = 'flex';
-    } catch (error) {
-        console.error('Error loading user profile:', error);
-        // Fallback to basic profile display
-        const popup = document.getElementById('user-profile-popup');
-        if (popup) {
-            document.getElementById('popup-avatar').src = getAvatarUrl(username);
-            document.getElementById('popup-username').textContent = username;
-            document.getElementById('popup-bio').textContent = 'No bio available';
-            document.getElementById('popup-age').textContent = 'Not specified';
-            document.getElementById('popup-gender').textContent = 'Not specified';
-            document.getElementById('popup-location').textContent = 'Not specified';
-            document.getElementById('popup-interests').textContent = 'Not specified';
-            
-            const messageBtn = document.getElementById('popup-message-btn');
-            const currentUser = currentUserSession?.username;
-            if (username === currentUser) {
-                messageBtn.style.display = 'none';
-            } else {
-                messageBtn.style.display = 'block';
-            }
-            
-            popup.style.display = 'flex';
-        }
-    }
-}
-
 // MODIFIED: Profile display function - properly updates the dropdown
 function updateProfileDisplay(profile) {
     console.log('Updating profile display:', profile);
@@ -10291,55 +10548,6 @@ function updateOnlineUsersList(onlineUsers) {
     updateSingleOnlineList('private-online-users-list', 'private-online-count', onlineUsers);
 }
 
-function updateSingleOnlineList(listElementId, countElementId, onlineUsers) {
-    const onlineList = document.getElementById(listElementId);
-    const onlineCount = document.getElementById(countElementId);
-    
-    if (onlineList) {
-        onlineList.innerHTML = '';
-        onlineUsers.forEach(user => {
-            const userElement = document.createElement('div');
-            userElement.className = 'online-user';
-            
-            // Fetch profile for each online user
-            fetchUserProfileFromServer(user).then(profile => {
-                const avatarUrl = profile.avatar || getAvatarUrl(user);
-                const displayName = profile.display_name || user;
-                
-                userElement.innerHTML = `
-                    <div class="online-user-avatar">
-                        <img src="${avatarUrl}" alt="${displayName}" loading="lazy">
-                        <div class="online-dot"></div>
-                    </div>
-                    <div class="online-user-info">
-                        <div class="online-user-name">${displayName}</div>
-                    </div>
-                `;
-            }).catch(() => {
-                userElement.innerHTML = `
-                    <div class="online-user-avatar">
-                        <img src="${getAvatarUrl(user)}" alt="${user}" loading="lazy">
-                        <div class="online-dot"></div>
-                    </div>
-                    <div class="online-user-info">
-                        <div class="online-user-name">${user}</div>
-                    </div>
-                `;
-            });
-            
-            userElement.onclick = () => {
-                showUserProfile(user);
-            };
-            
-            onlineList.appendChild(userElement);
-        });
-    }
-    
-    if (onlineCount) {
-        onlineCount.textContent = onlineUsers.length;
-    }
-}
-
 // Remove offline user from the lists
 function removeOfflineUser(username) {
     console.log('Removing offline user from UI:', username);
@@ -10371,30 +10579,6 @@ function removeUserFromSingleList(listElementId, countElementId, username) {
             onlineCount.textContent = Math.max(0, currentCount - 1);
         }
     }
-}
-
-// Update status indicator for a specific user
-function updateUserStatusIndicator(username, status) {
-    // Find all messages from this user and update their status
-    const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
-    userMessages.forEach(msg => {
-        let statusIndicator = msg.querySelector('.user-status-indicator');
-        if (!statusIndicator) {
-            statusIndicator = createStatusIndicator();
-            const usernameDiv = msg.querySelector('.username');
-            if (usernameDiv) {
-                usernameDiv.appendChild(statusIndicator);
-            }
-        }
-        statusIndicator.className = `user-status-indicator ${status}`;
-    });
-}
-
-// Create a status indicator element
-function createStatusIndicator() {
-    const indicator = document.createElement('span');
-    indicator.className = 'user-status-indicator';
-    return indicator;
 }
 
 // Handle typing events
@@ -11011,6 +11195,22 @@ function resetSecretCodeForm() {
 // Initialize username validation
 document.addEventListener('DOMContentLoaded', function() {
     setupUsernameValidation();
+    
+    // ===== ADDED: Initialize last seen times on page load =====
+    // Load last seen times from localStorage if available
+    const savedLastSeenTimes = localStorage.getItem('userLastSeenTimes');
+    if (savedLastSeenTimes) {
+        try {
+            userLastSeenTimes = JSON.parse(savedLastSeenTimes);
+        } catch (e) {
+            console.error('Error loading last seen times:', e);
+        }
+    }
+    
+    // Save last seen times to localStorage periodically
+    setInterval(() => {
+        localStorage.setItem('userLastSeenTimes', JSON.stringify(userLastSeenTimes));
+    }, 30000);
 });
 
 function setupUsernameValidation() {
