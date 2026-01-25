@@ -4108,7 +4108,49 @@ html, body {
     .post-content {
         font-size: 14px;
     }
-    
+    /* Add this to the CSS section */
+.online-time-display {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: rgba(255, 255, 255, 0.9);
+    color: #65676b;
+    font-size: 8px;
+    font-weight: bold;
+    padding: 1px 3px;
+    border-radius: 8px;
+    border: 1px solid #e4e6eb;
+    min-width: 20px;
+    text-align: center;
+    z-index: 3;
+    white-space: nowrap;
+}
+
+.online-user-avatar {
+    position: relative;
+}
+
+/* Update the existing online-dot to be less prominent when offline */
+.online-dot.offline {
+    background: #bcc0c4;
+    color: white;
+    font-size: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    min-width: 20px;
+}
+
+/* Hide the offline dot text when it's too long */
+.online-dot.offline::before {
+    content: attr(data-time);
+    font-size: 6px;
+    font-weight: bold;
+    padding: 0 2px;
+}
     .post-action {
         padding: 6px;
         font-size: 12px;
