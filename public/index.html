@@ -1399,55 +1399,20 @@ html, body {
     cursor: pointer; /* ADDED: Make username clickable */
 }
 
-// --- IN THE CSS SECTION ---
-
-/* MODIFIED: Status indicator in messages - shows online dot or time ago when offline */
 .user-status-indicator {
-    font-size: 0.6rem;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
     display: inline-block;
-    margin-left: 5px;
 }
 
 .user-status-indicator.online {
-    color: #4CAF50;
-    font-weight: bold;
-}
-
-.user-status-indicator.online:before {
-    content: "● ";
-    color: #4CAF50;
-    font-size: 0.7rem;
+    background-color: #4CAF50;
+    box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
 }
 
 .user-status-indicator.offline {
-    color: #999;
-}
-
-/* In the directory-user-status section */
-.directory-user-status .status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-    margin-right: 5px;
-}
-
-.directory-user-status .status-dot.online {
-    background: #31a24c;
-}
-
-.directory-user-status .status-dot.offline {
-    background: #bcc0c4;
-}
-
-/* In user profile popup */
-.user-status-indicator.online-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #31a24c;
-    display: inline-block;
-    margin-right: 5px;
+    background-color: #ccc;
 }
 
 .user-status-indicator.away {
@@ -4108,49 +4073,7 @@ html, body {
     .post-content {
         font-size: 14px;
     }
-    /* Add this to the CSS section */
-.online-time-display {
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    background: rgba(255, 255, 255, 0.9);
-    color: #65676b;
-    font-size: 8px;
-    font-weight: bold;
-    padding: 1px 3px;
-    border-radius: 8px;
-    border: 1px solid #e4e6eb;
-    min-width: 20px;
-    text-align: center;
-    z-index: 3;
-    white-space: nowrap;
-}
-
-.online-user-avatar {
-    position: relative;
-}
-
-/* Update the existing online-dot to be less prominent when offline */
-.online-dot.offline {
-    background: #bcc0c4;
-    color: white;
-    font-size: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    min-width: 20px;
-}
-
-/* Hide the offline dot text when it's too long */
-.online-dot.offline::before {
-    content: attr(data-time);
-    font-size: 6px;
-    font-weight: bold;
-    padding: 0 2px;
-}
+    
     .post-action {
         padding: 6px;
         font-size: 12px;
@@ -4876,321 +4799,6 @@ let isUsersLoaded = false;
 let usersLoadStarted = false; // Track if load has started
 let usersRefreshInterval = null;
 
-// ===== TIME SINCE LAST ONLINE FUNCTIONS =====
-
-// Add this function to calculate time since last online
-function formatTimeSinceLastOnline(lastActive) {
-    if (!lastActive) return 'Never';
-    
-    const now = new Date();
-    const lastActiveDate = new Date(lastActive);
-    const diffMs = now - lastActiveDate;
-    const diffSec = Math.floor(diffMs / 1000);
-    const diffMin = Math.floor(diffSec / 60);
-    const diffHour = Math.floor(diffMin / 60);
-    const diffDay = Math.floor(diffHour / 24);
-    
-    if (diffSec < 60) {
-        return `${diffSec}s`;
-    } else if (diffMin < 60) {
-        return `${diffMin}m`;
-    } else if (diffHour < 24) {
-        return `${diffHour}h`;
-    } else if (diffDay < 7) {
-        return `${diffDay}d`;
-    } else {
-        return 'Long';
-    }
-}
-
-// Add detailed time formatting for profile popup
-function formatDetailedTimeSinceLastOnline(lastActive) {
-    if (!lastActive) return 'a long time ago';
-    
-    const now = new Date();
-    const lastActiveDate = new Date(lastActive);
-    const diffMs = now - lastActiveDate;
-    const diffSec = Math.floor(diffMs / 1000);
-    const diffMin = Math.floor(diffSec / 60);
-    const diffHour = Math.floor(diffMin / 60);
-    const diffDay = Math.floor(diffHour / 24);
-    const diffWeek = Math.floor(diffDay / 7);
-    const diffMonth = Math.floor(diffDay / 30);
-    const diffYear = Math.floor(diffDay / 365);
-    
-    if (diffSec < 60) {
-        return `${diffSec} second${diffSec !== 1 ? 's' : ''} ago`;
-    } else if (diffMin < 60) {
-        return `${diffMin} minute${diffMin !== 1 ? 's' : ''} ago`;
-    } else if (diffHour < 24) {
-        return `${diffHour} hour${diffHour !== 1 ? 's' : ''} ago`;
-    } else if (diffDay < 7) {
-        return `${diffDay} day${diffDay !== 1 ? 's' : ''} ago`;
-    } else if (diffWeek < 4) {
-        return `${diffWeek} week${diffWeek !== 1 ? 's' : ''} ago`;
-    } else if (diffMonth < 12) {
-        return `${diffMonth} month${diffMonth !== 1 ? 's' : ''} ago`;
-    } else {
-        return `${diffYear} year${diffYear !== 1 ? 's' : ''} ago`;
-    }
-}
-
-// ===== UPDATED ONLINE USER FUNCTIONS =====
-
-// Update the updateSingleOnlineList function
-function updateSingleOnlineList(listElementId, countElementId, onlineUsers) {
-    const onlineList = document.getElementById(listElementId);
-    const onlineCount = document.getElementById(countElementId);
-    
-    if (onlineList) {
-        onlineList.innerHTML = '';
-        
-        // Show all users from profileCache
-        const allUsers = Object.keys(profileCache);
-        
-        allUsers.forEach(user => {
-            const isOnline = onlineUsers.includes(user);
-            const profile = profileCache[user];
-            const lastActive = profile.last_active || profile.lastActive;
-            
-            const userElement = document.createElement('div');
-            userElement.className = 'online-user';
-            
-            let statusHtml = '';
-            if (isOnline) {
-                statusHtml = `<div class="online-dot"></div>`;
-            } else {
-                // Show time since last online
-                const timeAgo = formatTimeSinceLastOnline(lastActive);
-                statusHtml = `<div class="online-dot offline" data-time="${timeAgo}"></div>`;
-            }
-            
-            userElement.innerHTML = `
-                <div class="online-user-avatar">
-                    <img src="${profile.avatar || getAvatarUrl(user)}" alt="${profile.display_name || user}" loading="lazy">
-                    ${statusHtml}
-                </div>
-                <div class="online-user-info">
-                    <div class="online-user-name">${profile.display_name || user}</div>
-                </div>
-            `;
-            
-            userElement.onclick = () => {
-                showUserProfile(user);
-            };
-            
-            onlineList.appendChild(userElement);
-        });
-    }
-    
-    if (onlineCount) {
-        onlineCount.textContent = onlineUsers.length;
-    }
-}
-
-// ===== UPDATED USER PROFILE FUNCTIONS =====
-
-// Update the showUserProfile function to show last online time
-async function showUserProfile(username) {
-    const popup = document.getElementById('user-profile-popup');
-    if (!popup) return;
-    
-    try {
-        // Fetch user profile from server
-        const profile = await fetchUserProfileFromServer(username);
-        
-        // Update popup content
-        document.getElementById('popup-avatar').src = profile.avatar || getAvatarUrl(username);
-        
-        // Set display name
-        let displayName = profile.display_name || username;
-        if (profile.firstname && profile.lastname) {
-            displayName = `${profile.firstname} ${profile.lastname}`;
-        } else if (profile.firstname) {
-            displayName = profile.firstname;
-        } else if (profile.lastname) {
-            displayName = profile.lastname;
-        }
-        document.getElementById('popup-username').textContent = displayName;
-        
-        // Set status with last online time
-        const statusDot = document.getElementById('popup-status-dot');
-        const statusText = document.getElementById('popup-status-text');
-        const isOnline = onlineUsers.includes(username);
-        
-        if (isOnline) {
-            statusDot.className = 'user-status-indicator online';
-            statusText.textContent = 'Online';
-        } else {
-            statusDot.className = 'user-status-indicator offline';
-            const lastActive = profile.last_active;
-            if (lastActive) {
-                const timeAgo = formatDetailedTimeSinceLastOnline(lastActive);
-                statusText.textContent = `Last seen ${timeAgo}`;
-            } else {
-                statusText.textContent = 'Offline';
-            }
-        }
-        
-        // Set bio
-        document.getElementById('popup-bio').textContent = profile.bio || 'No bio available';
-        
-        // Set details
-        document.getElementById('popup-age').textContent = profile.age || 'Not specified';
-        document.getElementById('popup-gender').textContent = profile.gender ? 
-            profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1) : 'Not specified';
-        document.getElementById('popup-location').textContent = profile.location || 'Not specified';
-        document.getElementById('popup-interests').textContent = profile.interests || 'Not specified';
-        
-        // Update message button
-        const messageBtn = document.getElementById('popup-message-btn');
-        const currentUser = currentUserSession?.username;
-        if (username === currentUser) {
-            messageBtn.style.display = 'none';
-        } else {
-            messageBtn.style.display = 'block';
-            messageBtn.onclick = () => {
-                hideUserProfile();
-                // Switch to private messages and open chat with this user
-                showContainer('private-messages');
-                setTimeout(() => {
-                    openPrivateChat(username);
-                }, 100);
-            };
-        }
-        
-        // Show popup
-        popup.style.display = 'flex';
-    } catch (error) {
-        console.error('Error loading user profile:', error);
-        // Fallback to basic profile display
-        const popup = document.getElementById('user-profile-popup');
-        if (popup) {
-            document.getElementById('popup-avatar').src = getAvatarUrl(username);
-            document.getElementById('popup-username').textContent = username;
-            document.getElementById('popup-status-dot').className = 'user-status-indicator offline';
-            document.getElementById('popup-status-text').textContent = 'Offline';
-            document.getElementById('popup-bio').textContent = 'No bio available';
-            document.getElementById('popup-age').textContent = 'Not specified';
-            document.getElementById('popup-gender').textContent = 'Not specified';
-            document.getElementById('popup-location').textContent = 'Not specified';
-            document.getElementById('popup-interests').textContent = 'Not specified';
-            
-            const messageBtn = document.getElementById('popup-message-btn');
-            const currentUser = currentUserSession?.username;
-            if (username === currentUser) {
-                messageBtn.style.display = 'none';
-            } else {
-                messageBtn.style.display = 'block';
-            }
-            
-            popup.style.display = 'flex';
-        }
-    }
-}
-
-// ===== UPDATED USER CARD FUNCTION =====
-
-// Update the createUserCard function for All Users directory
-function createUserCard(user) {
-    const card = document.createElement('div');
-    card.className = 'user-directory-card';
-    
-    // Calculate time since joined
-    const joinDate = new Date(user.created_at || user.join_date);
-    const now = new Date();
-    const diffTime = Math.abs(now - joinDate);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    const timeJoined = diffDays === 1 ? 'Today' : 
-                       diffDays < 7 ? `${diffDays} days ago` : 
-                       joinDate.toLocaleDateString();
-    
-    // Status and last online time
-    let statusColor = '#bcc0c4';
-    let statusText = 'Offline';
-    let lastOnlineText = '';
-    
-    if (user.status === 'online') {
-        statusColor = '#31a24c';
-        statusText = 'Online';
-    } else if (user.status === 'away') {
-        statusColor = '#f7b928';
-        statusText = 'Away';
-    } else {
-        // Offline - show last online time
-        const lastActive = user.last_active || user.lastActive;
-        if (lastActive) {
-            const timeAgo = formatTimeSinceLastOnline(lastActive);
-            statusText = `${timeAgo} ago`;
-        }
-    }
-    
-    // Activity score
-    const activityScore = (user.message_count || 0) + (user.post_count || 0);
-    let activityLevel = 'New';
-    if (activityScore > 50) activityLevel = 'Very Active';
-    else if (activityScore > 20) activityLevel = 'Active';
-    else if (activityScore > 5) activityLevel = 'Regular';
-    
-    // Check if user is new (joined in last 7 days)
-    const isNewUser = diffDays <= 7;
-    
-    card.innerHTML = `
-        <div class="directory-user-header">
-            <img src="${user.avatar || `https://i.pravatar.cc/150?u=${user.username}`}" 
-                 alt="${user.display_name || user.username}" 
-                 class="directory-user-avatar"
-                 onerror="this.src='https://i.pravatar.cc/150?u=default'">
-            ${isNewUser ? '<span class="new-user-badge">NEW</span>' : ''}
-        </div>
-        
-        <div class="directory-user-info">
-            <div class="directory-user-name">
-                ${user.display_name || user.username}
-                <span class="directory-user-details">@${user.username}</span>
-            </div>
-            
-            <div class="directory-user-details">
-                ${user.bio || 'No bio yet'}
-            </div>
-            
-            <div class="user-stats">
-                <div class="user-stat">
-                    <i class="fas fa-comment"></i>
-                    <span>${user.message_count || 0} messages</span>
-                </div>
-                <div class="user-stat">
-                    <i class="fas fa-newspaper"></i>
-                    <span>${user.post_count || 0} posts</span>
-                </div>
-                <div class="user-stat">
-                    <i class="fas fa-chart-line"></i>
-                    <span>${activityLevel}</span>
-                </div>
-            </div>
-            
-            <div class="directory-user-status">
-                <span class="status-dot" style="background-color: ${statusColor};"></span>
-                <span>${statusText}</span>
-                ${lastOnlineText ? `<span>• ${lastOnlineText}</span>` : ''}
-                <span>• Joined ${timeJoined}</span>
-                ${user.location ? `<span>• ${user.location}</span>` : ''}
-            </div>
-        </div>
-        
-        <div class="directory-user-actions">
-            <button class="directory-action-btn profile" onclick="showUserProfile('${user.username}')">
-                <i class="fas fa-user"></i> Profile
-            </button>
-            <button class="directory-action-btn message" onclick="openPrivateChatFromDirectory('${user.username}')">
-                <i class="fas fa-comment"></i> Message
-            </button>
-        </div>
-    `;
-    
-    return card;
-}
-
 // Add this function to show all users on first visit
 function showAllUsersOnFirstVisit() {
     // Check if it's the first visit
@@ -5570,6 +5178,104 @@ function renderAllUsers() {
         }
     }
     // If users are not loaded yet, keep the loading message
+}
+
+// Create user card element
+function createUserCard(user) {
+    const card = document.createElement('div');
+    card.className = 'user-directory-card';
+    
+    // Calculate time since joined
+    const joinDate = new Date(user.created_at || user.join_date);
+    const now = new Date();
+    const diffTime = Math.abs(now - joinDate);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const timeJoined = diffDays === 1 ? 'Today' : 
+                       diffDays < 7 ? `${diffDays} days ago` : 
+                       joinDate.toLocaleDateString();
+    
+    // Status color
+    let statusColor = '#bcc0c4';
+    let statusText = 'Offline';
+    
+    switch (user.status) {
+        case 'online':
+            statusColor = '#31a24c';
+            statusText = 'Online';
+            break;
+        case 'away':
+            statusColor = '#f7b928';
+            statusText = 'Away';
+            break;
+        case 'offline':
+        default:
+            statusColor = '#bcc0c4';
+            statusText = 'Offline';
+    }
+    
+    // Activity score
+    const activityScore = (user.message_count || 0) + (user.post_count || 0);
+    let activityLevel = 'New';
+    if (activityScore > 50) activityLevel = 'Very Active';
+    else if (activityScore > 20) activityLevel = 'Active';
+    else if (activityScore > 5) activityLevel = 'Regular';
+    
+    // Check if user is new (joined in last 7 days)
+    const isNewUser = diffDays <= 7;
+    
+    card.innerHTML = `
+        <div class="directory-user-header">
+            <img src="${user.avatar || `https://i.pravatar.cc/150?u=${user.username}`}" 
+                 alt="${user.display_name || user.username}" 
+                 class="directory-user-avatar"
+                 onerror="this.src='https://i.pravatar.cc/150?u=default'">
+            ${isNewUser ? '<span class="new-user-badge">NEW</span>' : ''}
+        </div>
+        
+        <div class="directory-user-info">
+            <div class="directory-user-name">
+                ${user.display_name || user.username}
+                <span class="directory-user-details">@${user.username}</span>
+            </div>
+            
+            <div class="directory-user-details">
+                ${user.bio || 'No bio yet'}
+            </div>
+            
+            <div class="user-stats">
+                <div class="user-stat">
+                    <i class="fas fa-comment"></i>
+                    <span>${user.message_count || 0} messages</span>
+                </div>
+                <div class="user-stat">
+                    <i class="fas fa-newspaper"></i>
+                    <span>${user.post_count || 0} posts</span>
+                </div>
+                <div class="user-stat">
+                    <i class="fas fa-chart-line"></i>
+                    <span>${activityLevel}</span>
+                </div>
+            </div>
+            
+            <div class="directory-user-status">
+                <span class="status-dot" style="background-color: ${statusColor};"></span>
+                <span>${statusText}</span>
+                <span>• Joined ${timeJoined}</span>
+                ${user.location ? `<span>• ${user.location}</span>` : ''}
+            </div>
+        </div>
+        
+        <div class="directory-user-actions">
+            <button class="directory-action-btn profile" onclick="showUserProfile('${user.username}')">
+                <i class="fas fa-user"></i> Profile
+            </button>
+            <button class="directory-action-btn message" onclick="openPrivateChatFromDirectory('${user.username}')">
+                <i class="fas fa-comment"></i> Message
+            </button>
+        </div>
+    `;
+    
+    return card;
 }
 
 // Setup search functionality for all users
@@ -10274,6 +9980,125 @@ async function saveProfile() {
     }
 }
 
+// MODIFIED: Get user profile from server for popups
+async function showUserProfile(username) {
+    const popup = document.getElementById('user-profile-popup');
+    if (!popup) return;
+    
+    try {
+        // Fetch user profile from server
+        const profile = await fetchUserProfileFromServer(username);
+        
+        // Update popup content
+        document.getElementById('popup-avatar').src = profile.avatar || getAvatarUrl(username);
+        
+        // Set display name
+        let displayName = profile.display_name || username;
+        if (profile.firstname && profile.lastname) {
+            displayName = `${profile.firstname} ${profile.lastname}`;
+        } else if (profile.firstname) {
+            displayName = profile.firstname;
+        } else if (profile.lastname) {
+            displayName = profile.lastname;
+        }
+        document.getElementById('popup-username').textContent = displayName;
+        
+        // Set status (check if user is online)
+        const statusDot = document.getElementById('popup-status-dot');
+        const statusText = document.getElementById('popup-status-text');
+        const isOnline = onlineUsers.includes(username);
+        
+        statusDot.className = `user-status-indicator ${isOnline ? 'online' : 'offline'}`;
+        statusText.textContent = isOnline ? 'Online' : 'Offline';
+        
+        // Set bio
+        document.getElementById('popup-bio').textContent = profile.bio || 'No bio available';
+        
+        // Set details
+        document.getElementById('popup-age').textContent = profile.age || 'Not specified';
+        document.getElementById('popup-gender').textContent = profile.gender ? 
+            profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1) : 'Not specified';
+        document.getElementById('popup-location').textContent = profile.location || 'Not specified';
+        document.getElementById('popup-interests').textContent = profile.interests || 'Not specified';
+        
+        // Update message button
+        const messageBtn = document.getElementById('popup-message-btn');
+        const currentUser = currentUserSession?.username;
+        if (username === currentUser) {
+            messageBtn.style.display = 'none';
+        } else {
+            messageBtn.style.display = 'block';
+            messageBtn.onclick = () => {
+                hideUserProfile();
+                // Switch to private messages and open chat with this user
+                showContainer('private-messages');
+                setTimeout(() => {
+                    openPrivateChat(username);
+                }, 100);
+            };
+        }
+        
+        // Show popup
+        popup.style.display = 'flex';
+    } catch (error) {
+        console.error('Error loading user profile:', error);
+        // Fallback to basic profile display
+        const popup = document.getElementById('user-profile-popup');
+        if (popup) {
+            document.getElementById('popup-avatar').src = getAvatarUrl(username);
+            document.getElementById('popup-username').textContent = username;
+            document.getElementById('popup-bio').textContent = 'No bio available';
+            document.getElementById('popup-age').textContent = 'Not specified';
+            document.getElementById('popup-gender').textContent = 'Not specified';
+            document.getElementById('popup-location').textContent = 'Not specified';
+            document.getElementById('popup-interests').textContent = 'Not specified';
+            
+            const messageBtn = document.getElementById('popup-message-btn');
+            const currentUser = currentUserSession?.username;
+            if (username === currentUser) {
+                messageBtn.style.display = 'none';
+            } else {
+                messageBtn.style.display = 'block';
+            }
+            
+            popup.style.display = 'flex';
+        }
+    }
+}
+
+// MODIFIED: Profile display function - properly updates the dropdown
+function updateProfileDisplay(profile) {
+    console.log('Updating profile display:', profile);
+    
+    // Update display section in dropdown
+    const displayUsername = document.getElementById('display-username');
+    const displayBio = document.getElementById('display-bio');
+    const displayAvatar = document.getElementById('display-avatar');
+    
+    if (displayUsername) {
+        if (profile.firstname && profile.lastname) {
+            displayUsername.textContent = `${profile.firstname} ${profile.lastname}`;
+        } else if (profile.firstname) {
+            displayUsername.textContent = profile.firstname;
+        } else if (profile.lastname) {
+            displayUsername.textContent = profile.lastname;
+        } else {
+            // Use display_name or username if no first/last name
+            displayUsername.textContent = profile.display_name || profile.username || currentUserSession?.username || 'User';
+        }
+    }
+    
+    if (displayBio) {
+        displayBio.textContent = profile.bio || 'No bio yet';
+    }
+    
+    if (displayAvatar) {
+        displayAvatar.src = profile.avatar || getAvatarUrl(profile.username || currentUserSession?.username || 'default');
+    }
+    
+    console.log('✅ Profile display updated');
+}
+
 function changeAvatar() {
     const avatarUrl = prompt('Enter the URL for your new profile picture:');
     if (avatarUrl) {
@@ -10464,6 +10289,55 @@ function updateOnlineUsersList(onlineUsers) {
     
     // Update private AI online list
     updateSingleOnlineList('private-online-users-list', 'private-online-count', onlineUsers);
+}
+
+function updateSingleOnlineList(listElementId, countElementId, onlineUsers) {
+    const onlineList = document.getElementById(listElementId);
+    const onlineCount = document.getElementById(countElementId);
+    
+    if (onlineList) {
+        onlineList.innerHTML = '';
+        onlineUsers.forEach(user => {
+            const userElement = document.createElement('div');
+            userElement.className = 'online-user';
+            
+            // Fetch profile for each online user
+            fetchUserProfileFromServer(user).then(profile => {
+                const avatarUrl = profile.avatar || getAvatarUrl(user);
+                const displayName = profile.display_name || user;
+                
+                userElement.innerHTML = `
+                    <div class="online-user-avatar">
+                        <img src="${avatarUrl}" alt="${displayName}" loading="lazy">
+                        <div class="online-dot"></div>
+                    </div>
+                    <div class="online-user-info">
+                        <div class="online-user-name">${displayName}</div>
+                    </div>
+                `;
+            }).catch(() => {
+                userElement.innerHTML = `
+                    <div class="online-user-avatar">
+                        <img src="${getAvatarUrl(user)}" alt="${user}" loading="lazy">
+                        <div class="online-dot"></div>
+                    </div>
+                    <div class="online-user-info">
+                        <div class="online-user-name">${user}</div>
+                    </div>
+                `;
+            });
+            
+            userElement.onclick = () => {
+                showUserProfile(user);
+            };
+            
+            onlineList.appendChild(userElement);
+        });
+    }
+    
+    if (onlineCount) {
+        onlineCount.textContent = onlineUsers.length;
+    }
 }
 
 // Remove offline user from the lists
