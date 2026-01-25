@@ -4721,7 +4721,775 @@ html, body {
         </div>
     </div>
 <script>
-// Opera Mini compatible messaging functions
+// ===== FIXED: ENHANCED ONLINE USERS DISPLAY =====
+
+// Global variable to track all online users with their profiles
+let allOnlineUsers = new Map(); // Store as {username: {profile, socketId, lastSeen}}
+
+// Initialize online users tracking
+function initializeOnlineUsersTracking() {
+    console.log('👥 Initializing enhanced online users tracking...');
+    
+    // Clear any existing intervals
+    if (window.onlineUsersRefreshInterval) {
+        clearInterval(window.onlineUsersRefreshInterval);
+    }
+    
+    // Start periodic update of online users
+    window.onlineUsersRefreshInterval = setInterval(() => {
+        updateAllOnlineUsersList();
+    }, 10000); // Update every 10 seconds
+    
+    // Initial load
+    setTimeout(() => {
+        updateAllOnlineUsersList();
+        updateOnlineCountDisplay();
+    }, 1000);
+}
+
+// Get all online users including yourself
+async function updateAllOnlineUsersList() {
+    try {
+        console.log('🔄 Updating all online users list...');
+        
+        const currentUser = currentUserSession?.username;
+        if (!currentUser) {
+            console.log('⚠️ No user logged in, skipping online users update');
+            return;
+        }
+        
+        // First, get all users from the server
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch('/api/users/all', {
+            method: 'GET',
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            console.log('⚠️ Could not fetch all users, using socket online users');
+            updateOnlineUsersFromSocket();
+            return;
+        }
+        
+        const data = await response.json();
+        if (data.success && data.users) {
+            // Get online users from socket
+            const socketOnlineUsers = Array.from(onlineUsers); // from socket.io tracking
+            
+            // Combine with users data
+            const updatedOnlineUsers = new Map();
+            
+            // Add current user first
+            const currentUserProfile = await fetchUserProfileFromServer(currentUser);
+            if (currentUserProfile) {
+                updatedOnlineUsers.set(currentUser, {
+                    profile: currentUserProfile,
+                    socketId: socket.id,
+                    lastSeen: new Date().toISOString(),
+                    isOnline: true
+                });
+            }
+            
+            // Add other users
+            for (const user of data.users) {
+                const username = user.username;
+                if (username === currentUser) continue;
+                
+                const isOnline = socketOnlineUsers.includes(username);
+                const userProfile = await fetchUserProfileFromServer(username);
+                
+                updatedOnlineUsers.set(username, {
+                    profile: userProfile,
+                    socketId: null, // We don't have socket ID for other users
+                    lastSeen: userProfile.last_seen || user.created_at,
+                    isOnline: isOnline
+                });
+            }
+            
+            // Update global variable
+            allOnlineUsers = updatedOnlineUsers;
+            
+            console.log(`✅ Updated ${updatedOnlineUsers.size} users (${socketOnlineUsers.length} online via socket)`);
+            
+            // Update all displays
+            updateOnlineUsersInMainChat();
+            updateOnlineUsersInPanels();
+            updateOnlineCountDisplay();
+        }
+    } catch (error) {
+        console.error('❌ Error updating all online users:', error);
+        updateOnlineUsersFromSocket();
+    }
+}
+
+// Fallback: Update online users from socket only
+function updateOnlineUsersFromSocket() {
+    const currentUser = currentUserSession?.username;
+    if (!currentUser) return;
+    
+    // Get current socket online users
+    const socketOnlineUsers = Array.from(onlineUsers);
+    
+    // Add current user if not already in list
+    if (!socketOnlineUsers.includes(currentUser)) {
+        socketOnlineUsers.push(currentUser);
+    }
+    
+    console.log(`📡 Online users from socket: ${socketOnlineUsers.length} users`);
+    
+    // Update displays
+    updateOnlineCountDisplay(socketOnlineUsers.length);
+    updateOnlineUsersInPanels(socketOnlineUsers);
+}
+
+// Update online count display everywhere
+function updateOnlineCountDisplay(count) {
+    const onlineCount = count || allOnlineUsers.size;
+    
+    // Update main chat online count
+    const mainOnlineCount = document.getElementById('online-count');
+    if (mainOnlineCount) {
+        mainOnlineCount.textContent = onlineCount;
+        mainOnlineCount.title = `${onlineCount} users online`;
+    }
+    
+    // Update private AI online count
+    const privateOnlineCount = document.getElementById('private-online-count');
+    if (privateOnlineCount) {
+        privateOnlineCount.textContent = onlineCount;
+        privateOnlineCount.title = `${onlineCount} users online`;
+    }
+    
+    // Update in chat header if exists
+    const chatHeaderCount = document.querySelector('.chat-header .online-count');
+    if (chatHeaderCount) {
+        chatHeaderCount.textContent = onlineCount;
+    }
+    
+    console.log(`📊 Online count updated: ${onlineCount} users`);
+}
+
+// Update online users in both panels
+function updateOnlineUsersInPanels(usersArray) {
+    // Convert Map to array if needed
+    let usersToDisplay = usersArray;
+    if (!usersArray && allOnlineUsers.size > 0) {
+        usersToDisplay = Array.from(allOnlineUsers.keys());
+    }
+    
+    if (!usersToDisplay || usersToDisplay.length === 0) {
+        console.log('⚠️ No users to display in panels');
+        return;
+    }
+    
+    console.log(`🔄 Updating ${usersToDisplay.length} users in panels...`);
+    
+    // Update main chat online panel
+    updateEnhancedOnlineList('online-users-list', 'online-count', usersToDisplay);
+    
+    // Update private AI online panel
+    updateEnhancedOnlineList('private-online-users-list', 'private-online-count', usersToDisplay);
+}
+
+// Enhanced online list update with profiles
+function updateEnhancedOnlineList(listElementId, countElementId, usersArray) {
+    const onlineList = document.getElementById(listElementId);
+    const onlineCount = document.getElementById(countElementId);
+    
+    if (!onlineList) return;
+    
+    // Clear current list
+    onlineList.innerHTML = '';
+    
+    // Get current user
+    const currentUser = currentUserSession?.username;
+    
+    // Count online users
+    let onlineCountValue = 0;
+    
+    // Add current user first
+    if (currentUser && allOnlineUsers.has(currentUser)) {
+        const userData = allOnlineUsers.get(currentUser);
+        if (userData && userData.profile) {
+            const userElement = createEnhancedUserElement(currentUser, userData.profile, true, true);
+            onlineList.appendChild(userElement);
+            onlineCountValue++;
+        }
+    }
+    
+    // Add other online users
+    for (const username of usersArray) {
+        if (username === currentUser) continue;
+        
+        const userData = allOnlineUsers.get(username);
+        const isOnline = userData ? userData.isOnline : false;
+        
+        if (isOnline) {
+            if (userData && userData.profile) {
+                const userElement = createEnhancedUserElement(username, userData.profile, false, true);
+                onlineList.appendChild(userElement);
+            } else {
+                // Create basic element if no profile
+                const userElement = createBasicUserElement(username, true);
+                onlineList.appendChild(userElement);
+            }
+            onlineCountValue++;
+        }
+    }
+    
+    // Add offline users (recently active)
+    for (const [username, userData] of allOnlineUsers.entries()) {
+        if (username === currentUser) continue;
+        if (usersArray.includes(username)) continue;
+        
+        // Show users who were active in last 24 hours
+        const lastSeen = userData?.lastSeen || userData?.profile?.last_seen;
+        if (lastSeen) {
+            const lastSeenDate = new Date(lastSeen);
+            const now = new Date();
+            const hoursSinceLastSeen = (now - lastSeenDate) / (1000 * 60 * 60);
+            
+            if (hoursSinceLastSeen < 24) { // Show users active in last 24 hours
+                if (userData && userData.profile) {
+                    const userElement = createEnhancedUserElement(username, userData.profile, false, false);
+                    onlineList.appendChild(userElement);
+                } else {
+                    const userElement = createBasicUserElement(username, false);
+                    onlineList.appendChild(userElement);
+                }
+            }
+        }
+    }
+    
+    // Update count display
+    if (onlineCount) {
+        onlineCount.textContent = onlineCountValue;
+        onlineCount.title = `${onlineCountValue} users online`;
+    }
+    
+    console.log(`✅ Updated ${listElementId}: ${onlineCountValue} online users`);
+}
+
+// Create enhanced user element with profile
+function createEnhancedUserElement(username, profile, isCurrentUser = false, isOnline = false) {
+    const userElement = document.createElement('div');
+    userElement.className = 'online-user enhanced-user';
+    userElement.dataset.username = username;
+    
+    // Get display name
+    const displayName = profile.display_name || username;
+    
+    // Get avatar
+    const avatarUrl = profile.avatar || `https://i.pravatar.cc/50?u=${username}`;
+    
+    // Format last seen
+    let lastSeenText = 'Online now';
+    let lastSeenTime = '';
+    
+    if (!isOnline && profile.last_seen) {
+        const lastSeenDate = new Date(profile.last_seen);
+        const now = new Date();
+        const diffMs = now - lastSeenDate;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        
+        if (diffMins < 60) {
+            lastSeenText = `${diffMins}m ago`;
+        } else if (diffHours < 24) {
+            lastSeenText = `${diffHours}h ago`;
+        } else {
+            lastSeenText = `${diffDays}d ago`;
+        }
+        lastSeenTime = profile.last_seen;
+    }
+    
+    userElement.innerHTML = `
+        <div class="online-user-avatar">
+            <img src="${avatarUrl}" alt="${displayName}" loading="lazy">
+            <div class="user-status ${isOnline ? 'online' : 'offline'}"></div>
+            ${isCurrentUser ? '<div class="current-user-badge">You</div>' : ''}
+        </div>
+        <div class="online-user-info">
+            <div class="online-user-name">${displayName}</div>
+            <div class="online-user-status">
+                ${isOnline ? '<span class="online-text">Online</span>' : `<span class="offline-text">${lastSeenText}</span>`}
+            </div>
+            ${profile.bio ? `<div class="online-user-bio">${profile.bio.substring(0, 50)}${profile.bio.length > 50 ? '...' : ''}</div>` : ''}
+        </div>
+    `;
+    
+    // Add click event to show profile
+    userElement.onclick = (e) => {
+        e.stopPropagation();
+        showUserProfile(username);
+    };
+    
+    return userElement;
+}
+
+// Create basic user element (fallback)
+function createBasicUserElement(username, isOnline = false) {
+    const userElement = document.createElement('div');
+    userElement.className = 'online-user';
+    userElement.dataset.username = username;
+    
+    userElement.innerHTML = `
+        <div class="online-user-avatar">
+            <img src="https://i.pravatar.cc/50?u=${username}" alt="${username}" loading="lazy">
+            <div class="user-status ${isOnline ? 'online' : 'offline'}"></div>
+        </div>
+        <div class="online-user-info">
+            <div class="online-user-name">${username}</div>
+            <div class="online-user-status">
+                ${isOnline ? '<span class="online-text">Online</span>' : '<span class="offline-text">Offline</span>'}
+            </div>
+        </div>
+    `;
+    
+    userElement.onclick = (e) => {
+        e.stopPropagation();
+        showUserProfile(username);
+    };
+    
+    return userElement;
+}
+
+// Update online users in main chat messages
+function updateOnlineUsersInMainChat() {
+    console.log('💬 Updating online status in main chat...');
+    
+    // Update user status in all messages
+    const allMessages = document.querySelectorAll('.message[data-username]');
+    allMessages.forEach(message => {
+        const username = message.dataset.username;
+        if (username) {
+            const userData = allOnlineUsers.get(username);
+            if (userData) {
+                const isOnline = userData.isOnline;
+                updateMessageUserStatus(message, username, isOnline);
+            }
+        }
+    });
+    
+    console.log(`✅ Updated online status for ${allMessages.length} messages`);
+}
+
+// Update user status in a message
+function updateMessageUserStatus(messageElement, username, isOnline) {
+    // Find the status indicator in the message
+    let statusIndicator = messageElement.querySelector('.user-status-indicator');
+    if (!statusIndicator) {
+        // Create status indicator if it doesn't exist
+        const usernameDiv = messageElement.querySelector('.username');
+        if (usernameDiv) {
+            statusIndicator = document.createElement('span');
+            statusIndicator.className = 'user-status-indicator';
+            usernameDiv.appendChild(statusIndicator);
+        }
+    }
+    
+    if (statusIndicator) {
+        if (isOnline) {
+            statusIndicator.className = 'user-status-indicator online';
+            statusIndicator.textContent = '●';
+            statusIndicator.title = 'Online now';
+        } else {
+            const userData = allOnlineUsers.get(username);
+            const lastSeen = userData?.lastSeen || userData?.profile?.last_seen;
+            const timeAgo = formatTimeAgo(lastSeen);
+            
+            statusIndicator.className = 'user-status-indicator offline';
+            statusIndicator.textContent = timeAgo;
+            statusIndicator.title = `Last seen ${timeAgo}`;
+        }
+    }
+}
+
+// ===== MODIFIED: Socket.io event handlers for online users =====
+
+// Enhanced initSocket function
+function initSocket() {
+    console.log('🔌 Initializing socket connection...');
+    
+    // Start Opera Mini polling if needed
+    if (operaMessenger.isOperaMini) {
+        console.log('📱 Opera Mini detected, starting polling...');
+        operaMessenger.startPolling(
+            (message) => {
+                // Handle new message
+                const isOwnMessage = message.username === currentUserSession?.username;
+                const isAIResponse = message.username === 'AI' || message.username === 'Bot';
+                
+                if (!isOwnMessage || isAIResponse) {
+                    displayMessage(
+                        message.content, 
+                        isOwnMessage ? 'sent' : 'received', 
+                        message.reply_to, 
+                        message.username, 
+                        message.id, 
+                        true
+                    );
+                    
+                    if (document.visibilityState !== 'visible' && !isOwnMessage) {
+                        showNotification(message.username, message.content);
+                    }
+                }
+            },
+            (messageId) => {
+                // Handle deleted message
+                console.log('🗑️ Message deleted via polling:', messageId);
+                const messageElement = document.querySelector(`[data-id="${messageId}"]`);
+                if (messageElement) {
+                    messageElement.remove();
+                    showSuccess('Message deleted (by another user)');
+                }
+            }
+        );
+        
+        // Also load initial messages via polling
+        setTimeout(() => loadMessages(), 1000);
+        return;
+    }
+    
+    // Original Socket.io code for non-Opera Mini browsers
+    socket = io({
+        transports: ['polling', 'websocket'],
+        upgrade: false,
+        forceNew: true,
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 20000
+    });
+    
+    socket.on('connect', () => {
+        console.log('✅ Socket connected');
+        const username = currentUserSession?.username;
+        if (username) {
+            socket.emit('user-online', username);
+            // Initialize enhanced online tracking
+            initializeOnlineUsersTracking();
+        }
+        
+        // Add touch listeners to existing messages after socket connects
+        setTimeout(addTouchListenersToExistingMessages, 1000);
+    });
+
+    // Listen for new messages in real-time
+    socket.on('new-message', (message) => {
+        console.log('💬 New message received via socket:', message);
+        
+        const isOwnMessage = message.username === currentUserSession?.username;
+        const isAIResponse = message.username === 'AI' || message.username === 'Bot';
+        
+        // Check if we already have this message displayed (without ID)
+        if (isOwnMessage) {
+            // Find messages from this user without an ID and update them
+            const userMessages = document.querySelectorAll(`.message[data-username="${message.username}"]:not([data-id]), .message.sent:not([data-id])`);
+            userMessages.forEach(msg => {
+                if (msg.dataset.content === message.content && !msg.dataset.id) {
+                    // Update the message with the ID
+                    msg.dataset.id = message.id;
+                    msg.setAttribute('data-id', message.id);
+                    console.log('✅ Updated message with ID:', message.id);
+                }
+            });
+        }
+        
+        // Only display if we don't already have it
+        const existingMessage = document.querySelector(`[data-id="${message.id}"]`);
+        if (!existingMessage && (!isOwnMessage || isAIResponse)) {
+            displayMessage(
+                message.content, 
+                isOwnMessage ? 'sent' : 'received', 
+                message.reply_to, 
+                message.username, 
+                message.id, 
+                true
+            );
+            
+            // Update online users list
+            updateAllOnlineUsersList();
+            
+            if (document.visibilityState !== 'visible' && !isOwnMessage) {
+                showNotification(message.username, message.content);
+            }
+        }
+    });
+
+    // Listen for message history when first connecting
+    socket.on('chat-messages', (messages) => {
+        console.log('📨 Received message history:', messages.length, 'messages');
+        renderMessages(messages, true);
+        // Update online users after loading messages
+        setTimeout(() => {
+            updateAllOnlineUsersList();
+        }, 1000);
+    });
+
+    // Listen for message deletions
+    socket.on('message-deleted', (messageId) => {
+        console.log('🗑️ Message deleted via socket:', messageId);
+        const messageElement = document.querySelector(`[data-id="${messageId}"]`);
+        if (messageElement) {
+            messageElement.remove();
+            showSuccess('Message deleted (by another user)');
+        }
+    });
+
+    // Enhanced user status updates
+    socket.on('user-status-change', (data) => {
+        console.log('👤 User status change:', data);
+        
+        // Update online users array
+        onlineUsers = data.onlineUsers || [];
+        
+        // Update all online users tracking
+        updateAllOnlineUsersList();
+        
+        // Update specific user status indicator
+        updateUserStatusIndicator(data.username, data.status);
+    });
+
+    // Typing events
+    socket.on('user-typing-start', (data) => {
+        console.log('⌨️ User started typing:', data.username);
+        showTypingIndicator(data.username);
+    });
+
+    socket.on('user-typing-stop', (data) => {
+        console.log('💤 User stopped typing:', data.username);
+        hideTypingIndicator(data.username);
+    });
+
+    socket.on('disconnect', (reason) => {
+        console.log('🔌 Socket disconnected:', reason);
+    });
+
+    socket.on('connect_error', (error) => {
+        console.error('❌ Socket connection error:', error);
+        // Fallback to HTTP polling if Socket.IO fails
+        if (!window.socketFallback) {
+            window.socketFallback = setInterval(() => {
+                loadMessages();
+                updateAllOnlineUsersList();
+            }, 3000);
+            console.log('🔄 Using HTTP polling fallback');
+        }
+    });
+
+    // Send heartbeat every 2 minutes to stay online
+    const heartbeatInterval = setInterval(() => {
+        const username = currentUserSession?.username;
+        if (username && socket.connected) {
+            socket.emit('user-online', username);
+            console.log('💓 Heartbeat sent - keeping user online');
+            // Update online users list
+            updateAllOnlineUsersList();
+        }
+    }, 120000); // 2 minutes
+
+    // Cleanup interval on page unload
+    window.addEventListener('beforeunload', () => {
+        clearInterval(heartbeatInterval);
+        if (window.socketFallback) {
+            clearInterval(window.socketFallback);
+        }
+        // Stop Opera Mini polling if active
+        if (operaMessenger) {
+            operaMessenger.stopPolling();
+        }
+        // Clear users refresh interval
+        if (usersRefreshInterval) {
+            clearInterval(usersRefreshInterval);
+        }
+        // Clear online users interval
+        if (window.onlineUsersRefreshInterval) {
+            clearInterval(window.onlineUsersRefreshInterval);
+        }
+    });
+}
+
+// ===== MODIFIED: Update user status indicator =====
+function updateUserStatusIndicator(username, status, lastSeen = null) {
+    // Update last seen time
+    if (status === 'offline' && !lastSeen) {
+        userLastSeenTimes[username] = new Date().toISOString();
+    } else if (lastSeen) {
+        userLastSeenTimes[username] = lastSeen;
+    }
+    
+    // Update in allOnlineUsers Map
+    if (allOnlineUsers.has(username)) {
+        const userData = allOnlineUsers.get(username);
+        userData.isOnline = status === 'online';
+        if (lastSeen) {
+            userData.lastSeen = lastSeen;
+        }
+    }
+    
+    // Find all messages from this user and update their status
+    const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
+    userMessages.forEach(msg => {
+        updateMessageUserStatus(msg, username, status === 'online');
+    });
+    
+    // Update online users panels
+    updateOnlineUsersInPanels();
+    
+    console.log(`✅ Updated status for ${username}: ${status}`);
+}
+
+// ===== MODIFIED: Initialize main app with online users tracking =====
+function initializeMainApp() {
+    console.log('🚀 Initializing main application for logged-in user...');
+    
+    // Show main interface elements
+    document.querySelector('.menu').style.display = 'flex';
+    document.querySelector('.news-toggle').style.display = 'block';
+    
+    initializeButtons();
+    showContainer('chat');
+    
+    // IMPORTANT: Create profile section and load profile data
+    updateProfileSection(); // Create the profile section first
+    loadProfile(); // Then load the actual profile data from server
+    
+    initializeChat();
+
+    initSocket();
+    setupTypingHandlers();
+    setupTypingDetection();
+    setupTypingSocketEvents();
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
+    
+    if (hasVerifiedCode()) {
+        enableSQLEditorAccess();
+    }
+    
+    // Initialize enhanced online users tracking
+    setTimeout(() => {
+        initializeOnlineUsersTracking();
+    }, 2000);
+    
+    // Show welcome message instead of login prompt
+    showSuccess(`Welcome back, ${currentUserSession?.username || 'User'}!`);
+    
+    console.log('✅ Main application initialized successfully');
+}
+
+// ===== ADD CSS STYLES FOR ENHANCED ONLINE USERS =====
+const enhancedStyles = `
+<style>
+/* Enhanced online users styles */
+.online-user.enhanced-user {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f0f2f5;
+}
+
+.online-user.enhanced-user:hover {
+    background-color: #f0f2f5;
+}
+
+.online-user.enhanced-user .online-user-avatar {
+    position: relative;
+    margin-right: 10px;
+}
+
+.online-user.enhanced-user .current-user-badge {
+    position: absolute;
+    bottom: -3px;
+    right: -3px;
+    background: #1877f2;
+    color: white;
+    font-size: 9px;
+    padding: 1px 4px;
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+.online-user.enhanced-user .online-user-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.online-user.enhanced-user .online-user-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: #050505;
+    margin-bottom: 2px;
+}
+
+.online-user.enhanced-user .online-user-status {
+    font-size: 12px;
+    margin-bottom: 3px;
+}
+
+.online-user.enhanced-user .online-user-status .online-text {
+    color: #31a24c;
+    font-weight: 500;
+}
+
+.online-user.enhanced-user .online-user-status .offline-text {
+    color: #65676b;
+}
+
+.online-user.enhanced-user .online-user-bio {
+    font-size: 12px;
+    color: #65676b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
+}
+
+/* Updated user status indicator in messages */
+.user-status-indicator {
+    margin-left: 6px;
+    font-size: 11px;
+    font-weight: normal;
+}
+
+.user-status-indicator.online {
+    color: #31a24c;
+    font-weight: bold;
+}
+
+.user-status-indicator.offline {
+    color: #65676b;
+}
+
+/* Online count badge */
+.online-count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    background-color: #1877f2;
+    color: white;
+    font-size: 11px;
+    font-weight: bold;
+    border-radius: 9px;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+</style>
+`;
+
+// Add styles to document head
+document.head.insertAdjacentHTML('beforeend', enhancedStyles);
+
+// ===== Opera Mini compatible messaging functions =====
 class OperaMiniMessenger {
   constructor() {
     this.clientId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
@@ -6723,1684 +7491,7 @@ async function deleteMessageContext(messageId, username) {
     }
 }
 
-// MODIFIED: initSocket function to start Opera Mini polling
-function initSocket() {
-    console.log('🔌 Initializing socket connection...');
-    
-    // Start Opera Mini polling if needed
-    if (operaMessenger.isOperaMini) {
-        console.log('📱 Opera Mini detected, starting polling...');
-        operaMessenger.startPolling(
-            (message) => {
-                // Handle new message
-                const isOwnMessage = message.username === currentUserSession?.username;
-                const isAIResponse = message.username === 'AI' || message.username === 'Bot';
-                
-                if (!isOwnMessage || isAIResponse) {
-                    displayMessage(
-                        message.content, 
-                        isOwnMessage ? 'sent' : 'received', 
-                        message.reply_to, 
-                        message.username, 
-                        message.id, 
-                        true
-                    );
-                    
-                    if (document.visibilityState !== 'visible' && !isOwnMessage) {
-                        showNotification(message.username, message.content);
-                    }
-                }
-            },
-            (messageId) => {
-                // Handle deleted message
-                console.log('🗑️ Message deleted via polling:', messageId);
-                const messageElement = document.querySelector(`[data-id="${messageId}"]`);
-                if (messageElement) {
-                    messageElement.remove();
-                    showSuccess('Message deleted (by another user)');
-                }
-            }
-        );
-        
-        // Also load initial messages via polling
-        setTimeout(() => loadMessages(), 1000);
-        return;
-    }
-    
-    // Original Socket.io code for non-Opera Mini browsers
-    socket = io({
-        transports: ['polling', 'websocket'],
-        upgrade: false,
-        forceNew: true,
-        reconnection: true,
-        reconnectionAttempts: 10,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        timeout: 20000
-    });
-    
-    socket.on('connect', () => {
-        console.log('✅ Socket connected');
-        const username = currentUserSession?.username;
-        if (username) {
-            socket.emit('user-online', username);
-        }
-        
-        // Add touch listeners to existing messages after socket connects
-        setTimeout(addTouchListenersToExistingMessages, 1000);
-    });
-
-    // Listen for new messages in real-time
-    socket.on('new-message', (message) => {
-        console.log('💬 New message received via socket:', message);
-        
-        const isOwnMessage = message.username === currentUserSession?.username;
-        const isAIResponse = message.username === 'AI' || message.username === 'Bot';
-        
-        // Check if we already have this message displayed (without ID)
-        if (isOwnMessage) {
-            // Find messages from this user without an ID and update them
-            const userMessages = document.querySelectorAll(`.message[data-username="${message.username}"]:not([data-id]), .message.sent:not([data-id])`);
-            userMessages.forEach(msg => {
-                if (msg.dataset.content === message.content && !msg.dataset.id) {
-                    // Update the message with the ID
-                    msg.dataset.id = message.id;
-                    msg.setAttribute('data-id', message.id);
-                    console.log('✅ Updated message with ID:', message.id);
-                }
-            });
-        }
-        
-        // Only display if we don't already have it
-        const existingMessage = document.querySelector(`[data-id="${message.id}"]`);
-        if (!existingMessage && (!isOwnMessage || isAIResponse)) {
-            displayMessage(
-                message.content, 
-                isOwnMessage ? 'sent' : 'received', 
-                message.reply_to, 
-                message.username, 
-                message.id, 
-                true
-            );
-            
-            if (document.visibilityState !== 'visible' && !isOwnMessage) {
-                showNotification(message.username, message.content);
-            }
-        }
-    });
-
-    // Listen for message history when first connecting
-    socket.on('chat-messages', (messages) => {
-        console.log('📨 Received message history:', messages.length, 'messages');
-        renderMessages(messages, true);
-    });
-
-    // Listen for message deletions
-    socket.on('message-deleted', (messageId) => {
-        console.log('🗑️ Message deleted via socket:', messageId);
-        const messageElement = document.querySelector(`[data-id="${messageId}"]`);
-        if (messageElement) {
-            messageElement.remove();
-            showSuccess('Message deleted (by another user)');
-        }
-    });
-
-    // User status updates
-    socket.on('user-status-change', (data) => {
-        console.log('👤 User status change:', data);
-        onlineUsers = data.onlineUsers || [];
-        updateOnlineUsersList(onlineUsers);
-        updateUserStatusIndicator(data.username, data.status);
-    });
-
-    // Typing events
-    socket.on('user-typing-start', (data) => {
-        console.log('⌨️ User started typing:', data.username);
-        showTypingIndicator(data.username);
-    });
-
-    socket.on('user-typing-stop', (data) => {
-        console.log('💤 User stopped typing:', data.username);
-        hideTypingIndicator(data.username);
-    });
-
-    socket.on('disconnect', (reason) => {
-        console.log('🔌 Socket disconnected:', reason);
-    });
-
-    socket.on('connect_error', (error) => {
-        console.error('❌ Socket connection error:', error);
-        // Fallback to HTTP polling if Socket.IO fails
-        if (!window.socketFallback) {
-            window.socketFallback = setInterval(() => {
-                loadMessages();
-            }, 3000);
-            console.log('🔄 Using HTTP polling fallback');
-        }
-    });
-
-    // Send heartbeat every 2 minutes to stay online
-    const heartbeatInterval = setInterval(() => {
-        const username = currentUserSession?.username;
-        if (username && socket.connected) {
-            socket.emit('user-online', username);
-            console.log('💓 Heartbeat sent - keeping user online');
-        }
-    }, 120000); // 2 minutes
-
-    // Cleanup interval on page unload
-    window.addEventListener('beforeunload', () => {
-        clearInterval(heartbeatInterval);
-        if (window.socketFallback) {
-            clearInterval(window.socketFallback);
-        }
-        // Stop Opera Mini polling if active
-        if (operaMessenger) {
-            operaMessenger.stopPolling();
-        }
-        // Clear users refresh interval
-        if (usersRefreshInterval) {
-            clearInterval(usersRefreshInterval);
-        }
-    });
-}
-
-// MODIFIED: Update the delete button handler in showMessageContextMenu
-// In the delete button creation section, replace the onclick handler:
-const deleteButton = document.createElement('button');
-deleteButton.textContent = 'Delete';
-deleteButton.className = 'delete-btn';
-deleteButton.onclick = async () => {
-    try {
-        console.log('Deleting message:', messageId, 'Username:', currentUsername);
-        
-        // Use the unified deleteMessageContext function
-        const success = await deleteMessageContext(messageId, currentUsername);
-        
-        if (success) {
-            console.log('✅ Message deleted successfully');
-            
-            // Remove from UI
-            message.remove();
-            showSuccess('Message deleted successfully');
-            
-        } else {
-            throw new Error('Delete failed');
-        }
-        
-    } catch (err) {
-        console.error('Delete error:', err);
-        // Even if server delete fails, remove from UI for better UX
-        message.remove();
-        showSuccess('Message removed locally');
-    }
-    contextMenu.remove();
-};
-
-// Initialize the first visit check when the page loads
-window.addEventListener('load', function() {
-    // Check for first visit after a short delay
-    setTimeout(() => {
-        const isLoggedIn = localStorage.getItem('auth_token') && localStorage.getItem('username');
-        if (isLoggedIn && !localStorage.getItem('hasVisitedBefore')) {
-            showAllUsersOnFirstVisit();
-        }
-    }, 1500);
-});
-
-// NEW: Welcome screen animation function
-function animateWelcomeText() {
-    const text = "MessageMate";
-    const animatedText = document.getElementById('animated-text');
-    
-    // Clear any existing content
-    animatedText.innerHTML = '';
-    
-    // Create individual letter elements
-    for (let i = 0; i < text.length; i++) {
-        const letter = document.createElement('span');
-        letter.className = 'letter';
-        letter.textContent = text[i];
-        letter.style.animationDelay = `${i * 0.1}s`;
-        animatedText.appendChild(letter);
-    }
-    
-    // Check if user is already logged in
-    const isLoggedIn = currentUserSession !== null;
-    
-    console.log('User login status:', isLoggedIn ? 'Logged in' : 'Not logged in');
-    
-    // Hide welcome screen after animation completes
-    setTimeout(() => {
-        const welcomeScreen = document.getElementById('welcome-screen');
-        welcomeScreen.style.opacity = '0';
-        setTimeout(() => {
-            welcomeScreen.style.display = 'none';
-            
-            if (isLoggedIn) {
-                // User is already logged in - go directly to main app
-                console.log('✅ User already logged in, skipping auth screen');
-                initializeMainApp();
-            } else {
-                // User not logged in - show auth container
-                console.log('❌ User not logged in, showing auth screen');
-                document.getElementById('auth-container').style.display = 'flex';
-            }
-        }, 500);
-    }, 2500); // Total animation time: 2.5 seconds
-}
-
-// NEW: Function to initialize main app when user is already logged in
-function initializeMainApp() {
-    console.log('🚀 Initializing main application for logged-in user...');
-    
-    // Show main interface elements
-    document.querySelector('.menu').style.display = 'flex';
-    document.querySelector('.news-toggle').style.display = 'block';
-    
-    initializeButtons();
-    showContainer('chat');
-    
-    // IMPORTANT: Create profile section and load profile data
-    updateProfileSection(); // Create the profile section first
-    loadProfile(); // Then load the actual profile data from server
-    
-    initializeChat();
-
-    initSocket();
-    setupTypingHandlers();
-    setupTypingDetection();
-    setupTypingSocketEvents();
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    window.addEventListener('pagehide', handlePageHide);
-    
-    if (hasVerifiedCode()) {
-        enableSQLEditorAccess();
-    }
-    
-    // Show welcome message instead of login prompt
-    showSuccess(`Welcome back, ${currentUserSession?.username || 'User'}!`);
-    
-    console.log('✅ Main application initialized successfully');
-}
-
-// Initialize welcome screen animation when page loads
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize current year
-    if (document.getElementById("year")) {
-        document.getElementById("year").textContent = new Date().getFullYear();
-    }
-    
-    // First, try auto-login to check if user is already logged in
-    attemptAutoLogin().then(success => {
-        if (success) {
-            console.log('✅ User auto-logged in successfully');
-            // User is logged in - start the welcome animation
-            // The animation will detect the login status and skip auth screen
-            animateWelcomeText();
-        } else {
-            // User not logged in - start the welcome animation
-            console.log('❌ No valid session found, showing welcome then login');
-            animateWelcomeText();
-        }
-        
-        // Initialize buttons and other common components
-        initializeButtons();
-        
-        // FIXED: Initialize online panel toggle
-        initializeOnlinePanelToggle();
-        
-        // Load user panel preference
-        loadUserPanelPreference();
-        
-        if ('Notification' in window) {
-            Notification.requestPermission().then(permission => {
-                notificationPermissionGranted = permission === 'granted';
-                console.log('📢 Notification permission:', permission);
-            });
-        }
-
-        initializeChat();
-        
-        // ADDED: Setup typing detection
-        setupTypingDetection();
-        setupTypingSocketEvents();
-
-        // Add optimized scroll event listener for main chat
-        if (elements.chatContainer) {
-            elements.chatContainer.addEventListener('scroll', throttle(updateScrollState, 100));
-        }
-
-        // Initialize Private AI input handler
-        if (elements.privateInput) {
-            elements.privateInput.addEventListener('input', () => {
-                autoResize(elements.privateInput);
-                const hasText = elements.privateInput.value.trim().length > 0;
-                elements.privateSendButton.disabled = !hasText;
-                elements.privateSendButton.classList.toggle('enabled', hasText);
-            });
-            elements.privateInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendPrivateMessage();
-                }
-            });
-        }
-
-        console.log('🎯 Application initialization complete');
-    });
-});
-
-// ===== PERFORMANCE OPTIMIZATIONS =====
-
-// Throttle function to limit how often a function can be called
-function throttle(func, limit) {
-    let inThrottle;
-    return function() {
-        const args = arguments;
-        const context = this;
-        if (!inThrottle) {
-            func.apply(context, args);
-            inThrottle = true;
-            setTimeout(() => inThrottle = false, limit);
-        }
-    }
-}
-
-// Debounce function to delay function execution
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
-
-// Batch DOM updates for better performance
-let renderQueue = [];
-let isRendering = false;
-
-function batchMessageRender(messages, renderFunction) {
-    if (!messages.length) return;
-    
-    renderQueue = renderQueue.concat(messages);
-    
-    if (!isRendering) {
-        isRendering = true;
-        requestAnimationFrame(() => {
-            const fragment = document.createDocumentFragment();
-            const batch = renderQueue.splice(0, 50); // Render 50 messages at once
-            
-            batch.forEach(message => {
-                const messageDiv = renderFunction(message);
-                if (messageDiv) fragment.appendChild(messageDiv);
-            });
-            
-            elements.chatContainer.appendChild(fragment);
-            
-            if (renderQueue.length > 0) {
-                isRendering = false;
-                batchMessageRender([], renderFunction);
-            } else {
-                isRendering = false;
-                // Scroll to bottom after rendering
-                setTimeout(() => forceScrollToBottom('chat-container'), 50);
-            }
-        });
-    }
-}
-
-// --- IN THE JAVASCRIPT SECTION ---
-
-// Add this variable to track user last seen times
-let userLastSeenTimes = {};
-
-// ===== YOUR EXISTING VARIABLES AND FUNCTIONS =====
-
-let isLogin = true;
-let longPressTimer;
-let isLongPress = false;
-const badWords = ['fuck', 'nigga', 'shit', 'bitch', 'asshole'];
-const spamTracker = {};
-const SPAM_LIMIT = 5;
-const SPAM_WINDOW = 10000;
-const BAN_DURATION = 60000;
-const bannedUsers = {};
-const warnedUsers = {};
-
-// SECRET CODE VERIFICATION VARIABLES
-const SECRET_CODE = "456i";
-let failedAttempts = 0;
-const MAX_ATTEMPTS = 3;
-let isLockedOut = false;
-let lockoutTimeout = null;
-
-// SQL Editor Variables
-let sqlEditor = null;
-let sqlResults = [];
-let savedQueries = JSON.parse(localStorage.getItem('savedQueries')) || [];
-
-// Notification variables
-let lastMessageId = null;
-let notificationPermissionGranted = false;
-
-// Flag to prevent duplicate sends
-let isSending = false;
-
-// Scroll state variables
-let isAtBottom = true;
-let newMessagesCount = 0;
-let scrollToBottomBtn;
-let newMessagesCountEl = document.getElementById('newMessagesCount');
-
-// Real-time active status variables
-let socket;
-let isTyping = false;
-let typingTimer;
-
-// ✅ ADDED: Typing indicator variables
-let typingUsers = {};
-let typingTimeout;
-
-// ✅ ADDED: Flag to track if we're processing a command to prevent duplicates
-let isProcessingCommand = false;
-
-// ✅ ADDED: Track online users for profile popup
-let onlineUsers = [];
-
-// ✅ ADDED: Private Messaging Variables
-let currentPrivateChatUser = null;
-let privateMessageTypingTimer;
-
-// ✅ ADDED: Track last sent messages to prevent duplicates
-let lastSentMessages = {
-    private: {},
-    main: {}
-};
-
-// ✅ ADDED: User Panel Visibility State
-let userPanelVisible = true;
-
-// ✅ ADDED: Current user session
-let currentUserSession = null;
-
-// ✅ ADDED: Message pagination
-let messagePage = 0;
-const MESSAGES_PER_PAGE = 50;
-let isLoadingMessages = false;
-let hasMoreMessages = true;
-
-// ✅ ADDED: Profile cache to reduce server calls
-let profileCache = {};
-
-const elements = {
-    usernameInput: document.getElementById('auth-username'),
-    messageInput: document.getElementById('user-input'),
-    sendButton: document.getElementById('send-button'),
-    chatContainer: document.getElementById('chat-container'),
-    replyPreview: document.getElementById('reply-preview-container'),
-    errorDisplay: document.getElementById('error-message'),
-    successDisplay: document.getElementById('success-message'),
-    privateInput: document.getElementById('private-user-input'),
-    privateSendButton: document.getElementById('private-send-button')
-};
-
-let replyToText = null;
-
-// ===== ADDED: FORMAT TIME AGO FUNCTION =====
-function formatTimeAgo(timestamp) {
-    if (!timestamp) return 'long time ago';
-    
-    const now = new Date();
-    const lastSeen = new Date(timestamp);
-    const diffMs = now - lastSeen;
-    const diffSec = Math.floor(diffMs / 1000);
-    const diffMin = Math.floor(diffSec / 60);
-    const diffHour = Math.floor(diffMin / 60);
-    const diffDay = Math.floor(diffHour / 24);
-    
-    if (diffSec < 60) {
-        return `${diffSec}s ago`;
-    } else if (diffMin < 60) {
-        return `${diffMin}m ago`;
-    } else if (diffHour < 24) {
-        return `${diffHour}h ago`;
-    } else if (diffDay < 7) {
-        return `${diffDay}d ago`;
-    } else {
-        return lastSeen.toLocaleDateString();
-    }
-}
-
-// ===== MODIFIED: AVATAR URL HELPER FUNCTION =====
-function getAvatarUrl(username) {
-    if (!username) return `https://i.pravatar.cc/50?u=default`;
-    
-    // First check if we have the profile in cache
-    if (profileCache[username]) {
-        // Use cached avatar
-        return profileCache[username].avatar || `https://i.pravatar.cc/50?u=${encodeURIComponent(username)}`;
-    }
-    
-    // Check if this is the current user
-    if (currentUserSession && username === currentUserSession.username) {
-        // For current user, we should have loaded the profile already
-        // Return default while we fetch or if not available
-        return `https://i.pravatar.cc/50?u=${encodeURIComponent(username)}`;
-    }
-    
-    // For other users, return default for now
-    // The actual profile will be fetched when needed
-    return `https://i.pravatar.cc/50?u=${encodeURIComponent(username)}`;
-}
-
-// ===== MODIFIED: Function to create user status indicator =====
-function createUserStatusIndicator(username, isOnline, lastSeen) {
-    const indicator = document.createElement('span');
-    
-    if (isOnline) {
-        indicator.className = 'user-status-indicator online';
-        indicator.textContent = ''; // REMOVED: 'Online' text
-        indicator.title = 'Currently online';
-    } else {
-        indicator.className = 'user-status-indicator offline';
-        const timeAgo = formatTimeAgo(lastSeen);
-        indicator.textContent = timeAgo;
-        indicator.title = `Last seen ${timeAgo}`;
-    }
-    
-    return indicator;
-}
-
-// ===== MODIFIED: NEW FUNCTION TO FETCH PROFILE FROM SERVER =====
-async function fetchUserProfileFromServer(username) {
-    if (!username) return null;
-    
-    // Check cache first
-    if (profileCache[username]) {
-        return profileCache[username];
-    }
-    
-    try {
-        console.log(`📋 Fetching profile from server for: ${username}`);
-        
-        const response = await fetch(`/api/user/profile/${username}`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            if (data.success && data.profile) {
-                // Cache the profile
-                profileCache[username] = {
-                    username: data.profile.username,
-                    firstname: data.profile.firstname || '',
-                    lastname: data.profile.lastname || '',
-                    bio: data.profile.bio || '',
-                    age: data.profile.age || '',
-                    gender: data.profile.gender || '',
-                    location: data.profile.location || '',
-                    interests: data.profile.interests || '',
-                    avatar: data.profile.avatar || `https://i.pravatar.cc/150?u=${username}`,
-                    display_name: data.profile.display_name || username,
-                    status: data.profile.status || 'offline',
-                    last_seen: data.profile.last_seen || userLastSeenTimes[username] || new Date().toISOString(),
-                    created_at: data.profile.created_at || new Date().toISOString()
-                };
-                
-                // Store last seen time
-                if (data.profile.last_seen && !userLastSeenTimes[username]) {
-                    userLastSeenTimes[username] = data.profile.last_seen;
-                }
-                
-                console.log(`✅ Profile fetched from server for: ${username}`);
-                return profileCache[username];
-            }
-        }
-        
-        // If not found or error, return default profile
-        const defaultProfile = {
-            username: username,
-            firstname: '',
-            lastname: '',
-            bio: '',
-            age: '',
-            gender: '',
-            location: '',
-            interests: '',
-            avatar: `https://i.pravatar.cc/150?u=${username}`,
-            display_name: username,
-            status: 'offline',
-            last_seen: userLastSeenTimes[username] || new Date(Date.now() - 86400000).toISOString(), // 1 day ago as default
-            created_at: new Date().toISOString()
-        };
-        
-        profileCache[username] = defaultProfile;
-        return defaultProfile;
-        
-    } catch (error) {
-        console.error(`❌ Error fetching profile for ${username}:`, error);
-        
-        // Return default profile on error
-        const defaultProfile = {
-            username: username,
-            firstname: '',
-            lastname: '',
-            bio: '',
-            age: '',
-            gender: '',
-            location: '',
-            interests: '',
-            avatar: `https://i.pravatar.cc/150?u=${username}`,
-            display_name: username,
-            status: 'offline',
-            last_seen: userLastSeenTimes[username] || new Date(Date.now() - 86400000).toISOString(),
-            created_at: new Date().toISOString()
-        };
-        
-        profileCache[username] = defaultProfile;
-        return defaultProfile;
-    }
-}
-
-// ===== NEW: FUNCTION TO FETCH AND UPDATE AVATAR =====
-async function updateAvatarFromServer(username, element) {
-    try {
-        const profile = await fetchUserProfileFromServer(username);
-        if (profile && profile.avatar && element) {
-            element.src = profile.avatar;
-        }
-    } catch (error) {
-        console.error(`❌ Error updating avatar for ${username}:`, error);
-    }
-}
-
-// ===== MODIFIED: Update createMessageElement function =====
-function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${sender}`;
-    if (messageId) messageDiv.dataset.id = messageId;
-    messageDiv.dataset.content = text;
-    messageDiv.dataset.username = username;
-    messageDiv.dataset.timestamp = Date.now();
-
-    if (sender === 'received') {
-        const avatarDiv = document.createElement('div');
-        avatarDiv.className = 'avatar';
-        
-        const avatarUrl = getAvatarUrl(username);
-        const img = new Image();
-        img.src = avatarUrl;
-        img.alt = "avatar";
-        img.loading = "lazy";
-        
-        avatarDiv.appendChild(img);
-        
-        // Add click event to show user profile
-        avatarDiv.onclick = (e) => {
-            e.stopPropagation();
-            showUserProfile(username);
-        };
-        
-        messageDiv.appendChild(avatarDiv);
-
-        const messageBody = document.createElement('div');
-        messageBody.className = 'message-body';
-        
-        const usernameDiv = document.createElement('div');
-        usernameDiv.className = 'username';
-        
-        // Add click event to username to show user profile
-        usernameDiv.onclick = (e) => {
-            e.stopPropagation();
-            showUserProfile(username);
-        };
-        
-        // Check if user is online
-        const isOnline = onlineUsers.includes(username);
-        const lastSeen = userLastSeenTimes[username];
-        const statusIndicator = createUserStatusIndicator(username, isOnline, lastSeen);
-        
-        usernameDiv.appendChild(document.createTextNode(username));
-        usernameDiv.appendChild(statusIndicator);
-        messageBody.appendChild(usernameDiv);
-
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'content';
-        if (repliedTo) {
-            const replyBubble = document.createElement('div');
-            replyBubble.className = 'reply-preview';
-            replyBubble.textContent = repliedTo;
-            contentDiv.appendChild(replyBubble);
-        }
-
-        const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
-        const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
-        const imageMatches = [...text.matchAll(imagePattern)];
-        const audioMatches = [...text.matchAll(audioPattern)];
-        let modifiedText = text;
-        [...imageMatches, ...audioMatches].forEach(match => {
-            modifiedText = modifiedText.replace(match[0], '');
-        });
-        modifiedText = modifiedText.trim();
-        
-        if (modifiedText) {
-            const textDiv = document.createElement('div');
-            textDiv.textContent = modifiedText;
-            contentDiv.appendChild(textDiv);
-        }
-
-        // Use lazy loading for images
-        imageMatches.forEach(match => {
-            const img = new Image();
-            img.src = match[0];
-            img.alt = "image";
-            img.loading = "lazy";
-            img.style.maxWidth = "100%";
-            img.style.height = "auto";
-            img.style.borderRadius = "8px";
-            img.style.marginTop = "5px";
-            contentDiv.appendChild(img);
-        });
-
-        audioMatches.forEach(match => {
-            const audio = document.createElement('audio');
-            audio.controls = true;
-            audio.src = match[0];
-            contentDiv.appendChild(audio);
-        });
-        
-        messageBody.appendChild(contentDiv);
-        messageDiv.appendChild(messageBody);
-    } else {
-        // For sent messages - simpler structure without avatar/username
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'content';
-        if (repliedTo) {
-            const replyBubble = document.createElement('div');
-            replyBubble.className = 'reply-preview';
-            replyBubble.textContent = repliedTo;
-            contentDiv.appendChild(replyBubble);
-        }
-        const textDiv = document.createElement('div');
-        textDiv.textContent = text;
-        contentDiv.appendChild(textDiv);
-        messageDiv.appendChild(contentDiv);
-    }
-    
-    return messageDiv;
-}
-
-// ===== MODIFIED: Update online users panel to show time ago for offline users =====
-function updateSingleOnlineList(listElementId, countElementId, onlineUsersArray) {
-    const onlineList = document.getElementById(listElementId);
-    const onlineCount = document.getElementById(countElementId);
-    
-    if (onlineList) {
-        onlineList.innerHTML = '';
-        
-        // Get current time for calculating last seen
-        const now = new Date();
-        
-        onlineUsersArray.forEach(user => {
-            const userElement = document.createElement('div');
-            userElement.className = 'online-user';
-            
-            // Check if user is online or offline
-            const isOnline = onlineUsers.includes(user.username || user);
-            const userObj = typeof user === 'string' ? { username: user } : user;
-            const lastSeen = userLastSeenTimes[userObj.username] || userObj.lastSeen;
-            
-            fetchUserProfileFromServer(userObj.username).then(profile => {
-                const avatarUrl = profile.avatar || getAvatarUrl(userObj.username);
-                const displayName = profile.display_name || userObj.username;
-                
-                userElement.innerHTML = `
-                    <div class="online-user-avatar">
-                        <img src="${avatarUrl}" alt="${displayName}" loading="lazy">
-                        ${isOnline ? '<div class="online-dot"></div>' : ''}
-                    </div>
-                    <div class="online-user-info">
-                        <div class="online-user-name">${displayName}</div>
-                        <div class="online-user-status">
-                            ${isOnline ? '' : formatTimeAgo(lastSeen)} <!-- REMOVED: 'Online' text -->
-                        </div>
-                    </div>
-                `;
-            }).catch(() => {
-                userElement.innerHTML = `
-                    <div class="online-user-avatar">
-                        <img src="${getAvatarUrl(userObj.username)}" alt="${userObj.username}" loading="lazy">
-                        ${isOnline ? '<div class="online-dot"></div>' : ''}
-                    </div>
-                    <div class="online-user-info">
-                        <div class="online-user-name">${userObj.username}</div>
-                        <div class="online-user-status">
-                            ${isOnline ? '' : formatTimeAgo(lastSeen)} <!-- REMOVED: 'Online' text -->
-                        </div>
-                    </div>
-                `;
-            });
-            
-            userElement.onclick = () => {
-                showUserProfile(userObj.username);
-            };
-            
-            onlineList.appendChild(userElement);
-        });
-    }
-    
-    if (onlineCount) {
-        onlineCount.textContent = onlineUsersArray.filter(user => {
-            const userObj = typeof user === 'string' ? { username: user } : user;
-            return onlineUsers.includes(userObj.username);
-        }).length;
-    }
-}
-
-// ===== MODIFIED: Update socket event handlers to track user last seen times =====
-function initSocket() {
-    // ... existing socket initialization code ...
-    
-    // Listen for user status changes
-    socket.on('user-status-change', (data) => {
-        console.log('👤 User status change:', data);
-        onlineUsers = data.onlineUsers || [];
-        
-        // Update last seen time for users who went offline
-        if (data.username && data.status === 'offline') {
-            userLastSeenTimes[data.username] = new Date().toISOString();
-        }
-        
-        updateOnlineUsersList(onlineUsers);
-        updateUserStatusIndicator(data.username, data.status);
-    });
-    
-    // Listen for user last seen time updates
-    socket.on('user-last-seen', (data) => {
-        if (data.username && data.lastSeen) {
-            userLastSeenTimes[data.username] = data.lastSeen;
-            updateUserStatusIndicator(data.username, 'offline');
-        }
-    });
-    
-    // ... rest of socket initialization code ...
-}
-
-// ===== MODIFIED: Update user status indicator function =====
-function updateUserStatusIndicator(username, status, lastSeen = null) {
-    // Update last seen time
-    if (status === 'offline' && !lastSeen) {
-        userLastSeenTimes[username] = new Date().toISOString();
-    } else if (lastSeen) {
-        userLastSeenTimes[username] = lastSeen;
-    }
-    
-    // Find all messages from this user and update their status
-    const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
-    userMessages.forEach(msg => {
-        let statusIndicator = msg.querySelector('.user-status-indicator');
-        if (!statusIndicator) {
-            statusIndicator = document.createElement('span');
-            statusIndicator.className = 'user-status-indicator';
-            const usernameDiv = msg.querySelector('.username');
-            if (usernameDiv) {
-                // Insert after username text
-                usernameDiv.appendChild(statusIndicator);
-            }
-        }
-        
-        if (status === 'online') {
-            statusIndicator.className = 'user-status-indicator online';
-            statusIndicator.textContent = ''; // REMOVED: 'Online' text
-            statusIndicator.title = 'Currently online';
-        } else {
-            statusIndicator.className = 'user-status-indicator offline';
-            const timeAgo = formatTimeAgo(userLastSeenTimes[username]);
-            statusIndicator.textContent = timeAgo;
-            statusIndicator.title = `Last seen ${timeAgo}`;
-        }
-    });
-    
-    // Update online users panel
-    updateOnlineUsersList(onlineUsers);
-}
-
-// ===== MODIFIED: Show user profile popup with last seen time =====
-async function showUserProfile(username) {
-    const popup = document.getElementById('user-profile-popup');
-    if (!popup) return;
-    
-    try {
-        // Fetch user profile from server
-        const profile = await fetchUserProfileFromServer(username);
-        
-        // Update popup content
-        document.getElementById('popup-avatar').src = profile.avatar || getAvatarUrl(username);
-        
-        // Set display name
-        let displayName = profile.display_name || username;
-        if (profile.firstname && profile.lastname) {
-            displayName = `${profile.firstname} ${profile.lastname}`;
-        } else if (profile.firstname) {
-            displayName = profile.firstname;
-        } else if (profile.lastname) {
-            displayName = profile.lastname;
-        }
-        document.getElementById('popup-username').textContent = displayName;
-        
-        // Set status (check if user is online)
-        const statusDot = document.getElementById('popup-status-dot');
-        const statusText = document.getElementById('popup-status-text');
-        const isOnline = onlineUsers.includes(username);
-        
-        if (isOnline) {
-            statusDot.className = 'user-status-indicator online-dot';
-            statusText.textContent = ''; // REMOVED: 'Online' text
-            statusText.style.color = '#31a24c';
-        } else {
-            statusDot.className = 'user-status-indicator online-dot offline';
-            const timeAgo = formatTimeAgo(profile.last_seen);
-            statusText.textContent = `Last seen ${timeAgo}`;
-            statusText.style.color = '#65676b';
-        }
-        
-        // Set bio
-        document.getElementById('popup-bio').textContent = profile.bio || 'No bio available';
-        
-        // Set details
-        document.getElementById('popup-age').textContent = profile.age || 'Not specified';
-        document.getElementById('popup-gender').textContent = profile.gender ? 
-            profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1) : 'Not specified';
-        document.getElementById('popup-location').textContent = profile.location || 'Not specified';
-        document.getElementById('popup-interests').textContent = profile.interests || 'Not specified';
-        
-        // Update message button
-        const messageBtn = document.getElementById('popup-message-btn');
-        const currentUser = currentUserSession?.username;
-        if (username === currentUser) {
-            messageBtn.style.display = 'none';
-        } else {
-            messageBtn.style.display = 'block';
-            messageBtn.onclick = () => {
-                hideUserProfile();
-                // Switch to private messages and open chat with this user
-                showContainer('private-messages');
-                setTimeout(() => {
-                    openPrivateChat(username);
-                }, 100);
-            };
-        }
-        
-        // Show popup
-        popup.style.display = 'flex';
-    } catch (error) {
-        console.error('Error loading user profile:', error);
-        // Fallback to basic profile display
-        const popup = document.getElementById('user-profile-popup');
-        if (popup) {
-            document.getElementById('popup-avatar').src = getAvatarUrl(username);
-            document.getElementById('popup-username').textContent = username;
-            
-            // Set status
-            const statusText = document.getElementById('popup-status-text');
-            const isOnline = onlineUsers.includes(username);
-            if (isOnline) {
-                statusText.textContent = ''; // REMOVED: 'Online' text
-                statusText.style.color = '#31a24c';
-            } else {
-                statusText.textContent = 'Offline';
-                statusText.style.color = '#65676b';
-            }
-            
-            document.getElementById('popup-bio').textContent = 'No bio available';
-            document.getElementById('popup-age').textContent = 'Not specified';
-            document.getElementById('popup-gender').textContent = 'Not specified';
-            document.getElementById('popup-location').textContent = 'Not specified';
-            document.getElementById('popup-interests').textContent = 'Not specified';
-            
-            const messageBtn = document.getElementById('popup-message-btn');
-            const currentUser = currentUserSession?.username;
-            if (username === currentUser) {
-                messageBtn.style.display = 'none';
-            } else {
-                messageBtn.style.display = 'block';
-            }
-            
-            popup.style.display = 'flex';
-        }
-    }
-}
-
-// ===== NEW: Add this function to periodically update last seen times =====
-function updateLastSeenTimes() {
-    // Update all offline users' status indicators
-    Object.keys(userLastSeenTimes).forEach(username => {
-        if (!onlineUsers.includes(username)) {
-            updateUserStatusIndicator(username, 'offline', userLastSeenTimes[username]);
-        }
-    });
-}
-
-// Call this periodically (every minute)
-setInterval(updateLastSeenTimes, 60000);
-
-// ===== OPTIMIZED TYPING INDICATOR FUNCTIONS =====
-function showTypingIndicator(username) {
-    if (!username || username === currentUserSession?.username) return;
-    
-    typingUsers[username] = Date.now();
-    updateTypingIndicator();
-}
-
-function hideTypingIndicator(username) {
-    if (typingUsers[username]) {
-        delete typingUsers[username];
-        updateTypingIndicator();
-    }
-}
-
-function updateTypingIndicator() {
-    const typingIndicator = document.getElementById('typing-indicator');
-    if (!typingIndicator) return;
-    
-    const currentUsers = Object.keys(typingUsers);
-    
-    // Clean up old entries (more than 5 seconds)
-    const now = Date.now();
-    Object.keys(typingUsers).forEach(username => {
-        if (now - typingUsers[username] > 5000) {
-            delete typingUsers[username];
-        }
-    });
-    
-    if (currentUsers.length === 0) {
-        typingIndicator.style.display = 'none';
-        typingIndicator.innerHTML = '';
-        return;
-    }
-    
-    let message = '';
-    if (currentUsers.length === 1) {
-        message = `${currentUsers[0]} is typing...`;
-    } else if (currentUsers.length === 2) {
-        message = `${currentUsers[0]} and ${currentUsers[1]} are typing...`;
-    } else {
-        message = `${currentUsers[0]} and ${currentUsers.length - 1} others are typing...`;
-    }
-    
-    typingIndicator.innerHTML = `
-        <div class="typing-indicator-message">
-            <div class="typing-dots">
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-            </div>
-            <span class="typing-text">${message}</span>
-        </div>
-    `;
-    typingIndicator.style.display = 'block';
-}
-
-function sendTypingStart() {
-    const username = currentUserSession?.username;
-    if (username && socket) {
-        socket.emit('typing-start', { username });
-    }
-}
-
-function sendTypingStop() {
-    const username = currentUserSession?.username;
-    if (username && socket) {
-        socket.emit('typing-stop', { username });
-    }
-}
-
-function setupTypingDetection() {
-    const messageInput = document.getElementById('user-input');
-    if (!messageInput) return;
-    
-    let isTyping = false;
-    let typingTimer;
-    
-    messageInput.addEventListener('input', () => {
-        if (!isTyping) {
-            isTyping = true;
-            sendTypingStart();
-        }
-        
-        clearTimeout(typingTimer);
-        typingTimer = setTimeout(() => {
-            isTyping = false;
-            sendTypingStop();
-        }, 1000);
-    });
-    
-    messageInput.addEventListener('blur', () => {
-        if (isTyping) {
-            isTyping = false;
-            sendTypingStop();
-        }
-    });
-    
-    // Also stop typing when message is sent
-    const originalSendMessage = sendMessage;
-    window.sendMessage = function() {
-        if (isTyping) {
-            isTyping = false;
-            sendTypingStop();
-        }
-        originalSendMessage();
-    };
-}
-
-function setupTypingSocketEvents() {
-    if (!socket) return;
-    
-    // Listen for typing start events
-    socket.on('user-typing-start', (data) => {
-        showTypingIndicator(data.username);
-    });
-    
-    // Listen for typing stop events
-    socket.on('user-typing-stop', (data) => {
-        hideTypingIndicator(data.username);
-    });
-    
-    // Clean up typing indicators when user goes offline
-    socket.on('user-offline', (username) => {
-        hideTypingIndicator(username);
-    });
-}
-
-// ===== AUTHENTICATION FUNCTIONS =====
-async function handleAuth() {
-    const username = document.getElementById('auth-username').value.trim();
-    const password = document.getElementById('auth-password').value;
-    const loader = document.getElementById('loader');
-    
-    elements.errorDisplay.style.display = 'none';
-    elements.successDisplay.style.display = 'none';
-    
-    if (!username || !password) {
-        showError('Please enter both username and password');
-        return;
-    }
-    
-    if (username.length < 3 || username.length > 20) {
-        showError('Username must be between 3-20 characters');
-        return;
-    }
-    
-    if (password.length < 4 || password.length > 20) {
-        showError('Password must be between 4-20 characters');
-        return;
-    }
-    
-    // Validate username format
-    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-        showError('Username can only contain letters, numbers, and underscores');
-        return;
-    }
-    
-    loader.style.display = 'flex';
-    
-    try {
-        if (isLogin) {
-            // Login - USING UPDATED ENDPOINT
-            const response = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ username, password })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                showSuccess('Login successful!');
-                
-                // Save user session with token for persistent login
-                saveUserSession({
-                    username: data.username,
-                    user_id: data.user_id,
-                    token: data.token
-                });
-                
-                setTimeout(() => {
-                    loader.style.display = 'none';
-                    document.getElementById('auth-container').style.display = 'none';
-                    
-                    // Use the new initializeMainApp function
-                    initializeMainApp();
-                }, 500);
-            } else {
-                throw new Error(data.error || 'Login failed');
-            }
-        } else {
-            // Signup - USING UPDATED ENDPOINT
-            const response = await fetch('/api/auth/register', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ username, password })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                showSuccess('Account created successfully! Please login.');
-                setTimeout(() => {
-                    loader.style.display = 'none';
-                    toggleAuth();
-                }, 1000);
-            } else {
-                throw new Error(data.error || 'Registration failed');
-            }
-        }
-    } catch (error) {
-        loader.style.display = 'none';
-        showError(error.message);
-    }
-}
-
-function toggleAuth() {
-    isLogin = !isLogin;
-    const authTitle = document.getElementById('auth-title');
-    const authButton = document.querySelector('.auth-box button');
-    const toggleText = document.getElementById('toggle-text');
-    const toggleLink = document.getElementById('toggle-link');
-    elements.errorDisplay.style.display = 'none';
-    elements.successDisplay.style.display = 'none';
-    
-    if (isLogin) {
-        authTitle.textContent = 'Login';
-        authButton.textContent = 'Login';
-        toggleText.textContent = "Don't have an account? ";
-        toggleLink.textContent = 'Sign Up';
-    } else {
-        authTitle.textContent = 'Sign Up';
-        authButton.textContent = 'Sign Up';
-        toggleText.textContent = 'Already have an account? ';
-        toggleLink.textContent = 'Login';
-    }
-    
-    // Reset username validation
-    const usernameInput = document.getElementById('auth-username');
-    if (usernameInput) {
-        usernameInput.classList.remove('username-valid', 'username-invalid');
-    }
-}
-
-// ===== ENHANCED USER SESSION MANAGEMENT =====
-function checkUserSession() {
-    // Check localStorage first for persistent login
-    const savedSession = localStorage.getItem('userSession');
-    const savedToken = localStorage.getItem('auth_token');
-    
-    if (savedSession && savedToken) {
-        try {
-            currentUserSession = JSON.parse(savedSession);
-            return true;
-        } catch (e) {
-            console.error('Error parsing saved session:', e);
-            clearUserSession();
-        }
-    }
-    
-    // Fallback to sessionStorage
-    const sessionData = sessionStorage.getItem('currentUserSession');
-    if (sessionData) {
-        currentUserSession = JSON.parse(sessionData);
-        return true;
-    }
-    return false;
-}
-
-function saveUserSession(userData) {
-    currentUserSession = userData;
-    
-    // Save to both sessionStorage (for current session) and localStorage (for persistence)
-    sessionStorage.setItem('currentUserSession', JSON.stringify(userData));
-    localStorage.setItem('userSession', JSON.stringify(userData));
-    
-    // Also store token for API calls
-    if (userData.token) {
-        localStorage.setItem('auth_token', userData.token);
-    }
-    
-    console.log('✅ User session saved for persistent login');
-}
-
-function clearUserSession() {
-    currentUserSession = null;
-    sessionStorage.removeItem('currentUserSession');
-    localStorage.removeItem('userSession');
-    localStorage.removeItem('auth_token');
-    // Clear profile cache on logout
-    profileCache = {};
-    // Clear last seen times on logout
-    userLastSeenTimes = {};
-    localStorage.removeItem('userLastSeenTimes');
-    console.log('✅ User session cleared');
-}
-
-// ===== AUTO-LOGIN FUNCTIONALITY =====
-async function attemptAutoLogin() {
-    const savedSession = localStorage.getItem('userSession');
-    const savedToken = localStorage.getItem('auth_token');
-    
-    if (!savedSession || !savedToken) {
-        return false;
-    }
-    
-    try {
-        const userData = JSON.parse(savedSession);
-        const response = await fetch('/api/auth/auto-login', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${savedToken}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            console.log('✅ Auto-login successful for:', data.username);
-            
-            // Update session with fresh data
-            saveUserSession({
-                ...userData,
-                username: data.username,
-                user_id: data.user_id
-            });
-            
-            return true;
-        } else {
-            // Auto-login failed, clear invalid session
-            clearUserSession();
-            return false;
-        }
-    } catch (error) {
-        console.error('Auto-login error:', error);
-        clearUserSession();
-        return false;
-    }
-}
-
-// ===== UTILITY FUNCTIONS =====
-function showSuccess(message) {
-    elements.successDisplay.textContent = message;
-    elements.successDisplay.style.display = 'block';
-    setTimeout(() => {
-        elements.successDisplay.style.display = 'none';
-    }, 3000);
-}
-
-function showError(message) {
-    elements.errorDisplay.textContent = message;
-    elements.errorDisplay.style.display = 'block';
-    setTimeout(() => {
-        elements.errorDisplay.style.display = 'none';
-    }, 3000);
-}
-
-function autoResize(textarea) {
-    if (textarea) {
-        textarea.style.height = 'auto';
-        textarea.style.height = (textarea.scrollHeight > 100 ? 100 : textarea.scrollHeight) + 'px';
-    }
-}
-
-// Helper function to escape HTML
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// ===== OPTIMIZED: Update showContainer function =====
-function showContainer(containerId) {
-    console.log('🔄 Showing container:', containerId);
-    
-    // Hide all containers
-    document.querySelectorAll('.main-chat-interface').forEach(container => {
-        container.style.display = 'none';
-    });
-    
-    // Hide all info containers
-    document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container, .profile-container').forEach(container => {
-        container.style.display = 'none';
-    });
-    
-    // Hide all chat inputs
-    document.querySelectorAll('.chat-input').forEach(input => {
-        input.style.display = 'none';
-    });
-    
-    // Show the selected container
-    const container = document.getElementById(containerId);
-    if (container) {
-        container.style.display = 'block';
-        
-        // Show the appropriate chat input
-        if (containerId === 'chat' || containerId === 'private-ai') {
-            const chatInput = container.querySelector('.chat-input');
-            if (chatInput) chatInput.style.display = 'flex';
-        }
-        
-        // For private messages, only show users panel initially
-        if (containerId === 'private-messages') {
-            showUsersPanel();
-            initializePrivateMessaging();
-        }
-        
-        // Load profile data when showing profile container
-        if (containerId === 'profile') {
-            loadProfile();
-        }
-        
-        // Initialize secret code if showing that container
-        if (containerId === 'secret-code') {
-            resetSecretCodeForm();
-            initializeSecretCodeVerification();
-        }
-        
-        // Initialize SQL editor if showing that container
-        if (containerId === 'sql-editor-container') {
-            if (!hasVerifiedCode()) {
-                showError('Access denied. Please verify the secret code first.');
-                showContainer('secret-code');
-                return;
-            }
-            initializeSQLEditor();
-        }
-        
-        // MODIFIED: Initialize posts if showing that container
-        if (containerId === 'posts') {
-            console.log('📝 Initializing posts feed...');
-            createPostsContainer();
-            initializePosts();
-            
-            setTimeout(() => {
-                const createPostBox = document.querySelector('.create-post-box');
-                if (!createPostBox) {
-                    setupCreatePostBox();
-                }
-            }, 100);
-        }
-        
-        // NEW: Initialize all users when showing the all-users container
-        if (containerId === 'all-users') {
-            console.log('👥 Initializing all users directory...');
-            initializeAllUsers();
-            
-            // Start auto-refresh for online status updates
-            startAllUsersRefresh();
-        }
-    }
-    
-    // Show overlay for non-chat containers
-    const overlay = document.getElementById('overlay');
-    if (overlay) {
-        if (containerId === 'chat' || containerId === 'private-ai' || containerId === 'private-messages' || containerId === 'posts' || containerId === 'all-users') {
-            overlay.style.display = 'none';
-        } else {
-            overlay.style.display = 'block';
-        }
-    }
-    
-    // Handle button visibility based on container
-    if (containerId === 'chat') {
-        console.log('Showing main chat container');
-        // Re-initialize scroll button for main chat
-        setTimeout(() => {
-            initializeButtons();
-            setTimeout(() => {
-                forceScrollToBottom('chat-container');
-                updateScrollState();
-            }, 200);
-        }, 100);
-        
-        // Show main chat scroll button, hide private AI button
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'flex';
-            updateScrollState();
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    } else if (containerId === 'private-ai') {
-        // Show private AI button, hide main chat scroll button
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'flex';
-            handlePrivateScroll();
-        }
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        // Attach scroll event for private container
-        if (privateContainer) {
-            privateContainer.addEventListener('scroll', throttle(handlePrivateScroll, 100));
-            setTimeout(handlePrivateScroll, 100);
-            setTimeout(() => forceScrollToBottom('private-ai-container'), 200);
-        }
-    } else if (containerId === 'private-messages') {
-        // Hide both buttons for private messages
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    } else if (containerId === 'posts') {
-        // Hide both buttons for posts feed
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    } else if (containerId === 'all-users') {
-        // Hide both buttons for all users directory
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    } else {
-        // For other containers, hide both buttons
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    }
-
-    // Close dropdown menu when switching containers
-    const dropdown = document.getElementById('dropdown');
-    if (dropdown) dropdown.style.display = 'none';
-    
-    const kebabDropdown = document.querySelector('.kebab-dropdown');
-    if (kebabDropdown) kebabDropdown.classList.remove('active');
-}
-
-function hideContainer(containerId) {
-    console.log('🔄 Hiding container:', containerId);
-    const container = document.getElementById(containerId);
-    if (container) container.style.display = 'none';
-    
-    const overlay = document.getElementById('overlay');
-    if (overlay) overlay.style.display = 'none';
-    
-    // Close all menus when hiding any container
-    const dropdown = document.getElementById('dropdown');
-    if (dropdown) dropdown.style.display = 'none';
-    
-    const kebabDropdown = document.querySelector('.kebab-dropdown');
-    if (kebabDropdown) kebabDropdown.classList.remove('active');
-    
-    // Show chat container and input after closing any section
-    showContainer('chat');
-}
-
-async function sendPrivateMessage() {
-    const input = document.getElementById('private-user-input');
-    if (!input) return;
-    
-    const content = input.value.trim();
-    if (!content) return;
-
-    // Display user message immediately
-    displayPrivateMessage(content, 'sent');
-    input.value = '';
-    autoResize(input);
-
-    // Disable send button after sending
-    elements.privateSendButton.disabled = true;
-    elements.privateSendButton.classList.remove('enabled');
-
-    try {
-        // Get AI response directly
-        await fetchPrivateAIResponse(content);
-    } catch (error) {
-        console.error('Error sending private message:', error);
-        showError('Could not process your private message. Please try again.');
-    }
-
-    // Re-enable send button after processing
-    setTimeout(() => {
-        const hasText = input.value.trim().length > 0;
-        elements.privateSendButton.disabled = !hasText;
-        elements.privateSendButton.classList.toggle('enabled', hasText);
-    }, 1000);
-}
-
-// ===== NEW FUNCTION: Add touch event listeners to message element =====
+// ===== MODIFIED: Add touch event listeners to message element =====
 function addMessageTouchListeners(messageDiv) {
     // Check if listeners already added to prevent duplicates
     if (messageDiv.dataset.hasTouchListeners === 'true') {
@@ -8419,7 +7510,7 @@ function addMessageTouchListeners(messageDiv) {
     messageDiv.dataset.hasTouchListeners = 'true';
 }
 
-// ===== NEW FUNCTION: Add private message touch event listeners =====
+// ===== MODIFIED: Add private message touch event listeners =====
 function addPrivateMessageTouchListeners(messageDiv) {
     // Check if listeners already added to prevent duplicates
     if (messageDiv.dataset.hasTouchListeners === 'true') {
@@ -8465,6 +7556,11 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
 
     // Update scroll state
     updateScrollState();
+    
+    // Update online users display after new message
+    setTimeout(() => {
+        updateAllOnlineUsersList();
+    }, 100);
 }
 
 function displayPrivateMessage(text, sender, repliedTo = null, username = 'Private AI', messageId = null) {
@@ -9187,6 +8283,12 @@ function logout() {
         sqlEditorMenuItem.style.display = 'none';
     }
     
+    // Clear online users tracking
+    if (window.onlineUsersRefreshInterval) {
+        clearInterval(window.onlineUsersRefreshInterval);
+    }
+    allOnlineUsers.clear();
+    
     console.log('✅ User logged out successfully');
 }
 
@@ -9483,6 +8585,7 @@ function updateUserPanelToggleButton() {
     });
 }
 
+// --- CUT HERE ---
 // ===== ENHANCED PRIVATE MESSAGING FUNCTIONS =====
 
 // Load users for private messaging from API
@@ -11564,4 +10667,3 @@ document.addEventListener('click', function (e) {
 </script>
 </body>
 </html>
- 
