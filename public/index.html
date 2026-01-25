@@ -1402,26 +1402,25 @@ html, body {
 // --- IN THE CSS SECTION ---
 
 /* MODIFIED: Status indicator in messages - shows online dot or time ago when offline */
-.user-status-indicator {
-    font-size: 0.6rem;
-    display: inline-block;
-    margin-left: 5px;
-}
-
+/* Updated status indicator styles */
 .user-status-indicator.online {
-    color: #4CAF50;
-    font-weight: bold;
-}
-
-.user-status-indicator.online:before {
-    content: "● ";
-    color: #4CAF50;
-    font-size: 0.7rem;
+    background-color: #4CAF50;
+    box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
 }
 
 .user-status-indicator.offline {
-    color: #999;
+    background-color: #ccc;
+    box-shadow: none;
 }
+
+/* Last seen text for offline users */
+.last-seen-text {
+    font-size: 0.65rem;
+    color: #999;
+    margin-left: 5px;
+    font-style: italic;
+}
+
 
 /* In the directory-user-status section */
 .directory-user-status .status-dot {
