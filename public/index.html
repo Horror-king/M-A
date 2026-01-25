@@ -4721,6 +4721,10 @@ html, body {
         </div>
     </div>
 <script>
+// ===== FIXED: DECLARE MISSING VARIABLES =====
+let currentUserSession = null; // Add this to fix ReferenceError
+let lastSentMessages = { main: {}, private: {} }; // Add this to fix ReferenceError
+
 // ===== FIXED: ENHANCED ONLINE USERS DISPLAY =====
 
 // Global variable to track all online users with their profiles
@@ -10667,3 +10671,4 @@ document.addEventListener('click', function (e) {
 </script>
 </body>
 </html>
+ 
