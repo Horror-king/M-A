@@ -1399,20 +1399,55 @@ html, body {
     cursor: pointer; /* ADDED: Make username clickable */
 }
 
+// --- IN THE CSS SECTION ---
+
+/* MODIFIED: Status indicator in messages - shows online dot or time ago when offline */
 .user-status-indicator {
+    font-size: 0.6rem;
+    display: inline-block;
+    margin-left: 5px;
+}
+
+.user-status-indicator.online {
+    color: #4CAF50;
+    font-weight: bold;
+}
+
+.user-status-indicator.online:before {
+    content: "● ";
+    color: #4CAF50;
+    font-size: 0.7rem;
+}
+
+.user-status-indicator.offline {
+    color: #999;
+}
+
+/* In the directory-user-status section */
+.directory-user-status .status-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
     display: inline-block;
+    margin-right: 5px;
 }
 
-.user-status-indicator.online {
-    background-color: #4CAF50;
-    box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
+.directory-user-status .status-dot.online {
+    background: #31a24c;
 }
 
-.user-status-indicator.offline {
-    background-color: #ccc;
+.directory-user-status .status-dot.offline {
+    background: #bcc0c4;
+}
+
+/* In user profile popup */
+.user-status-indicator.online-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #31a24c;
+    display: inline-block;
+    margin-right: 5px;
 }
 
 .user-status-indicator.away {
@@ -4685,7 +4720,7 @@ html, body {
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
-<script>
+   <script>
 // Opera Mini compatible messaging functions
 class OperaMiniMessenger {
   constructor() {
@@ -4787,6 +4822,262 @@ class OperaMiniMessenger {
 
 // Create Opera Mini messenger instance
 const operaMessenger = new OperaMiniMessenger();
+
+// Update the formatLastSeen function to be more precise
+function formatLastSeen(timestamp) {
+    if (!timestamp) return 'last seen a long time ago';
+    
+    const now = new Date();
+    const lastSeen = new Date(timestamp);
+    const diffMs = now - lastSeen;
+    
+    // Convert to seconds, minutes, hours, days
+    const diffSeconds = Math.floor(diffMs / 1000);
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    const diffHours = Math.floor(diffMinutes / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffSeconds < 60) {
+        return 'just now';
+    } else if (diffMinutes < 60) {
+        return `${diffMinutes} min${diffMinutes === 1 ? '' : 's'} ago`;
+    } else if (diffHours < 24) {
+        return `${diffHours} hr${diffHours === 1 ? '' : 's'} ago`;
+    } else if (diffDays === 1) {
+        return 'yesterday';
+    } else if (diffDays < 7) {
+        return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+    } else if (diffDays < 30) {
+        const weeks = Math.floor(diffDays / 7);
+        return `${weeks} week${weeks === 1 ? '' : 's'} ago`;
+    } else {
+        // Show date if more than a month
+        return lastSeen.toLocaleDateString();
+    }
+}
+
+// Update the createMessageElement function to show last seen for offline users
+function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null, status = 'online', lastSeen = null) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${sender}`;
+    if (messageId) messageDiv.dataset.id = messageId;
+    messageDiv.dataset.content = text;
+    messageDiv.dataset.username = username;
+    messageDiv.dataset.timestamp = Date.now();
+
+    // Only create avatar for received messages
+    if (sender === 'received') {
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'avatar';
+        
+        const avatarUrl = getAvatarUrl(username);
+        const img = new Image();
+        img.src = avatarUrl;
+        img.alt = "avatar";
+        img.loading = "lazy";
+        
+        // Fetch and update avatar from server in background
+        setTimeout(() => {
+            updateAvatarFromServer(username, img);
+        }, 100);
+        
+        avatarDiv.appendChild(img);
+        
+        // Add click event to show user profile
+        avatarDiv.onclick = (e) => {
+            e.stopPropagation();
+            showUserProfile(username);
+        };
+        
+        messageDiv.appendChild(avatarDiv);
+
+        const messageBody = document.createElement('div');
+        messageBody.className = 'message-body';
+        
+        // Username with status indicator
+        const usernameDiv = document.createElement('div');
+        usernameDiv.className = 'username';
+        
+        // Add click event to username to show user profile
+        usernameDiv.onclick = (e) => {
+            e.stopPropagation();
+            showUserProfile(username);
+        };
+        
+        // Create username text
+        const usernameText = document.createTextNode(username);
+        usernameDiv.appendChild(usernameText);
+        
+        // Add status indicator based on user status
+        if (status === 'online') {
+            const statusIndicator = document.createElement('span');
+            statusIndicator.className = 'user-status-indicator online';
+            statusIndicator.title = 'Online';
+            usernameDiv.appendChild(statusIndicator);
+        } else {
+            // For offline users, show last seen time
+            const statusIndicator = document.createElement('span');
+            statusIndicator.className = 'user-status-indicator offline';
+            statusIndicator.title = 'Offline';
+            usernameDiv.appendChild(statusIndicator);
+            
+            // Add last seen text if available
+            if (lastSeen) {
+                const lastSeenText = document.createElement('span');
+                lastSeenText.className = 'last-seen-text';
+                lastSeenText.textContent = `last seen ${formatLastSeen(lastSeen)}`;
+                usernameDiv.appendChild(lastSeenText);
+            }
+        }
+        
+        messageBody.appendChild(usernameDiv);
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'content';
+        if (repliedTo) {
+            const replyBubble = document.createElement('div');
+            replyBubble.className = 'reply-preview';
+            replyBubble.textContent = repliedTo;
+            contentDiv.appendChild(replyBubble);
+        }
+
+        const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
+        const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
+        const imageMatches = [...text.matchAll(imagePattern)];
+        const audioMatches = [...text.matchAll(audioPattern)];
+        let modifiedText = text;
+        [...imageMatches, ...audioMatches].forEach(match => {
+            modifiedText = modifiedText.replace(match[0], '');
+        });
+        modifiedText = modifiedText.trim();
+        
+        if (modifiedText) {
+            const textDiv = document.createElement('div');
+            textDiv.textContent = modifiedText;
+            contentDiv.appendChild(textDiv);
+        }
+
+        // Use lazy loading for images
+        imageMatches.forEach(match => {
+            const img = new Image();
+            img.src = match[0];
+            img.alt = "image";
+            img.loading = "lazy";
+            img.style.maxWidth = "100%";
+            img.style.height = "auto";
+            img.style.borderRadius = "8px";
+            img.style.marginTop = "5px";
+            contentDiv.appendChild(img);
+        });
+
+        audioMatches.forEach(match => {
+            const audio = document.createElement('audio');
+            audio.controls = true;
+            audio.src = match[0];
+            contentDiv.appendChild(audio);
+        });
+        
+        messageBody.appendChild(contentDiv);
+        messageDiv.appendChild(messageBody);
+    } else {
+        // For sent messages - simpler structure without avatar/username
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'content';
+        if (repliedTo) {
+            const replyBubble = document.createElement('div');
+            replyBubble.className = 'reply-preview';
+            replyBubble.textContent = repliedTo;
+            contentDiv.appendChild(replyBubble);
+        }
+        const textDiv = document.createElement('div');
+        textDiv.textContent = text;
+        contentDiv.appendChild(textDiv);
+        messageDiv.appendChild(contentDiv);
+    }
+    
+    return messageDiv;
+}
+
+// Update the displayMessage function to pass status and lastSeen
+function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true, status = 'online', lastSeen = null) {
+    if (!elements.chatContainer) return;
+    
+    // Check if message already exists to prevent duplicates
+    const existingMessage = document.querySelector(`[data-id="${messageId}"]`);
+    if (existingMessage) {
+        console.log('⚠️ Message already exists, skipping:', messageId);
+        return;
+    }
+    
+    const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId, status, lastSeen);
+    
+    // Add event listeners to ALL messages
+    addMessageTouchListeners(messageDiv);
+
+    // Always append new messages to the bottom
+    elements.chatContainer.appendChild(messageDiv);
+    
+    // Only scroll if it's a new message and we're at the bottom
+    if (isNew && isAtBottom) {
+        requestAnimationFrame(() => {
+            elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
+        });
+    }
+
+    // Update scroll state
+    updateScrollState();
+}
+
+// Update the renderMessages function to include status and lastSeen
+function renderMessages(messages, isFirstLoad = false) {
+    if (!elements.chatContainer) return;
+    
+    if (isFirstLoad) {
+        // Clear container for first load
+        elements.chatContainer.innerHTML = '';
+    }
+    
+    // Sort messages by timestamp or ID in ascending order
+    const sortedMessages = messages.sort((a, b) => {
+        if (a.created_at && b.created_at) {
+            return new Date(a.created_at) - new Date(b.created_at);
+        }
+        return a.id - b.id;
+    });
+    
+    // Use document fragment for better performance
+    const fragment = document.createDocumentFragment();
+    
+    sortedMessages.forEach(msg => {
+        const isOwn = msg.username?.trim().toLowerCase() === currentUserSession?.username?.trim().toLowerCase();
+        // Get user status from online users list or default to offline
+        const isOnline = onlineUsers.includes(msg.username);
+        const status = isOnline ? 'online' : 'offline';
+        const lastSeen = msg.last_seen || null;
+        
+        const messageDiv = createMessageElement(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id, status, lastSeen);
+        
+        // ADD TOUCH LISTENERS TO ALL MESSAGES (including loaded ones)
+        addMessageTouchListeners(messageDiv);
+        
+        fragment.appendChild(messageDiv);
+    });
+    
+    if (isFirstLoad) {
+        elements.chatContainer.appendChild(fragment);
+        
+        // Scroll to bottom after rendering
+        requestAnimationFrame(() => {
+            elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
+        });
+    } else {
+        // Prepend for pagination
+        elements.chatContainer.prepend(fragment);
+    }
+    
+    // Update scroll state after rendering messages
+    setTimeout(updateScrollState, 0);
+}
 
 // ===== NEW: ALL USERS FUNCTIONALITY =====
 
@@ -6688,7 +6979,7 @@ async function deleteMessageContext(messageId, username) {
     }
 }
 
-// MODIFIED: initSocket function to start Opera Mini polling
+// MODIFIED: initSocket function to start Opera Mini polling and update user status with lastSeen
 function initSocket() {
     console.log('🔌 Initializing socket connection...');
     
@@ -6810,12 +7101,12 @@ function initSocket() {
         }
     });
 
-    // User status updates
+    // UPDATED: User status updates with lastSeen
     socket.on('user-status-change', (data) => {
         console.log('👤 User status change:', data);
         onlineUsers = data.onlineUsers || [];
         updateOnlineUsersList(onlineUsers);
-        updateUserStatusIndicator(data.username, data.status);
+        updateUserStatusIndicator(data.username, data.status, data.lastSeen);
     });
 
     // Typing events
@@ -7120,8 +7411,6 @@ function batchMessageRender(messages, renderFunction) {
         });
     }
 }
-// --- CUT HERE ---
-// --- CUT HERE ---
 
 // ===== YOUR EXISTING VARIABLES AND FUNCTIONS =====
 
@@ -7271,7 +7560,8 @@ async function fetchUserProfileFromServer(username) {
                     interests: data.profile.interests || '',
                     avatar: data.profile.avatar || `https://i.pravatar.cc/150?u=${username}`,
                     display_name: data.profile.display_name || username,
-                    status: data.profile.status || 'offline'
+                    status: data.profile.status || 'offline',
+                    last_seen: data.profile.last_seen || null
                 };
                 
                 console.log(`✅ Profile fetched from server for: ${username}`);
@@ -7291,7 +7581,8 @@ async function fetchUserProfileFromServer(username) {
             interests: '',
             avatar: `https://i.pravatar.cc/150?u=${username}`,
             display_name: username,
-            status: 'offline'
+            status: 'offline',
+            last_seen: null
         };
         
         profileCache[username] = defaultProfile;
@@ -7312,7 +7603,8 @@ async function fetchUserProfileFromServer(username) {
             interests: '',
             avatar: `https://i.pravatar.cc/150?u=${username}`,
             display_name: username,
-            status: 'offline'
+            status: 'offline',
+            last_seen: null
         };
         
         profileCache[username] = defaultProfile;
@@ -7706,184 +7998,6 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// ===== OPTIMIZED: Update showContainer function =====
-function showContainer(containerId) {
-    console.log('🔄 Showing container:', containerId);
-    
-    // Hide all containers
-    document.querySelectorAll('.main-chat-interface').forEach(container => {
-        container.style.display = 'none';
-    });
-    
-    // Hide all info containers
-    document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container, .profile-container').forEach(container => {
-        container.style.display = 'none';
-    });
-    
-    // Hide all chat inputs
-    document.querySelectorAll('.chat-input').forEach(input => {
-        input.style.display = 'none';
-    });
-    
-    // Show the selected container
-    const container = document.getElementById(containerId);
-    if (container) {
-        container.style.display = 'block';
-        
-        // Show the appropriate chat input
-        if (containerId === 'chat' || containerId === 'private-ai') {
-            const chatInput = container.querySelector('.chat-input');
-            if (chatInput) chatInput.style.display = 'flex';
-        }
-        
-        // For private messages, only show users panel initially
-        if (containerId === 'private-messages') {
-            showUsersPanel();
-            initializePrivateMessaging();
-        }
-        
-        // Load profile data when showing profile container
-        if (containerId === 'profile') {
-            loadProfile();
-        }
-        
-        // Initialize secret code if showing that container
-        if (containerId === 'secret-code') {
-            resetSecretCodeForm();
-            initializeSecretCodeVerification();
-        }
-        
-        // Initialize SQL editor if showing that container
-        if (containerId === 'sql-editor-container') {
-            if (!hasVerifiedCode()) {
-                showError('Access denied. Please verify the secret code first.');
-                showContainer('secret-code');
-                return;
-            }
-            initializeSQLEditor();
-        }
-        
-        // MODIFIED: Initialize posts if showing that container
-        if (containerId === 'posts') {
-            console.log('📝 Initializing posts feed...');
-            createPostsContainer();
-            initializePosts();
-            
-            setTimeout(() => {
-                const createPostBox = document.querySelector('.create-post-box');
-                if (!createPostBox) {
-                    setupCreatePostBox();
-                }
-            }, 100);
-        }
-        
-        // NEW: Initialize all users when showing the all-users container
-        if (containerId === 'all-users') {
-            console.log('👥 Initializing all users directory...');
-            initializeAllUsers();
-            
-            // Start auto-refresh for online status updates
-            startAllUsersRefresh();
-        }
-    }
-    
-    // Show overlay for non-chat containers
-    const overlay = document.getElementById('overlay');
-    if (overlay) {
-        if (containerId === 'chat' || containerId === 'private-ai' || containerId === 'private-messages' || containerId === 'posts' || containerId === 'all-users') {
-            overlay.style.display = 'none';
-        } else {
-            overlay.style.display = 'block';
-        }
-    }
-    
-    // Handle button visibility based on container
-    if (containerId === 'chat') {
-        console.log('Showing main chat container');
-        // Re-initialize scroll button for main chat
-        setTimeout(() => {
-            initializeButtons();
-            setTimeout(() => {
-                forceScrollToBottom('chat-container');
-                updateScrollState();
-            }, 200);
-        }, 100);
-        
-        // Show main chat scroll button, hide private AI button
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'flex';
-            updateScrollState();
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    } else if (containerId === 'private-ai') {
-        // Show private AI button, hide main chat scroll button
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'flex';
-            handlePrivateScroll();
-        }
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        // Attach scroll event for private container
-        if (privateContainer) {
-            privateContainer.addEventListener('scroll', throttle(handlePrivateScroll, 100));
-            setTimeout(handlePrivateScroll, 100);
-            setTimeout(() => forceScrollToBottom('private-ai-container'), 200);
-        }
-    } else if (containerId === 'private-messages') {
-        // Hide both buttons for private messages
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    } else if (containerId === 'posts') {
-        // Hide both buttons for posts feed
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    } else if (containerId === 'all-users') {
-        // Hide both buttons for all users directory
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    } else {
-        // For other containers, hide both buttons
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    }
-
-    // Close dropdown menu when switching containers
-    const dropdown = document.getElementById('dropdown');
-    if (dropdown) dropdown.style.display = 'none';
-    
-    const kebabDropdown = document.querySelector('.kebab-dropdown');
-    if (kebabDropdown) kebabDropdown.classList.remove('active');
-}
-
 function hideContainer(containerId) {
     console.log('🔄 Hiding container:', containerId);
     const container = document.getElementById(containerId);
@@ -7935,127 +8049,6 @@ async function sendPrivateMessage() {
     }, 1000);
 }
 
-// ===== MODIFIED: MESSAGE DISPLAY FUNCTIONS WITH SERVER PROFILE FETCHING =====
-function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${sender}`;
-    if (messageId) messageDiv.dataset.id = messageId;
-    messageDiv.dataset.content = text;
-    messageDiv.dataset.username = username;
-    messageDiv.dataset.timestamp = Date.now();
-
-    // Only create avatar for received messages
-    if (sender === 'received') {
-        const avatarDiv = document.createElement('div');
-        avatarDiv.className = 'avatar';
-        
-        // MODIFIED: Use getAvatarUrl function which now fetches from server
-        const avatarUrl = getAvatarUrl(username);
-        const img = new Image();
-        img.src = avatarUrl;
-        img.alt = "avatar";
-        img.loading = "lazy";
-        
-        // Fetch and update avatar from server in background
-        setTimeout(() => {
-            updateAvatarFromServer(username, img);
-        }, 100);
-        
-        avatarDiv.appendChild(img);
-        
-        // Add click event to show user profile
-        avatarDiv.onclick = (e) => {
-            e.stopPropagation();
-            showUserProfile(username);
-        };
-        
-        messageDiv.appendChild(avatarDiv);
-
-        const messageBody = document.createElement('div');
-        messageBody.className = 'message-body';
-        
-        // Username with status indicator
-        const usernameDiv = document.createElement('div');
-        usernameDiv.className = 'username';
-        
-        // Add click event to username to show user profile
-        usernameDiv.onclick = (e) => {
-            e.stopPropagation();
-            showUserProfile(username);
-        };
-        
-        const statusIndicator = document.createElement('span');
-        statusIndicator.className = 'user-status-indicator online';
-        usernameDiv.appendChild(document.createTextNode(username));
-        usernameDiv.appendChild(statusIndicator);
-        messageBody.appendChild(usernameDiv);
-
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'content';
-        if (repliedTo) {
-            const replyBubble = document.createElement('div');
-            replyBubble.className = 'reply-preview';
-            replyBubble.textContent = repliedTo;
-            contentDiv.appendChild(replyBubble);
-        }
-
-        const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
-        const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
-        const imageMatches = [...text.matchAll(imagePattern)];
-        const audioMatches = [...text.matchAll(audioPattern)];
-        let modifiedText = text;
-        [...imageMatches, ...audioMatches].forEach(match => {
-            modifiedText = modifiedText.replace(match[0], '');
-        });
-        modifiedText = modifiedText.trim();
-        
-        if (modifiedText) {
-            const textDiv = document.createElement('div');
-            textDiv.textContent = modifiedText;
-            contentDiv.appendChild(textDiv);
-        }
-
-        // Use lazy loading for images
-        imageMatches.forEach(match => {
-            const img = new Image();
-            img.src = match[0];
-            img.alt = "image";
-            img.loading = "lazy";
-            img.style.maxWidth = "100%";
-            img.style.height = "auto";
-            img.style.borderRadius = "8px";
-            img.style.marginTop = "5px";
-            contentDiv.appendChild(img);
-        });
-
-        audioMatches.forEach(match => {
-            const audio = document.createElement('audio');
-            audio.controls = true;
-            audio.src = match[0];
-            contentDiv.appendChild(audio);
-        });
-        
-        messageBody.appendChild(contentDiv);
-        messageDiv.appendChild(messageBody);
-    } else {
-        // For sent messages - simpler structure without avatar/username
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'content';
-        if (repliedTo) {
-            const replyBubble = document.createElement('div');
-            replyBubble.className = 'reply-preview';
-            replyBubble.textContent = repliedTo;
-            contentDiv.appendChild(replyBubble);
-        }
-        const textDiv = document.createElement('div');
-        textDiv.textContent = text;
-        contentDiv.appendChild(textDiv);
-        messageDiv.appendChild(contentDiv);
-    }
-    
-    return messageDiv;
-}
-
 // ===== NEW FUNCTION: Add touch event listeners to message element =====
 function addMessageTouchListeners(messageDiv) {
     // Check if listeners already added to prevent duplicates
@@ -8092,35 +8085,6 @@ function addPrivateMessageTouchListeners(messageDiv) {
     
     // Mark that listeners have been added
     messageDiv.dataset.hasTouchListeners = 'true';
-}
-
-function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true) {
-    if (!elements.chatContainer) return;
-    
-    // Check if message already exists to prevent duplicates
-    const existingMessage = document.querySelector(`[data-id="${messageId}"]`);
-    if (existingMessage) {
-        console.log('⚠️ Message already exists, skipping:', messageId);
-        return;
-    }
-    
-    const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId);
-    
-    // Add event listeners to ALL messages
-    addMessageTouchListeners(messageDiv);
-
-    // Always append new messages to the bottom
-    elements.chatContainer.appendChild(messageDiv);
-    
-    // Only scroll if it's a new message and we're at the bottom
-    if (isNew && isAtBottom) {
-        requestAnimationFrame(() => {
-            elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
-        });
-    }
-
-    // Update scroll state
-    updateScrollState();
 }
 
 function displayPrivateMessage(text, sender, repliedTo = null, username = 'Private AI', messageId = null) {
@@ -9088,7 +9052,6 @@ function initializePrivateMessaging() {
     loadUnreadCounts();
 }
 
-// --- CUT HERE ---
 // ===== ADDED: USER PANEL VISIBILITY FUNCTIONS =====
 function toggleUserPanel() {
     userPanelVisible = !userPanelVisible;
@@ -9831,7 +9794,8 @@ async function loadProfile() {
                 interests: profile.interests || '',
                 avatar: profile.avatar || `https://i.pravatar.cc/150?u=${username}`,
                 display_name: profile.display_name || username,
-                status: profile.status || 'online'
+                status: profile.status || 'online',
+                last_seen: profile.last_seen || null
             };
             
             // Populate form fields
@@ -9865,7 +9829,8 @@ async function loadProfile() {
                 interests: '',
                 avatar: `https://i.pravatar.cc/150?u=${username}`,
                 display_name: username,
-                status: 'online'
+                status: 'online',
+                last_seen: null
             };
             profileCache[username] = defaultProfile;
             updateProfileDisplay(defaultProfile);
@@ -9884,7 +9849,8 @@ async function loadProfile() {
             interests: '',
             avatar: `https://i.pravatar.cc/150?u=${username}`,
             display_name: username,
-            status: 'online'
+            status: 'online',
+            last_seen: null
         };
         profileCache[username] = defaultProfile;
         updateProfileDisplay(defaultProfile);
@@ -9946,7 +9912,8 @@ async function saveProfile() {
                 interests: updatedProfile.interests || '',
                 avatar: updatedProfile.avatar || `https://i.pravatar.cc/150?u=${username}`,
                 display_name: updatedProfile.display_name || username,
-                status: updatedProfile.status || 'online'
+                status: updatedProfile.status || 'online',
+                last_seen: updatedProfile.last_seen || null
             };
             
             // Update display section
@@ -9980,7 +9947,7 @@ async function saveProfile() {
     }
 }
 
-// MODIFIED: Get user profile from server for popups
+// MODIFIED: Get user profile from server for popups - UPDATED WITH LAST SEEN
 async function showUserProfile(username) {
     const popup = document.getElementById('user-profile-popup');
     if (!popup) return;
@@ -10008,8 +9975,19 @@ async function showUserProfile(username) {
         const statusText = document.getElementById('popup-status-text');
         const isOnline = onlineUsers.includes(username);
         
-        statusDot.className = `user-status-indicator ${isOnline ? 'online' : 'offline'}`;
-        statusText.textContent = isOnline ? 'Online' : 'Offline';
+        if (isOnline) {
+            statusDot.className = `user-status-indicator online`;
+            statusText.textContent = 'Online';
+        } else {
+            // For offline users, show last seen time
+            statusDot.className = `user-status-indicator offline`;
+            // Show last seen time if available
+            if (profile.last_seen) {
+                statusText.textContent = `Last seen ${formatLastSeen(profile.last_seen)}`;
+            } else {
+                statusText.textContent = 'Offline';
+            }
+        }
         
         // Set bio
         document.getElementById('popup-bio').textContent = profile.bio || 'No bio available';
@@ -10234,50 +10212,58 @@ async function loadMessages() {
     }
 }
 
-// ===== MODIFIED: RENDER MESSAGES WITH TOUCH LISTENERS =====
-function renderMessages(messages, isFirstLoad = false) {
-    if (!elements.chatContainer) return;
-    
-    if (isFirstLoad) {
-        // Clear container for first load
-        elements.chatContainer.innerHTML = '';
-    }
-    
-    // Sort messages by timestamp or ID in ascending order
-    const sortedMessages = messages.sort((a, b) => {
-        if (a.created_at && b.created_at) {
-            return new Date(a.created_at) - new Date(b.created_at);
+// ===== UPDATE USER STATUS INDICATOR FUNCTION (UPDATED WITH LAST SEEN) =====
+function updateUserStatusIndicator(username, status, lastSeen = null) {
+    // Find all messages from this user and update their status
+    const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
+    userMessages.forEach(msg => {
+        let statusIndicator = msg.querySelector('.user-status-indicator');
+        let lastSeenText = msg.querySelector('.last-seen-text');
+        
+        if (!statusIndicator) {
+            // Create status indicator if it doesn't exist
+            const usernameDiv = msg.querySelector('.username');
+            if (usernameDiv) {
+                // Find where to insert it
+                const usernameText = Array.from(usernameDiv.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
+                if (usernameText) {
+                    statusIndicator = createStatusIndicator();
+                    usernameDiv.insertBefore(statusIndicator, usernameText.nextSibling);
+                }
+            }
         }
-        return a.id - b.id;
+        
+        if (statusIndicator) {
+            if (status === 'online') {
+                statusIndicator.className = 'user-status-indicator online';
+                statusIndicator.title = 'Online';
+                // Remove last seen text if it exists
+                if (lastSeenText) {
+                    lastSeenText.remove();
+                }
+            } else {
+                statusIndicator.className = 'user-status-indicator offline';
+                statusIndicator.title = 'Offline';
+                
+                // Update or add last seen text
+                if (lastSeen) {
+                    if (!lastSeenText) {
+                        lastSeenText = document.createElement('span');
+                        lastSeenText.className = 'last-seen-text';
+                        statusIndicator.parentNode.insertBefore(lastSeenText, statusIndicator.nextSibling);
+                    }
+                    lastSeenText.textContent = `last seen ${formatLastSeen(lastSeen)}`;
+                }
+            }
+        }
     });
-    
-    // Use document fragment for better performance
-    const fragment = document.createDocumentFragment();
-    
-    sortedMessages.forEach(msg => {
-        const isOwn = msg.username?.trim().toLowerCase() === currentUserSession?.username?.trim().toLowerCase();
-        const messageDiv = createMessageElement(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id);
-        
-        // ADD TOUCH LISTENERS TO ALL MESSAGES (including loaded ones)
-        addMessageTouchListeners(messageDiv);
-        
-        fragment.appendChild(messageDiv);
-    });
-    
-    if (isFirstLoad) {
-        elements.chatContainer.appendChild(fragment);
-        
-        // Scroll to bottom after rendering
-        requestAnimationFrame(() => {
-            elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
-        });
-    } else {
-        // Prepend for pagination
-        elements.chatContainer.prepend(fragment);
-    }
-    
-    // Update scroll state after rendering messages
-    setTimeout(updateScrollState, 0);
+}
+
+// Create a status indicator element
+function createStatusIndicator() {
+    const indicator = document.createElement('span');
+    indicator.className = 'user-status-indicator';
+    return indicator;
 }
 
 // Update online users lists
@@ -10373,30 +10359,6 @@ function removeUserFromSingleList(listElementId, countElementId, username) {
     }
 }
 
-// Update status indicator for a specific user
-function updateUserStatusIndicator(username, status) {
-    // Find all messages from this user and update their status
-    const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
-    userMessages.forEach(msg => {
-        let statusIndicator = msg.querySelector('.user-status-indicator');
-        if (!statusIndicator) {
-            statusIndicator = createStatusIndicator();
-            const usernameDiv = msg.querySelector('.username');
-            if (usernameDiv) {
-                usernameDiv.appendChild(statusIndicator);
-            }
-        }
-        statusIndicator.className = `user-status-indicator ${status}`;
-    });
-}
-
-// Create a status indicator element
-function createStatusIndicator() {
-    const indicator = document.createElement('span');
-    indicator.className = 'user-status-indicator';
-    return indicator;
-}
-
 // Handle typing events
 function setupTypingHandlers() {
     const messageInput = document.getElementById('user-input');
@@ -10426,8 +10388,6 @@ function checkIfAtBottom(container) {
 }
 
 // Private AI Go to Top button functions
-let privateGoTopBtn;
-let privateContainer;
 function handlePrivateScroll() {
     if (!privateContainer || !privateGoTopBtn) return;
     const scrollTop = privateContainer.scrollTop;
@@ -11364,4 +11324,3 @@ document.addEventListener('click', function (e) {
 </script>
 </body>
 </html>
- 
