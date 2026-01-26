@@ -190,6 +190,7 @@
     /* This will make the chat container adjust automatically */
     height: auto !important;
 }
+/* User status indicator styles */
 .user-status-indicator {
     display: inline-block;
     width: 8px;
@@ -202,6 +203,7 @@
 .user-status-indicator.online {
     background-color: #31a24c;
     box-shadow: 0 0 0 2px rgba(49, 162, 76, 0.2);
+    animation: pulse 2s infinite;
 }
 
 .user-status-indicator.offline {
@@ -225,6 +227,18 @@
 
 .username:hover {
     text-decoration: underline;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(49, 162, 76, 0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 4px rgba(49, 162, 76, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(49, 162, 76, 0);
+    }
 }
         
 /* FIXED: Chat input positioning */
@@ -4755,7 +4769,7 @@ html, body {
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
- <script>
+<script>
 // Opera Mini compatible messaging functions
 class OperaMiniMessenger {
   constructor() {
@@ -4860,7 +4874,7 @@ const operaMessenger = new OperaMiniMessenger();
 
 // Update the formatLastSeen function to be more precise
 function formatLastSeen(timestamp) {
-    if (!timestamp) return 'last seen a long time ago';
+    if (!timestamp) return 'a long time ago';
     
     const now = new Date();
     const lastSeen = new Date(timestamp);
@@ -4871,75 +4885,158 @@ function formatLastSeen(timestamp) {
     const diffMinutes = Math.floor(diffSeconds / 60);
     const diffHours = Math.floor(diffMinutes / 60);
     const diffDays = Math.floor(diffHours / 24);
+    const diffWeeks = Math.floor(diffDays / 7);
     
-    if (diffSeconds < 60) {
+    if (diffSeconds < 30) {
+        return 'just now';
+    } else if (diffSeconds < 60) {
         return 'just now';
     } else if (diffMinutes < 60) {
-        return `${diffMinutes} min${diffMinutes === 1 ? '' : 's'} ago`;
+        if (diffMinutes === 1) return '1 minute ago';
+        return `${diffMinutes} minutes ago`;
     } else if (diffHours < 24) {
-        return `${diffHours} hr${diffHours === 1 ? '' : 's'} ago`;
+        if (diffHours === 1) return '1 hour ago';
+        return `${diffHours} hours ago`;
     } else if (diffDays === 1) {
         return 'yesterday';
     } else if (diffDays < 7) {
-        return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
-    } else if (diffDays < 30) {
-        const weeks = Math.floor(diffDays / 7);
-        return `${weeks} week${weeks === 1 ? '' : 's'} ago`;
+        return `${diffDays} days ago`;
+    } else if (diffWeeks === 1) {
+        return '1 week ago';
+    } else if (diffWeeks < 4) {
+        return `${diffWeeks} weeks ago`;
     } else {
-        // Show date if more than a month
-        return lastSeen.toLocaleDateString();
-    }
-}
-
-// Function to update message status for a specific message
-function updateMessageStatus(messageId, status, lastSeen) {
-    const messageElement = document.querySelector(`[data-id="${messageId}"]`);
-    if (!messageElement) return;
-    
-    const usernameDiv = messageElement.querySelector('.username');
-    if (!usernameDiv) return;
-    
-    // Remove existing status indicators
-    const existingIndicator = usernameDiv.querySelector('.user-status-indicator');
-    const existingLastSeen = usernameDiv.querySelector('.last-seen-text');
-    
-    if (existingIndicator) existingIndicator.remove();
-    if (existingLastSeen) existingLastSeen.remove();
-    
-    // Add new status indicator based on user status
-    if (status === 'online') {
-        const statusIndicator = document.createElement('span');
-        statusIndicator.className = 'user-status-indicator online';
-        statusIndicator.title = 'Online';
-        usernameDiv.appendChild(statusIndicator);
-    } else {
-        // For offline users, show last seen time
-        const statusIndicator = document.createElement('span');
-        statusIndicator.className = 'user-status-indicator offline';
-        statusIndicator.title = 'Offline';
-        usernameDiv.appendChild(statusIndicator);
+        // More than a month ago, show the date
+        const month = lastSeen.toLocaleString('default', { month: 'short' });
+        const day = lastSeen.getDate();
+        const year = lastSeen.getFullYear();
         
-        // Add last seen text if available
-        if (lastSeen) {
-            const lastSeenText = document.createElement('span');
-            lastSeenText.className = 'last-seen-text';
-            lastSeenText.textContent = `last seen ${formatLastSeen(lastSeen)}`;
-            usernameDiv.appendChild(lastSeenText);
+        const currentYear = now.getFullYear();
+        if (year === currentYear) {
+            return `${month} ${day}`;
+        } else {
+            return `${month} ${day}, ${year}`;
         }
     }
 }
 
-// Function to update all messages from a specific user
-function updateAllMessagesFromUser(username, status, lastSeen) {
+// UPDATED: Update user status indicator with last seen time
+function updateUserStatusIndicator(username, status, lastSeen = null) {
+    console.log(`🔄 Updating status for ${username}: ${status}, lastSeen: ${lastSeen}`);
+    
+    // Find all messages from this user and update their status
     const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
-    userMessages.forEach(messageElement => {
-        const messageId = messageElement.dataset.id;
-        updateMessageStatus(messageId, status, lastSeen);
+    
+    userMessages.forEach(msg => {
+        const usernameDiv = msg.querySelector('.username');
+        if (!usernameDiv) return;
+        
+        // Remove existing status indicators
+        const existingIndicator = usernameDiv.querySelector('.user-status-indicator');
+        const existingLastSeen = usernameDiv.querySelector('.last-seen-text');
+        
+        if (existingIndicator) existingIndicator.remove();
+        if (existingLastSeen) existingLastSeen.remove();
+        
+        // Add new status indicator
+        if (status === 'online') {
+            // Show green dot for online users
+            const statusIndicator = document.createElement('span');
+            statusIndicator.className = 'user-status-indicator online';
+            statusIndicator.title = 'Online';
+            usernameDiv.appendChild(statusIndicator);
+        } else {
+            // For offline users, show grey dot and last seen time
+            const statusIndicator = document.createElement('span');
+            statusIndicator.className = 'user-status-indicator offline';
+            statusIndicator.title = 'Offline';
+            usernameDiv.appendChild(statusIndicator);
+            
+            // Add last seen text if available
+            if (lastSeen) {
+                const lastSeenText = document.createElement('span');
+                lastSeenText.className = 'last-seen-text';
+                lastSeenText.textContent = ` • last seen ${formatLastSeen(lastSeen)}`;
+                usernameDiv.appendChild(lastSeenText);
+            }
+        }
+    });
+    
+    // Also update in user directory if it's open
+    updateUserDirectoryStatus(username, status, lastSeen);
+}
+
+// NEW: Update user status in directory
+function updateUserDirectoryStatus(username, status, lastSeen = null) {
+    const userCards = document.querySelectorAll(`.user-directory-card`);
+    userCards.forEach(card => {
+        const usernameElement = card.querySelector('.directory-user-details');
+        if (usernameElement && usernameElement.textContent.includes(`@${username}`)) {
+            const statusDot = card.querySelector('.status-dot');
+            const statusText = card.querySelector('.directory-user-status');
+            
+            if (statusDot && statusText) {
+                if (status === 'online') {
+                    statusDot.style.backgroundColor = '#31a24c';
+                    statusText.innerHTML = `<span class="status-dot" style="background-color: #31a24c;"></span>
+                                           <span>Online</span>`;
+                } else {
+                    statusDot.style.backgroundColor = '#bcc0c4';
+                    if (lastSeen) {
+                        statusText.innerHTML = `<span class="status-dot" style="background-color: #bcc0c4;"></span>
+                                               <span>Last seen ${formatLastSeen(lastSeen)}</span>`;
+                    } else {
+                        statusText.innerHTML = `<span class="status-dot" style="background-color: #bcc0c4;"></span>
+                                               <span>Offline</span>`;
+                    }
+                }
+            }
+        }
     });
 }
 
-// Update the createMessageElement function to show last seen for offline users
-function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null, status = 'online', lastSeen = null) {
+// UPDATED: Function to update all messages from a specific user with last seen
+function updateAllMessagesFromUser(username, status, lastSeen) {
+    const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
+    console.log(`Updating ${userMessages.length} messages for ${username} to status: ${status}`);
+    
+    userMessages.forEach(messageElement => {
+        const usernameDiv = messageElement.querySelector('.username');
+        if (!usernameDiv) return;
+        
+        // Remove existing status indicators
+        const existingIndicator = usernameDiv.querySelector('.user-status-indicator');
+        const existingLastSeen = usernameDiv.querySelector('.last-seen-text');
+        
+        if (existingIndicator) existingIndicator.remove();
+        if (existingLastSeen) existingLastSeen.remove();
+        
+        // Add new status indicator based on user status
+        if (status === 'online') {
+            const statusIndicator = document.createElement('span');
+            statusIndicator.className = 'user-status-indicator online';
+            statusIndicator.title = 'Online';
+            usernameDiv.appendChild(statusIndicator);
+        } else {
+            // For offline users, show grey dot and last seen time
+            const statusIndicator = document.createElement('span');
+            statusIndicator.className = 'user-status-indicator offline';
+            statusIndicator.title = 'Offline';
+            usernameDiv.appendChild(statusIndicator);
+            
+            // Add last seen text if available
+            if (lastSeen) {
+                const lastSeenText = document.createElement('span');
+                lastSeenText.className = 'last-seen-text';
+                lastSeenText.textContent = ` • last seen ${formatLastSeen(lastSeen)}`;
+                usernameDiv.appendChild(lastSeenText);
+            }
+        }
+    });
+}
+
+// UPDATED: Create message element with last seen for offline users
+function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null, status = 'offline', lastSeen = null) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${sender}`;
     if (messageId) messageDiv.dataset.id = messageId;
@@ -4997,7 +5094,7 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
             statusIndicator.title = 'Online';
             usernameDiv.appendChild(statusIndicator);
         } else {
-            // For offline users, show last seen time
+            // For offline users, show grey dot and last seen time
             const statusIndicator = document.createElement('span');
             statusIndicator.className = 'user-status-indicator offline';
             statusIndicator.title = 'Offline';
@@ -5080,7 +5177,7 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
     return messageDiv;
 }
 
-// Update the displayMessage function to pass status and lastSeen
+// UPDATED: Display message with status and lastSeen
 function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true, status = 'offline', lastSeen = null) {
     if (!elements.chatContainer) return;
     
@@ -5090,7 +5187,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
         console.log('⚠️ Message already exists, skipping:', messageId);
         
         // Update status of existing message if needed
-        updateMessageStatus(messageId, status, lastSeen);
+        updateUserStatusIndicator(username, status, lastSeen);
         return;
     }
     
@@ -5113,7 +5210,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
     updateScrollState();
 }
 
-// Update the renderMessages function to include status and lastSeen from server response
+// UPDATED: Render messages with status and lastSeen from server response
 function renderMessages(messages, isFirstLoad = false) {
     if (!elements.chatContainer) return;
     
