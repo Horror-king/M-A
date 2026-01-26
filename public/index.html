@@ -190,56 +190,7 @@
     /* This will make the chat container adjust automatically */
     height: auto !important;
 }
-/* User status indicator styles */
-.user-status-indicator {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    margin-left: 5px;
-    vertical-align: middle;
-}
 
-.user-status-indicator.online {
-    background-color: #31a24c;
-    box-shadow: 0 0 0 2px rgba(49, 162, 76, 0.2);
-    animation: pulse 2s infinite;
-}
-
-.user-status-indicator.offline {
-    background-color: #bcc0c4;
-}
-
-.last-seen-text {
-    font-size: 11px;
-    color: #65676b;
-    margin-left: 5px;
-    font-style: italic;
-}
-
-.username {
-    display: flex;
-    align-items: center;
-    font-weight: bold;
-    margin-bottom: 4px;
-    cursor: pointer;
-}
-
-.username:hover {
-    text-decoration: underline;
-}
-
-@keyframes pulse {
-    0% {
-        box-shadow: 0 0 0 0 rgba(49, 162, 76, 0.4);
-    }
-    70% {
-        box-shadow: 0 0 0 4px rgba(49, 162, 76, 0);
-    }
-    100% {
-        box-shadow: 0 0 0 0 rgba(49, 162, 76, 0);
-    }
-}
 /* FIXED: Chat input positioning */
 .chat-input {
     display: none;
@@ -5084,8 +5035,8 @@ async function updateAllMessagesFromUser(username, status, lastSeen) {
     });
 }
 
-// UPDATED: Create message element with last seen for offline users - NOW FETCHES FROM API
-async function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null, status = 'offline', lastSeen = null) {
+// FIXED: Create message element with last seen for offline users - SIMPLIFIED VERSION
+function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null, status = 'offline', lastSeen = null) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${sender}`;
     if (messageId) messageDiv.dataset.id = messageId;
@@ -5135,40 +5086,6 @@ async function createMessageElement(text, sender, repliedTo = null, username = '
         // Create username text
         const usernameText = document.createTextNode(username + ' ');
         usernameDiv.appendChild(usernameText);
-        
-        // If status is offline, fetch last seen from API
-        let finalStatus = status;
-        let finalLastSeen = lastSeen;
-        
-        if (status === 'offline' && username) {
-            // Fetch last seen in background and update
-            fetchUserLastSeen(username).then(data => {
-                const existingIndicator = usernameDiv.querySelector('.user-status-indicator');
-                const existingLastSeen = usernameDiv.querySelector('.last-seen-text');
-                
-                if (existingIndicator) existingIndicator.remove();
-                if (existingLastSeen) existingLastSeen.remove();
-                
-                if (data.status === 'online') {
-                    const statusIndicator = document.createElement('span');
-                    statusIndicator.className = 'user-status-indicator online';
-                    statusIndicator.title = 'Online';
-                    usernameDiv.appendChild(statusIndicator);
-                } else {
-                    const statusIndicator = document.createElement('span');
-                    statusIndicator.className = 'user-status-indicator offline';
-                    statusIndicator.title = 'Offline';
-                    usernameDiv.appendChild(statusIndicator);
-                    
-                    if (data.last_seen) {
-                        const lastSeenText = document.createElement('span');
-                        lastSeenText.className = 'last-seen-text';
-                        lastSeenText.textContent = ` • last seen ${formatLastSeen(data.last_seen)}`;
-                        usernameDiv.appendChild(lastSeenText);
-                    }
-                }
-            });
-        }
         
         // Add initial status indicator
         if (status === 'online') {
@@ -5260,8 +5177,8 @@ async function createMessageElement(text, sender, repliedTo = null, username = '
     return messageDiv;
 }
 
-// UPDATED: Display message with status and lastSeen - NOW FETCHES FROM API
-async function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true, status = 'offline', lastSeen = null) {
+// FIXED: Display message with status and lastSeen - REMOVED ASYNC/AWAIT
+function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true, status = 'offline', lastSeen = null) {
     if (!elements.chatContainer) return;
     
     // Check if message already exists to prevent duplicates
@@ -5274,7 +5191,7 @@ async function displayMessage(text, sender, repliedTo = null, username = '', mes
         return;
     }
     
-    const messageDiv = await createMessageElement(text, sender, repliedTo, username, messageId, status, lastSeen);
+    const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId, status, lastSeen);
     
     // Add event listeners to ALL messages
     addMessageTouchListeners(messageDiv);
@@ -5291,11 +5208,18 @@ async function displayMessage(text, sender, repliedTo = null, username = '', mes
 
     // Update scroll state
     updateScrollState();
+    
+    // Update status indicator in background
+    if (username && status === 'offline') {
+        updateUserStatusIndicator(username, status, lastSeen);
+    }
 }
 
-// UPDATED: Render messages with status and lastSeen from server response
-async function renderMessages(messages, isFirstLoad = false) {
+// FIXED: Render messages with status and lastSeen from server response - SIMPLIFIED
+function renderMessages(messages, isFirstLoad = false) {
     if (!elements.chatContainer) return;
+    
+    console.log(`📨 Rendering ${messages.length} messages`);
     
     if (isFirstLoad) {
         // Clear container for first load
@@ -5313,20 +5237,29 @@ async function renderMessages(messages, isFirstLoad = false) {
     // Use document fragment for better performance
     const fragment = document.createDocumentFragment();
     
+    // Track unique users to update status
+    const usersToUpdate = new Set();
+    
     for (const msg of sortedMessages) {
         const isOwn = msg.username?.trim().toLowerCase() === currentUserSession?.username?.trim().toLowerCase();
         // Get user status from server response (msg.user_status) or default to offline
         let status = msg.user_status || 'offline';
         let lastSeen = msg.last_seen || null;
         
-        // If status is offline, fetch last seen from API
-        if (status === 'offline' && msg.username) {
-            const userData = await fetchUserLastSeen(msg.username);
-            status = userData.status;
-            lastSeen = userData.last_seen;
+        // Add user to update list
+        if (msg.username) {
+            usersToUpdate.add(msg.username);
         }
         
-        const messageDiv = await createMessageElement(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id, status, lastSeen);
+        const messageDiv = createMessageElement(
+            msg.content, 
+            isOwn ? 'sent' : 'received', 
+            msg.reply_to, 
+            msg.username, 
+            msg.id, 
+            status, 
+            lastSeen
+        );
         
         // ADD TOUCH LISTENERS TO ALL MESSAGES (including loaded ones)
         addMessageTouchListeners(messageDiv);
@@ -5340,14 +5273,19 @@ async function renderMessages(messages, isFirstLoad = false) {
         // Scroll to bottom after rendering
         requestAnimationFrame(() => {
             elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
+            isAtBottom = true;
         });
+        
+        console.log('✅ Messages rendered successfully');
     } else {
         // Prepend for pagination
         elements.chatContainer.prepend(fragment);
     }
     
-    // Update scroll state after rendering messages
-    setTimeout(updateScrollState, 0);
+    // Update user status indicators in background
+    usersToUpdate.forEach(username => {
+        updateUserStatusIndicator(username);
+    });
 }
 
 // ===== NEW: ALL USERS FUNCTIONALITY =====
@@ -10455,7 +10393,7 @@ function messageUser() {
     // This function is called from the popup message button
 }
 
-// ===== MODIFIED: OPTIMIZED MESSAGE LOADING WITH PAGINATION AND TOUCH LISTENERS =====
+// ===== FIXED: OPTIMIZED MESSAGE LOADING WITH PAGINATION AND TOUCH LISTENERS =====
 async function loadMessages() {
     if (isLoadingMessages) return;
     isLoadingMessages = true;
@@ -10486,7 +10424,7 @@ async function loadMessages() {
         // Check if we have more messages
         hasMoreMessages = data.length === MESSAGES_PER_PAGE;
         
-        await renderMessages(data, messagePage === 0);
+        renderMessages(data, messagePage === 0);
         
         if (hasMoreMessages) {
             messagePage++;
