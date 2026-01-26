@@ -240,7 +240,6 @@
         box-shadow: 0 0 0 0 rgba(49, 162, 76, 0);
     }
 }
-        
 /* FIXED: Chat input positioning */
 .chat-input {
     display: none;
@@ -4920,9 +4919,39 @@ function formatLastSeen(timestamp) {
     }
 }
 
-// UPDATED: Update user status indicator with last seen time
-function updateUserStatusIndicator(username, status, lastSeen = null) {
+// NEW: Function to fetch last seen time from API
+async function fetchUserLastSeen(username) {
+    if (!username) return { status: 'offline', last_seen: null };
+    
+    try {
+        const response = await fetch(`/api/user/last-seen/${username}`);
+        if (response.ok) {
+            const data = await response.json();
+            return {
+                status: data.status || 'offline',
+                last_seen: data.last_seen || null
+            };
+        }
+        return { status: 'offline', last_seen: null };
+    } catch (error) {
+        console.error(`❌ Error fetching last seen for ${username}:`, error);
+        return { status: 'offline', last_seen: null };
+    }
+}
+
+// UPDATED: Update user status indicator with last seen time - NOW FETCHES FROM API
+async function updateUserStatusIndicator(username, status, lastSeen = null) {
     console.log(`🔄 Updating status for ${username}: ${status}, lastSeen: ${lastSeen}`);
+    
+    // If status is not provided or is offline, fetch last seen from API
+    let finalStatus = status;
+    let finalLastSeen = lastSeen;
+    
+    if (!status || status === 'offline') {
+        const userData = await fetchUserLastSeen(username);
+        finalStatus = userData.status;
+        finalLastSeen = userData.last_seen;
+    }
     
     // Find all messages from this user and update their status
     const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
@@ -4939,7 +4968,7 @@ function updateUserStatusIndicator(username, status, lastSeen = null) {
         if (existingLastSeen) existingLastSeen.remove();
         
         // Add new status indicator
-        if (status === 'online') {
+        if (finalStatus === 'online') {
             // Show green dot for online users
             const statusIndicator = document.createElement('span');
             statusIndicator.className = 'user-status-indicator online';
@@ -4953,21 +4982,21 @@ function updateUserStatusIndicator(username, status, lastSeen = null) {
             usernameDiv.appendChild(statusIndicator);
             
             // Add last seen text if available
-            if (lastSeen) {
+            if (finalLastSeen) {
                 const lastSeenText = document.createElement('span');
                 lastSeenText.className = 'last-seen-text';
-                lastSeenText.textContent = ` • last seen ${formatLastSeen(lastSeen)}`;
+                lastSeenText.textContent = ` • last seen ${formatLastSeen(finalLastSeen)}`;
                 usernameDiv.appendChild(lastSeenText);
             }
         }
     });
     
     // Also update in user directory if it's open
-    updateUserDirectoryStatus(username, status, lastSeen);
+    updateUserDirectoryStatus(username, finalStatus, finalLastSeen);
 }
 
 // NEW: Update user status in directory
-function updateUserDirectoryStatus(username, status, lastSeen = null) {
+async function updateUserDirectoryStatus(username, status, lastSeen = null) {
     const userCards = document.querySelectorAll(`.user-directory-card`);
     userCards.forEach(card => {
         const usernameElement = card.querySelector('.directory-user-details');
@@ -4982,12 +5011,22 @@ function updateUserDirectoryStatus(username, status, lastSeen = null) {
                                            <span>Online</span>`;
                 } else {
                     statusDot.style.backgroundColor = '#bcc0c4';
-                    if (lastSeen) {
-                        statusText.innerHTML = `<span class="status-dot" style="background-color: #bcc0c4;"></span>
-                                               <span>Last seen ${formatLastSeen(lastSeen)}</span>`;
+                    // Fetch last seen from API if not provided
+                    let finalLastSeen = lastSeen;
+                    if (!lastSeen) {
+                        // We'll update this asynchronously
+                        fetchUserLastSeen(username).then(data => {
+                            if (data.last_seen) {
+                                statusText.innerHTML = `<span class="status-dot" style="background-color: #bcc0c4;"></span>
+                                                       <span>Last seen ${formatLastSeen(data.last_seen)}</span>`;
+                            } else {
+                                statusText.innerHTML = `<span class="status-dot" style="background-color: #bcc0c4;"></span>
+                                                       <span>Offline</span>`;
+                            }
+                        });
                     } else {
                         statusText.innerHTML = `<span class="status-dot" style="background-color: #bcc0c4;"></span>
-                                               <span>Offline</span>`;
+                                               <span>Last seen ${formatLastSeen(lastSeen)}</span>`;
                     }
                 }
             }
@@ -4995,10 +5034,20 @@ function updateUserDirectoryStatus(username, status, lastSeen = null) {
     });
 }
 
-// UPDATED: Function to update all messages from a specific user with last seen
-function updateAllMessagesFromUser(username, status, lastSeen) {
+// UPDATED: Function to update all messages from a specific user with last seen - NOW FETCHES FROM API
+async function updateAllMessagesFromUser(username, status, lastSeen) {
     const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
     console.log(`Updating ${userMessages.length} messages for ${username} to status: ${status}`);
+    
+    // If status is not provided or is offline, fetch last seen from API
+    let finalStatus = status;
+    let finalLastSeen = lastSeen;
+    
+    if (!status || status === 'offline') {
+        const userData = await fetchUserLastSeen(username);
+        finalStatus = userData.status;
+        finalLastSeen = userData.last_seen;
+    }
     
     userMessages.forEach(messageElement => {
         const usernameDiv = messageElement.querySelector('.username');
@@ -5012,7 +5061,7 @@ function updateAllMessagesFromUser(username, status, lastSeen) {
         if (existingLastSeen) existingLastSeen.remove();
         
         // Add new status indicator based on user status
-        if (status === 'online') {
+        if (finalStatus === 'online') {
             const statusIndicator = document.createElement('span');
             statusIndicator.className = 'user-status-indicator online';
             statusIndicator.title = 'Online';
@@ -5025,18 +5074,18 @@ function updateAllMessagesFromUser(username, status, lastSeen) {
             usernameDiv.appendChild(statusIndicator);
             
             // Add last seen text if available
-            if (lastSeen) {
+            if (finalLastSeen) {
                 const lastSeenText = document.createElement('span');
                 lastSeenText.className = 'last-seen-text';
-                lastSeenText.textContent = ` • last seen ${formatLastSeen(lastSeen)}`;
+                lastSeenText.textContent = ` • last seen ${formatLastSeen(finalLastSeen)}`;
                 usernameDiv.appendChild(lastSeenText);
             }
         }
     });
 }
 
-// UPDATED: Create message element with last seen for offline users
-function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null, status = 'offline', lastSeen = null) {
+// UPDATED: Create message element with last seen for offline users - NOW FETCHES FROM API
+async function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null, status = 'offline', lastSeen = null) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${sender}`;
     if (messageId) messageDiv.dataset.id = messageId;
@@ -5087,14 +5136,48 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
         const usernameText = document.createTextNode(username + ' ');
         usernameDiv.appendChild(usernameText);
         
-        // Add status indicator based on user status
+        // If status is offline, fetch last seen from API
+        let finalStatus = status;
+        let finalLastSeen = lastSeen;
+        
+        if (status === 'offline' && username) {
+            // Fetch last seen in background and update
+            fetchUserLastSeen(username).then(data => {
+                const existingIndicator = usernameDiv.querySelector('.user-status-indicator');
+                const existingLastSeen = usernameDiv.querySelector('.last-seen-text');
+                
+                if (existingIndicator) existingIndicator.remove();
+                if (existingLastSeen) existingLastSeen.remove();
+                
+                if (data.status === 'online') {
+                    const statusIndicator = document.createElement('span');
+                    statusIndicator.className = 'user-status-indicator online';
+                    statusIndicator.title = 'Online';
+                    usernameDiv.appendChild(statusIndicator);
+                } else {
+                    const statusIndicator = document.createElement('span');
+                    statusIndicator.className = 'user-status-indicator offline';
+                    statusIndicator.title = 'Offline';
+                    usernameDiv.appendChild(statusIndicator);
+                    
+                    if (data.last_seen) {
+                        const lastSeenText = document.createElement('span');
+                        lastSeenText.className = 'last-seen-text';
+                        lastSeenText.textContent = ` • last seen ${formatLastSeen(data.last_seen)}`;
+                        usernameDiv.appendChild(lastSeenText);
+                    }
+                }
+            });
+        }
+        
+        // Add initial status indicator
         if (status === 'online') {
             const statusIndicator = document.createElement('span');
             statusIndicator.className = 'user-status-indicator online';
             statusIndicator.title = 'Online';
             usernameDiv.appendChild(statusIndicator);
         } else {
-            // For offline users, show grey dot and last seen time
+            // For offline users, show grey dot
             const statusIndicator = document.createElement('span');
             statusIndicator.className = 'user-status-indicator offline';
             statusIndicator.title = 'Offline';
@@ -5177,8 +5260,8 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
     return messageDiv;
 }
 
-// UPDATED: Display message with status and lastSeen
-function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true, status = 'offline', lastSeen = null) {
+// UPDATED: Display message with status and lastSeen - NOW FETCHES FROM API
+async function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true, status = 'offline', lastSeen = null) {
     if (!elements.chatContainer) return;
     
     // Check if message already exists to prevent duplicates
@@ -5191,7 +5274,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
         return;
     }
     
-    const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId, status, lastSeen);
+    const messageDiv = await createMessageElement(text, sender, repliedTo, username, messageId, status, lastSeen);
     
     // Add event listeners to ALL messages
     addMessageTouchListeners(messageDiv);
@@ -5211,7 +5294,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
 }
 
 // UPDATED: Render messages with status and lastSeen from server response
-function renderMessages(messages, isFirstLoad = false) {
+async function renderMessages(messages, isFirstLoad = false) {
     if (!elements.chatContainer) return;
     
     if (isFirstLoad) {
@@ -5230,19 +5313,26 @@ function renderMessages(messages, isFirstLoad = false) {
     // Use document fragment for better performance
     const fragment = document.createDocumentFragment();
     
-    sortedMessages.forEach(msg => {
+    for (const msg of sortedMessages) {
         const isOwn = msg.username?.trim().toLowerCase() === currentUserSession?.username?.trim().toLowerCase();
         // Get user status from server response (msg.user_status) or default to offline
-        const status = msg.user_status || 'offline';
-        const lastSeen = msg.last_seen || null;
+        let status = msg.user_status || 'offline';
+        let lastSeen = msg.last_seen || null;
         
-        const messageDiv = createMessageElement(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id, status, lastSeen);
+        // If status is offline, fetch last seen from API
+        if (status === 'offline' && msg.username) {
+            const userData = await fetchUserLastSeen(msg.username);
+            status = userData.status;
+            lastSeen = userData.last_seen;
+        }
+        
+        const messageDiv = await createMessageElement(msg.content, isOwn ? 'sent' : 'received', msg.reply_to, msg.username, msg.id, status, lastSeen);
         
         // ADD TOUCH LISTENERS TO ALL MESSAGES (including loaded ones)
         addMessageTouchListeners(messageDiv);
         
         fragment.appendChild(messageDiv);
-    });
+    }
     
     if (isFirstLoad) {
         elements.chatContainer.appendChild(fragment);
@@ -5351,8 +5441,11 @@ async function loadAllUsers() {
                 allUsersList = data.users;
                 
                 // Cache profiles
-                allUsersList.forEach(user => {
+                for (const user of allUsersList) {
                     if (!profileCache[user.username]) {
+                        // Fetch last seen for each user
+                        const lastSeenData = await fetchUserLastSeen(user.username);
+                        
                         profileCache[user.username] = {
                             username: user.username,
                             firstname: user.firstname || '',
@@ -5364,14 +5457,14 @@ async function loadAllUsers() {
                             interests: user.interests || '',
                             avatar: user.avatar || `https://i.pravatar.cc/150?u=${user.username}`,
                             display_name: user.display_name || user.username,
-                            status: user.status || 'offline',
+                            status: lastSeenData.status || user.status || 'offline',
                             created_at: user.created_at || new Date().toISOString(),
-                            last_active: user.last_active || new Date().toISOString(),
+                            last_active: lastSeenData.last_seen || user.last_active || new Date().toISOString(),
                             message_count: user.message_count || 0,
                             post_count: user.post_count || 0
                         };
                     }
-                });
+                }
                 
                 // Update stats display
                 updateUserStats(data.total_count || allUsersList.length, data.new_users || 0);
@@ -5418,7 +5511,7 @@ function updateUserStats(totalUsers, newUsers) {
 }
 
 // Show sample users (for demo purposes) - OPTIMIZED
-function showSampleUsers() {
+async function showSampleUsers() {
     console.log('👥 Loading sample users...');
     
     // Create sample users array
@@ -5533,6 +5626,13 @@ function showSampleUsers() {
         ...user,
         avatar: `https://i.pravatar.cc/150?u=${user.username}`
     }));
+    
+    // Fetch last seen for each sample user
+    for (const user of allUsersList) {
+        const lastSeenData = await fetchUserLastSeen(user.username);
+        user.status = lastSeenData.status || user.status;
+        user.last_seen = lastSeenData.last_seen || null;
+    }
     
     // Update stats
     updateUserStats(allUsersList.length, 2);
@@ -5653,7 +5753,7 @@ function renderAllUsers() {
 }
 
 // Create user card element
-function createUserCard(user) {
+async function createUserCard(user) {
     const card = document.createElement('div');
     card.className = 'user-directory-card';
     
@@ -5666,11 +5766,16 @@ function createUserCard(user) {
                        diffDays < 7 ? `${diffDays} days ago` : 
                        joinDate.toLocaleDateString();
     
+    // Fetch last seen data
+    const lastSeenData = await fetchUserLastSeen(user.username);
+    const status = lastSeenData.status || user.status || 'offline';
+    const lastSeen = lastSeenData.last_seen || user.last_seen || null;
+    
     // Status color
     let statusColor = '#bcc0c4';
     let statusText = 'Offline';
     
-    switch (user.status) {
+    switch (status) {
         case 'online':
             statusColor = '#31a24c';
             statusText = 'Online';
@@ -5732,6 +5837,7 @@ function createUserCard(user) {
             <div class="directory-user-status">
                 <span class="status-dot" style="background-color: ${statusColor};"></span>
                 <span>${statusText}</span>
+                ${status === 'offline' && lastSeen ? `<span>• Last seen ${formatLastSeen(lastSeen)}</span>` : ''}
                 <span>• Joined ${timeJoined}</span>
                 ${user.location ? `<span>• ${user.location}</span>` : ''}
             </div>
@@ -9336,47 +9442,34 @@ async function loadPrivateUsers() {
         }
         
         // Add conversations to the list
-        conversations.forEach(conversation => {
+        for (const conversation of conversations) {
             const userItem = document.createElement('div');
             userItem.className = 'user-item';
             if (conversation.unread) userItem.classList.add('unread');
             userItem.dataset.username = conversation.username;
             userItem.onclick = () => openPrivateChat(conversation.username);
             
-            // For demo online status
-            const isOnline = onlineUsers.includes(conversation.username);
+            // Fetch user profile for avatar and status
+            const profile = await fetchUserProfileFromServer(conversation.username);
+            const lastSeenData = await fetchUserLastSeen(conversation.username);
+            const isOnline = lastSeenData.status === 'online';
             
-            // Fetch user profile for avatar
-            fetchUserProfileFromServer(conversation.username).then(profile => {
-                userItem.innerHTML = `
-                    <div class="user-avatar">
-                        <img src="${profile.avatar || getAvatarUrl(conversation.username)}" alt="${conversation.username}" loading="lazy">
-                        <div class="user-status ${isOnline ? 'online' : 'offline'}"></div>
-                        ${conversation.unread ? '<div class="unread-badge"></div>' : ''}
-                    </div>
-                    <div class="user-info">
-                        <div class="user-name">${profile.display_name || conversation.username}</div>
-                        <div class="user-last-message">${conversation.isSender ? 'You: ' : ''}${conversation.lastMessage || 'No messages'}</div>
-                        <div class="user-time">${formatMessageTime(conversation.lastMessageTime)}</div>
-                    </div>
-                `;
-            }).catch(() => {
-                userItem.innerHTML = `
-                    <div class="user-avatar">
-                        <img src="${getAvatarUrl(conversation.username)}" alt="${conversation.username}" loading="lazy">
-                        <div class="user-status ${isOnline ? 'online' : 'offline'}"></div>
-                        ${conversation.unread ? '<div class="unread-badge"></div>' : ''}
-                    </div>
-                    <div class="user-info">
-                        <div class="user-name">${conversation.username}</div>
-                        <div class="user-last-message">${conversation.isSender ? 'You: ' : ''}${conversation.lastMessage || 'No messages'}</div>
-                        <div class="user-time">${formatMessageTime(conversation.lastMessageTime)}</div>
-                    </div>
-                `;
-            });
+            userItem.innerHTML = `
+                <div class="user-avatar">
+                    <img src="${profile.avatar || getAvatarUrl(conversation.username)}" alt="${conversation.username}" loading="lazy">
+                    <div class="user-status ${isOnline ? 'online' : 'offline'}"></div>
+                    ${conversation.unread ? '<div class="unread-badge"></div>' : ''}
+                </div>
+                <div class="user-info">
+                    <div class="user-name">${profile.display_name || conversation.username}</div>
+                    <div class="user-last-message">${conversation.isSender ? 'You: ' : ''}${conversation.lastMessage || 'No messages'}</div>
+                    <div class="user-time">${formatMessageTime(conversation.lastMessageTime)}</div>
+                    ${!isOnline && lastSeenData.last_seen ? `<div class="user-last-seen">Last seen ${formatLastSeen(lastSeenData.last_seen)}</div>` : ''}
+                </div>
+            `;
             
             usersList.appendChild(userItem);
-        });
+        }
         
         // Add search functionality
         setupUsersSearch();
@@ -9411,23 +9504,28 @@ async function openPrivateChat(username) {
         privateMessagesHeader.style.padding = '8px 15px';
     }
     
-    // Update chat header with profile data
-    fetchUserProfileFromServer(username).then(profile => {
-        document.getElementById('partner-avatar').innerHTML = 
-            `<img src="${profile.avatar || getAvatarUrl(username)}" alt="${username}" loading="lazy">`;
-        
-        document.getElementById('partner-name').textContent = profile.display_name || username;
-    }).catch(() => {
-        document.getElementById('partner-avatar').innerHTML = 
-            `<img src="${getAvatarUrl(username)}" alt="${username}" loading="lazy">`;
-        
-        document.getElementById('partner-name').textContent = username;
-    });
+    // Update chat header with profile data and last seen
+    const profile = await fetchUserProfileFromServer(username);
+    const lastSeenData = await fetchUserLastSeen(username);
+    const isOnline = lastSeenData.status === 'online';
     
-    // Set online status
-    const isOnline = onlineUsers.includes(username);
-    document.getElementById('partner-status').textContent = isOnline ? 'Online' : 'Offline';
-    document.getElementById('partner-status').style.color = isOnline ? '#4CAF50' : '#65676b';
+    document.getElementById('partner-avatar').innerHTML = 
+        `<img src="${profile.avatar || getAvatarUrl(username)}" alt="${username}" loading="lazy">`;
+    
+    document.getElementById('partner-name').textContent = profile.display_name || username;
+    
+    // Set online status with last seen
+    if (isOnline) {
+        document.getElementById('partner-status').textContent = 'Online';
+        document.getElementById('partner-status').style.color = '#4CAF50';
+    } else {
+        if (lastSeenData.last_seen) {
+            document.getElementById('partner-status').textContent = `Last seen ${formatLastSeen(lastSeenData.last_seen)}`;
+        } else {
+            document.getElementById('partner-status').textContent = 'Offline';
+        }
+        document.getElementById('partner-status').style.color = '#65676b';
+    }
     
     // Show chat container and hide users panel
     showChatContainer();
@@ -9490,14 +9588,14 @@ async function loadPrivateMessages(username) {
         }
         
         // Display messages
-        messages.forEach(message => {
+        for (const message of messages) {
             displayPrivateUserMessage(
                 message.content, 
                 message.sender_username === currentUser ? 'sent' : 'received',
                 message.created_at,
                 message.sender_username
             );
-        });
+        }
         
         // Scroll to bottom
         setTimeout(() => {
@@ -9972,6 +10070,9 @@ async function loadProfile() {
         if (data.success) {
             const profile = data.profile;
             
+            // Fetch last seen data
+            const lastSeenData = await fetchUserLastSeen(username);
+            
             // Cache the profile
             profileCache[username] = {
                 username: profile.username,
@@ -9984,8 +10085,8 @@ async function loadProfile() {
                 interests: profile.interests || '',
                 avatar: profile.avatar || `https://i.pravatar.cc/150?u=${username}`,
                 display_name: profile.display_name || username,
-                status: profile.status || 'online',
-                last_seen: profile.last_seen || null
+                status: lastSeenData.status || profile.status || 'online',
+                last_seen: lastSeenData.last_seen || profile.last_seen || null
             };
             
             // Populate form fields
@@ -10145,6 +10246,7 @@ async function showUserProfile(username) {
     try {
         // Fetch user profile from server
         const profile = await fetchUserProfileFromServer(username);
+        const lastSeenData = await fetchUserLastSeen(username);
         
         // Update popup content
         document.getElementById('popup-avatar').src = profile.avatar || getAvatarUrl(username);
@@ -10163,7 +10265,7 @@ async function showUserProfile(username) {
         // Set status (check if user is online)
         const statusDot = document.getElementById('popup-status-dot');
         const statusText = document.getElementById('popup-status-text');
-        const isOnline = onlineUsers.includes(username);
+        const isOnline = lastSeenData.status === 'online';
         
         if (isOnline) {
             statusDot.className = `user-status-indicator online`;
@@ -10172,8 +10274,8 @@ async function showUserProfile(username) {
             // For offline users, show last seen time
             statusDot.className = `user-status-indicator offline`;
             // Show last seen time if available
-            if (profile.last_seen) {
-                statusText.textContent = `Last seen ${formatLastSeen(profile.last_seen)}`;
+            if (lastSeenData.last_seen) {
+                statusText.textContent = `Last seen ${formatLastSeen(lastSeenData.last_seen)}`;
             } else {
                 statusText.textContent = 'Offline';
             }
@@ -10384,7 +10486,7 @@ async function loadMessages() {
         // Check if we have more messages
         hasMoreMessages = data.length === MESSAGES_PER_PAGE;
         
-        renderMessages(data, messagePage === 0);
+        await renderMessages(data, messagePage === 0);
         
         if (hasMoreMessages) {
             messagePage++;
@@ -10403,7 +10505,17 @@ async function loadMessages() {
 }
 
 // ===== UPDATE USER STATUS INDICATOR FUNCTION (UPDATED WITH LAST SEEN) =====
-function updateUserStatusIndicator(username, status, lastSeen = null) {
+async function updateUserStatusIndicator(username, status, lastSeen = null) {
+    // Fetch last seen from API if not provided or status is offline
+    let finalStatus = status;
+    let finalLastSeen = lastSeen;
+    
+    if (!status || status === 'offline') {
+        const userData = await fetchUserLastSeen(username);
+        finalStatus = userData.status;
+        finalLastSeen = userData.last_seen;
+    }
+    
     // Find all messages from this user and update their status
     const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
     userMessages.forEach(msg => {
@@ -10424,7 +10536,7 @@ function updateUserStatusIndicator(username, status, lastSeen = null) {
         }
         
         if (statusIndicator) {
-            if (status === 'online') {
+            if (finalStatus === 'online') {
                 statusIndicator.className = 'user-status-indicator online';
                 statusIndicator.title = 'Online';
                 // Remove last seen text if it exists
@@ -10436,13 +10548,13 @@ function updateUserStatusIndicator(username, status, lastSeen = null) {
                 statusIndicator.title = 'Offline';
                 
                 // Update or add last seen text
-                if (lastSeen) {
+                if (finalLastSeen) {
                     if (!lastSeenText) {
                         lastSeenText = document.createElement('span');
                         lastSeenText.className = 'last-seen-text';
                         statusIndicator.parentNode.insertBefore(lastSeenText, statusIndicator.nextSibling);
                     }
-                    lastSeenText.textContent = `last seen ${formatLastSeen(lastSeen)}`;
+                    lastSeenText.textContent = `last seen ${formatLastSeen(finalLastSeen)}`;
                 }
             }
         }
@@ -10467,48 +10579,37 @@ function updateOnlineUsersList(onlineUsers) {
     updateSingleOnlineList('private-online-users-list', 'private-online-count', onlineUsers);
 }
 
-function updateSingleOnlineList(listElementId, countElementId, onlineUsers) {
+async function updateSingleOnlineList(listElementId, countElementId, onlineUsers) {
     const onlineList = document.getElementById(listElementId);
     const onlineCount = document.getElementById(countElementId);
     
     if (onlineList) {
         onlineList.innerHTML = '';
-        onlineUsers.forEach(user => {
+        for (const user of onlineUsers) {
             const userElement = document.createElement('div');
             userElement.className = 'online-user';
             
             // Fetch profile for each online user
-            fetchUserProfileFromServer(user).then(profile => {
-                const avatarUrl = profile.avatar || getAvatarUrl(user);
-                const displayName = profile.display_name || user;
-                
-                userElement.innerHTML = `
-                    <div class="online-user-avatar">
-                        <img src="${avatarUrl}" alt="${displayName}" loading="lazy">
-                        <div class="online-dot"></div>
-                    </div>
-                    <div class="online-user-info">
-                        <div class="online-user-name">${displayName}</div>
-                    </div>
-                `;
-            }).catch(() => {
-                userElement.innerHTML = `
-                    <div class="online-user-avatar">
-                        <img src="${getAvatarUrl(user)}" alt="${user}" loading="lazy">
-                        <div class="online-dot"></div>
-                    </div>
-                    <div class="online-user-info">
-                        <div class="online-user-name">${user}</div>
-                    </div>
-                `;
-            });
+            const profile = await fetchUserProfileFromServer(user);
+            const avatarUrl = profile.avatar || getAvatarUrl(user);
+            const displayName = profile.display_name || user;
+            
+            userElement.innerHTML = `
+                <div class="online-user-avatar">
+                    <img src="${avatarUrl}" alt="${displayName}" loading="lazy">
+                    <div class="online-dot"></div>
+                </div>
+                <div class="online-user-info">
+                    <div class="online-user-name">${displayName}</div>
+                </div>
+            `;
             
             userElement.onclick = () => {
                 showUserProfile(user);
             };
             
             onlineList.appendChild(userElement);
-        });
+        }
     }
     
     if (onlineCount) {
