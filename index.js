@@ -1604,17 +1604,46 @@ app.post('/api/ai/chat', async (req, res) => {
 
 // ===== ADD MESSAGES ENDPOINTS TO MATCH CLIENT =====
 
-// GET messages endpoint that client expects
+// GET messages endpoint - UPDATED TO INCLUDE USER STATUS
 app.get('/api/messages', async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const { data: messages, error: messagesError } = await supabase
       .from('chatter')
       .select('id, content, username, created_at, image_url, reply_to')
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
-    res.json(data || []);
+    if (messagesError) throw messagesError;
+
+    // Get unique usernames from messages
+    const usernames = [...new Set(messages.map(msg => msg.username))];
+    
+    // Fetch user profiles for these usernames
+    const { data: profiles, error: profilesError } = await supabase
+      .from('user_profiles')
+      .select('username, status, last_active')
+      .in('username', usernames);
+
+    // Create a map of username to profile data
+    const profileMap = {};
+    if (profiles && !profilesError) {
+      profiles.forEach(profile => {
+        profileMap[profile.username] = {
+          status: profile.status || 'offline',
+          last_seen: profile.last_active
+        };
+      });
+    }
+
+    // Combine messages with user status
+    const messagesWithStatus = messages.map(msg => ({
+      ...msg,
+      user_status: profileMap[msg.username]?.status || 'offline',
+      last_seen: profileMap[msg.username]?.last_seen || null
+    }));
+
+    res.json(messagesWithStatus || []);
   } catch (err) {
+    console.error('Error fetching messages:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
