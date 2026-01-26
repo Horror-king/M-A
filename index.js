@@ -1925,7 +1925,7 @@ app.get('/api/users/stats', async (req, res) => {
         const { count: totalUsers, error: countError } = await supabase
             .from('users')
             .select('*', { count: 'exact', head: true });
-        
+
         if (countError) {
             console.error('❌ Error counting users:', countError);
             return res.status(500).json({ error: "Failed to get user stats" });
@@ -1939,7 +1939,7 @@ app.get('/api/users/stats', async (req, res) => {
             .from('users')
             .select('*', { count: 'exact', head: true })
             .gte('created_at', today.toISOString());
-        
+
         if (newError) {
             console.error('❌ Error counting new users:', newError);
             return res.status(500).json({ error: "Failed to get new user stats" });
@@ -1953,7 +1953,7 @@ app.get('/api/users/stats', async (req, res) => {
             .from('users')
             .select('*', { count: 'exact', head: true })
             .gte('last_login', yesterday.toISOString());
-        
+
         if (activeError) {
             console.error('❌ Error counting active users:', activeError);
             return res.status(500).json({ error: "Failed to get active user stats" });
@@ -4094,13 +4094,20 @@ io.on('connection', (socket) => {
     if (username) {
       console.log('👤 User online:', username);
       
+      // Check if user was already tracked (returning after being away)
+      const existingUser = onlineUsers.get(username);
+      const lastSeenTime = existingUser ? existingUser.lastSeen : Date.now();
+      
       // Update or add user to online users
       onlineUsers.set(username, {
         socketId: socket.id,
         username: username,
-        lastSeen: Date.now(),
+        lastSeen: lastSeenTime, // Preserve last seen time if returning
         isOnline: true
       });
+      
+      // Update database status to online
+      updateUserStatusOnline(username);
       
       // Get current online users list
       const onlineUsersArray = Array.from(onlineUsers.keys());
@@ -4110,6 +4117,7 @@ io.on('connection', (socket) => {
       io.emit('user-status-change', { 
         username, 
         status: 'online',
+        lastSeen: null, // No last seen when online
         onlineUsers: onlineUsersArray
       });
     }
@@ -4128,6 +4136,7 @@ io.on('connection', (socket) => {
       io.emit('user-status-change', { 
         username, 
         status: 'away',
+        lastSeen: new Date(userData.lastSeen).toISOString(),
         onlineUsers: Array.from(onlineUsers.keys())
       });
     }
@@ -4256,31 +4265,48 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Handle disconnect properly
+  // Handle disconnect properly - UPDATED WITH LAST SEEN
   socket.on('disconnect', (reason) => {
     console.log('🔌 User disconnected:', socket.id, 'Reason:', reason);
     
-    // Find user by socket ID but DON'T remove them immediately
-    // They stay in the list for 5 minutes due to the timeout
+    // Find user by socket ID
     let foundUsername = null;
+    let userLastSeen = null;
+    
     for (let [username, data] of onlineUsers.entries()) {
       if (data.socketId === socket.id) {
         foundUsername = username;
-        // Update last seen but keep in list
+        userLastSeen = data.lastSeen; // Get the actual lastSeen timestamp
+        
+        // Update last seen but keep in list for 5 minutes
         data.lastSeen = Date.now();
         data.isOnline = false;
-        console.log('⏸️ User marked as inactive:', username);
+        
+        // Update last_active in database
+        updateUserLastActive(username);
+        
+        console.log('⏸️ User marked as inactive:', username, 'Last seen:', new Date(userLastSeen).toLocaleString());
         break;
       }
     }
     
-    // Don't remove from list immediately - let the timeout handle it
+    // If user was found, broadcast their offline status with last seen
     if (foundUsername) {
+      // Update the online users map
+      const userData = onlineUsers.get(foundUsername);
+      
+      // Broadcast to all users that this user is offline with last seen
+      const onlineUsersArray = Array.from(onlineUsers.keys());
+      
+      // FIX: Use the actual lastSeen time instead of current time
       io.emit('user-status-change', { 
         username: foundUsername, 
-        status: 'away',
-        onlineUsers: Array.from(onlineUsers.keys())
+        status: 'offline',
+        lastSeen: new Date(userLastSeen).toISOString(), // Use the actual lastSeen timestamp
+        onlineUsers: onlineUsersArray
       });
+      
+      console.log(`📢 Broadcasted offline status for ${foundUsername} with last seen:`, new Date(userLastSeen).toLocaleString());
     }
   });
   
@@ -4309,6 +4335,41 @@ function getPrivateChatRoomName(user1, user2) {
   return `private_chat_${users[0]}_${users[1]}`;
 }
 
+// Function to update user's last_active in database - ADD THIS FUNCTION
+async function updateUserLastActive(username) {
+  try {
+    console.log(`💾 Updating last_active for ${username} in database...`);
+    
+    await supabase
+      .from('user_profiles')
+      .update({ 
+        last_active: new Date().toISOString(),
+        status: 'offline'
+      })
+      .eq('username', username);
+    
+    console.log(`✅ Updated last_active for ${username}`);
+  } catch (error) {
+    console.error(`❌ Error updating last_active for ${username}:`, error.message);
+  }
+}
+
+// Add this function to update status to online
+async function updateUserStatusOnline(username) {
+  try {
+    await supabase
+      .from('user_profiles')
+      .update({ 
+        status: 'online',
+        last_active: new Date().toISOString()
+      })
+      .eq('username', username);
+    console.log(`✅ Updated status to online for ${username}`);
+  } catch (error) {
+    console.error(`❌ Error updating online status for ${username}:`, error.message);
+  }
+}
+
 // 5 MINUTE CLEANUP - Remove users after 5 minutes of inactivity for mobile users
 setInterval(() => {
   const now = Date.now();
@@ -4318,22 +4379,30 @@ setInterval(() => {
     // 5 minute timeout (300000 milliseconds) for mobile
     if (now - data.lastSeen > onlineStatusTimeout) {
       console.log('⏰ Removing inactive user (5 minutes):', username);
+      
+      // Update database before removing
+      updateUserLastActive(username);
+      
       onlineUsers.delete(username);
-      removedUsers.push(username);
+      removedUsers.push({
+        username: username,
+        lastSeen: data.lastSeen
+      });
     }
   }
   
   // Notify clients about removed users
   if (removedUsers.length > 0) {
     const onlineUsersArray = Array.from(onlineUsers.keys());
-    removedUsers.forEach(username => {
+    removedUsers.forEach(user => {
       io.emit('user-status-change', { 
-        username, 
+        username: user.username, 
         status: 'offline',
+        lastSeen: new Date(user.lastSeen).toISOString(),
         onlineUsers: onlineUsersArray
       });
     });
-    console.log('🧹 Cleaned up inactive users (5min timeout):', removedUsers);
+    console.log('🧹 Cleaned up inactive users (5min timeout):', removedUsers.map(u => u.username));
     console.log('📊 Current online users after cleanup:', onlineUsersArray);
   }
 }, 60000); // Check every 60 seconds
@@ -4420,6 +4489,42 @@ io.on('connection', (socket) => {
       socket.emit('message-update-error', { error: 'Failed to update message' });
     }
   });
+});
+
+// NEW: Get user's last seen time
+app.get('/api/user/last-seen/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    
+    const { data: profiles, error } = await supabase
+      .from('user_profiles')
+      .select('last_active, status')
+      .eq('username', username)
+      .limit(1);
+    
+    if (error) {
+      console.error('❌ Error fetching last seen:', error);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    
+    if (!profiles || profiles.length === 0) {
+      return res.json({ 
+        username: username,
+        status: 'offline',
+        last_seen: null,
+        message: 'User not found'
+      });
+    }
+    
+    res.json({
+      username: username,
+      status: profiles[0].status || 'offline',
+      last_seen: profiles[0].last_active
+    });
+  } catch (error) {
+    console.error('❌ Error in last-seen endpoint:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // Start server
