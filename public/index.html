@@ -4891,59 +4891,53 @@ function formatLastSeen(timestamp) {
     }
 }
 
-// Function to update user status in messages
-function updateUserStatusIndicator(username, status, lastSeen) {
-    // Find all messages from this user
-    const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
+// Function to update message status for a specific message
+function updateMessageStatus(messageId, status, lastSeen) {
+    const messageElement = document.querySelector(`[data-id="${messageId}"]`);
+    if (!messageElement) return;
     
-    userMessages.forEach(messageElement => {
-        const usernameDiv = messageElement.querySelector('.username');
-        if (!usernameDiv) return;
+    const usernameDiv = messageElement.querySelector('.username');
+    if (!usernameDiv) return;
+    
+    // Remove existing status indicators
+    const existingIndicator = usernameDiv.querySelector('.user-status-indicator');
+    const existingLastSeen = usernameDiv.querySelector('.last-seen-text');
+    
+    if (existingIndicator) existingIndicator.remove();
+    if (existingLastSeen) existingLastSeen.remove();
+    
+    // Add new status indicator based on user status
+    if (status === 'online') {
+        const statusIndicator = document.createElement('span');
+        statusIndicator.className = 'user-status-indicator online';
+        statusIndicator.title = 'Online';
+        usernameDiv.appendChild(statusIndicator);
+    } else {
+        // For offline users, show last seen time
+        const statusIndicator = document.createElement('span');
+        statusIndicator.className = 'user-status-indicator offline';
+        statusIndicator.title = 'Offline';
+        usernameDiv.appendChild(statusIndicator);
         
-        // Remove existing status indicators
-        const existingIndicator = usernameDiv.querySelector('.user-status-indicator');
-        const existingLastSeen = usernameDiv.querySelector('.last-seen-text');
-        
-        if (existingIndicator) existingIndicator.remove();
-        if (existingLastSeen) existingLastSeen.remove();
-        
-        // Add new status indicator
-        if (status === 'online') {
-            const statusIndicator = document.createElement('span');
-            statusIndicator.className = 'user-status-indicator online';
-            statusIndicator.title = 'Online';
-            usernameDiv.appendChild(statusIndicator);
-        } else {
-            // For offline users, show last seen time
-            const statusIndicator = document.createElement('span');
-            statusIndicator.className = 'user-status-indicator offline';
-            statusIndicator.title = 'Offline';
-            usernameDiv.appendChild(statusIndicator);
-            
-            // Add last seen text if available
-            if (lastSeen) {
-                const lastSeenText = document.createElement('span');
-                lastSeenText.className = 'last-seen-text';
-                lastSeenText.textContent = ` • last seen ${formatLastSeen(lastSeen)}`;
-                usernameDiv.appendChild(lastSeenText);
-            }
+        // Add last seen text if available
+        if (lastSeen) {
+            const lastSeenText = document.createElement('span');
+            lastSeenText.className = 'last-seen-text';
+            lastSeenText.textContent = `last seen ${formatLastSeen(lastSeen)}`;
+            usernameDiv.appendChild(lastSeenText);
         }
+    }
+}
+
+// Function to update all messages from a specific user
+function updateAllMessagesFromUser(username, status, lastSeen) {
+    const userMessages = document.querySelectorAll(`.message[data-username="${username}"]`);
+    userMessages.forEach(messageElement => {
+        const messageId = messageElement.dataset.id;
+        updateMessageStatus(messageId, status, lastSeen);
     });
 }
 
-// Update the Socket.io listener for user status changes
-if (socket) {
-    socket.on('user-status-change', (data) => {
-        console.log('👤 User status change:', data);
-        onlineUsers = data.onlineUsers || [];
-        updateOnlineUsersList(onlineUsers);
-        
-        // Update status for all messages from this user with last_seen
-        if (data.username && data.status) {
-            updateUserStatusIndicator(data.username, data.status, data.last_seen);
-        }
-    });
-}
 // Update the createMessageElement function to show last seen for offline users
 function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null, status = 'online', lastSeen = null) {
     const messageDiv = document.createElement('div');
