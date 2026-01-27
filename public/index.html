@@ -190,42 +190,7 @@
     /* This will make the chat container adjust automatically */
     height: auto !important;
 }
-.user-status-indicator {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    margin-left: 5px;
-    vertical-align: middle;
-}
-
-.user-status-indicator.online {
-    background-color: #31a24c;
-    box-shadow: 0 0 0 2px rgba(49, 162, 76, 0.2);
-}
-
-.user-status-indicator.offline {
-    background-color: #bcc0c4;
-}
-
-.last-seen-text {
-    font-size: 11px;
-    color: #65676b;
-    margin-left: 5px;
-    font-style: italic;
-}
-
-.username {
-    display: flex;
-    align-items: center;
-    font-weight: bold;
-    margin-bottom: 4px;
-    cursor: pointer;
-}
-
-.username:hover {
-    text-decoration: underline;
-}
+  
 /* FIXED: Chat input positioning */
 .chat-input {
     display: none;
@@ -5361,8 +5326,8 @@ function showAllUsersOnFirstVisit() {
 function initializeAllUsers() {
     console.log('👥 Initializing all users directory...');
     
-    // Render immediately - either cached users or empty state
-    renderAllUsers();
+    // Create the users container structure if it doesn't exist
+    createAllUsersContainer();
     
     // Setup UI components immediately
     setupAllUsersSearch();
@@ -5373,10 +5338,7 @@ function initializeAllUsers() {
         usersLoadStarted = true;
         
         // Show initial loading state
-        const container = document.getElementById('all-users-container');
-        if (container && allUsersList.length === 0) {
-            container.innerHTML = '<div class="no-users-found"><p>Loading users...</p></div>';
-        }
+        renderAllUsersLoading();
         
         // Load users without blocking UI
         setTimeout(() => {
@@ -5388,14 +5350,89 @@ function initializeAllUsers() {
     }
 }
 
+// Create all users container structure
+function createAllUsersContainer() {
+    const allUsersSection = document.getElementById('all-users');
+    if (!allUsersSection) return;
+    
+    // Remove existing structure if any
+    const existingMainContainer = allUsersSection.querySelector('.all-users-main-container');
+    if (existingMainContainer) {
+        existingMainContainer.remove();
+    }
+    
+    // Create main container
+    const mainContainer = document.createElement('div');
+    mainContainer.className = 'all-users-main-container';
+    
+    // Create header with stats
+    const header = document.createElement('div');
+    header.className = 'all-users-header';
+    header.innerHTML = `
+        <div class="all-users-title">
+            <h3><i class="fas fa-users"></i> All Users Directory</h3>
+            <div class="all-users-stats" id="all-users-stats">
+                <div class="user-stat-item">
+                    <i class="fas fa-users"></i>
+                    <span>0 Total Users</span>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Create search container
+    const searchContainer = document.createElement('div');
+    searchContainer.className = 'all-users-search-container';
+    searchContainer.innerHTML = `
+        <div class="search-input-group">
+            <i class="fas fa-search"></i>
+            <input type="text" id="all-users-search" placeholder="Search users by name, bio, location, or interests...">
+        </div>
+    `;
+    
+    // Create filter buttons
+    const filterContainer = document.createElement('div');
+    filterContainer.className = 'all-users-filters';
+    filterContainer.id = 'filter-buttons';
+    filterContainer.innerHTML = `
+        <button class="filter-btn active" onclick="filterUsers('all')">All Users</button>
+        <button class="filter-btn" onclick="filterUsers('online')">Online Now</button>
+        <button class="filter-btn" onclick="filterUsers('new')">New Users</button>
+        <button class="filter-btn" onclick="filterUsers('active')">Most Active</button>
+    `;
+    
+    // Create users container (scrollable)
+    const usersContainer = document.createElement('div');
+    usersContainer.id = 'all-users-container';
+    usersContainer.className = 'all-users-container';
+    
+    mainContainer.appendChild(header);
+    mainContainer.appendChild(searchContainer);
+    mainContainer.appendChild(filterContainer);
+    mainContainer.appendChild(usersContainer);
+    
+    allUsersSection.appendChild(mainContainer);
+    console.log('✅ All users container structure created');
+}
+
+// Show loading state
+function renderAllUsersLoading() {
+    const container = document.getElementById('all-users-container');
+    if (!container) return;
+    
+    container.innerHTML = `
+        <div class="users-loading">
+            <div class="loading-spinner"></div>
+            <p>Loading users...</p>
+        </div>
+    `;
+}
+
 // Load all users from server - OPTIMIZED for speed
 async function loadAllUsers() {
     try {
         console.log('🔄 Loading users from server...');
         
-        const container = document.getElementById('all-users-container');
-        
-        // Fetch all users from API
         const token = localStorage.getItem('auth_token');
         const response = await fetch('/api/users/all', {
             method: 'GET',
@@ -5403,41 +5440,19 @@ async function loadAllUsers() {
                 'Authorization': token ? `Bearer ${token}` : '',
                 'Content-Type': 'application/json'
             },
-            // Add cache control for better performance
             cache: 'no-cache'
         });
         
         if (response.ok) {
             const data = await response.json();
+            console.log('📊 Users data received:', data);
+            
             if (data.success && data.users) {
                 console.log(`✅ Loaded ${data.users.length} users from server`);
                 allUsersList = data.users;
                 
-                // Cache profiles
-                for (const user of allUsersList) {
-                    if (!profileCache[user.username]) {
-                        // Fetch last seen for each user
-                        const lastSeenData = await fetchUserLastSeen(user.username);
-                        
-                        profileCache[user.username] = {
-                            username: user.username,
-                            firstname: user.firstname || '',
-                            lastname: user.lastname || '',
-                            bio: user.bio || '',
-                            age: user.age || '',
-                            gender: user.gender || '',
-                            location: user.location || '',
-                            interests: user.interests || '',
-                            avatar: user.avatar || `https://i.pravatar.cc/150?u=${user.username}`,
-                            display_name: user.display_name || user.username,
-                            status: lastSeenData.status || user.status || 'offline',
-                            created_at: user.created_at || new Date().toISOString(),
-                            last_active: lastSeenData.last_seen || user.last_active || new Date().toISOString(),
-                            message_count: user.message_count || 0,
-                            post_count: user.post_count || 0
-                        };
-                    }
-                }
+                // Fetch last seen status for all users
+                await updateAllUsersStatus();
                 
                 // Update stats display
                 updateUserStats(data.total_count || allUsersList.length, data.new_users || 0);
@@ -5464,6 +5479,55 @@ async function loadAllUsers() {
     }
 }
 
+// Update status for all users
+async function updateAllUsersStatus() {
+    console.log('🔄 Updating status for all users...');
+    
+    const promises = allUsersList.map(async (user) => {
+        const lastSeenData = await fetchUserLastSeen(user.username);
+        
+        // Update user status based on last seen
+        const now = new Date();
+        const lastSeen = new Date(lastSeenData.last_seen || user.last_login);
+        const diffMinutes = (now - lastSeen) / (1000 * 60);
+        
+        // If user was active in the last 5 minutes, consider them online
+        if (diffMinutes <= 5 && lastSeenData.status !== 'offline') {
+            user.status = 'online';
+        } else {
+            user.status = 'offline';
+        }
+        
+        user.last_seen = lastSeenData.last_seen || user.last_login;
+        
+        // Cache profile
+        if (!profileCache[user.username]) {
+            profileCache[user.username] = {
+                username: user.username,
+                firstname: user.firstname || '',
+                lastname: user.lastname || '',
+                bio: user.bio || '',
+                age: user.age || '',
+                gender: user.gender || '',
+                location: user.location || '',
+                interests: user.interests || '',
+                avatar: user.avatar || `https://i.pravatar.cc/150?u=${user.username}`,
+                display_name: user.display_name || user.username,
+                status: user.status,
+                created_at: user.created_at || new Date().toISOString(),
+                last_active: user.last_seen || new Date().toISOString(),
+                message_count: user.message_count || 0,
+                post_count: user.post_count || 0
+            };
+        }
+        
+        return user;
+    });
+    
+    allUsersList = await Promise.all(promises);
+    console.log('✅ All users status updated');
+}
+
 // Update user statistics display
 function updateUserStats(totalUsers, newUsers) {
     const statsElement = document.getElementById('all-users-stats');
@@ -5472,6 +5536,10 @@ function updateUserStats(totalUsers, newUsers) {
             <div class="user-stat-item">
                 <i class="fas fa-users"></i>
                 <span>${totalUsers} Total Users</span>
+            </div>
+            <div class="user-stat-item">
+                <i class="fas fa-circle online"></i>
+                <span>${allUsersList.filter(u => u.status === 'online').length} Online Now</span>
             </div>
             ${newUsers > 0 ? `
                 <div class="user-stat-item new-users">
@@ -5487,125 +5555,112 @@ function updateUserStats(totalUsers, newUsers) {
 async function showSampleUsers() {
     console.log('👥 Loading sample users...');
     
-    // Create sample users array
+    // Create sample users array using your actual data structure
     const sampleUsers = [
         {
-            username: 'john_doe',
-            display_name: 'John Doe',
-            bio: 'Web developer and tech enthusiast',
-            age: 28,
-            gender: 'male',
-            location: 'New York',
-            interests: 'coding, hiking, photography',
+            username: 'Purity',
+            display_name: 'Purity',
+            bio: '',
+            age: null,
+            gender: '',
+            location: '',
+            interests: '',
+            status: 'online', // Changed to online for demo
+            created_at: '2026-01-17T09:05:49.554+00:00',
+            last_login: '2026-01-17T17:48:49.543+00:00',
+            message_count: 0,
+            post_count: 0,
+            join_date: '2026-01-17T09:05:49.554+00:00',
+            is_new_user: false
+        },
+        {
+            username: 'Boluayanf',
+            display_name: 'Boluayanf',
+            bio: '',
+            age: null,
+            gender: '',
+            location: '',
+            interests: '',
             status: 'online',
-            created_at: '2024-01-15T10:30:00Z',
-            message_count: 45,
-            post_count: 12
+            created_at: '2026-01-15T16:15:38.741+00:00',
+            last_login: '2026-01-20T13:10:22.455+00:00',
+            message_count: 0,
+            post_count: 0,
+            join_date: '2026-01-15T16:15:38.741+00:00',
+            is_new_user: false
         },
         {
-            username: 'jane_smith',
-            display_name: 'Jane Smith',
-            bio: 'Designer and artist',
-            age: 25,
-            gender: 'female',
-            location: 'Los Angeles',
-            interests: 'art, music, travel',
+            username: 'Admin',
+            display_name: 'Admin',
+            bio: 'Web dev',
+            age: null,
+            gender: '',
+            location: '',
+            interests: '',
             status: 'online',
-            created_at: '2024-01-20T14:20:00Z',
-            message_count: 32,
-            post_count: 8
+            created_at: '2025-10-17T17:40:48.808+00:00',
+            last_login: '2026-01-26T14:49:46.282+00:00',
+            message_count: 15,
+            post_count: 3,
+            join_date: '2025-10-17T17:40:48.808+00:00',
+            is_new_user: false
         },
         {
-            username: 'alex_wong',
-            display_name: 'Alex Wong',
-            bio: 'Student and gamer',
-            age: 21,
-            gender: 'male',
-            location: 'San Francisco',
-            interests: 'gaming, movies, coding',
-            status: 'away',
-            created_at: '2024-02-05T09:15:00Z',
-            message_count: 18,
-            post_count: 5
+            username: 'Bot',
+            display_name: 'Bot',
+            bio: 'Hassan chat-bot',
+            age: null,
+            gender: '',
+            location: '',
+            interests: '',
+            status: 'online',
+            created_at: '2025-10-19T03:11:11.542+00:00',
+            last_login: '2026-01-18T13:00:45.825+00:00',
+            message_count: 28,
+            post_count: 13,
+            join_date: '2025-10-19T03:11:11.542+00:00',
+            is_new_user: false
         },
         {
-            username: 'sarah_connor',
-            display_name: 'Sarah Connor',
-            bio: 'Fitness trainer and health coach',
-            age: 30,
-            gender: 'female',
-            location: 'Miami',
-            interests: 'fitness, nutrition, yoga',
+            username: 'Tony',
+            display_name: 'Tony',
+            bio: '',
+            age: null,
+            gender: '',
+            location: '',
+            interests: '',
             status: 'offline',
-            created_at: '2024-02-10T16:45:00Z',
-            message_count: 27,
-            post_count: 15
+            created_at: '2025-10-20T15:07:27.173+00:00',
+            last_login: '2026-01-26T21:47:50.107+00:00',
+            message_count: 5,
+            post_count: 0,
+            join_date: '2025-10-20T15:07:27.173+00:00',
+            is_new_user: false
         },
         {
-            username: 'mike_chen',
-            display_name: 'Mike Chen',
-            bio: 'Entrepreneur and food vlogger',
-            age: 35,
-            gender: 'male',
-            location: 'Seattle',
-            interests: 'cooking, business, travel',
-            status: 'online',
-            created_at: '2024-01-25T11:30:00Z',
-            message_count: 56,
-            post_count: 22
-        },
-        {
-            username: 'emma_jones',
-            display_name: 'Emma Jones',
-            bio: 'Writer and book lover',
-            age: 27,
-            gender: 'female',
-            location: 'Boston',
-            interests: 'reading, writing, coffee',
-            status: 'away',
-            created_at: '2024-02-12T13:20:00Z',
-            message_count: 14,
-            post_count: 6
-        },
-        {
-            username: 'david_lee',
-            display_name: 'David Lee',
-            bio: 'Musician and producer',
-            age: 29,
-            gender: 'male',
-            location: 'Austin',
-            interests: 'music, production, concerts',
+            username: 'testuser',
+            display_name: 'testuser',
+            bio: '',
+            age: null,
+            gender: '',
+            location: '',
+            interests: '',
             status: 'offline',
-            created_at: '2024-01-30T18:10:00Z',
-            message_count: 23,
-            post_count: 9
-        },
-        {
-            username: 'lisa_park',
-            display_name: 'Lisa Park',
-            bio: 'Photographer and traveler',
-            age: 26,
-            gender: 'female',
-            location: 'Chicago',
-            interests: 'photography, travel, nature',
-            status: 'online',
-            created_at: '2024-02-08T12:45:00Z',
-            message_count: 39,
-            post_count: 18
+            created_at: '2025-12-26T10:23:48.541085+00:00',
+            last_login: '2025-12-26T10:23:48.541085+00:00',
+            message_count: 0,
+            post_count: 0,
+            join_date: '2025-12-26T10:23:48.541085+00:00',
+            is_new_user: false
         }
     ];
     
     allUsersList = sampleUsers.map(user => ({
         ...user,
-        avatar: `https://i.pravatar.cc/150?u=${user.username}`
+        avatar: user.username === 'Bot' ? 'https://i.ibb.co/pvTzjSmJ/1767010794043.jpg' :
+                user.username === 'Admin' ? 'https://i.ibb.co/6cc65wpZ/Screenshot-20260105-190457-Opera-Mini.jpg' :
+                `https://i.pravatar.cc/150?u=${user.username}`
     }));
-    
-    // Fetch last seen for each sample user
-    for (const user of allUsersList) {
-        const lastSeenData = await fetchUserLastSeen(user.username);
-        user.status = lastSeenData.status || user.status;
-        user.last_seen = lastSeenData.last_seen || null;
-    }
     
     // Update stats
     updateUserStats(allUsersList.length, 2);
@@ -5696,37 +5751,33 @@ function renderAllUsers() {
         return;
     }
     
+    // If users are still loading
+    if (!isUsersLoaded) {
+        container.innerHTML = `
+            <div class="users-loading">
+                <div class="loading-spinner"></div>
+                <p>Loading users...</p>
+            </div>
+        `;
+        return;
+    }
+    
     // If users are loaded, show them immediately
     if (filteredUsers.length > 0) {
         container.innerHTML = '';
         
-        // Render first few users immediately for instant display
-        const usersToRender = filteredUsers.slice(0, 8); // Render first 8 immediately
-        
-        usersToRender.forEach(user => {
+        // Render all users immediately
+        filteredUsers.forEach(user => {
             const userCard = createUserCard(user);
             container.appendChild(userCard);
         });
         
-        // If there are more users, render them in the background
-        if (filteredUsers.length > 8) {
-            setTimeout(() => {
-                const remainingUsers = filteredUsers.slice(8);
-                remainingUsers.forEach(user => {
-                    const userCard = createUserCard(user);
-                    container.appendChild(userCard);
-                });
-                console.log(`✅ Rendered all ${filteredUsers.length} users`);
-            }, 100);
-        } else {
-            console.log(`✅ Rendered ${filteredUsers.length} users`);
-        }
+        console.log(`✅ Rendered ${filteredUsers.length} users`);
     }
-    // If users are not loaded yet, keep the loading message
 }
 
 // Create user card element
-async function createUserCard(user) {
+function createUserCard(user) {
     const card = document.createElement('div');
     card.className = 'user-directory-card';
     
@@ -5739,19 +5790,14 @@ async function createUserCard(user) {
                        diffDays < 7 ? `${diffDays} days ago` : 
                        joinDate.toLocaleDateString();
     
-    // Fetch last seen data
-    const lastSeenData = await fetchUserLastSeen(user.username);
-    const status = lastSeenData.status || user.status || 'offline';
-    const lastSeen = lastSeenData.last_seen || user.last_seen || null;
-    
     // Status color
     let statusColor = '#bcc0c4';
     let statusText = 'Offline';
     
-    switch (status) {
+    switch (user.status) {
         case 'online':
             statusColor = '#31a24c';
-            statusText = 'Online';
+            statusText = 'Online Now';
             break;
         case 'away':
             statusColor = '#f7b928';
@@ -5771,7 +5817,7 @@ async function createUserCard(user) {
     else if (activityScore > 5) activityLevel = 'Regular';
     
     // Check if user is new (joined in last 7 days)
-    const isNewUser = diffDays <= 7;
+    const isNewUser = diffDays <= 7 || user.is_new_user;
     
     card.innerHTML = `
         <div class="directory-user-header">
@@ -5810,7 +5856,7 @@ async function createUserCard(user) {
             <div class="directory-user-status">
                 <span class="status-dot" style="background-color: ${statusColor};"></span>
                 <span>${statusText}</span>
-                ${status === 'offline' && lastSeen ? `<span>• Last seen ${formatLastSeen(lastSeen)}</span>` : ''}
+                ${user.status === 'offline' && user.last_seen ? `<span>• Last seen ${formatLastSeen(user.last_seen)}</span>` : ''}
                 <span>• Joined ${timeJoined}</span>
                 ${user.location ? `<span>• ${user.location}</span>` : ''}
             </div>
@@ -5890,7 +5936,7 @@ function setupAllUsersFilters() {
     if (!filterButtons.querySelector('.filter-btn')) {
         filterButtons.innerHTML = `
             <button class="filter-btn active" onclick="filterUsers('all')">All Users</button>
-            <button class="filter-btn" onclick="filterUsers('online')">Online</button>
+            <button class="filter-btn" onclick="filterUsers('online')">Online Now</button>
             <button class="filter-btn" onclick="filterUsers('new')">New Users</button>
             <button class="filter-btn" onclick="filterUsers('active')">Most Active</button>
         `;
@@ -5915,16 +5961,17 @@ function startAllUsersRefresh() {
         clearInterval(usersRefreshInterval);
     }
     
-    // Refresh every 60 seconds, but only if container is visible
+    // Refresh every 30 seconds, but only if container is visible
     usersRefreshInterval = setInterval(() => {
         if (document.getElementById('all-users') && 
             document.getElementById('all-users').style.display === 'block' &&
             isUsersLoaded) {
             
             console.log('🔄 Refreshing users data...');
-            loadAllUsers();
+            updateAllUsersStatus();
+            filterUsers(currentFilter);
         }
-    }, 60000); // 60 seconds
+    }, 30000); // 30 seconds
 }
 
 // Add this to the initialization code
@@ -5945,7 +5992,7 @@ function onUserLoginSuccess(username) {
     showAllUsersOnFirstVisit();
 }
 
-// Modify the showContainer function for immediate loading
+// MODIFIED: Modify the showContainer function to initialize all users when showing the container
 function showContainer(containerId) {
     console.log('🔄 Showing container:', containerId);
     
@@ -9234,7 +9281,6 @@ function closeZoom() {
     if (overlay) overlay.style.display = 'none';
 }
 
-// --- CUT HERE ---
 // ===== OPTIMIZED INITIALIZATION FUNCTIONS =====
 function initializeButtons() {
     console.log('Initializing buttons...');
