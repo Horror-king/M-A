@@ -5375,8 +5375,10 @@ function showAllUsersOnFirstVisit() {
 function initializeAllUsers() {
     console.log('👥 Initializing all users directory...');
     
-    // Create the users container structure if it doesn't exist
-    createAllUsersContainer();
+    // Don't create container - use existing HTML structure
+    // Remove any existing loading state
+    const loadingElements = document.querySelectorAll('.no-users-found, .users-loading');
+    loadingElements.forEach(el => el.remove());
     
     // Setup UI components immediately
     setupAllUsersSearch();
@@ -5386,8 +5388,16 @@ function initializeAllUsers() {
     if (!isUsersLoaded && !usersLoadStarted) {
         usersLoadStarted = true;
         
-        // Show initial loading state
-        renderAllUsersLoading();
+        // Show initial loading state in the existing container
+        const container = document.getElementById('all-users-container');
+        if (container) {
+            container.innerHTML = `
+                <div class="users-loading" style="text-align: center; padding: 40px;">
+                    <div class="loading-spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid #4267B2; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px;"></div>
+                    <p style="color: #65676b;">Loading users...</p>
+                </div>
+            `;
+        }
         
         // Load users without blocking UI
         setTimeout(() => {
@@ -5399,7 +5409,7 @@ function initializeAllUsers() {
     }
 }
 
-// Create all users container structure
+// COMMENT OUT OR REMOVE THIS FUNCTION:
 function createAllUsersContainer() {
     const allUsersSection = document.getElementById('all-users');
     if (!allUsersSection) return;
@@ -5410,58 +5420,7 @@ function createAllUsersContainer() {
         existingMainContainer.remove();
     }
     
-    // Create main container
-    const mainContainer = document.createElement('div');
-    mainContainer.className = 'all-users-main-container';
-    
-    // Create header with stats
-    const header = document.createElement('div');
-    header.className = 'all-users-header';
-    header.innerHTML = `
-        <div class="all-users-title">
-            <h3><i class="fas fa-users"></i> All Users Directory</h3>
-            <div class="all-users-stats" id="all-users-stats">
-                <div class="user-stat-item">
-                    <i class="fas fa-users"></i>
-                    <span>0 Total Users</span>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    // Create search container
-    const searchContainer = document.createElement('div');
-    searchContainer.className = 'all-users-search-container';
-    searchContainer.innerHTML = `
-        <div class="search-input-group">
-            <i class="fas fa-search"></i>
-            <input type="text" id="all-users-search" placeholder="Search users by name, bio, location, or interests...">
-        </div>
-    `;
-    
-    // Create filter buttons
-    const filterContainer = document.createElement('div');
-    filterContainer.className = 'all-users-filters';
-    filterContainer.id = 'filter-buttons';
-    filterContainer.innerHTML = `
-        <button class="filter-btn active" onclick="filterUsers('all')">All Users</button>
-        <button class="filter-btn" onclick="filterUsers('online')">Online Now</button>
-        <button class="filter-btn" onclick="filterUsers('new')">New Users</button>
-        <button class="filter-btn" onclick="filterUsers('active')">Most Active</button>
-    `;
-    
-    // Create users container (scrollable)
-    const usersContainer = document.createElement('div');
-    usersContainer.id = 'all-users-container';
-    usersContainer.className = 'all-users-container';
-    
-    mainContainer.appendChild(header);
-    mainContainer.appendChild(searchContainer);
-    mainContainer.appendChild(filterContainer);
-    mainContainer.appendChild(usersContainer);
-    
-    allUsersSection.appendChild(mainContainer);
-    console.log('✅ All users container structure created');
+    // ... rest of the function ...
 }
 
 // Show loading state
@@ -5514,18 +5473,38 @@ async function loadAllUsers() {
                 
                 console.log('✅ Users loaded and displayed successfully');
             } else {
-                console.log('⚠️ Using sample users (server data format issue)');
-                showSampleUsers();
+                console.log('⚠️ Server data format issue');
+                // Show empty state instead of sample users
+                showNoUsersFound();
             }
         } else {
-            console.log('⚠️ Using sample users (server error)');
-            showSampleUsers();
+            console.log('⚠️ Server error');
+            // Show empty state instead of sample users
+            showNoUsersFound();
         }
     } catch (error) {
         console.error('Error loading all users:', error);
-        console.log('⚠️ Using sample users (fetch error)');
-        showSampleUsers();
+        // Show empty state instead of sample users
+        showNoUsersFound();
     }
+}
+
+// Add this helper function
+function showNoUsersFound() {
+    const container = document.getElementById('all-users-container');
+    if (container) {
+        container.innerHTML = `
+            <div class="no-users-found">
+                <i class="fas fa-users" style="font-size: 48px; color: #ddd; margin-bottom: 15px;"></i>
+                <p>No users found or failed to load</p>
+                <button onclick="loadAllUsers()" class="filter-btn" style="margin-top: 15px;">
+                    Try Again
+                </button>
+            </div>
+        `;
+    }
+    isUsersLoaded = false;
+    usersLoadStarted = false;
 }
 
 // Update status for all users
@@ -6125,6 +6104,7 @@ function showContainer(containerId) {
         // NEW: Initialize all users when showing the all-users container - IMMEDIATELY
         if (containerId === 'all-users') {
             console.log('👥 Initializing all users directory...');
+            // DO NOT call createAllUsersContainer() - use existing HTML
             initializeAllUsers();
             
             // Start auto-refresh for online status updates
