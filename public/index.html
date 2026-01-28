@@ -6478,23 +6478,22 @@ function renderPosts() {
     });
 }
 
-// UPDATED: Create post element with image URL detection
+// UPDATED: Create post element with image URL detection - MODIFIED TO USE ACTUAL PROFILE AVATAR
 function createPostElement(post) {
     const postDiv = document.createElement('div');
     postDiv.className = 'post-card';
     postDiv.dataset.postId = post.id;
     
     const timeAgo = formatPostTime(post.timestamp);
-    const userProfile = getUserProfile(post.author);
     
-    // Process content to detect and display images
-    const processedContent = processContentForMultipleImages(post.content);
+    // Fetch user profile to get actual avatar - MODIFIED: Use getUserProfile which gets from cache/server
+    const userProfile = getUserProfile(post.author);
     
     postDiv.innerHTML = `
         <div class="post-header">
             <img class="post-author-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/50?u=${post.author}`}" alt="${post.author}">
             <div class="post-author-info">
-                <div class="post-author-name">${userProfile.displayName || post.author}</div>
+                <div class="post-author-name">${userProfile.display_name || userProfile.displayName || post.author}</div>
                 <div class="post-meta">
                     <span class="post-time">${timeAgo}</span>
                     <span>•</span>
@@ -6502,16 +6501,7 @@ function createPostElement(post) {
                 </div>
             </div>
         </div>
-        ${processedContent.text ? `<div class="post-content">${processedContent.text}</div>` : ''}
-        ${processedContent.images.length > 0 ? `
-            <div class="post-media">
-                ${processedContent.images.map(url => `
-                    <div class="post-image-container">
-                        <img src="${escapeHtml(url)}" alt="Post image" onclick="openZoom('${escapeHtml(url)}')" loading="lazy">
-                    </div>
-                `).join('')}
-            </div>
-        ` : ''}
+        ${post.content ? `<div class="post-content">${escapeHtml(post.content)}</div>` : ''}
         ${post.media ? `
             <div class="post-media">
                 ${post.media.type === 'image' ? 
@@ -6549,15 +6539,18 @@ function createPostElement(post) {
                 </button>
             </div>
             <div class="comments-list" id="comments-list-${post.id}">
-                ${post.comments ? post.comments.map(comment => `
+                ${post.comments ? post.comments.map(comment => {
+                    // Fetch comment author's profile for avatar - MODIFIED: Use getUserProfile
+                    const commentAuthorProfile = getUserProfile(comment.author_username || comment.author);
+                    return `
                     <div class="comment">
-                        <img class="comment-avatar" src="${getUserProfile(comment.author_username || comment.author).avatar || `https://i.pravatar.cc/32?u=${comment.author_username || comment.author}`}" alt="${comment.author_username || comment.author}">
+                        <img class="comment-avatar" src="${commentAuthorProfile.avatar || `https://i.pravatar.cc/32?u=${comment.author_username || comment.author}`}" alt="${comment.author_username || comment.author}">
                         <div class="comment-content">
-                            <div class="comment-author">${getUserProfile(comment.author_username || comment.author).displayName || (comment.author_username || comment.author)}</div>
+                            <div class="comment-author">${commentAuthorProfile.display_name || commentAuthorProfile.displayName || (comment.author_username || comment.author)}</div>
                             <div class="comment-text">${escapeHtml(comment.content || comment.text)}</div>
                         </div>
                     </div>
-                `).join('') : '<div class="no-comments">No comments yet</div>'}
+                `}).join('') : '<div class="no-comments">No comments yet</div>'}
             </div>
             <div class="comment-input">
                 <input type="text" id="comment-input-${post.id}" placeholder="Write a comment..." onkeypress="handleCommentKeypress(event, '${post.id}')">
@@ -6857,12 +6850,13 @@ function updateCommentsUI(postId) {
                     const commentElement = document.createElement('div');
                     commentElement.className = 'comment';
                     
+                    // Fetch comment author's profile for avatar - MODIFIED: Use getUserProfile
                     const userProfile = getUserProfile(comment.author_username || comment.author);
                     
                     commentElement.innerHTML = `
                         <img class="comment-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/32?u=${comment.author_username || comment.author}`}" alt="${comment.author_username || comment.author}">
                         <div class="comment-content">
-                            <div class="comment-author">${userProfile.displayName || (comment.author_username || comment.author)}</div>
+                            <div class="comment-author">${userProfile.display_name || userProfile.displayName || (comment.author_username || comment.author)}</div>
                             <div class="comment-text">${escapeHtml(comment.content || comment.text)}</div>
                         </div>
                     `;
@@ -6994,7 +6988,7 @@ function openCreatePostModal() {
         if (currentUser) {
             const userProfile = getUserProfile(currentUser);
             document.getElementById('post-author-avatar').src = userProfile.avatar || `https://i.pravatar.cc/50?u=${currentUser}`;
-            document.getElementById('post-author-name').textContent = userProfile.displayName || currentUser;
+            document.getElementById('post-author-name').textContent = userProfile.display_name || userProfile.displayName || currentUser;
         }
         
         // Reset form
@@ -7130,9 +7124,26 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// MODIFIED: Get user profile - updated to fetch from cache/server and return proper profile object
 function getUserProfile(username) {
+    // First check if we have the profile in cache
+    if (profileCache[username]) {
+        return profileCache[username];
+    }
+    
+    // Check local storage for profiles
     const profiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
-    return profiles[username] || { username: username };
+    if (profiles[username]) {
+        return profiles[username];
+    }
+    
+    // Return default profile with proper structure
+    return { 
+        username: username,
+        display_name: username,
+        displayName: username, // Keep both for compatibility
+        avatar: `https://i.pravatar.cc/50?u=${username}`
+    };
 }
 
 // MODIFIED: sendMessage function to use OperaMiniMessenger when on Opera Mini
