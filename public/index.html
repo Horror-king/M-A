@@ -5169,14 +5169,26 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
             contentDiv.appendChild(replyBubble);
         }
 
-        const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
-        const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
+        // IMPROVED: Better image link detection
+        // Check for common raw content URLs that might contain image data
+        const pastebinPattern = /https?:\/\/(?:pastebin\.com\/raw\/|pastebin\.com\/)[^\s]+/gi;
+        const rawGithubPattern = /https?:\/\/(?:raw\.githubusercontent\.com\/|gist\.githubusercontent\.com\/)[^\s]+/gi;
+        const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp|bmp|svg))(?:\?[^\s]*)?/gi;
+        const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))(?:\?[^\s]*)?/gi;
+        
+        // Extract all URLs
+        const pastebinMatches = [...text.matchAll(pastebinPattern)];
+        const rawGithubMatches = [...text.matchAll(rawGithubPattern)];
         const imageMatches = [...text.matchAll(imagePattern)];
         const audioMatches = [...text.matchAll(audioPattern)];
+        
         let modifiedText = text;
-        [...imageMatches, ...audioMatches].forEach(match => {
+        
+        // Remove all matched URLs from text
+        [...pastebinMatches, ...rawGithubMatches, ...imageMatches, ...audioMatches].forEach(match => {
             modifiedText = modifiedText.replace(match[0], '');
         });
+        
         modifiedText = modifiedText.trim();
         
         if (modifiedText) {
@@ -5185,7 +5197,84 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
             contentDiv.appendChild(textDiv);
         }
 
-        // Use lazy loading for images
+        // Process pastebin/raw GitHub URLs as potential image/text content
+        const processRawContentUrls = async (urls) => {
+            for (const match of urls) {
+                const url = match[0];
+                try {
+                    const response = await fetch(url);
+                    if (response.ok) {
+                        const content = await response.text();
+                        // Check if content looks like an image (contains data:image or base64)
+                        if (content.includes('data:image') || content.includes('base64')) {
+                            // Try to extract image data
+                            const base64Match = content.match(/data:image\/[^;]+;base64,([^'"\s]+)/);
+                            if (base64Match && base64Match[1]) {
+                                const img = new Image();
+                                img.src = `data:image/png;base64,${base64Match[1]}`;
+                                img.alt = "image from pastebin";
+                                img.loading = "lazy";
+                                img.style.maxWidth = "100%";
+                                img.style.height = "auto";
+                                img.style.borderRadius = "8px";
+                                img.style.marginTop = "5px";
+                                img.style.cursor = "pointer";
+                                img.onclick = () => openZoom(img.src);
+                                contentDiv.appendChild(img);
+                            } else {
+                                // Display as text if not an image
+                                const pre = document.createElement('pre');
+                                pre.style.cssText = `
+                                    background: #f5f5f5;
+                                    padding: 10px;
+                                    border-radius: 5px;
+                                    overflow-x: auto;
+                                    margin-top: 5px;
+                                    font-size: 12px;
+                                    white-space: pre-wrap;
+                                    word-wrap: break-word;
+                                `;
+                                pre.textContent = content.substring(0, 500) + (content.length > 500 ? '...' : '');
+                                contentDiv.appendChild(pre);
+                            }
+                        } else {
+                            // Display raw text content
+                            const pre = document.createElement('pre');
+                            pre.style.cssText = `
+                                background: #f5f5f5;
+                                padding: 10px;
+                                border-radius: 5px;
+                                overflow-x: auto;
+                                margin-top: 5px;
+                                font-size: 12px;
+                                white-space: pre-wrap;
+                                word-wrap: break-word;
+                            `;
+                            pre.textContent = content.substring(0, 500) + (content.length > 500 ? '...' : '');
+                            contentDiv.appendChild(pre);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error fetching raw content:', error);
+                    // Display as link if fetch fails
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.textContent = url;
+                    link.target = "_blank";
+                    link.rel = "noopener noreferrer";
+                    link.style.cssText = `
+                        color: #0066cc;
+                        text-decoration: underline;
+                        display: block;
+                        margin-top: 5px;
+                        word-break: break-all;
+                    `;
+                    contentDiv.appendChild(link);
+                }
+            }
+        };
+
+        // Process image matches
         imageMatches.forEach(match => {
             const img = new Image();
             img.src = match[0];
@@ -5195,6 +5284,8 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
             img.style.height = "auto";
             img.style.borderRadius = "8px";
             img.style.marginTop = "5px";
+            img.style.cursor = "pointer";
+            img.onclick = () => openZoom(img.src);
             contentDiv.appendChild(img);
         });
 
@@ -5204,6 +5295,11 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
             audio.src = match[0];
             contentDiv.appendChild(audio);
         });
+
+        // Process pastebin and raw GitHub URLs
+        if (pastebinMatches.length > 0 || rawGithubMatches.length > 0) {
+            processRawContentUrls([...pastebinMatches, ...rawGithubMatches]);
+        }
         
         messageBody.appendChild(contentDiv);
         messageDiv.appendChild(messageBody);
