@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7859,6 +7858,7 @@ function batchMessageRender(messages, renderFunction) {
     }
 }
 
+// --- CUT HERE ---
 // ===== YOUR EXISTING VARIABLES AND FUNCTIONS =====
 
 let isLogin = true;
@@ -7916,11 +7916,14 @@ let onlineUsers = [];
 let currentPrivateChatUser = null;
 let privateMessageTypingTimer;
 
-// ✅ ADDED: Track last sent messages to prevent duplicates
+// ✅ ADDED: Track last sent messages to prevent duplicates - FIXED
 let lastSentMessages = {
     private: {},
     main: {}
 };
+
+// ✅ ADDED: Track sent message IDs to prevent duplicates
+let sentMessageIds = new Set();
 
 // ✅ ADDED: User Panel Visibility State
 let userPanelVisible = true;
@@ -7936,6 +7939,9 @@ let hasMoreMessages = true;
 
 // ✅ ADDED: Profile cache to reduce server calls
 let profileCache = {};
+
+// ✅ ADDED: Message duplicate prevention
+let isSendingPrivateMessage = false;
 
 const elements = {
     usernameInput: document.getElementById('auth-username'),
@@ -8464,12 +8470,21 @@ function hideContainer(containerId) {
     showContainer('chat');
 }
 
+// ===== MODIFIED: sendPrivateMessage with duplicate prevention =====
 async function sendPrivateMessage() {
     const input = document.getElementById('private-user-input');
     if (!input) return;
     
     const content = input.value.trim();
     if (!content) return;
+
+    // Check if already sending
+    if (isSending) {
+        console.log('🛑 Already sending a message, skipping...');
+        return;
+    }
+    
+    isSending = true;
 
     // Display user message immediately
     displayPrivateMessage(content, 'sent');
@@ -8486,14 +8501,15 @@ async function sendPrivateMessage() {
     } catch (error) {
         console.error('Error sending private message:', error);
         showError('Could not process your private message. Please try again.');
+    } finally {
+        // Re-enable send button after processing
+        setTimeout(() => {
+            const hasText = input.value.trim().length > 0;
+            elements.privateSendButton.disabled = !hasText;
+            elements.privateSendButton.classList.toggle('enabled', hasText);
+            isSending = false;
+        }, 1000);
     }
-
-    // Re-enable send button after processing
-    setTimeout(() => {
-        const hasText = input.value.trim().length > 0;
-        elements.privateSendButton.disabled = !hasText;
-        elements.privateSendButton.classList.toggle('enabled', hasText);
-    }, 1000);
 }
 
 // ===== NEW FUNCTION: Add touch event listeners to message element =====
@@ -9794,7 +9810,7 @@ function displayPrivateUserMessage(text, sender, timestamp, username) {
     }, 10);
 }
 
-// MODIFIED: Send private message to user with duplicate prevention
+// ===== MODIFIED: Send private message to user with FIXED duplicate prevention =====
 async function sendPrivateMessageToUser() {
     if (!currentPrivateChatUser) {
         showError('Please select a user to message');
@@ -9808,50 +9824,26 @@ async function sendPrivateMessageToUser() {
     
     const currentUser = currentUserSession?.username;
     
-    // Check for duplicate message
-    const messageKey = `${currentUser}-${currentPrivateChatUser}-${content}`;
-    if (lastSentMessages.private[messageKey] && 
-        Date.now() - lastSentMessages.private[messageKey] < 3000) {
-        console.log('Duplicate private message prevented');
+    // ✅ FIXED: Check for duplicate message with better tracking
+    const messageKey = `private-${Date.now()}-${currentUser}-${currentPrivateChatUser}-${content}`;
+    
+    // Check if we're already sending this message
+    if (isSendingPrivateMessage || sentMessageIds.has(messageKey)) {
+        console.log('🛑 Duplicate private message prevented');
         return;
     }
     
-    // Track this message
-    lastSentMessages.private[messageKey] = Date.now();
+    // Mark as sending and track message
+    isSendingPrivateMessage = true;
+    sentMessageIds.add(messageKey);
     
     try {
         const token = localStorage.getItem('auth_token');
         
-        // Send via HTTP or Socket.io
-        if (socket) {
-            // Send via Socket.io for real-time delivery
-            socket.emit('send-private-message-socket', {
-                sender_username: currentUser,
-                receiver_username: currentPrivateChatUser,
-                content: content
-            });
-        } else {
-            // Fallback to HTTP
-            const response = await fetch('/api/private/messages', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': token ? `Bearer ${token}` : ''
-                },
-                body: JSON.stringify({
-                    sender_username: currentUser,
-                    receiver_username: currentPrivateChatUser,
-                    content: content
-                })
-            });
-            
-            if (!response.ok) throw new Error('Failed to send message');
-        }
-        
         // Display message immediately for better UX
         displayPrivateUserMessage(content, 'sent', new Date().toISOString(), currentUser);
         
-        // Clear input
+        // Clear input immediately
         input.value = '';
         autoResize(input);
         
@@ -9862,32 +9854,80 @@ async function sendPrivateMessageToUser() {
             sendButton.classList.remove('enabled');
         }
         
+        // Send via HTTP (Socket.io fallback can cause duplicates)
+        const response = await fetch('/api/private/messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': token ? `Bearer ${token}` : ''
+            },
+            body: JSON.stringify({
+                sender_username: currentUser,
+                receiver_username: currentPrivateChatUser,
+                content: content
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(errorData.error || `Failed to send message: ${response.status}`);
+        }
+        
+        console.log('✅ Private message sent successfully');
+        
         // Update user list to show last message
         loadPrivateUsers();
         
     } catch (error) {
-        console.error('Error sending private message:', error);
+        console.error('❌ Error sending private message:', error);
         showError('Failed to send message');
         
-        // Remove from tracking on error
-        delete lastSentMessages.private[messageKey];
+        // Remove the displayed message on error
+        const messagesContainer = document.getElementById('private-chat-messages');
+        if (messagesContainer) {
+            const lastMessage = messagesContainer.querySelector('.private-message.sent:last-child');
+            if (lastMessage) {
+                lastMessage.remove();
+            }
+        }
+    } finally {
+        // Re-enable after delay
+        setTimeout(() => {
+            isSendingPrivateMessage = false;
+            
+            // Re-enable send button if there's text
+            const hasText = input.value.trim().length > 0;
+            const sendButton = document.getElementById('private-messages-send-button');
+            if (sendButton) {
+                sendButton.disabled = !hasText;
+                sendButton.classList.toggle('enabled', hasText);
+            }
+            
+            // Clean up old message IDs after 5 seconds
+            setTimeout(() => {
+                sentMessageIds.delete(messageKey);
+            }, 5000);
+        }, 1000);
     }
 }
 
-// MODIFIED: Handle new private message with duplicate check
+// ===== MODIFIED: Handle new private message with improved duplicate prevention =====
 function handleNewPrivateMessage(message) {
     const currentUser = currentUserSession?.username;
     
     // Check if this message is relevant to current user
     if (message.sender_username === currentUser || message.receiver_username === currentUser) {
         
-        // Check for duplicate display
-        const messageKey = `display-${message.sender_username}-${message.receiver_username}-${message.content}`;
+        // ✅ FIXED: Better duplicate check
+        const messageKey = `received-${message.id || message.sender_username}-${message.receiver_username}-${message.content}`;
+        
+        // Check if we've already processed this message
         if (lastSentMessages.private[messageKey]) {
-            console.log('Duplicate private message display prevented');
+            console.log('🛑 Duplicate private message received, skipping');
             return;
         }
         
+        // Track this message
         lastSentMessages.private[messageKey] = Date.now();
         
         // If we're in the chat with this user, display the message
@@ -9896,6 +9936,17 @@ function handleNewPrivateMessage(message) {
              currentPrivateChatUser === message.receiver_username)) {
             
             const senderType = message.sender_username === currentUser ? 'sent' : 'received';
+            
+            // Don't display if it's a sent message we already displayed
+            if (senderType === 'sent') {
+                // Check if we already displayed this as a sent message
+                const sentMessageKey = `private-${message.sender_username}-${message.receiver_username}-${message.content}`;
+                if (sentMessageIds.has(sentMessageKey)) {
+                    console.log('🛑 Already displayed as sent message, skipping');
+                    return;
+                }
+            }
+            
             displayPrivateUserMessage(message.content, senderType, message.created_at, message.sender_username);
             
             // Mark as read if we're the receiver
@@ -10191,6 +10242,20 @@ function clearOldMessageTracking() {
             delete lastSentMessages.main[key];
         }
     });
+    
+    // Clean sent message IDs
+    const oldIds = [];
+    sentMessageIds.forEach(id => {
+        // Extract timestamp from message key if possible
+        const match = id.match(/private-(\d+)-/);
+        if (match && match[1]) {
+            const timestamp = parseInt(match[1]);
+            if (now - timestamp > maxAge) {
+                oldIds.push(id);
+            }
+        }
+    });
+    oldIds.forEach(id => sentMessageIds.delete(id));
 }
 
 // Run cleanup every 30 seconds
