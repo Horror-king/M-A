@@ -4768,6 +4768,7 @@ html, body {
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
+// --- CUT HERE ---
 <script>
 // Opera Mini compatible messaging functions
 class OperaMiniMessenger {
@@ -5169,26 +5170,14 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
             contentDiv.appendChild(replyBubble);
         }
 
-        // IMPROVED: Better image link detection
-        // Check for common raw content URLs that might contain image data
-        const pastebinPattern = /https?:\/\/(?:pastebin\.com\/raw\/|pastebin\.com\/)[^\s]+/gi;
-        const rawGithubPattern = /https?:\/\/(?:raw\.githubusercontent\.com\/|gist\.githubusercontent\.com\/)[^\s]+/gi;
-        const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp|bmp|svg))(?:\?[^\s]*)?/gi;
-        const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))(?:\?[^\s]*)?/gi;
-        
-        // Extract all URLs
-        const pastebinMatches = [...text.matchAll(pastebinPattern)];
-        const rawGithubMatches = [...text.matchAll(rawGithubPattern)];
+        const imagePattern = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp))/gi;
+        const audioPattern = /(https?:\/\/[^\s]+\.(?:mp3|ogg|wav|m4a|mp4))/gi;
         const imageMatches = [...text.matchAll(imagePattern)];
         const audioMatches = [...text.matchAll(audioPattern)];
-        
         let modifiedText = text;
-        
-        // Remove all matched URLs from text
-        [...pastebinMatches, ...rawGithubMatches, ...imageMatches, ...audioMatches].forEach(match => {
+        [...imageMatches, ...audioMatches].forEach(match => {
             modifiedText = modifiedText.replace(match[0], '');
         });
-        
         modifiedText = modifiedText.trim();
         
         if (modifiedText) {
@@ -5197,84 +5186,7 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
             contentDiv.appendChild(textDiv);
         }
 
-        // Process pastebin/raw GitHub URLs as potential image/text content
-        const processRawContentUrls = async (urls) => {
-            for (const match of urls) {
-                const url = match[0];
-                try {
-                    const response = await fetch(url);
-                    if (response.ok) {
-                        const content = await response.text();
-                        // Check if content looks like an image (contains data:image or base64)
-                        if (content.includes('data:image') || content.includes('base64')) {
-                            // Try to extract image data
-                            const base64Match = content.match(/data:image\/[^;]+;base64,([^'"\s]+)/);
-                            if (base64Match && base64Match[1]) {
-                                const img = new Image();
-                                img.src = `data:image/png;base64,${base64Match[1]}`;
-                                img.alt = "image from pastebin";
-                                img.loading = "lazy";
-                                img.style.maxWidth = "100%";
-                                img.style.height = "auto";
-                                img.style.borderRadius = "8px";
-                                img.style.marginTop = "5px";
-                                img.style.cursor = "pointer";
-                                img.onclick = () => openZoom(img.src);
-                                contentDiv.appendChild(img);
-                            } else {
-                                // Display as text if not an image
-                                const pre = document.createElement('pre');
-                                pre.style.cssText = `
-                                    background: #f5f5f5;
-                                    padding: 10px;
-                                    border-radius: 5px;
-                                    overflow-x: auto;
-                                    margin-top: 5px;
-                                    font-size: 12px;
-                                    white-space: pre-wrap;
-                                    word-wrap: break-word;
-                                `;
-                                pre.textContent = content.substring(0, 500) + (content.length > 500 ? '...' : '');
-                                contentDiv.appendChild(pre);
-                            }
-                        } else {
-                            // Display raw text content
-                            const pre = document.createElement('pre');
-                            pre.style.cssText = `
-                                background: #f5f5f5;
-                                padding: 10px;
-                                border-radius: 5px;
-                                overflow-x: auto;
-                                margin-top: 5px;
-                                font-size: 12px;
-                                white-space: pre-wrap;
-                                word-wrap: break-word;
-                            `;
-                            pre.textContent = content.substring(0, 500) + (content.length > 500 ? '...' : '');
-                            contentDiv.appendChild(pre);
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error fetching raw content:', error);
-                    // Display as link if fetch fails
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.textContent = url;
-                    link.target = "_blank";
-                    link.rel = "noopener noreferrer";
-                    link.style.cssText = `
-                        color: #0066cc;
-                        text-decoration: underline;
-                        display: block;
-                        margin-top: 5px;
-                        word-break: break-all;
-                    `;
-                    contentDiv.appendChild(link);
-                }
-            }
-        };
-
-        // Process image matches
+        // Use lazy loading for images
         imageMatches.forEach(match => {
             const img = new Image();
             img.src = match[0];
@@ -5284,8 +5196,6 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
             img.style.height = "auto";
             img.style.borderRadius = "8px";
             img.style.marginTop = "5px";
-            img.style.cursor = "pointer";
-            img.onclick = () => openZoom(img.src);
             contentDiv.appendChild(img);
         });
 
@@ -5295,11 +5205,6 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
             audio.src = match[0];
             contentDiv.appendChild(audio);
         });
-
-        // Process pastebin and raw GitHub URLs
-        if (pastebinMatches.length > 0 || rawGithubMatches.length > 0) {
-            processRawContentUrls([...pastebinMatches, ...rawGithubMatches]);
-        }
         
         messageBody.appendChild(contentDiv);
         messageDiv.appendChild(messageBody);
@@ -6574,7 +6479,7 @@ function renderPosts() {
     });
 }
 
-// UPDATED: Create post element with image URL detection - MODIFIED TO USE ACTUAL PROFILE AVATAR
+// UPDATED: Create post element with image URL detection AND USER PROFILE DATA
 function createPostElement(post) {
     const postDiv = document.createElement('div');
     postDiv.className = 'post-card';
@@ -6582,14 +6487,18 @@ function createPostElement(post) {
     
     const timeAgo = formatPostTime(post.timestamp);
     
-    // Fetch user profile to get actual avatar - MODIFIED: Use getUserProfile which gets from cache/server
-    const userProfile = getUserProfile(post.author);
+    // Get user profile from cache or server
+    let userProfile = getUserProfile(post.author_username || post.author);
     
+    // Process content to detect and display images
+    const processedContent = processContentForMultipleImages(post.content);
+    
+    // Start with the HTML structure
     postDiv.innerHTML = `
         <div class="post-header">
-            <img class="post-author-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/50?u=${post.author}`}" alt="${post.author}">
+            <img class="post-author-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/50?u=${post.author_username || post.author}`}" alt="${post.author_username || post.author}">
             <div class="post-author-info">
-                <div class="post-author-name">${userProfile.display_name || userProfile.displayName || post.author}</div>
+                <div class="post-author-name">${userProfile.display_name || post.author_username || post.author}</div>
                 <div class="post-meta">
                     <span class="post-time">${timeAgo}</span>
                     <span>•</span>
@@ -6597,7 +6506,16 @@ function createPostElement(post) {
                 </div>
             </div>
         </div>
-        ${post.content ? `<div class="post-content">${escapeHtml(post.content)}</div>` : ''}
+        ${processedContent.text ? `<div class="post-content">${processedContent.text}</div>` : ''}
+        ${processedContent.images.length > 0 ? `
+            <div class="post-media">
+                ${processedContent.images.map(url => `
+                    <div class="post-image-container">
+                        <img src="${escapeHtml(url)}" alt="Post image" onclick="openZoom('${escapeHtml(url)}')" loading="lazy">
+                    </div>
+                `).join('')}
+            </div>
+        ` : ''}
         ${post.media ? `
             <div class="post-media">
                 ${post.media.type === 'image' ? 
@@ -6635,18 +6553,15 @@ function createPostElement(post) {
                 </button>
             </div>
             <div class="comments-list" id="comments-list-${post.id}">
-                ${post.comments ? post.comments.map(comment => {
-                    // Fetch comment author's profile for avatar - MODIFIED: Use getUserProfile
-                    const commentAuthorProfile = getUserProfile(comment.author_username || comment.author);
-                    return `
+                ${post.comments ? post.comments.map(comment => `
                     <div class="comment">
-                        <img class="comment-avatar" src="${commentAuthorProfile.avatar || `https://i.pravatar.cc/32?u=${comment.author_username || comment.author}`}" alt="${comment.author_username || comment.author}">
+                        <img class="comment-avatar" src="${getUserProfile(comment.author_username || comment.author).avatar || `https://i.pravatar.cc/32?u=${comment.author_username || comment.author}`}" alt="${comment.author_username || comment.author}">
                         <div class="comment-content">
-                            <div class="comment-author">${commentAuthorProfile.display_name || commentAuthorProfile.displayName || (comment.author_username || comment.author)}</div>
+                            <div class="comment-author">${getUserProfile(comment.author_username || comment.author).display_name || (comment.author_username || comment.author)}</div>
                             <div class="comment-text">${escapeHtml(comment.content || comment.text)}</div>
                         </div>
                     </div>
-                `}).join('') : '<div class="no-comments">No comments yet</div>'}
+                `).join('') : '<div class="no-comments">No comments yet</div>'}
             </div>
             <div class="comment-input">
                 <input type="text" id="comment-input-${post.id}" placeholder="Write a comment..." onkeypress="handleCommentKeypress(event, '${post.id}')">
@@ -6654,6 +6569,29 @@ function createPostElement(post) {
             </div>
         </div>
     `;
+    
+    // Fetch updated profile from server and update the post if needed
+    (async () => {
+        try {
+            const updatedProfile = await fetchUserProfileFromServer(post.author_username || post.author);
+            if (updatedProfile) {
+                // Update avatar if different
+                const avatarImg = postDiv.querySelector('.post-author-avatar');
+                if (avatarImg && updatedProfile.avatar && avatarImg.src !== updatedProfile.avatar) {
+                    avatarImg.src = updatedProfile.avatar;
+                }
+                
+                // Update display name if different
+                const displayNameElement = postDiv.querySelector('.post-author-name');
+                const displayName = updatedProfile.display_name || post.author_username || post.author;
+                if (displayNameElement && displayName !== displayNameElement.textContent) {
+                    displayNameElement.textContent = displayName;
+                }
+            }
+        } catch (error) {
+            console.error('Error updating profile in post:', error);
+        }
+    })();
     
     return postDiv;
 }
@@ -6946,13 +6884,12 @@ function updateCommentsUI(postId) {
                     const commentElement = document.createElement('div');
                     commentElement.className = 'comment';
                     
-                    // Fetch comment author's profile for avatar - MODIFIED: Use getUserProfile
                     const userProfile = getUserProfile(comment.author_username || comment.author);
                     
                     commentElement.innerHTML = `
                         <img class="comment-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/32?u=${comment.author_username || comment.author}`}" alt="${comment.author_username || comment.author}">
                         <div class="comment-content">
-                            <div class="comment-author">${userProfile.display_name || userProfile.displayName || (comment.author_username || comment.author)}</div>
+                            <div class="comment-author">${userProfile.display_name || (comment.author_username || comment.author)}</div>
                             <div class="comment-text">${escapeHtml(comment.content || comment.text)}</div>
                         </div>
                     `;
@@ -7079,12 +7016,12 @@ function openCreatePostModal() {
     if (modal) {
         modal.style.display = 'flex';
         
-        // Set author info
+        // Set author info - USE USER'S PROFILE DATA
         const currentUser = currentUserSession?.username;
         if (currentUser) {
             const userProfile = getUserProfile(currentUser);
             document.getElementById('post-author-avatar').src = userProfile.avatar || `https://i.pravatar.cc/50?u=${currentUser}`;
-            document.getElementById('post-author-name').textContent = userProfile.display_name || userProfile.displayName || currentUser;
+            document.getElementById('post-author-name').textContent = userProfile.display_name || currentUser;
         }
         
         // Reset form
@@ -7220,26 +7157,37 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// MODIFIED: Get user profile - updated to fetch from cache/server and return proper profile object
+// MODIFIED: Get user profile from cache or server - UPDATED TO USE profileCache
 function getUserProfile(username) {
-    // First check if we have the profile in cache
+    // Check the profileCache first (most up-to-date)
     if (profileCache[username]) {
         return profileCache[username];
     }
     
-    // Check local storage for profiles
+    // If not in cache, check localStorage (legacy fallback)
     const profiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
     if (profiles[username]) {
         return profiles[username];
     }
     
-    // Return default profile with proper structure
-    return { 
+    // If not found anywhere, return a default profile
+    const defaultProfile = {
         username: username,
         display_name: username,
-        displayName: username, // Keep both for compatibility
-        avatar: `https://i.pravatar.cc/50?u=${username}`
+        avatar: `https://i.pravatar.cc/50?u=${username}`,
+        bio: '',
+        age: '',
+        gender: '',
+        location: '',
+        interests: ''
     };
+    
+    // Fetch profile from server in background
+    setTimeout(() => {
+        fetchUserProfileFromServer(username);
+    }, 0);
+    
+    return defaultProfile;
 }
 
 // MODIFIED: sendMessage function to use OperaMiniMessenger when on Opera Mini
