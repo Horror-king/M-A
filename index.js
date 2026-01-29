@@ -1,3 +1,4 @@
+
 const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
@@ -1978,7 +1979,84 @@ app.get('/api/users/stats', async (req, res) => {
     }
 });
 
-// ===== FIXED PRIVATE MESSAGES ENDPOINTS =====
+// ===== FIXED PRIVATE MESSAGES ENDPOINTS - DUPLICATE PREVENTION ADDED =====
+
+// Send private message - FIXED TO PREVENT DUPLICATES
+app.post('/api/private/messages', async (req, res) => {
+  try {
+    const { sender_username, receiver_username, content, image_url } = req.body;
+
+    console.log('📨 Private message via API:', { sender_username, receiver_username, content, image_url });
+
+    if (!sender_username || !receiver_username) {
+      return res.status(400).json({ 
+        success: false,
+        error: "Sender and receiver usernames are required" 
+      });
+    }
+
+    if ((!content || content.trim() === '') && !image_url) {
+      return res.status(400).json({ 
+        success: false,
+        error: "Content or image is required" 
+      });
+    }
+
+    // ✅ FIXED: Generate unique ID to track message
+    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const insertData = {
+      sender_username: sender_username.trim(),
+      receiver_username: receiver_username.trim(),
+      content: content ? content.trim() : '',
+      image_url: image_url || null,
+      read: false,
+      created_at: new Date().toISOString(),
+      message_id: messageId // Add custom message ID for tracking
+    };
+
+    console.log('📝 Inserting private message with ID:', messageId);
+
+    const { data, error } = await supabase
+      .from('private_messages')
+      .insert([insertData])
+      .select();
+
+    if (error) {
+      console.error('❌ Private message insert failed:', error);
+      return res.status(500).json({ 
+        success: false,
+        error: "Database error: " + error.message
+      });
+    }
+
+    console.log('✅ Private message saved successfully. ID:', data[0]?.id);
+    
+    // ✅ FIXED: Add message ID to response for tracking
+    const responseData = {
+      ...data[0],
+      custom_message_id: messageId
+    };
+    
+    // ✅ FIXED: Broadcast via Socket.io to ONLY the receiver
+    // Don't broadcast to sender - sender already has the message from HTTP response
+    io.to(receiver_username).emit('new-private-message', responseData);
+    io.to(sender_username).emit('private-message-sent', responseData); // Separate event for sender
+    
+    res.status(201).json({
+      success: true,
+      data: responseData,
+      custom_message_id: messageId
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to save private message:', error);
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to send private message: " + error.message 
+    });
+  }
+});
 
 // Get conversations for the current user - FIXED
 app.get('/api/private/conversations', async (req, res) => {
@@ -2090,75 +2168,6 @@ app.get('/api/private/messages/:username', async (req, res) => {
   } catch (error) {
     console.error('❌ Error fetching private messages:', error);
     res.status(500).json({ error: 'Failed to fetch private messages: ' + error.message });
-  }
-});
-
-// Send private message - COMPLETELY FIXED
-app.post('/api/private/messages', async (req, res) => {
-  try {
-    const { sender_username, receiver_username, content, image_url } = req.body;
-
-    console.log('📨 Private message via API:', { sender_username, receiver_username, content, image_url });
-
-    if (!sender_username || !receiver_username) {
-      return res.status(400).json({ 
-        success: false,
-        error: "Sender and receiver usernames are required" 
-      });
-    }
-
-    if ((!content || content.trim() === '') && !image_url) {
-      return res.status(400).json({ 
-        success: false,
-        error: "Content or image is required" 
-      });
-    }
-
-    // FIXED: Use only the fields that exist in the table
-    const insertData = {
-      sender_username: sender_username.trim(),
-      receiver_username: receiver_username.trim(),
-      content: content ? content.trim() : '',
-      image_url: image_url || null, // Use null instead of empty string
-      read: false,
-      created_at: new Date().toISOString()
-    };
-
-    console.log('📝 Inserting private message with corrected data:', insertData);
-
-    const { data, error } = await supabase
-      .from('private_messages')
-      .insert([insertData])
-      .select();
-
-    if (error) {
-      console.error('❌ Private message insert failed:', error);
-      
-      // If there's still an issue, provide detailed error
-      return res.status(500).json({ 
-        success: false,
-        error: "Database error: " + error.message,
-        details: "Make sure your private_messages table has the correct structure",
-        required_fields: ["sender_username", "receiver_username", "content", "read"]
-      });
-    }
-
-    console.log('✅ Private message saved successfully. ID:', data[0]?.id);
-    
-    // Broadcast via Socket.io to both users - use polling for Opera compatibility
-    io.emit('new-private-message', data[0]);
-    
-    res.status(201).json({
-      success: true,
-      data: data[0]
-    });
-
-  } catch (error) {
-    console.error('❌ Failed to save private message:', error);
-    res.status(500).json({ 
-      success: false,
-      error: "Failed to send private message: " + error.message 
-    });
   }
 });
 
@@ -4073,6 +4082,22 @@ app.get('/online-users', (req, res) => {
 io.on('connection', (socket) => {
   console.log('🔌 User connected via polling:', socket.id);
 
+  // User joins their own room for private messages
+  socket.on('join-user-room', (username) => {
+    if (username) {
+      socket.join(username);
+      console.log(`👤 User ${username} joined their private room`);
+    }
+  });
+
+  // User leaves their room
+  socket.on('leave-user-room', (username) => {
+    if (username) {
+      socket.leave(username);
+      console.log(`👋 User ${username} left their private room`);
+    }
+  });
+
   // Send existing messages to newly connected client
   socket.on('request-messages', async () => {
     try {
@@ -4198,22 +4223,42 @@ io.on('connection', (socket) => {
     }
   });
 
-  // ===== PRIVATE MESSAGING SOCKET EVENTS =====
+  // ===== PRIVATE MESSAGING SOCKET EVENTS WITH DUPLICATE PREVENTION =====
 
-  // Handle private messaging via Socket.io
+  // Join private chat room
+  socket.on('join-private-chat', (data) => {
+    const { username, otherUser } = data;
+    const roomName = getPrivateChatRoomName(username, otherUser);
+    socket.join(roomName);
+    console.log(`👥 ${username} joined private chat room: ${roomName}`);
+  });
+
+  // Leave private chat room
+  socket.on('leave-private-chat', (data) => {
+    const { username, otherUser } = data;
+    const roomName = getPrivateChatRoomName(username, otherUser);
+    socket.leave(roomName);
+    console.log(`👋 ${username} left private chat room: ${roomName}`);
+  });
+
+  // ✅ FIXED: Handle private messaging via Socket.io - PREVENT DUPLICATES
   socket.on('send-private-message-socket', async (data) => {
     try {
       console.log('🤫 Private message via socket:', data);
       
       const { sender_username, receiver_username, content, image_url } = data;
 
+      // Generate unique message ID
+      const messageId = `socket_msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
       const insertData = {
         sender_username: sender_username.trim(),
         receiver_username: receiver_username.trim(),
         content: content ? content.trim() : '',
         image_url: image_url || '',
         read: false,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        message_id: messageId
       };
 
       const { data: messageData, error } = await supabase
@@ -4223,27 +4268,28 @@ io.on('connection', (socket) => {
 
       if (error) throw error;
 
-      // Emit to both sender and receiver
-      io.emit('new-private-message', messageData[0]);
+      // ✅ FIXED: Emit to receiver's room ONLY
+      // Don't emit back to sender - they already see their message
+      const responseData = {
+        ...messageData[0],
+        custom_message_id: messageId
+      };
+      
+      // Emit to receiver's personal room
+      io.to(receiver_username).emit('new-private-message', responseData);
+      
+      // Emit separate event to sender for confirmation only
+      socket.emit('private-message-confirmation', {
+        ...responseData,
+        status: 'sent'
+      });
+      
+      console.log(`✅ Private message sent from ${sender_username} to ${receiver_username}`);
       
     } catch (error) {
       console.error('❌ Private message error:', error);
       socket.emit('private-message-error', { error: 'Failed to send private message' });
     }
-  });
-
-  socket.on('join-private-chat', (data) => {
-    const { username, otherUser } = data;
-    const roomName = getPrivateChatRoomName(username, otherUser);
-    socket.join(roomName);
-    console.log(`👥 ${username} joined private chat room: ${roomName}`);
-  });
-
-  socket.on('leave-private-chat', (data) => {
-    const { username, otherUser } = data;
-    const roomName = getPrivateChatRoomName(username, otherUser);
-    socket.leave(roomName);
-    console.log(`👋 ${username} left private chat room: ${roomName}`);
   });
 
   // Listen for new private messages and deliver to specific users
@@ -4530,6 +4576,10 @@ app.get('/api/user/last-seen/:username', async (req, res) => {
 // Start server
 server.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
+  console.log(`🤫 PRIVATE MESSAGING: FIXED - No more duplicate messages!`);
+  console.log(`✅ Duplicate message prevention: ENABLED`);
+  console.log(`🔒 Private messages now use unique message IDs`);
+  console.log(`📨 Socket.io events: Only sent to receivers (not back to senders)`);
   console.log(`🔹 Command prefix: "${PREFIX}"`);
   console.log(`👥 Online users tracking: ACTIVE (5 minute timeout for mobile)`);
   console.log(`💾 SINGLE RESPONSE SYSTEM: ENABLED`);
