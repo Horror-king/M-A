@@ -7189,17 +7189,20 @@ function getUserProfile(username) {
     return defaultProfile;
 }
 
-// MODIFIED: sendMessage function to use OperaMiniMessenger when on Opera Mini
+// ===== FIXED: sendMessage function - Fixed double message issue =====
 async function sendMessage() {
-    if (isSending || isProcessingCommand) return;
-    isSending = true;
+    // Prevent multiple simultaneous sends
+    if (isSending) {
+        console.log('🛑 Already sending a message, please wait...');
+        return;
+    }
     
     const content = elements.messageInput.value.trim();
     const username = currentUserSession?.username;
     
     if (!content || !username) {
-        isSending = false;
-        return showError('Please enter both username and message');
+        showError('Please enter both username and message');
+        return;
     }
 
     // Check for duplicate message in main chat
@@ -7207,7 +7210,6 @@ async function sendMessage() {
     if (lastSentMessages.main[messageKey] && 
         Date.now() - lastSentMessages.main[messageKey] < 3000) {
         console.log('Duplicate message prevented in main chat');
-        isSending = false;
         return;
     }
     
@@ -7219,12 +7221,11 @@ async function sendMessage() {
     if (badWords.some(word => lowerContent.includes(word))) {
         if (!warnedUsers[username]) {
             warnedUsers[username] = true;
-            isSending = false;
-            return showError('Warning: bad word detected! If you repeat, you will be banned.');
+            showError('Warning: bad word detected! If you repeat, you will be banned.');
+            return;
         } else {
             bannedUsers[username] = Date.now() + BAN_DURATION;
             showError('You used bad words again. Account deleted and banned.');
-            isSending = false;
             setTimeout(() => {
                 logout();
             }, 2000);
@@ -7235,8 +7236,8 @@ async function sendMessage() {
     // Spam protection
     const now = Date.now();
     if (bannedUsers[username] && bannedUsers[username] > now) {
-        isSending = false;
-        return showError(`You're banned. Wait ${Math.ceil((bannedUsers[username] - now) / 1000)}s.`);
+        showError(`You're banned. Wait ${Math.ceil((bannedUsers[username] - now) / 1000)}s.`);
+        return;
     }
     
     if (!spamTracker[username]) {
@@ -7247,10 +7248,13 @@ async function sendMessage() {
     
     if (spamTracker[username].length > SPAM_LIMIT) {
         bannedUsers[username] = now + BAN_DURATION;
-        isSending = false;
-        return showError("You're banned for spamming.");
+        showError("You're banned for spamming.");
+        return;
     }
 
+    // Set sending flag to prevent duplicates
+    isSending = true;
+    
     try {
         elements.sendButton.disabled = true;
         elements.sendButton.classList.remove('enabled');
@@ -7317,12 +7321,13 @@ async function sendMessage() {
         // Remove from tracking on error
         delete lastSentMessages.main[messageKey];
     } finally {
+        // Reset sending flag after a short delay to prevent rapid double sends
         setTimeout(() => {
             isSending = false;
             const hasText = elements.messageInput.value.trim().length > 0;
             elements.sendButton.disabled = !hasText;
             elements.sendButton.classList.toggle('enabled', hasText);
-        }, 500);
+        }, 1000); // Increased delay to prevent rapid successive sends
     }
 }
 
@@ -7659,8 +7664,12 @@ function initializeMainApp() {
     updateProfileSection(); // Create the profile section first
     loadProfile(); // Then load the actual profile data from server
     
-    initializeChat();
-
+    // Initialize chat only once
+    if (!chatInitialized) {
+        initializeChat();
+        chatInitialized = true;
+    }
+    
     initSocket();
     setupTypingHandlers();
     setupTypingDetection();
@@ -7716,7 +7725,8 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
-        initializeChat();
+        // Don't initialize chat here - it will be initialized in initializeMainApp
+        // Only initialize chat input handlers for the private AI section
         
         // ADDED: Setup typing detection
         setupTypingDetection();
@@ -7839,7 +7849,7 @@ let savedQueries = JSON.parse(localStorage.getItem('savedQueries')) || [];
 let lastMessageId = null;
 let notificationPermissionGranted = false;
 
-// Flag to prevent duplicate sends
+// Flag to prevent duplicate sends - FIXED: Set to false initially
 let isSending = false;
 
 // Scroll state variables
@@ -7887,6 +7897,9 @@ let hasMoreMessages = true;
 
 // ✅ ADDED: Profile cache to reduce server calls
 let profileCache = {};
+
+// ✅ ADDED: Chat initialized flag to prevent duplicate initialization
+let chatInitialized = false;
 
 const elements = {
     usernameInput: document.getElementById('auth-username'),
@@ -9205,6 +9218,9 @@ function logout() {
         sqlEditorMenuItem.style.display = 'none';
     }
     
+    // Reset chat initialized flag
+    chatInitialized = false;
+    
     console.log('✅ User logged out successfully');
 }
 
@@ -9408,12 +9424,18 @@ function initializeButtons() {
 
 function initializeChat() {
     if (elements.messageInput) {
+        // Remove any existing event listeners first to prevent duplicates
+        const newMessageInput = elements.messageInput.cloneNode(true);
+        elements.messageInput.parentNode.replaceChild(newMessageInput, elements.messageInput);
+        elements.messageInput = newMessageInput;
+        
         elements.messageInput.addEventListener('input', () => {
             autoResize(elements.messageInput);
             const hasText = elements.messageInput.value.trim().length > 0;
             elements.sendButton.disabled = !hasText;
             elements.sendButton.classList.toggle('enabled', hasText);
         });
+        
         elements.messageInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !e.shiftKey && !isSending) {
                 e.preventDefault();
