@@ -4185,19 +4185,35 @@ html, body {
     </div>
 
     <div class="auth-container" id="auth-container" style="display: none;">
-        <div class="auth-box">
-            <h2 id="auth-title">Login</h2>
-            <input type="text" id="auth-username" placeholder="Username">
-            <input type="password" id="auth-password" placeholder="Password">
-            <div class="error-message" id="error-message"></div>
-            <div class="success-message" id="success-message"></div>
-            <button onclick="handleAuth()">Login</button>
-            <div class="auth-toggle">
-                <span id="toggle-text">Don't have an account? </span>
-                <a href="#" id="toggle-link" onclick="toggleAuth()">Sign Up</a>
-            </div>
+    <div class="auth-box">
+        <h2 id="auth-title">Welcome Back! 👋</h2>
+        
+        <input type="text" id="auth-username" placeholder="Username" autocomplete="username">
+        
+        <div class="password-container">
+            <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password">
+            <button type="button" class="toggle-password" id="toggle-password-btn">
+                <i class="fas fa-eye"></i>
+            </button>
+        </div>
+        
+        <div class="error-message" id="error-message"></div>
+        <div class="success-message" id="success-message"></div>
+        
+        <button onclick="handleAuth()" id="auth-button">Login</button>
+        
+        <div class="auth-welcome">
+            Connect with friends, share moments, and discover communities
+        </div>
+        
+        <div class="auth-toggle">
+            <span id="toggle-text">Don't have an account? </span>
+            <a href="#" id="toggle-link" onclick="toggleAuth()">
+                <strong>Sign Up Now</strong>
+            </a>
         </div>
     </div>
+</div>
 
     <!-- All these elements are hidden until login -->
     <div class="menu" style="display: none;">
@@ -4769,6 +4785,145 @@ html, body {
         </div>
     </div>
 <script>
+// ===== PASSWORD VISIBILITY TOGGLE FUNCTION =====
+function setupPasswordToggle() {
+    const toggleBtn = document.getElementById('toggle-password-btn');
+    const passwordInput = document.getElementById('auth-password');
+    
+    if (toggleBtn && passwordInput) {
+        toggleBtn.addEventListener('click', function() {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            
+            // Toggle eye icon
+            const eyeIcon = this.querySelector('i');
+            if (type === 'text') {
+                eyeIcon.className = 'fas fa-eye-slash';
+                this.setAttribute('title', 'Hide password');
+            } else {
+                eyeIcon.className = 'fas fa-eye';
+                this.setAttribute('title', 'Show password');
+            }
+        });
+    }
+}
+
+// ===== IMPROVED AUTH FORM HANDLING =====
+function updateAuthUI() {
+    const isLogin = document.getElementById('auth-title').textContent === 'Welcome Back! 👋';
+    const authButton = document.getElementById('auth-button');
+    const authTitle = document.getElementById('auth-title');
+    const toggleText = document.getElementById('toggle-text');
+    const toggleLink = document.getElementById('toggle-link');
+    const welcomeMessage = document.querySelector('.auth-welcome');
+    
+    if (isLogin) {
+        // Switching to signup
+        authTitle.textContent = 'Join MessageMate! 🚀';
+        authButton.textContent = 'Sign Up';
+        toggleText.textContent = 'Already have an account? ';
+        toggleLink.innerHTML = '<strong>Login</strong>';
+        
+        if (welcomeMessage) {
+            welcomeMessage.textContent = 'Create your account and start connecting with amazing people';
+        }
+        
+        // Update placeholders
+        document.getElementById('auth-username').placeholder = 'Choose a username';
+        document.getElementById('auth-password').placeholder = 'Create a password';
+        
+        // Focus on username field
+        setTimeout(() => {
+            document.getElementById('auth-username').focus();
+        }, 100);
+    } else {
+        // Switching to login
+        authTitle.textContent = 'Welcome Back! 👋';
+        authButton.textContent = 'Login';
+        toggleText.textContent = 'Don\'t have an account? ';
+        toggleLink.innerHTML = '<strong>Sign Up Now</strong>';
+        
+        if (welcomeMessage) {
+            welcomeMessage.textContent = 'Connect with friends, share moments, and discover communities';
+        }
+        
+        // Update placeholders
+        document.getElementById('auth-username').placeholder = 'Username';
+        document.getElementById('auth-password').placeholder = 'Password';
+    }
+    
+    // Clear error/success messages
+    document.getElementById('error-message').style.display = 'none';
+    document.getElementById('success-message').style.display = 'none';
+}
+
+// Replace your existing toggleAuth function with this one:
+function toggleAuth() {
+    const isLogin = document.getElementById('auth-title').textContent === 'Welcome Back! 👋';
+    
+    // Clear inputs
+    document.getElementById('auth-username').value = '';
+    document.getElementById('auth-password').value = '';
+    
+    // Reset password field to hidden
+    const passwordInput = document.getElementById('auth-password');
+    const toggleBtn = document.getElementById('toggle-password-btn');
+    if (passwordInput && toggleBtn) {
+        passwordInput.setAttribute('type', 'password');
+        const eyeIcon = toggleBtn.querySelector('i');
+        if (eyeIcon) {
+            eyeIcon.className = 'fas fa-eye';
+            toggleBtn.setAttribute('title', 'Show password');
+        }
+    }
+    
+    // Clear validation states
+    document.getElementById('auth-username').classList.remove('username-valid', 'username-invalid');
+    document.getElementById('error-message').style.display = 'none';
+    document.getElementById('success-message').style.display = 'none';
+    
+    // Update UI
+    updateAuthUI();
+}
+
+// ===== ENHANCED AUTH VALIDATION =====
+function showAuthError(message) {
+    const errorDisplay = document.getElementById('error-message');
+    const successDisplay = document.getElementById('success-message');
+    
+    errorDisplay.textContent = message;
+    errorDisplay.style.display = 'block';
+    successDisplay.style.display = 'none';
+    
+    // Shake animation for error
+    errorDisplay.classList.add('shake');
+    setTimeout(() => {
+        errorDisplay.classList.remove('shake');
+    }, 500);
+}
+
+function showAuthSuccess(message) {
+    const errorDisplay = document.getElementById('error-message');
+    const successDisplay = document.getElementById('success-message');
+    
+    successDisplay.textContent = message;
+    successDisplay.style.display = 'block';
+    errorDisplay.style.display = 'none';
+}
+
+// Add shake animation to CSS
+const shakeAnimation = `
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+.shake {
+    animation: shake 0.5s ease-in-out;
+}
+`;
+
 // Opera Mini compatible messaging functions
 class OperaMiniMessenger {
   constructor() {
@@ -7796,6 +7951,9 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
+        // Initialize the password toggle
+        setupPasswordToggle();
+        
         console.log('🎯 Application initialization complete');
     });
 });
@@ -8213,23 +8371,23 @@ async function handleAuth() {
     elements.successDisplay.style.display = 'none';
     
     if (!username || !password) {
-        showError('Please enter both username and password');
+        showAuthError('Please enter both username and password');
         return;
     }
     
     if (username.length < 3 || username.length > 20) {
-        showError('Username must be between 3-20 characters');
+        showAuthError('Username must be between 3-20 characters');
         return;
     }
     
     if (password.length < 4 || password.length > 20) {
-        showError('Password must be between 4-20 characters');
+        showAuthError('Password must be between 4-20 characters');
         return;
     }
     
     // Validate username format
     if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-        showError('Username can only contain letters, numbers, and underscores');
+        showAuthError('Username can only contain letters, numbers, and underscores');
         return;
     }
     
@@ -8249,7 +8407,7 @@ async function handleAuth() {
             const data = await response.json();
             
             if (data.success) {
-                showSuccess('Login successful!');
+                showAuthSuccess('Login successful!');
                 
                 // Save user session with token for persistent login
                 saveUserSession({
@@ -8281,7 +8439,7 @@ async function handleAuth() {
             const data = await response.json();
             
             if (data.success) {
-                showSuccess('Account created successfully! Please login.');
+                showAuthSuccess('Account created successfully! Please login.');
                 setTimeout(() => {
                     loader.style.display = 'none';
                     toggleAuth();
@@ -8292,35 +8450,7 @@ async function handleAuth() {
         }
     } catch (error) {
         loader.style.display = 'none';
-        showError(error.message);
-    }
-}
-
-function toggleAuth() {
-    isLogin = !isLogin;
-    const authTitle = document.getElementById('auth-title');
-    const authButton = document.querySelector('.auth-box button');
-    const toggleText = document.getElementById('toggle-text');
-    const toggleLink = document.getElementById('toggle-link');
-    elements.errorDisplay.style.display = 'none';
-    elements.successDisplay.style.display = 'none';
-    
-    if (isLogin) {
-        authTitle.textContent = 'Login';
-        authButton.textContent = 'Login';
-        toggleText.textContent = "Don't have an account? ";
-        toggleLink.textContent = 'Sign Up';
-    } else {
-        authTitle.textContent = 'Sign Up';
-        authButton.textContent = 'Sign Up';
-        toggleText.textContent = 'Already have an account? ';
-        toggleLink.textContent = 'Login';
-    }
-    
-    // Reset username validation
-    const usernameInput = document.getElementById('auth-username');
-    if (usernameInput) {
-        usernameInput.classList.remove('username-valid', 'username-invalid');
+        showAuthError(error.message);
     }
 }
 
@@ -9227,7 +9357,7 @@ function logout() {
     // Reset auth form
     isLogin = true;
     const authTitle = document.getElementById('auth-title');
-    if (authTitle) authTitle.textContent = 'Login';
+    if (authTitle) authTitle.textContent = 'Welcome Back! 👋';
     
     const authButton = document.querySelector('.auth-box button');
     if (authButton) authButton.textContent = 'Login';
@@ -9236,7 +9366,7 @@ function logout() {
     if (toggleText) toggleText.textContent = "Don't have an account? ";
     
     const toggleLink = document.getElementById('toggle-link');
-    if (toggleLink) toggleLink.textContent = 'Sign Up';
+    if (toggleLink) toggleLink.innerHTML = '<strong>Sign Up Now</strong>';
     
     // Clear profile section
     const profileSection = document.querySelector('.profile-display-section');
@@ -11765,8 +11895,6 @@ document.addEventListener('click', function (e) {
         openZoom(e.target.src);
     }
 });
-
-// --- END OF JAVASCRIPT CODE ---
-</script>
+    </script>
 </body>
 </html>
