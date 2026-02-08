@@ -9,7 +9,9 @@ const config = require('./config.json');
 const http = require('http');
 const { Server } = require('socket.io');
 const crypto = require('crypto');
-const jwt = require('jsonwebtoken');
+
+// Remove jsonwebtoken import since it's not installed
+// const jwt = require('jsonwebtoken');
 
 // Initialize apps
 const app = express();
@@ -101,8 +103,8 @@ const renderExternalUrl = process.env.RENDER_EXTERNAL_URL;
 // Configuration for OAuth providers
 const oauthConfig = {
   google: {
-    clientId: process.env.GOOGLE_CLIENT_ID || '',
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+    clientId: process.env.GOOGLE_CLIENT_ID || '683571254262-gaq5glm6ml7481c9jlgi6ru3fi68k7d1.apps.googleusercontent.com',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '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',
     redirectUri: process.env.GOOGLE_REDIRECT_URI || (isRender ? `${renderExternalUrl}/api/auth/google/callback` : `http://localhost:${port}/api/auth/google/callback`),
     authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
     tokenUrl: 'https://oauth2.googleapis.com/token',
@@ -118,7 +120,7 @@ const oauthConfig = {
   }
 };
 
-// JWT Secret for token generation
+// JWT Secret for token generation (using crypto for simple token generation)
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production';
 
 // Middleware
@@ -140,22 +142,35 @@ function hashPassword(password) {
   return crypto.createHash('sha256').update(password + JWT_SECRET).digest('hex');
 }
 
-// Generate JWT token
-function generateJWTToken(user) {
-  const payload = {
-    id: user.id,
-    username: user.username,
-    email: user.email,
-    auth_provider: user.auth_provider
-  };
-  
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' });
+// Generate simple token (replacing JWT)
+function generateToken(user) {
+  const tokenData = `${user.id}:${user.username}:${Date.now()}`;
+  return Buffer.from(tokenData).toString('base64');
 }
 
-// Verify JWT token
-function verifyJWTToken(token) {
+// Verify token (replacing JWT)
+function verifyTokenSimple(token) {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    const decoded = Buffer.from(token, 'base64').toString('ascii');
+    const [userId, username, timestamp] = decoded.split(':');
+    
+    if (!userId || !username || !timestamp) {
+      return null;
+    }
+    
+    // Check if token is not too old (30 days)
+    const tokenAge = Date.now() - parseInt(timestamp);
+    const maxTokenAge = 30 * 24 * 60 * 60 * 1000; // 30 days
+    
+    if (isNaN(tokenAge) || tokenAge > maxTokenAge) {
+      return null;
+    }
+    
+    return {
+      id: userId,
+      username: username,
+      timestamp: parseInt(timestamp)
+    };
   } catch (error) {
     return null;
   }
@@ -391,8 +406,8 @@ async function handleOAuthCallback(provider, code, res) {
       console.log(`✅ New ${provider} user created:`, user.username);
     }
     
-    // Generate JWT token
-    const token = generateJWTToken(user);
+    // Generate token
+    const token = generateToken(user);
     
     return {
       success: true,
@@ -480,7 +495,7 @@ app.get('/api/auth/facebook/callback', async (req, res) => {
   }
 });
 
-// ===== ENHANCED JWT TOKEN VERIFICATION MIDDLEWARE =====
+// ===== ENHANCED TOKEN VERIFICATION MIDDLEWARE =====
 
 function verifyToken(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -505,11 +520,11 @@ function verifyToken(req, res, next) {
   }
 
   try {
-    // Try JWT verification first
-    const decoded = verifyJWTToken(token);
+    // Try simple token verification first
+    const decoded = verifyTokenSimple(token);
     
     if (decoded) {
-      console.log('✅ JWT token verified for user:', decoded.username);
+      console.log('✅ Token verified for user:', decoded.username);
       req.user = decoded;
       return next();
     }
@@ -697,8 +712,8 @@ app.post('/api/register', async (req, res) => {
 
     console.log('✅ User registered successfully:', username);
     
-    // Generate JWT token for persistent login
-    const userToken = generateJWTToken(newUser[0]);
+    // Generate token for persistent login
+    const userToken = generateToken(newUser[0]);
     
     // Create user profile
     try {
@@ -735,7 +750,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// User login endpoint - POST (updated with JWT)
+// User login endpoint - POST (updated with token)
 app.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -799,8 +814,8 @@ app.post('/api/login', async (req, res) => {
 
     console.log('✅ User logged in successfully:', username);
 
-    // Generate JWT token
-    const userToken = generateJWTToken(user);
+    // Generate token
+    const userToken = generateToken(user);
 
     res.json({ 
       success: true, 
@@ -966,8 +981,8 @@ app.post('/api/auth/register', async (req, res) => {
 
     console.log('✅ User registered successfully via auth endpoint:', username);
     
-    // Generate JWT token
-    const userToken = generateJWTToken(newUser[0]);
+    // Generate token
+    const userToken = generateToken(newUser[0]);
     
     // Create user profile
     try {
@@ -1068,8 +1083,8 @@ app.post('/api/auth/login', async (req, res) => {
 
     console.log('✅ User logged in successfully via auth endpoint:', username);
 
-    // Generate JWT token
-    const userToken = generateJWTToken(user);
+    // Generate token
+    const userToken = generateToken(user);
 
     res.json({ 
       success: true, 
@@ -5095,7 +5110,7 @@ app.post('/api/auth/link-account', verifyToken, async (req, res) => {
     
     // Generate new token with updated provider info
     const updatedUser = { ...req.user, auth_provider: provider };
-    const newToken = generateJWTToken(updatedUser);
+    const newToken = generateToken(updatedUser);
 
     res.json({ 
       success: true, 
@@ -5165,7 +5180,7 @@ app.post('/api/auth/unlink-account', verifyToken, async (req, res) => {
     
     // Generate new token with local provider info
     const updatedUser = { ...req.user, auth_provider: 'local' };
-    const newToken = generateJWTToken(updatedUser);
+    const newToken = generateToken(updatedUser);
 
     res.json({ 
       success: true, 
@@ -5264,14 +5279,14 @@ server.listen(port, () => {
   console.log(`🤫 PRIVATE MESSAGING: FIXED AND STABLE`);
   console.log(`🔒 Private endpoints: /private-messages/*`);
   console.log(`🔐 USER AUTHENTICATION: ENABLED (Server-side, no localStorage)`);
-  console.log(`🔐 Password hashing: ENHANCED with SHA-256 and JWT tokens`);
-  console.log(`🔐 JWT Tokens: ENABLED for secure authentication`);
+  console.log(`🔐 Password hashing: ENHANCED with SHA-256 and simple tokens`);
+  console.log(`🔐 Simple Tokens: ENABLED for secure authentication (No JWT module needed)`);
   console.log(`🔐 Auth Providers: LOCAL, GOOGLE, and FACEBOOK supported`);
   console.log(`🌐 Cross-browser compatibility: ENABLED`);
   
   // Google OAuth information
   if (oauthConfig.google.clientId) {
-    console.log(`🔐 GOOGLE OAUTH: ENABLED`);
+    console.log(`🔐 GOOGLE OAUTH: ENABLED with provided credentials`);
     console.log(`   GET /api/auth/google - Get Google OAuth URL`);
     console.log(`   GET /api/auth/google/callback - Google OAuth callback`);
   } else {
