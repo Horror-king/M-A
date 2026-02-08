@@ -8,6 +8,8 @@ const fs = require('fs-extra');
 const config = require('./config.json');
 const http = require('http');
 const { Server } = require('socket.io');
+const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 
 // Initialize apps
 const app = express();
@@ -95,6 +97,30 @@ const upload = multer({
 const isRender = process.env.RENDER === 'true';
 const renderExternalUrl = process.env.RENDER_EXTERNAL_URL;
 
+// ===== GOOGLE AND FACEBOOK AUTH CONFIGURATION =====
+// Configuration for OAuth providers
+const oauthConfig = {
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID || '',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+    redirectUri: process.env.GOOGLE_REDIRECT_URI || (isRender ? `${renderExternalUrl}/api/auth/google/callback` : `http://localhost:${port}/api/auth/google/callback`),
+    authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+    tokenUrl: 'https://oauth2.googleapis.com/token',
+    userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo'
+  },
+  facebook: {
+    clientId: process.env.FACEBOOK_APP_ID || '',
+    clientSecret: process.env.FACEBOOK_APP_SECRET || '',
+    redirectUri: process.env.FACEBOOK_REDIRECT_URI || (isRender ? `${renderExternalUrl}/api/auth/facebook/callback` : `http://localhost:${port}/api/auth/facebook/callback`),
+    authUrl: 'https://www.facebook.com/v12.0/dialog/oauth',
+    tokenUrl: 'https://graph.facebook.com/v12.0/oauth/access_token',
+    userInfoUrl: 'https://graph.facebook.com/v12.0/me'
+  }
+};
+
+// JWT Secret for token generation
+const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production';
+
 // Middleware
 app.use(cors({
   origin: '*',
@@ -107,83 +133,463 @@ app.use(express.json({ limit: '1mb' })); // Small payload for mobile
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(express.static('public'));
 
-// ===== ENHANCED USER AUTHENTICATION SYSTEM =====
+// ===== ENHANCED USER AUTHENTICATION SYSTEM WITH OAUTH =====
 
-// Simple password hashing function (basic implementation)
-function simpleHash(password) {
-  let hash = 0;
-  for (let i = 0; i < password.length; i++) {
-    const char = password.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  return hash.toString();
+// Better password hashing function using crypto
+function hashPassword(password) {
+  return crypto.createHash('sha256').update(password + JWT_SECRET).digest('hex');
 }
 
-// Initialize users table if it doesn't exist
-async function initializeUsersTable() {
+// Generate JWT token
+function generateJWTToken(user) {
+  const payload = {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    auth_provider: user.auth_provider
+  };
+  
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' });
+}
+
+// Verify JWT token
+function verifyJWTToken(token) {
   try {
-    // First check if table exists by trying to select from it
-    const { data, error } = await supabase
+    return jwt.verify(token, JWT_SECRET);
+  } catch (error) {
+    return null;
+  }
+}
+
+// Generate random username for OAuth users
+function generateRandomUsername(provider, providerId) {
+  const randomSuffix = Math.floor(Math.random() * 10000);
+  const baseName = provider === 'google' ? 'googler' : 'facebooker';
+  return `${baseName}_${randomSuffix}`;
+}
+
+// Generate display name from OAuth data
+function generateDisplayName(provider, userData) {
+  if (provider === 'google') {
+    return userData.name || userData.given_name || `Google User`;
+  } else if (provider === 'facebook') {
+    return userData.name || `Facebook User`;
+  }
+  return `Social User`;
+}
+
+// ===== OAUTH AUTHENTICATION ENDPOINTS =====
+
+// Google OAuth login URL
+app.get('/api/auth/google', (req, res) => {
+  if (!oauthConfig.google.clientId) {
+    return res.status(400).json({ 
+      success: false, 
+      error: "Google OAuth not configured. Please set GOOGLE_CLIENT_ID environment variable." 
+    });
+  }
+  
+  const googleAuthUrl = new URL(oauthConfig.google.authUrl);
+  googleAuthUrl.searchParams.append('client_id', oauthConfig.google.clientId);
+  googleAuthUrl.searchParams.append('redirect_uri', oauthConfig.google.redirectUri);
+  googleAuthUrl.searchParams.append('response_type', 'code');
+  googleAuthUrl.searchParams.append('scope', 'profile email');
+  googleAuthUrl.searchParams.append('access_type', 'offline');
+  googleAuthUrl.searchParams.append('prompt', 'consent');
+  
+  res.json({
+    success: true,
+    auth_url: googleAuthUrl.toString()
+  });
+});
+
+// Facebook OAuth login URL
+app.get('/api/auth/facebook', (req, res) => {
+  if (!oauthConfig.facebook.clientId) {
+    return res.status(400).json({ 
+      success: false, 
+      error: "Facebook OAuth not configured. Please set FACEBOOK_APP_ID environment variable." 
+    });
+  }
+  
+  const facebookAuthUrl = new URL(oauthConfig.facebook.authUrl);
+  facebookAuthUrl.searchParams.append('client_id', oauthConfig.facebook.clientId);
+  facebookAuthUrl.searchParams.append('redirect_uri', oauthConfig.facebook.redirectUri);
+  facebookAuthUrl.searchParams.append('response_type', 'code');
+  facebookAuthUrl.searchParams.append('scope', 'email,public_profile');
+  facebookAuthUrl.searchParams.append('state', crypto.randomBytes(16).toString('hex'));
+  
+  res.json({
+    success: true,
+    auth_url: facebookAuthUrl.toString()
+  });
+});
+
+// OAuth callback handler
+async function handleOAuthCallback(provider, code, res) {
+  try {
+    let tokenResponse, userInfo;
+    
+    if (provider === 'google') {
+      // Exchange code for access token
+      tokenResponse = await axios.post(oauthConfig.google.tokenUrl, {
+        client_id: oauthConfig.google.clientId,
+        client_secret: oauthConfig.google.clientSecret,
+        code: code,
+        redirect_uri: oauthConfig.google.redirectUri,
+        grant_type: 'authorization_code'
+      });
+      
+      // Get user info from Google
+      userInfo = await axios.get(oauthConfig.google.userInfoUrl, {
+        headers: { Authorization: `Bearer ${tokenResponse.data.access_token}` }
+      });
+    } else if (provider === 'facebook') {
+      // Exchange code for access token
+      tokenResponse = await axios.get(oauthConfig.facebook.tokenUrl, {
+        params: {
+          client_id: oauthConfig.facebook.clientId,
+          client_secret: oauthConfig.facebook.clientSecret,
+          code: code,
+          redirect_uri: oauthConfig.facebook.redirectUri
+        }
+      });
+      
+      // Get user info from Facebook
+      userInfo = await axios.get(oauthConfig.facebook.userInfoUrl, {
+        params: {
+          fields: 'id,name,email,picture.type(large),first_name,last_name',
+          access_token: tokenResponse.data.access_token
+        }
+      });
+    }
+    
+    const providerUser = userInfo.data;
+    const providerId = provider === 'google' ? providerUser.id : providerUser.id;
+    
+    // Check if user already exists by provider ID
+    const { data: existingUser, error: findError } = await supabase
       .from('users')
       .select('*')
+      .eq('auth_provider', provider)
+      .eq('provider_id', providerId)
       .limit(1);
-
-    if (error && error.code === '42P01') { // Table doesn't exist
-      console.log('⚠️ Users table does not exist. Please create it in Supabase.');
-      console.log('📋 SQL to create users table:');
-      console.log(`
-        CREATE TABLE IF NOT EXISTS users (
-          id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-          username VARCHAR(50) UNIQUE NOT NULL,
-          password_hash VARCHAR(255) NOT NULL,
-          email VARCHAR(255),
-          created_at TIMESTAMPTZ DEFAULT NOW(),
-          last_login TIMESTAMPTZ DEFAULT NOW(),
-          is_active BOOLEAN DEFAULT TRUE
-        );
-        
-        CREATE TABLE IF NOT EXISTS user_profiles (
-          id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-          user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-          username TEXT UNIQUE NOT NULL,
-          display_name TEXT,
-          avatar_url TEXT,
-          bio TEXT,
-          location VARCHAR(100),
-          website TEXT,
-          social_links JSONB DEFAULT '{}'::jsonb,
-          preferences JSONB DEFAULT '{
-            "theme": "light",
-            "privacy": "public",
-            "language": "en",
-            "soundEnabled": true,
-            "notifications": true
-          }'::jsonb,
-          message_count INTEGER DEFAULT 0,
-          last_active TIMESTAMPTZ DEFAULT NOW(),
-          status VARCHAR(20) DEFAULT 'online',
-          created_at TIMESTAMPTZ DEFAULT NOW(),
-          updated_at TIMESTAMPTZ DEFAULT NOW(),
-          firstname VARCHAR(100),
-          lastname VARCHAR(100),
-          age INTEGER,
-          gender VARCHAR(50),
-          interests TEXT
-        );
-      `);
-    } else if (!error) {
-      console.log('✅ Users table exists');
+    
+    let user;
+    
+    if (findError) {
+      console.error(`❌ Error finding ${provider} user:`, findError);
+      throw findError;
     }
+    
+    if (existingUser && existingUser.length > 0) {
+      // User exists - update last login
+      user = existingUser[0];
+      
+      await supabase
+        .from('users')
+        .update({ 
+          last_login: new Date().toISOString(),
+          avatar_url: provider === 'google' ? providerUser.picture : (providerUser.picture?.data?.url || user.avatar_url)
+        })
+        .eq('id', user.id);
+      
+      console.log(`✅ ${provider} user logged in:`, user.username);
+    } else {
+      // Create new user from OAuth provider
+      // Check if email already exists in the system
+      if (providerUser.email) {
+        const { data: existingEmailUser } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', providerUser.email)
+          .limit(1);
+        
+        if (existingEmailUser && existingEmailUser.length > 0) {
+          return {
+            success: false,
+            error: `Email ${providerUser.email} is already registered. Please login with your existing account.`
+          };
+        }
+      }
+      
+      // Generate username
+      let username;
+      if (providerUser.email) {
+        username = providerUser.email.split('@')[0];
+        // Clean username
+        username = username.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+      } else {
+        username = generateRandomUsername(provider, providerId);
+      }
+      
+      // Ensure username is unique
+      let counter = 1;
+      let originalUsername = username;
+      
+      while (true) {
+        const { data: checkUsers } = await supabase
+          .from('users')
+          .select('username')
+          .eq('username', username)
+          .limit(1);
+        
+        if (!checkUsers || checkUsers.length === 0) {
+          break;
+        }
+        username = `${originalUsername}_${counter}`;
+        counter++;
+      }
+      
+      // Create user
+      const userData = {
+        username: username,
+        email: providerUser.email || null,
+        email_verified: provider === 'google' ? (providerUser.verified_email || false) : true,
+        auth_provider: provider,
+        provider_id: providerId,
+        provider_data: providerUser,
+        avatar_url: provider === 'google' ? providerUser.picture : (providerUser.picture?.data?.url || null),
+        created_at: new Date().toISOString(),
+        last_login: new Date().toISOString(),
+        is_active: true
+      };
+      
+      const { data: newUser, error: createError } = await supabase
+        .from('users')
+        .insert([userData])
+        .select();
+      
+      if (createError) {
+        console.error(`❌ Error creating ${provider} user:`, createError);
+        throw createError;
+      }
+      
+      user = newUser[0];
+      
+      // Create user profile
+      try {
+        const profileData = {
+          user_id: user.id,
+          username: user.username,
+          display_name: generateDisplayName(provider, providerUser),
+          avatar_url: user.avatar_url,
+          firstname: provider === 'google' ? providerUser.given_name : providerUser.first_name,
+          lastname: provider === 'google' ? providerUser.family_name : providerUser.last_name,
+          bio: '',
+          status: 'online'
+        };
+        
+        await supabase
+          .from('user_profiles')
+          .insert([profileData]);
+      } catch (profileError) {
+        console.error(`❌ Error creating profile for ${provider} user:`, profileError);
+        // Continue even if profile creation fails
+      }
+      
+      console.log(`✅ New ${provider} user created:`, user.username);
+    }
+    
+    // Generate JWT token
+    const token = generateJWTToken(user);
+    
+    return {
+      success: true,
+      user: user,
+      token: token
+    };
+    
   } catch (error) {
-    console.error('❌ Error checking users table:', error);
+    console.error(`❌ ${provider} OAuth error:`, error);
+    throw error;
   }
 }
 
-// Call initialization
-initializeUsersTable();
+// Google OAuth callback
+app.get('/api/auth/google/callback', async (req, res) => {
+  try {
+    const { code, error: oauthError } = req.query;
+    
+    if (oauthError) {
+      throw new Error(`Google OAuth error: ${oauthError}`);
+    }
+    
+    if (!code) {
+      return res.status(400).json({ success: false, error: "Authorization code required" });
+    }
+    
+    const result = await handleOAuthCallback('google', code, res);
+    
+    if (!result.success) {
+      const frontendUrl = process.env.FRONTEND_URL || (isRender ? renderExternalUrl : `http://localhost:${port}`);
+      const errorRedirectUrl = `${frontendUrl}/auth/callback?error=${encodeURIComponent(result.error)}`;
+      return res.redirect(errorRedirectUrl);
+    }
+    
+    // Redirect to frontend with token
+    const frontendUrl = process.env.FRONTEND_URL || (isRender ? renderExternalUrl : `http://localhost:${port}`);
+    const redirectUrl = `${frontendUrl}/auth/callback?token=${result.token}&username=${result.user.username}&provider=google`;
+    
+    res.redirect(redirectUrl);
+    
+  } catch (error) {
+    console.error('❌ Google OAuth callback error:', error);
+    
+    const frontendUrl = process.env.FRONTEND_URL || (isRender ? renderExternalUrl : `http://localhost:${port}`);
+    const errorRedirectUrl = `${frontendUrl}/auth/callback?error=${encodeURIComponent('Google authentication failed')}`;
+    
+    res.redirect(errorRedirectUrl);
+  }
+});
 
-// ===== AUTHENTICATION ENDPOINTS =====
+// Facebook OAuth callback
+app.get('/api/auth/facebook/callback', async (req, res) => {
+  try {
+    const { code, error: oauthError } = req.query;
+    
+    if (oauthError) {
+      throw new Error(`Facebook OAuth error: ${oauthError}`);
+    }
+    
+    if (!code) {
+      return res.status(400).json({ success: false, error: "Authorization code required" });
+    }
+    
+    const result = await handleOAuthCallback('facebook', code, res);
+    
+    if (!result.success) {
+      const frontendUrl = process.env.FRONTEND_URL || (isRender ? renderExternalUrl : `http://localhost:${port}`);
+      const errorRedirectUrl = `${frontendUrl}/auth/callback?error=${encodeURIComponent(result.error)}`;
+      return res.redirect(errorRedirectUrl);
+    }
+    
+    // Redirect to frontend with token
+    const frontendUrl = process.env.FRONTEND_URL || (isRender ? renderExternalUrl : `http://localhost:${port}`);
+    const redirectUrl = `${frontendUrl}/auth/callback?token=${result.token}&username=${result.user.username}&provider=facebook`;
+    
+    res.redirect(redirectUrl);
+    
+  } catch (error) {
+    console.error('❌ Facebook OAuth callback error:', error);
+    
+    const frontendUrl = process.env.FRONTEND_URL || (isRender ? renderExternalUrl : `http://localhost:${port}`);
+    const errorRedirectUrl = `${frontendUrl}/auth/callback?error=${encodeURIComponent('Facebook authentication failed')}`;
+    
+    res.redirect(errorRedirectUrl);
+  }
+});
+
+// ===== ENHANCED JWT TOKEN VERIFICATION MIDDLEWARE =====
+
+function verifyToken(req, res, next) {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader) {
+    console.log('❌ No auth header found');
+    return res.status(401).json({ 
+      success: false, 
+      error: "Authentication token required" 
+    });
+  }
+
+  // Remove 'Bearer ' prefix if present
+  const token = authHeader.replace('Bearer ', '');
+  
+  if (!token) {
+    console.log('❌ Empty token after removing Bearer prefix');
+    return res.status(401).json({ 
+      success: false, 
+      error: "Authentication token required" 
+    });
+  }
+
+  try {
+    // Try JWT verification first
+    const decoded = verifyJWTToken(token);
+    
+    if (decoded) {
+      console.log('✅ JWT token verified for user:', decoded.username);
+      req.user = decoded;
+      return next();
+    }
+    
+    // Fallback to old token verification for backward compatibility
+    try {
+      const oldDecoded = Buffer.from(token, 'base64').toString('ascii');
+      console.log('🔐 Old token format detected:', oldDecoded);
+      
+      const [username, timestamp] = oldDecoded.split(':');
+      
+      if (!username) {
+        console.log('❌ No username found in old token');
+        return res.status(401).json({ 
+          success: false, 
+          error: "Invalid token format" 
+        });
+      }
+      
+      // Check if token is not too old (30 days)
+      const tokenAge = Date.now() - parseInt(timestamp);
+      const maxTokenAge = 30 * 24 * 60 * 60 * 1000; // 30 days
+      
+      if (isNaN(tokenAge) || tokenAge > maxTokenAge) {
+        console.log('❌ Old token expired or invalid timestamp');
+        return res.status(401).json({ 
+          success: false, 
+          error: "Token expired" 
+        });
+      }
+      
+      // Fetch user from database to get full info
+      supabase
+        .from('users')
+        .select('*')
+        .ilike('username', username)
+        .limit(1)
+        .then(({ data: users, error: userError }) => {
+          if (userError || !users || users.length === 0) {
+            return res.status(401).json({ 
+              success: false, 
+              error: "User not found" 
+            });
+          }
+          
+          req.user = {
+            id: users[0].id,
+            username: users[0].username,
+            email: users[0].email,
+            auth_provider: users[0].auth_provider
+          };
+          
+          console.log('✅ Old token verified for user:', username);
+          next();
+        })
+        .catch(error => {
+          console.error('❌ Error fetching user for old token:', error);
+          return res.status(401).json({ 
+            success: false, 
+            error: "Invalid token" 
+          });
+        });
+        
+    } catch (oldTokenError) {
+      console.error('❌ Old token verification error:', oldTokenError);
+      return res.status(401).json({ 
+        success: false, 
+        error: "Invalid token" 
+      });
+    }
+  } catch (error) {
+    console.error('❌ Token verification error:', error);
+    return res.status(401).json({ 
+      success: false, 
+      error: "Invalid token" 
+    });
+  }
+}
+
+// ===== UPDATED USER REGISTRATION WITH PASSWORD HASHING =====
 
 // User registration endpoint - POST
 app.post('/api/register', async (req, res) => {
@@ -242,8 +648,27 @@ app.post('/api/register', async (req, res) => {
       });
     }
 
-    // Simple password hashing
-    const hashedPassword = simpleHash(password);
+    // Check if email already exists for local users
+    if (email) {
+      const { data: existingEmail, error: emailError } = await supabase
+        .from('users')
+        .select('email')
+        .eq('email', email)
+        .eq('auth_provider', 'local')
+        .limit(1);
+
+      if (emailError) {
+        console.error('❌ Database error checking email:', emailError);
+      } else if (existingEmail && existingEmail.length > 0) {
+        return res.status(409).json({ 
+          success: false, 
+          error: "Email already registered with a local account" 
+        });
+      }
+    }
+
+    // Use enhanced password hashing
+    const hashedPassword = hashPassword(password);
 
     // Create user
     const { data: newUser, error: createError } = await supabase
@@ -253,9 +678,11 @@ app.post('/api/register', async (req, res) => {
           username: username.trim(),
           password_hash: hashedPassword,
           email: email || null,
+          auth_provider: 'local',
           created_at: new Date().toISOString(),
           last_login: new Date().toISOString(),
-          is_active: true
+          is_active: true,
+          avatar_url: `https://i.pravatar.cc/150?u=${username}`
         }
       ])
       .select();
@@ -270,15 +697,33 @@ app.post('/api/register', async (req, res) => {
 
     console.log('✅ User registered successfully:', username);
     
-    // Generate a simple token for persistent login
-    const userToken = generateUserToken(username);
+    // Generate JWT token for persistent login
+    const userToken = generateJWTToken(newUser[0]);
+    
+    // Create user profile
+    try {
+      await supabase
+        .from('user_profiles')
+        .insert([
+          {
+            user_id: newUser[0].id,
+            username: username,
+            display_name: username,
+            avatar_url: `https://i.pravatar.cc/150?u=${username}`,
+            status: 'online'
+          }
+        ]);
+    } catch (profileError) {
+      console.log('⚠️ Could not create profile:', profileError);
+    }
     
     res.status(201).json({ 
       success: true, 
       message: "User registered successfully",
       username: username,
       user_id: newUser[0].id,
-      token: userToken
+      token: userToken,
+      auth_provider: 'local'
     });
 
   } catch (error) {
@@ -290,7 +735,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// User login endpoint - POST
+// User login endpoint - POST (updated with JWT)
 app.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -328,8 +773,16 @@ app.post('/api/login', async (req, res) => {
 
     const user = users[0];
 
-    // Verify password with simple hash
-    const isPasswordValid = simpleHash(password) === user.password_hash;
+    // Check if user is using OAuth (no password)
+    if (user.auth_provider !== 'local' && !user.password_hash) {
+      return res.status(401).json({ 
+        success: false, 
+        error: `This account uses ${user.auth_provider} authentication. Please sign in with ${user.auth_provider}.` 
+      });
+    }
+
+    // Verify password with enhanced hash
+    const isPasswordValid = hashPassword(password) === user.password_hash;
     
     if (!isPasswordValid) {
       return res.status(401).json({ 
@@ -346,15 +799,16 @@ app.post('/api/login', async (req, res) => {
 
     console.log('✅ User logged in successfully:', username);
 
-    // Generate a token for persistent login
-    const userToken = generateUserToken(username);
+    // Generate JWT token
+    const userToken = generateJWTToken(user);
 
     res.json({ 
       success: true, 
       message: "Login successful",
       username: user.username,
       user_id: user.id,
-      token: userToken
+      token: userToken,
+      auth_provider: user.auth_provider
     });
 
   } catch (error) {
@@ -365,77 +819,6 @@ app.post('/api/login', async (req, res) => {
     });
   }
 });
-
-// Simple token generation function
-function generateUserToken(username) {
-  const timestamp = Date.now();
-  const data = `${username}:${timestamp}:${Math.random().toString(36).substr(2, 9)}`;
-  return Buffer.from(data).toString('base64');
-}
-
-// Token verification middleware - FIXED: Now handles both Bearer token and basic token
-function verifyToken(req, res, next) {
-  const authHeader = req.headers.authorization;
-  console.log('🔐 Auth header received:', authHeader ? 'Present' : 'Missing');
-  
-  if (!authHeader) {
-    console.log('❌ No auth header found');
-    return res.status(401).json({ 
-      success: false, 
-      error: "Authentication token required" 
-    });
-  }
-
-  // Remove 'Bearer ' prefix if present
-  const token = authHeader.replace('Bearer ', '');
-  
-  if (!token) {
-    console.log('❌ Empty token after removing Bearer prefix');
-    return res.status(401).json({ 
-      success: false, 
-      error: "Authentication token required" 
-    });
-  }
-
-  try {
-    // Simple token verification
-    const decoded = Buffer.from(token, 'base64').toString('ascii');
-    console.log('🔐 Decoded token:', decoded);
-    
-    const [username, timestamp] = decoded.split(':');
-    
-    if (!username) {
-      console.log('❌ No username found in token');
-      return res.status(401).json({ 
-        success: false, 
-        error: "Invalid token format" 
-      });
-    }
-    
-    // Check if token is not too old (30 days)
-    const tokenAge = Date.now() - parseInt(timestamp);
-    const maxTokenAge = 30 * 24 * 60 * 60 * 1000; // 30 days
-    
-    if (isNaN(tokenAge) || tokenAge > maxTokenAge) {
-      console.log('❌ Token expired or invalid timestamp');
-      return res.status(401).json({ 
-        success: false, 
-        error: "Token expired" 
-      });
-    }
-    
-    req.user = { username };
-    console.log('✅ Token verified for user:', username);
-    next();
-  } catch (error) {
-    console.error('❌ Token verification error:', error);
-    console.error('❌ Token that failed:', token);
-    return res.status(401).json({ 
-      success: false, 
-      error: "Invalid token" 
-    });
-  }
-}
 
 // Check username availability - POST
 app.post('/api/check-username', async (req, res) => {
@@ -536,8 +919,25 @@ app.post('/api/auth/register', async (req, res) => {
       });
     }
 
-    // Simple password hashing
-    const hashedPassword = simpleHash(password);
+    // Check if email already exists for local users
+    if (email) {
+      const { data: existingEmail } = await supabase
+        .from('users')
+        .select('email')
+        .eq('email', email)
+        .eq('auth_provider', 'local')
+        .limit(1);
+
+      if (existingEmail && existingEmail.length > 0) {
+        return res.status(409).json({ 
+          success: false, 
+          error: "Email already registered with a local account" 
+        });
+      }
+    }
+
+    // Use enhanced password hashing
+    const hashedPassword = hashPassword(password);
 
     // Create user
     const { data: newUser, error: createError } = await supabase
@@ -547,9 +947,11 @@ app.post('/api/auth/register', async (req, res) => {
           username: username.trim(),
           password_hash: hashedPassword,
           email: email || null,
+          auth_provider: 'local',
           created_at: new Date().toISOString(),
           last_login: new Date().toISOString(),
-          is_active: true
+          is_active: true,
+          avatar_url: `https://i.pravatar.cc/150?u=${username}`
         }
       ])
       .select();
@@ -564,15 +966,33 @@ app.post('/api/auth/register', async (req, res) => {
 
     console.log('✅ User registered successfully via auth endpoint:', username);
     
-    // Generate token for persistent login
-    const userToken = generateUserToken(username);
+    // Generate JWT token
+    const userToken = generateJWTToken(newUser[0]);
+    
+    // Create user profile
+    try {
+      await supabase
+        .from('user_profiles')
+        .insert([
+          {
+            user_id: newUser[0].id,
+            username: username,
+            display_name: username,
+            avatar_url: `https://i.pravatar.cc/150?u=${username}`,
+            status: 'online'
+          }
+        ]);
+    } catch (profileError) {
+      console.log('⚠️ Could not create profile:', profileError);
+    }
     
     res.status(201).json({ 
       success: true, 
       message: "User registered successfully",
       username: username,
       user_id: newUser[0].id,
-      token: userToken
+      token: userToken,
+      auth_provider: 'local'
     });
 
   } catch (error) {
@@ -622,8 +1042,16 @@ app.post('/api/auth/login', async (req, res) => {
 
     const user = users[0];
 
-    // Verify password with simple hash
-    const isPasswordValid = simpleHash(password) === user.password_hash;
+    // Check if user is using OAuth (no password)
+    if (user.auth_provider !== 'local' && !user.password_hash) {
+      return res.status(401).json({ 
+        success: false, 
+        error: `This account uses ${user.auth_provider} authentication. Please sign in with ${user.auth_provider}.` 
+      });
+    }
+
+    // Verify password with enhanced hash
+    const isPasswordValid = hashPassword(password) === user.password_hash;
     
     if (!isPasswordValid) {
       return res.status(401).json({ 
@@ -640,15 +1068,16 @@ app.post('/api/auth/login', async (req, res) => {
 
     console.log('✅ User logged in successfully via auth endpoint:', username);
 
-    // Generate token for persistent login
-    const userToken = generateUserToken(username);
+    // Generate JWT token
+    const userToken = generateJWTToken(user);
 
     res.json({ 
       success: true, 
       message: "Login successful",
       username: user.username,
       user_id: user.id,
-      token: userToken
+      token: userToken,
+      auth_provider: user.auth_provider
     });
 
   } catch (error) {
@@ -703,6 +1132,7 @@ app.post('/api/auth/check-username', async (req, res) => {
 // Add auto-login endpoint
 app.post('/api/auth/auto-login', verifyToken, async (req, res) => {
   try {
+    const userId = req.user.id;
     const username = req.user.username;
 
     console.log('🔄 Auto-login attempt for:', username);
@@ -711,7 +1141,7 @@ app.post('/api/auth/auto-login', verifyToken, async (req, res) => {
     const { data: users, error } = await supabase
       .from('users')
       .select('*')
-      .ilike('username', username)
+      .eq('id', userId)
       .limit(1);
 
     if (error || !users || users.length === 0) {
@@ -735,7 +1165,10 @@ app.post('/api/auth/auto-login', verifyToken, async (req, res) => {
       success: true, 
       message: "Auto-login successful",
       username: user.username,
-      user_id: user.id
+      user_id: user.id,
+      email: user.email,
+      auth_provider: user.auth_provider,
+      avatar_url: user.avatar_url
     });
 
   } catch (error) {
@@ -745,6 +1178,34 @@ app.post('/api/auth/auto-login', verifyToken, async (req, res) => {
       error: "Internal server error" 
     });
   }
+});
+
+// ===== ADD OAUTH INFO ENDPOINT =====
+
+// Get OAuth configuration info (safe to expose to frontend)
+app.get('/api/auth/oauth-info', (req, res) => {
+  res.json({
+    success: true,
+    google: {
+      enabled: !!oauthConfig.google.clientId,
+      clientId: oauthConfig.google.clientId,
+      redirectUri: oauthConfig.google.redirectUri
+    },
+    facebook: {
+      enabled: !!oauthConfig.facebook.clientId,
+      redirectUri: oauthConfig.facebook.redirectUri
+    },
+    endpoints: {
+      google: {
+        auth: `/api/auth/google`,
+        callback: `/api/auth/google/callback`
+      },
+      facebook: {
+        auth: `/api/auth/facebook`,
+        callback: `/api/auth/facebook/callback`
+      }
+    }
+  });
 });
 
 // ===== ADD GET ENDPOINTS FOR TESTING =====
@@ -846,13 +1307,29 @@ app.get('/api/auth-test', (req, res) => {
           username: "string",
           profileData: "object"
         }
+      },
+      {
+        method: "GET",
+        path: "/api/auth/google",
+        description: "Get Google OAuth URL"
+      },
+      {
+        method: "GET",
+        path: "/api/auth/facebook",
+        description: "Get Facebook OAuth URL"
+      },
+      {
+        method: "GET",
+        path: "/api/auth/oauth-info",
+        description: "Get OAuth configuration info"
       }
     ],
     testInstructions: [
       "1. Use POST /api/check-username to check availability",
       "2. Use POST /api/register to create account",
       "3. Use POST /api/login to authenticate",
-      "4. Use GET/POST /api/user/profile to manage profile"
+      "4. Use GET/POST /api/user/profile to manage profile",
+      "5. Use GET /api/auth/google or /api/auth/facebook for OAuth"
     ]
   });
 });
@@ -863,8 +1340,7 @@ app.get('/api/auth-test', (req, res) => {
 app.get('/api/user/profile', verifyToken, async (req, res) => {
   try {
     console.log('🔐 Profile request received');
-    console.log('📋 Headers:', req.headers);
-    console.log('👤 User from token:', req.user);
+    console.log('📋 User from token:', req.user);
     
     const username = req.user.username;
     
@@ -880,7 +1356,7 @@ app.get('/api/user/profile', verifyToken, async (req, res) => {
     // First get user info
     const { data: users, error: userError } = await supabase
       .from('users')
-      .select('id, username, email, created_at, last_login')
+      .select('id, username, email, auth_provider, created_at, last_login, avatar_url, provider_data')
       .ilike('username', username)
       .limit(1);
 
@@ -916,36 +1392,12 @@ app.get('/api/user/profile', verifyToken, async (req, res) => {
         gender: '',
         location: '',
         interests: '',
-        avatar_url: `https://i.pravatar.cc/150?u=${username}`,
+        avatar_url: user.avatar_url || `https://i.pravatar.cc/150?u=${username}`,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         display_name: username,
         status: 'online'
       };
-      
-      // Try to create the profile
-      try {
-        await supabase
-          .from('user_profiles')
-          .insert([
-            {
-              user_id: user.id,
-              username: username,
-              display_name: username,
-              avatar_url: `https://i.pravatar.cc/150?u=${username}`,
-              firstname: '',
-              lastname: '',
-              bio: '',
-              age: null,
-              gender: '',
-              location: '',
-              interests: '',
-              status: 'online'
-            }
-          ]);
-      } catch (createError) {
-        console.log('⚠️ Could not create profile, table might not exist');
-      }
       
     } else if (profileError) {
       console.error('❌ Profile query error:', profileError);
@@ -958,7 +1410,7 @@ app.get('/api/user/profile', verifyToken, async (req, res) => {
         gender: '',
         location: '',
         interests: '',
-        avatar_url: `https://i.pravatar.cc/150?u=${username}`,
+        avatar_url: user.avatar_url || `https://i.pravatar.cc/150?u=${username}`,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         display_name: username,
@@ -975,41 +1427,13 @@ app.get('/api/user/profile', verifyToken, async (req, res) => {
         gender: '',
         location: '',
         interests: '',
-        avatar_url: `https://i.pravatar.cc/150?u=${username}`,
+        avatar_url: user.avatar_url || `https://i.pravatar.cc/150?u=${username}`,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         display_name: username,
         status: 'online'
       };
       
-      // Try to create the profile
-      try {
-        const { data: newProfile } = await supabase
-          .from('user_profiles')
-          .insert([
-            {
-              user_id: user.id,
-              username: username,
-              display_name: username,
-              avatar_url: `https://i.pravatar.cc/150?u=${username}`,
-              firstname: '',
-              lastname: '',
-              bio: '',
-              age: null,
-              gender: '',
-              location: '',
-              interests: '',
-              status: 'online'
-            }
-          ])
-          .select();
-          
-        if (newProfile && newProfile.length > 0) {
-          profileData = { ...profileData, ...newProfile[0] };
-        }
-      } catch (createError) {
-        console.log('⚠️ Could not create profile:', createError);
-      }
     } else {
       // Profile exists, use it
       profileData = profiles[0];
@@ -1021,8 +1445,11 @@ app.get('/api/user/profile', verifyToken, async (req, res) => {
       username: username,
       email: user.email,
       user_id: user.id,
+      auth_provider: user.auth_provider || 'local',
       created_at: user.created_at,
       last_login: user.last_login,
+      avatar_url: user.avatar_url,
+      provider_data: user.provider_data,
       
       // Profile fields with defaults
       firstname: profileData.firstname || '',
@@ -1032,7 +1459,7 @@ app.get('/api/user/profile', verifyToken, async (req, res) => {
       gender: profileData.gender || '',
       location: profileData.location || '',
       interests: profileData.interests || '',
-      avatar: profileData.avatar_url || `https://i.pravatar.cc/150?u=${username}`,
+      avatar: profileData.avatar_url || user.avatar_url || `https://i.pravatar.cc/150?u=${username}`,
       display_name: profileData.display_name || username,
       status: profileData.status || 'online',
       profile_created_at: profileData.created_at || new Date().toISOString(),
@@ -1141,7 +1568,7 @@ async function updateProfileHandler(req, res) {
       username: username,
       user_id: userId,
       display_name: profileData.display_name || username,
-      avatar_url: profileData.avatar || `https://i.pravatar.cc/150?u=${username}`,
+      avatar_url: profileData.avatar || profileData.avatar_url || `https://i.pravatar.cc/150?u=${username}`,
       bio: profileData.bio || '',
       location: profileData.location || '',
       firstname: profileData.firstname || '',
@@ -1227,183 +1654,6 @@ async function updateProfileHandler(req, res) {
     });
   }
 }
-
-// ===== ADDED: ENDPOINT TO CREATE USER_PROFILES TABLE =====
-
-// Create user_profiles table if it doesn't exist
-app.get('/api/create-user-profiles-table', async (req, res) => {
-  try {
-    console.log('🔧 Checking user_profiles table...');
-    
-    const { data: tableCheck, error: checkError } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .limit(1);
-
-    if (checkError && checkError.code === '42P01') {
-      res.json({
-        success: false,
-        error: "Table doesn't exist",
-        instructions: [
-          "1. Go to your Supabase dashboard",
-          "2. Go to the SQL Editor",
-          "3. Run this SQL to create the table:",
-          `
-          -- Drop if exists and recreate with new schema
-          DROP TABLE IF EXISTS public.user_profiles CASCADE;
-
-          CREATE TABLE public.user_profiles (
-            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-            user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
-            username TEXT UNIQUE NOT NULL,
-            display_name TEXT,
-            avatar_url TEXT,
-            bio TEXT,
-            location VARCHAR(100),
-            website TEXT,
-            social_links JSONB DEFAULT '{}'::jsonb,
-            preferences JSONB DEFAULT '{
-              "theme": "light",
-              "privacy": "public",
-              "language": "en",
-              "soundEnabled": true,
-              "notifications": true
-            }'::jsonb,
-            message_count INTEGER DEFAULT 0,
-            last_active TIMESTAMPTZ DEFAULT NOW(),
-            status VARCHAR(20) DEFAULT 'online',
-            created_at TIMESTAMPTZ DEFAULT NOW(),
-            updated_at TIMESTAMPTZ DEFAULT NOW(),
-            firstname VARCHAR(100),
-            lastname VARCHAR(100),
-            age INTEGER,
-            gender VARCHAR(50),
-            interests TEXT
-          );
-
-          -- Create indexes
-          CREATE INDEX IF NOT EXISTS idx_user_profiles_username ON public.user_profiles(username);
-          CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id ON public.user_profiles(user_id);
-          CREATE INDEX IF NOT EXISTS idx_user_profiles_status ON public.user_profiles(status);
-
-          -- Enable RLS
-          ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
-
-          -- RLS Policy
-          DROP POLICY IF EXISTS "allow_all_user_profiles_operations" ON public.user_profiles;
-          CREATE POLICY "allow_all_user_profiles_operations" ON public.user_profiles FOR ALL USING (true) WITH CHECK (true);
-          `,
-          "4. Run the complete database setup script for all tables"
-        ]
-      });
-    } else if (checkError) {
-      throw checkError;
-    } else {
-      console.log('✅ user_profiles table exists');
-      
-      // Check if it has the required columns
-      const sampleRow = tableCheck?.[0];
-      const hasRequiredFields = sampleRow && 
-        'firstname' in sampleRow && 
-        'lastname' in sampleRow && 
-        'age' in sampleRow;
-        
-      res.json({
-        success: true,
-        message: hasRequiredFields ? "user_profiles table exists with all required fields" : "Table exists but missing some fields",
-        hasRequiredFields: hasRequiredFields,
-        sampleData: sampleRow,
-        rowCount: tableCheck?.length || 0,
-        missingFields: hasRequiredFields ? [] : ["firstname", "lastname", "age", "gender", "interests"],
-        instructions: !hasRequiredFields ? "Run the updated SQL script to add missing fields" : null
-      });
-    }
-
-  } catch (error) {
-    console.error('❌ Error checking table:', error);
-    res.status(500).json({ 
-      success: false,
-      error: "Error checking table: " + error.message 
-    });
-  }
-});
-
-// ===== ADDED: TEST PROFILE ENDPOINT (NO AUTH REQUIRED) =====
-
-// Test profile endpoint without authentication
-app.get('/api/test-profile', async (req, res) => {
-  try {
-    // Get username from query parameter for testing
-    const { username } = req.query;
-    
-    if (!username) {
-      return res.status(400).json({ 
-        success: false, 
-        error: "Username query parameter is required" 
-      });
-    }
-    
-    console.log('🧪 Test profile endpoint for:', username);
-    
-    // Test if we can query the table
-    const { data: profiles, error } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .eq('username', username)
-      .limit(1);
-
-    if (error) {
-      console.error('❌ Database error:', error);
-      return res.status(500).json({ 
-        success: false, 
-        error: "Database error: " + error.message,
-        code: error.code,
-        hint: error.hint
-      });
-    }
-
-    if (!profiles || profiles.length === 0) {
-      return res.json({ 
-        success: true,
-        message: "No profile found for user",
-        username: username,
-        defaultProfile: {
-          username: username,
-          firstname: '',
-          lastname: '',
-          bio: '',
-          age: null,
-          gender: '',
-          location: '',
-          interests: '',
-          avatar: `https://i.pravatar.cc/150?u=${username}`
-        }
-      });
-    }
-
-    console.log('✅ Found profile:', profiles[0]);
-    
-    // Map avatar_url to avatar for frontend compatibility
-    const profile = profiles[0];
-    const responseProfile = {
-      ...profile,
-      avatar: profile.avatar_url || `https://i.pravatar.cc/150?u=${username}`
-    };
-    
-    res.json({ 
-      success: true,
-      profile: responseProfile
-    });
-
-  } catch (error) {
-    console.error('❌ Test endpoint error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: "Internal server error: " + error.message,
-      stack: error.stack
-    });
-  }
-});
 
 // Get user profile by username (for profile popups) - FIXED
 app.get('/api/user/profile/:username', async (req, res) => {
@@ -1764,7 +2014,7 @@ app.get('/api/users/all', async (req, res) => {
         // Get all users from users table
         const { data: users, error: usersError } = await supabase
             .from('users')
-            .select('id, username, email, created_at, last_login')
+            .select('id, username, email, auth_provider, created_at, last_login, avatar_url, provider_data')
             .order('created_at', { ascending: false });
         
         if (usersError) {
@@ -1812,8 +2062,11 @@ app.get('/api/users/all', async (req, res) => {
                 username: user.username,
                 email: user.email || '',
                 user_id: user.id,
+                auth_provider: user.auth_provider || 'local',
                 created_at: user.created_at,
                 last_login: user.last_login,
+                avatar_url: user.avatar_url,
+                provider_data: user.provider_data,
                 
                 // Profile fields with defaults
                 firstname: profile.firstname || '',
@@ -1823,7 +2076,7 @@ app.get('/api/users/all', async (req, res) => {
                 gender: profile.gender || '',
                 location: profile.location || '',
                 interests: profile.interests || '',
-                avatar: profile.avatar_url || `https://i.pravatar.cc/150?u=${user.username}`,
+                avatar: profile.avatar_url || user.avatar_url || `https://i.pravatar.cc/150?u=${user.username}`,
                 display_name: profile.display_name || user.username,
                 status: 'offline', // Default status, could be enhanced with real-time tracking
                 
@@ -1888,11 +2141,19 @@ app.get('/api/users/all', async (req, res) => {
         // Count new users (joined in last 7 days)
         const newUsersCount = allUsersData.filter(u => u.is_new_user).length;
         
+        // Count by auth provider
+        const providerCounts = {};
+        allUsersData.forEach(user => {
+            const provider = user.auth_provider || 'local';
+            providerCounts[provider] = (providerCounts[provider] || 0) + 1;
+        });
+        
         res.json({
             success: true,
             users: allUsersData,
             total_count: allUsersData.length,
-            new_users: newUsersCount
+            new_users: newUsersCount,
+            provider_counts: providerCounts
         });
         
     } catch (error) {
@@ -1959,12 +2220,26 @@ app.get('/api/users/stats', async (req, res) => {
             return res.status(500).json({ error: "Failed to get active user stats" });
         }
         
+        // Get auth provider statistics
+        const { data: providerStats, error: providerError } = await supabase
+            .from('users')
+            .select('auth_provider');
+        
+        let providerCounts = {};
+        if (!providerError && providerStats) {
+            providerStats.forEach(user => {
+                const provider = user.auth_provider || 'local';
+                providerCounts[provider] = (providerCounts[provider] || 0) + 1;
+            });
+        }
+        
         res.json({
             success: true,
             stats: {
                 total_users: totalUsers || 0,
                 new_users_today: newUsersToday || 0,
                 active_users_last_24h: activeUsers || 0,
+                auth_providers: providerCounts,
                 timestamp: new Date().toISOString()
             }
         });
@@ -1976,6 +2251,183 @@ app.get('/api/users/stats', async (req, res) => {
             error: "Failed to get user stats: " + error.message 
         });
     }
+});
+
+// ===== ADDED: ENDPOINT TO CREATE USER_PROFILES TABLE =====
+
+// Create user_profiles table if it doesn't exist
+app.get('/api/create-user-profiles-table', async (req, res) => {
+  try {
+    console.log('🔧 Checking user_profiles table...');
+    
+    const { data: tableCheck, error: checkError } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .limit(1);
+
+    if (checkError && checkError.code === '42P01') {
+      res.json({
+        success: false,
+        error: "Table doesn't exist",
+        instructions: [
+          "1. Go to your Supabase dashboard",
+          "2. Go to the SQL Editor",
+          "3. Run this SQL to create the table:",
+          `
+          -- Drop if exists and recreate with new schema
+          DROP TABLE IF EXISTS public.user_profiles CASCADE;
+
+          CREATE TABLE public.user_profiles (
+            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+            user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+            username TEXT UNIQUE NOT NULL,
+            display_name TEXT,
+            avatar_url TEXT,
+            bio TEXT,
+            location VARCHAR(100),
+            website TEXT,
+            social_links JSONB DEFAULT '{}'::jsonb,
+            preferences JSONB DEFAULT '{
+              "theme": "light",
+              "privacy": "public",
+              "language": "en",
+              "soundEnabled": true,
+              "notifications": true
+            }'::jsonb,
+            message_count INTEGER DEFAULT 0,
+            last_active TIMESTAMPTZ DEFAULT NOW(),
+            status VARCHAR(20) DEFAULT 'online',
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW(),
+            firstname VARCHAR(100),
+            lastname VARCHAR(100),
+            age INTEGER,
+            gender VARCHAR(50),
+            interests TEXT
+          );
+
+          -- Create indexes
+          CREATE INDEX IF NOT EXISTS idx_user_profiles_username ON public.user_profiles(username);
+          CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id ON public.user_profiles(user_id);
+          CREATE INDEX IF NOT EXISTS idx_user_profiles_status ON public.user_profiles(status);
+
+          -- Enable RLS
+          ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
+
+          -- RLS Policy
+          DROP POLICY IF EXISTS "allow_all_user_profiles_operations" ON public.user_profiles;
+          CREATE POLICY "allow_all_user_profiles_operations" ON public.user_profiles FOR ALL USING (true) WITH CHECK (true);
+          `,
+          "4. Run the complete database setup script for all tables"
+        ]
+      });
+    } else if (checkError) {
+      throw checkError;
+    } else {
+      console.log('✅ user_profiles table exists');
+      
+      // Check if it has the required columns
+      const sampleRow = tableCheck?.[0];
+      const hasRequiredFields = sampleRow && 
+        'firstname' in sampleRow && 
+        'lastname' in sampleRow && 
+        'age' in sampleRow;
+        
+      res.json({
+        success: true,
+        message: hasRequiredFields ? "user_profiles table exists with all required fields" : "Table exists but missing some fields",
+        hasRequiredFields: hasRequiredFields,
+        sampleData: sampleRow,
+        rowCount: tableCheck?.length || 0,
+        missingFields: hasRequiredFields ? [] : ["firstname", "lastname", "age", "gender", "interests"],
+        instructions: !hasRequiredFields ? "Run the updated SQL script to add missing fields" : null
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Error checking table:', error);
+    res.status(500).json({ 
+      success: false,
+      error: "Error checking table: " + error.message 
+    });
+  }
+});
+
+// ===== ADDED: TEST PROFILE ENDPOINT (NO AUTH REQUIRED) =====
+
+// Test profile endpoint without authentication
+app.get('/api/test-profile', async (req, res) => {
+  try {
+    // Get username from query parameter for testing
+    const { username } = req.query;
+    
+    if (!username) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Username query parameter is required" 
+      });
+    }
+    
+    console.log('🧪 Test profile endpoint for:', username);
+    
+    // Test if we can query the table
+    const { data: profiles, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('username', username)
+      .limit(1);
+
+    if (error) {
+      console.error('❌ Database error:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: "Database error: " + error.message,
+        code: error.code,
+        hint: error.hint
+      });
+    }
+
+    if (!profiles || profiles.length === 0) {
+      return res.json({ 
+        success: true,
+        message: "No profile found for user",
+        username: username,
+        defaultProfile: {
+          username: username,
+          firstname: '',
+          lastname: '',
+          bio: '',
+          age: null,
+          gender: '',
+          location: '',
+          interests: '',
+          avatar: `https://i.pravatar.cc/150?u=${username}`
+        }
+      });
+    }
+
+    console.log('✅ Found profile:', profiles[0]);
+    
+    // Map avatar_url to avatar for frontend compatibility
+    const profile = profiles[0];
+    const responseProfile = {
+      ...profile,
+      avatar: profile.avatar_url || `https://i.pravatar.cc/150?u=${username}`
+    };
+    
+    res.json({ 
+      success: true,
+      profile: responseProfile
+    });
+
+  } catch (error) {
+    console.error('❌ Test endpoint error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Internal server error: " + error.message,
+      stack: error.stack
+    });
+  }
 });
 
 // ===== FIXED PRIVATE MESSAGES ENDPOINTS - DUPLICATE PREVENTION ADDED =====
@@ -4577,6 +5029,219 @@ app.get('/api/user/last-seen/:username', async (req, res) => {
   }
 });
 
+// ===== NEW: LINK LOCAL ACCOUNT WITH OAUTH =====
+
+// Link OAuth account to existing local account
+app.post('/api/auth/link-account', verifyToken, async (req, res) => {
+  try {
+    const { provider, code } = req.body;
+    const userId = req.user.id;
+    const username = req.user.username;
+
+    console.log(`🔗 Linking ${provider} account to user:`, username);
+
+    if (!provider || !code) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Provider and authorization code are required" 
+      });
+    }
+
+    // Handle OAuth callback to get provider data
+    const result = await handleOAuthCallback(provider, code, res);
+    
+    if (!result.success) {
+      return res.status(400).json({ 
+        success: false, 
+        error: result.error 
+      });
+    }
+
+    // Check if this provider account is already linked to another user
+    const { data: existingLinkedAccount } = await supabase
+      .from('users')
+      .select('id, username')
+      .eq('auth_provider', provider)
+      .eq('provider_id', result.user.provider_id)
+      .neq('id', userId)
+      .limit(1);
+
+    if (existingLinkedAccount && existingLinkedAccount.length > 0) {
+      return res.status(409).json({ 
+        success: false, 
+        error: `This ${provider} account is already linked to user: ${existingLinkedAccount[0].username}` 
+      });
+    }
+
+    // Update user with provider information
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({
+        auth_provider: provider,
+        provider_id: result.user.provider_id,
+        provider_data: result.user.provider_data,
+        avatar_url: result.user.avatar_url || req.user.avatar_url,
+        email_verified: result.user.email_verified || false,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
+
+    if (updateError) {
+      console.error(`❌ Error linking ${provider} account:`, updateError);
+      throw updateError;
+    }
+
+    console.log(`✅ ${provider} account linked successfully to user:`, username);
+    
+    // Generate new token with updated provider info
+    const updatedUser = { ...req.user, auth_provider: provider };
+    const newToken = generateJWTToken(updatedUser);
+
+    res.json({ 
+      success: true, 
+      message: `${provider} account linked successfully`,
+      auth_provider: provider,
+      token: newToken
+    });
+
+  } catch (error) {
+    console.error('❌ Link account error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Failed to link account: " + error.message 
+    });
+  }
+});
+
+// ===== NEW: UNLINK OAUTH ACCOUNT =====
+
+// Unlink OAuth account and revert to local
+app.post('/api/auth/unlink-account', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const username = req.user.username;
+
+    console.log('🔗 Unlinking OAuth account for user:', username);
+
+    // Check if user has a password (can revert to local)
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('password_hash')
+      .eq('id', userId)
+      .limit(1);
+
+    if (userError || !user || user.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: "User not found" 
+      });
+    }
+
+    // If no password hash exists, user can't unlink without setting a password
+    if (!user[0].password_hash) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Cannot unlink OAuth account. Please set a password first." 
+      });
+    }
+
+    // Revert to local authentication
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({
+        auth_provider: 'local',
+        provider_id: null,
+        provider_data: null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
+
+    if (updateError) {
+      console.error('❌ Error unlinking account:', updateError);
+      throw updateError;
+    }
+
+    console.log('✅ OAuth account unlinked successfully for user:', username);
+    
+    // Generate new token with local provider info
+    const updatedUser = { ...req.user, auth_provider: 'local' };
+    const newToken = generateJWTToken(updatedUser);
+
+    res.json({ 
+      success: true, 
+      message: "Account unlinked successfully",
+      auth_provider: 'local',
+      token: newToken
+    });
+
+  } catch (error) {
+    console.error('❌ Unlink account error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Failed to unlink account: " + error.message 
+    });
+  }
+});
+
+// ===== NEW: SET PASSWORD FOR OAUTH USERS =====
+
+// Set password for OAuth users (allows them to also login locally)
+app.post('/api/auth/set-password', verifyToken, async (req, res) => {
+  try {
+    const { password } = req.body;
+    const userId = req.user.id;
+    const username = req.user.username;
+
+    console.log('🔐 Setting password for OAuth user:', username);
+
+    if (!password) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Password is required" 
+      });
+    }
+
+    if (password.length < 4 || password.length > 20) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Password must be between 4-20 characters" 
+      });
+    }
+
+    // Hash the password
+    const hashedPassword = hashPassword(password);
+
+    // Update user with password
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({
+        password_hash: hashedPassword,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
+
+    if (updateError) {
+      console.error('❌ Error setting password:', updateError);
+      throw updateError;
+    }
+
+    console.log('✅ Password set successfully for user:', username);
+
+    res.json({ 
+      success: true, 
+      message: "Password set successfully",
+      note: "You can now login with your username and password"
+    });
+
+  } catch (error) {
+    console.error('❌ Set password error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Failed to set password: " + error.message 
+    });
+  }
+});
+
 // Start server
 server.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
@@ -4599,8 +5264,34 @@ server.listen(port, () => {
   console.log(`🤫 PRIVATE MESSAGING: FIXED AND STABLE`);
   console.log(`🔒 Private endpoints: /private-messages/*`);
   console.log(`🔐 USER AUTHENTICATION: ENABLED (Server-side, no localStorage)`);
-  console.log(`🔐 Password hashing: SIMPLE HASH (basic implementation)`);
+  console.log(`🔐 Password hashing: ENHANCED with SHA-256 and JWT tokens`);
+  console.log(`🔐 JWT Tokens: ENABLED for secure authentication`);
+  console.log(`🔐 Auth Providers: LOCAL, GOOGLE, and FACEBOOK supported`);
   console.log(`🌐 Cross-browser compatibility: ENABLED`);
+  
+  // Google OAuth information
+  if (oauthConfig.google.clientId) {
+    console.log(`🔐 GOOGLE OAUTH: ENABLED`);
+    console.log(`   GET /api/auth/google - Get Google OAuth URL`);
+    console.log(`   GET /api/auth/google/callback - Google OAuth callback`);
+  } else {
+    console.log(`⚠️ GOOGLE OAUTH: DISABLED (Set GOOGLE_CLIENT_ID environment variable)`);
+  }
+  
+  // Facebook OAuth information
+  if (oauthConfig.facebook.clientId) {
+    console.log(`🔐 FACEBOOK OAUTH: ENABLED`);
+    console.log(`   GET /api/auth/facebook - Get Facebook OAuth URL`);
+    console.log(`   GET /api/auth/facebook/callback - Facebook OAuth callback`);
+  } else {
+    console.log(`⚠️ FACEBOOK OAUTH: DISABLED (Set FACEBOOK_APP_ID environment variable)`);
+  }
+  
+  // Account linking and management
+  console.log(`🔗 ACCOUNT MANAGEMENT:`);
+  console.log(`   POST /api/auth/link-account - Link OAuth account to existing local account`);
+  console.log(`   POST /api/auth/unlink-account - Unlink OAuth account (revert to local)`);
+  console.log(`   POST /api/auth/set-password - Set password for OAuth users`);
   
   // NEW: Added missing endpoints
   console.log(`🤖 NEW: POST /api/ai/private - Private AI endpoint`);
@@ -4628,6 +5319,7 @@ server.listen(port, () => {
   console.log(`   GET /api/user/profile/:username - Get user profile`);
   console.log(`   POST /api/user/profile - Update user profile`);
   console.log(`   GET /api/auth-test - Test all authentication endpoints`);
+  console.log(`   GET /api/auth/oauth-info - Get OAuth configuration info`);
   console.log(`📨 MESSAGES ENDPOINTS:`);
   console.log(`   GET /api/messages - Get messages (client-compatible)`);
   console.log(`   POST /api/messages - Send message (client-compatible)`);
@@ -4672,6 +5364,27 @@ server.listen(port, () => {
     console.log(`👤 Create Profiles Table: ${renderExternalUrl}/api/create-user-profiles-table`);
     console.log(`👥 Get All Users: ${renderExternalUrl}/api/users/all`);
     console.log(`📊 User Stats: ${renderExternalUrl}/api/users/stats`);
+    
+    // Show OAuth callback URLs
+    console.log(`🔐 Google OAuth Callback: ${oauthConfig.google.redirectUri}`);
+    console.log(`🔐 Facebook OAuth Callback: ${oauthConfig.facebook.redirectUri}`);
+    
+    // Instructions for setting up OAuth
+    if (!oauthConfig.google.clientId || !oauthConfig.facebook.clientId) {
+      console.log(`\n⚠️ OAUTH SETUP INSTRUCTIONS:`);
+      console.log(`1. For Google OAuth:`);
+      console.log(`   - Go to https://console.cloud.google.com/apis/credentials`);
+      console.log(`   - Create OAuth 2.0 Client ID`);
+      console.log(`   - Set Authorized redirect URIs to: ${oauthConfig.google.redirectUri}`);
+      console.log(`   - Set environment variables in Render: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET`);
+      
+      console.log(`\n2. For Facebook OAuth:`);
+      console.log(`   - Go to https://developers.facebook.com/apps/`);
+      console.log(`   - Create a new app`);
+      console.log(`   - Add Facebook Login product`);
+      console.log(`   - Set Valid OAuth Redirect URIs to: ${oauthConfig.facebook.redirectUri}`);
+      console.log(`   - Set environment variables in Render: FACEBOOK_APP_ID and FACEBOOK_APP_SECRET`);
+    }
   }
 });
 
@@ -4695,7 +5408,10 @@ app.use((req, res) => {
         'POST /api/register',
         'POST /api/login', 
         'POST /api/check-username',
-        'GET /api/auth-test'
+        'GET /api/auth-test',
+        'GET /api/auth/google',
+        'GET /api/auth/facebook',
+        'GET /api/auth/oauth-info'
       ],
       chat: [
         'GET /api/messages',
