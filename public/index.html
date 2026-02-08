@@ -66,19 +66,6 @@
     transition: color 0.3s ease;
 }
 
-.password-hint {
-    font-size: 12px;
-    color: #65676b;
-    text-align: right;
-    margin-top: 5px;
-    padding-right: 10px;
-    display: none;
-}
-
-.password-container:focus-within ~ .password-hint {
-    display: block;
-}
-
     /* NEW: Welcome screen styles */
 .welcome-screen {
     position: fixed;
@@ -4259,9 +4246,6 @@ html, body {
                 <span class="toggle-password" id="toggle-password">
                     <i class="fas fa-eye"></i>
                 </span>
-            </div>
-            <div class="password-hint" style="font-size: 12px; color: #65676b; text-align: right; margin-top: 5px;">
-                Click the eye icon to show/hide password
             </div>
             <div class="error-message" id="error-message"></div>
             <div class="success-message" id="success-message"></div>
