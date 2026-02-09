@@ -5045,6 +5045,199 @@ function setupPasswordToggle() {
     }
 }
 
+// ===== GOOGLE OAUTH FUNCTIONS =====
+
+// NEW: Function to get OAuth configuration info from server
+async function getOAuthInfo() {
+    try {
+        const response = await fetch('/api/auth/oauth-info');
+        if (response.ok) {
+            const data = await response.json();
+            console.log('🔐 OAuth info loaded:', data);
+            return data;
+        }
+        return null;
+    } catch (error) {
+        console.error('❌ Error loading OAuth info:', error);
+        return null;
+    }
+}
+
+// NEW: Function to initiate Google OAuth login
+async function loginWithGoogle() {
+    try {
+        // Show loading state
+        const authBox = document.querySelector('.auth-box');
+        const originalContent = authBox.innerHTML;
+        authBox.innerHTML = `
+            <div style="text-align: center; padding: 20px;">
+                <div class="loading-spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid #4285F4; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px;"></div>
+                <p style="color: #65676b;">Connecting to Google...</p>
+            </div>
+        `;
+        
+        // Get Google OAuth URL from server
+        const response = await fetch('/api/auth/google');
+        const data = await response.json();
+        
+        if (data.success && data.auth_url) {
+            console.log('🔐 Redirecting to Google OAuth:', data.auth_url);
+            // Redirect to Google OAuth page
+            window.location.href = data.auth_url;
+        } else {
+            throw new Error(data.error || 'Failed to get Google OAuth URL');
+        }
+    } catch (error) {
+        console.error('❌ Google OAuth login error:', error);
+        // Restore auth box content
+        document.querySelector('.auth-box').innerHTML = originalContent;
+        showError(`Google login failed: ${error.message}`);
+        // Re-initialize password toggle
+        setupPasswordToggle();
+    }
+}
+
+// NEW: Function to initiate Facebook OAuth login
+async function loginWithFacebook() {
+    try {
+        // Show loading state
+        const authBox = document.querySelector('.auth-box');
+        const originalContent = authBox.innerHTML;
+        authBox.innerHTML = `
+            <div style="text-align: center; padding: 20px;">
+                <div class="loading-spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid #1877F2; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px;"></div>
+                <p style="color: #65676b;">Connecting to Facebook...</p>
+            </div>
+        `;
+        
+        // Get Facebook OAuth URL from server
+        const response = await fetch('/api/auth/facebook');
+        const data = await response.json();
+        
+        if (data.success && data.auth_url) {
+            console.log('🔐 Redirecting to Facebook OAuth:', data.auth_url);
+            // Redirect to Facebook OAuth page
+            window.location.href = data.auth_url;
+        } else {
+            throw new Error(data.error || 'Failed to get Facebook OAuth URL');
+        }
+    } catch (error) {
+        console.error('❌ Facebook OAuth login error:', error);
+        // Restore auth box content
+        document.querySelector('.auth-box').innerHTML = originalContent;
+        showError(`Facebook login failed: ${error.message}`);
+        // Re-initialize password toggle
+        setupPasswordToggle();
+    }
+}
+
+// NEW: Function to handle OAuth callback (should be called after redirect from OAuth provider)
+async function handleOAuthCallback() {
+    console.log('🔄 Handling OAuth callback...');
+    
+    // Check URL for OAuth callback parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    const username = urlParams.get('username');
+    const provider = urlParams.get('provider');
+    const error = urlParams.get('error');
+    
+    console.log('📋 OAuth callback params:', { token, username, provider, error });
+    
+    if (error) {
+        // Show error and redirect to login page
+        showError(`OAuth login failed: ${decodeURIComponent(error)}`);
+        setTimeout(() => {
+            window.location.href = '/';
+        }, 3000);
+        return;
+    }
+    
+    if (token && username) {
+        // Success! Save token and login
+        console.log(`✅ ${provider} OAuth successful for:`, username);
+        
+        // Save user session
+        saveUserSession({
+            username: username,
+            token: token,
+            auth_provider: provider || 'google'
+        });
+        
+        // Show success message
+        showSuccess(`Welcome, ${username}! You've successfully logged in with ${provider}.`);
+        
+        // Redirect to main app after short delay
+        setTimeout(() => {
+            // Clear URL parameters
+            window.history.replaceState({}, document.title, window.location.pathname);
+            // Initialize main app
+            initializeMainApp();
+        }, 1000);
+    } else {
+        // No OAuth parameters, just continue normally
+        console.log('ℹ️ No OAuth callback parameters found, continuing with normal flow');
+    }
+}
+
+// NEW: Function to initialize OAuth buttons
+async function initializeOAuth() {
+    try {
+        // Get OAuth configuration from server
+        const oauthInfo = await getOAuthInfo();
+        
+        if (!oauthInfo || !oauthInfo.success) {
+            console.log('ℹ️ OAuth not available or disabled');
+            // Hide OAuth buttons if not configured
+            const oauthButtons = document.querySelector('.oauth-buttons');
+            if (oauthButtons) {
+                oauthButtons.style.display = 'none';
+            }
+            return;
+        }
+        
+        // Update OAuth buttons based on configuration
+        const oauthProviders = document.querySelector('.oauth-providers');
+        if (oauthProviders) {
+            oauthProviders.innerHTML = '';
+            
+            // Add Google button if enabled
+            if (oauthInfo.google && oauthInfo.google.enabled) {
+                const googleBtn = document.createElement('button');
+                googleBtn.className = 'oauth-btn google-btn';
+                googleBtn.innerHTML = '<i class="fab fa-google"></i> Continue with Google';
+                googleBtn.onclick = loginWithGoogle;
+                oauthProviders.appendChild(googleBtn);
+            }
+            
+            // Add Facebook button if enabled
+            if (oauthInfo.facebook && oauthInfo.facebook.enabled) {
+                const facebookBtn = document.createElement('button');
+                facebookBtn.className = 'oauth-btn facebook-btn';
+                facebookBtn.innerHTML = '<i class="fab fa-facebook"></i> Continue with Facebook';
+                facebookBtn.onclick = loginWithFacebook;
+                oauthProviders.appendChild(facebookBtn);
+            }
+            
+            // If no OAuth providers enabled, hide the container
+            if (oauthProviders.children.length === 0) {
+                document.querySelector('.oauth-buttons').style.display = 'none';
+            } else if (oauthProviders.children.length === 1) {
+                // If only one provider, hide the "or" divider
+                document.querySelector('.oauth-divider').style.display = 'none';
+            }
+        }
+        
+    } catch (error) {
+        console.error('❌ Error initializing OAuth:', error);
+        // Hide OAuth buttons on error
+        const oauthButtons = document.querySelector('.oauth-buttons');
+        if (oauthButtons) {
+            oauthButtons.style.display = 'none';
+        }
+    }
+}
+
 // Opera Mini compatible messaging functions
 class OperaMiniMessenger {
   constructor() {
@@ -7655,7 +7848,7 @@ async function sendMessage() {
     }
 }
 
-// MODIFIED: deleteMessage function in context menu to use OperaMiniMessenger
+// MODIFIED: deleteMessageContext function in context menu to use OperaMiniMessenger
 async function deleteMessageContext(messageId, username) {
     try {
         console.log('Deleting message:', messageId, 'Username:', username);
@@ -8040,6 +8233,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Initialize password toggle
         setupPasswordToggle();
+        
+        // NEW: Initialize OAuth buttons
+        initializeOAuth();
+        
+        // NEW: Check for OAuth callback
+        handleOAuthCallback();
         
         if ('Notification' in window) {
             Notification.requestPermission().then(permission => {
@@ -8779,6 +8978,26 @@ async function sendPrivateMessage() {
     }, 1000);
 }
 
+// ===== NEW FUNCTION: Add touch event listeners to message element =====
+function addMessageTouchListeners(messageDiv) {
+    // Check if listeners already added to prevent duplicates
+    if (messageDiv.dataset.hasTouchListeners === 'true') {
+        return;
+    }
+    
+    messageDiv.addEventListener('touchstart', handleTouchStart);
+    messageDiv.addEventListener('touchend', handleTouchEnd);
+    messageDiv.addEventListener('touchmove', handleTouchMove);
+    messageDiv.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showMessageContextMenu(e, messageDiv);
+    });
+    
+    // Mark that listeners have been added
+    messageDiv.dataset.hasTouchListeners = 'true';
+}
+
+// --- CUT HERE ---
 // ===== NEW FUNCTION: Add touch event listeners to message element =====
 function addMessageTouchListeners(messageDiv) {
     // Check if listeners already added to prevent duplicates
