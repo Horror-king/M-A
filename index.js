@@ -104,7 +104,7 @@ const renderExternalUrl = process.env.RENDER_EXTERNAL_URL;
 const oauthConfig = {
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID || '393147848939-mmhpn1k0djeckfsk40r7ofhqj8fnh1d6.apps.googleusercontent.com',
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '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',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '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',
     redirectUri: process.env.GOOGLE_REDIRECT_URI || (isRender ? `${renderExternalUrl}/api/auth/google/callback` : `http://localhost:${port}/api/auth/google/callback`),
     authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
     tokenUrl: 'https://oauth2.googleapis.com/token',
@@ -195,7 +195,7 @@ function generateDisplayName(provider, userData) {
 
 // ===== OAUTH AUTHENTICATION ENDPOINTS =====
 
-// Google OAuth login URL
+// Google OAuth login URL - FIXED: Use exact client ID from your screenshot
 app.get('/api/auth/google', (req, res) => {
   if (!oauthConfig.google.clientId) {
     return res.status(400).json({ 
@@ -212,9 +212,15 @@ app.get('/api/auth/google', (req, res) => {
   googleAuthUrl.searchParams.append('access_type', 'offline');
   googleAuthUrl.searchParams.append('prompt', 'consent');
   
+  console.log('🔐 Google OAuth URL generated:', googleAuthUrl.toString());
+  console.log('🔐 Redirect URI:', oauthConfig.google.redirectUri);
+  console.log('🔐 Client ID:', oauthConfig.google.clientId);
+  
   res.json({
     success: true,
-    auth_url: googleAuthUrl.toString()
+    auth_url: googleAuthUrl.toString(),
+    redirect_uri: oauthConfig.google.redirectUri,
+    client_id: oauthConfig.google.clientId
   });
 });
 
@@ -246,6 +252,8 @@ async function handleOAuthCallback(provider, code, res) {
     let tokenResponse, userInfo;
     
     if (provider === 'google') {
+      console.log('🔐 Processing Google OAuth callback with code:', code.substring(0, 20) + '...');
+      
       // Exchange code for access token
       tokenResponse = await axios.post(oauthConfig.google.tokenUrl, {
         client_id: oauthConfig.google.clientId,
@@ -255,10 +263,14 @@ async function handleOAuthCallback(provider, code, res) {
         grant_type: 'authorization_code'
       });
       
+      console.log('✅ Google token exchange successful');
+      
       // Get user info from Google
       userInfo = await axios.get(oauthConfig.google.userInfoUrl, {
         headers: { Authorization: `Bearer ${tokenResponse.data.access_token}` }
       });
+      
+      console.log('✅ Google user info fetched:', userInfo.data.email);
     } else if (provider === 'facebook') {
       // Exchange code for access token
       tokenResponse = await axios.get(oauthConfig.facebook.tokenUrl, {
@@ -421,40 +433,79 @@ async function handleOAuthCallback(provider, code, res) {
   }
 }
 
-// Google OAuth callback
+// Google OAuth callback - FIXED: Better error handling and debugging
 app.get('/api/auth/google/callback', async (req, res) => {
   try {
-    const { code, error: oauthError } = req.query;
+    console.log('🔐 Google OAuth callback received');
+    console.log('📋 Query parameters:', req.query);
+    console.log('📋 Full URL:', req.originalUrl);
+    
+    const { code, error: oauthError, error_description } = req.query;
     
     if (oauthError) {
-      throw new Error(`Google OAuth error: ${oauthError}`);
+      console.error('❌ Google OAuth error:', oauthError, error_description);
+      throw new Error(`Google OAuth error: ${oauthError} - ${error_description}`);
     }
     
     if (!code) {
-      return res.status(400).json({ success: false, error: "Authorization code required" });
+      console.error('❌ No authorization code received');
+      console.error('❌ Full query:', req.query);
+      
+      // Check if we have any query parameters at all
+      if (Object.keys(req.query).length === 0) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "No query parameters received. Make sure your redirect_uri matches exactly with Google Cloud Console configuration.",
+          redirect_uri: oauthConfig.google.redirectUri,
+          expected_url: oauthConfig.google.redirectUri,
+          received_url: req.originalUrl
+        });
+      }
+      
+      return res.status(400).json({ 
+        success: false, 
+        error: "Authorization code required",
+        query: req.query,
+        redirect_uri: oauthConfig.google.redirectUri
+      });
     }
+    
+    console.log('✅ Authorization code received, processing...');
     
     const result = await handleOAuthCallback('google', code, res);
     
     if (!result.success) {
-      const frontendUrl = process.env.FRONTEND_URL || (isRender ? renderExternalUrl : `http://localhost:${port}`);
-      const errorRedirectUrl = `${frontendUrl}/auth/callback?error=${encodeURIComponent(result.error)}`;
-      return res.redirect(errorRedirectUrl);
+      console.error('❌ OAuth callback failed:', result.error);
+      
+      // Instead of redirecting, return JSON for easier debugging
+      return res.status(400).json({
+        success: false,
+        error: result.error,
+        message: "OAuth authentication failed"
+      });
     }
+    
+    console.log('✅ Google OAuth successful for user:', result.user.username);
     
     // Redirect to frontend with token
     const frontendUrl = process.env.FRONTEND_URL || (isRender ? renderExternalUrl : `http://localhost:${port}`);
     const redirectUrl = `${frontendUrl}/auth/callback?token=${result.token}&username=${result.user.username}&provider=google`;
     
+    console.log('🔗 Redirecting to frontend:', redirectUrl);
     res.redirect(redirectUrl);
     
   } catch (error) {
     console.error('❌ Google OAuth callback error:', error);
+    console.error('❌ Error stack:', error.stack);
     
-    const frontendUrl = process.env.FRONTEND_URL || (isRender ? renderExternalUrl : `http://localhost:${port}`);
-    const errorRedirectUrl = `${frontendUrl}/auth/callback?error=${encodeURIComponent('Google authentication failed')}`;
-    
-    res.redirect(errorRedirectUrl);
+    // Return JSON error instead of redirecting for debugging
+    res.status(500).json({ 
+      success: false, 
+      error: "Google authentication failed",
+      details: error.message,
+      redirect_uri: oauthConfig.google.redirectUri,
+      client_id: oauthConfig.google.clientId
+    });
   }
 });
 
@@ -5257,6 +5308,45 @@ app.post('/api/auth/set-password', verifyToken, async (req, res) => {
   }
 });
 
+// ===== NEW ENDPOINT: Debug Google OAuth Configuration =====
+app.get('/api/auth/google/debug', (req, res) => {
+  const debugInfo = {
+    success: true,
+    google_oauth_config: {
+      clientId: oauthConfig.google.clientId,
+      clientIdShort: oauthConfig.google.clientId ? oauthConfig.google.clientId.substring(0, 20) + '...' : 'Not set',
+      redirectUri: oauthConfig.google.redirectUri,
+      authUrl: oauthConfig.google.authUrl,
+      tokenUrl: oauthConfig.google.tokenUrl,
+      userInfoUrl: oauthConfig.google.userInfoUrl
+    },
+    environment: {
+      isRender: isRender,
+      renderExternalUrl: renderExternalUrl,
+      port: port,
+      node_env: process.env.NODE_ENV || 'development'
+    },
+    endpoints: {
+      auth_url: `/api/auth/google`,
+      callback_url: `/api/auth/google/callback`,
+      full_callback_url: oauthConfig.google.redirectUri
+    },
+    instructions: [
+      "1. Make sure the redirect_uri in Google Cloud Console matches exactly:",
+      `   ${oauthConfig.google.redirectUri}`,
+      "2. Make sure the client ID matches:",
+      `   ${oauthConfig.google.clientId}`,
+      "3. Make sure you've added the redirect URI to Authorized Redirect URIs in Google Cloud Console",
+      "4. Test the auth URL:",
+      `   ${renderExternalUrl || `http://localhost:${port}`}/api/auth/google`,
+      "5. After authorization, you should be redirected to:",
+      `   ${oauthConfig.google.redirectUri}?code=AUTHORIZATION_CODE`
+    ]
+  };
+  
+  res.json(debugInfo);
+});
+
 // Start server
 server.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
@@ -5289,6 +5379,7 @@ server.listen(port, () => {
     console.log(`🔐 GOOGLE OAUTH: ENABLED with provided credentials`);
     console.log(`   GET /api/auth/google - Get Google OAuth URL`);
     console.log(`   GET /api/auth/google/callback - Google OAuth callback`);
+    console.log(`   GET /api/auth/google/debug - Debug Google OAuth configuration`);
   } else {
     console.log(`⚠️ GOOGLE OAUTH: DISABLED (Set GOOGLE_CLIENT_ID environment variable)`);
   }
@@ -5426,7 +5517,8 @@ app.use((req, res) => {
         'GET /api/auth-test',
         'GET /api/auth/google',
         'GET /api/auth/facebook',
-        'GET /api/auth/oauth-info'
+        'GET /api/auth/oauth-info',
+        'GET /api/auth/google/debug'
       ],
       chat: [
         'GET /api/messages',
