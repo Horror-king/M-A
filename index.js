@@ -199,6 +199,81 @@ function generateDisplayName(provider, userData) {
   return `Social User`;
 }
 
+// ===== ADD MISSING ENDPOINTS FIRST (to fix the 404 error) =====
+
+// Add a catch-all route for unknown endpoints that returns available endpoints
+app.use((req, res, next) => {
+  // Only handle if no route matched
+  const availableEndpoints = {
+    authentication: [
+      "POST /api/register",
+      "POST /api/login",
+      "POST /api/check-username",
+      "GET /api/auth-test",
+      "GET /api/auth/google",
+      "GET /api/auth/facebook",
+      "GET /api/auth/oauth-info",
+      "GET /api/auth/google/debug"
+    ],
+    chat: [
+      "GET /api/messages",
+      "POST /api/messages",
+      "DELETE /api/messages/:id",
+      "POST /api/command"
+    ],
+    profiles: [
+      "GET /api/user/profile",
+      "POST /api/user/profile",
+      "PUT /api/user/profile",
+      "GET /api/user/profile/:username",
+      "GET /api/test-profile",
+      "GET /api/create-user-profiles-table"
+    ],
+    ai: [
+      "POST /api/ai/private",
+      "POST /api/ai/chat"
+    ],
+    privateMessages: [
+      "GET /api/private/conversations",
+      "GET /api/private/messages/:username",
+      "POST /api/private/messages",
+      "GET /api/private/unread",
+      "PUT /api/private/messages/read"
+    ],
+    users: [
+      "GET /api/users/all",
+      "GET /api/users/stats"
+    ],
+    posts: [
+      "GET /api/posts",
+      "POST /api/posts",
+      "POST /api/posts/:postId/comments",
+      "POST /api/posts/:postId/like",
+      "GET /api/posts/user/:username",
+      "DELETE /api/posts/:postId"
+    ],
+    debug: [
+      "GET /test-supabase",
+      "GET /debug-all-commands",
+      "GET /debug-private-messages",
+      "GET /health",
+      "GET /uptime",
+      "GET /api/health"
+    ],
+    frontendFixes: [
+      "GET /api/frontend-fix/original-content",
+      "GET /api/frontend-fix/notifications"
+    ]
+  };
+  
+  res.status(404).json({
+    success: false,
+    error: "Endpoint not found",
+    requestedEndpoint: `${req.method} ${req.originalUrl}`,
+    availableEndpoints: availableEndpoints
+  });
+});
+
 // ===== FIXED: GOOGLE OAUTH CALLBACK - MOVED BEFORE AUTH ROUTE =====
 app.get('/api/auth/google/callback', async (req, res) => {
   try {
@@ -5701,85 +5776,6 @@ server.listen(port, () => {
       console.log(`For Facebook: FACEBOOK_APP_ID and FACEBOOK_APP_SECRET`);
     }
   }
-});
-
-// Add error handling middleware
-app.use((err, req, res, next) => {
-  console.error('❌ Global Error Handler:', err);
-  res.status(err.status || 500).json({
-    success: false,
-    error: err.message || 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-  });
-});
-
-// 404 route handler
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    error: 'Endpoint not found',
-    availableEndpoints: {
-      authentication: [
-        'POST /api/register',
-        'POST /api/login', 
-        'POST /api/check-username',
-        'GET /api/auth-test',
-        'GET /api/auth/google',
-        'GET /api/auth/facebook',
-        'GET /api/auth/oauth-info',
-        'GET /api/auth/google/debug'
-      ],
-      chat: [
-        'GET /api/messages',
-        'POST /api/messages',
-        'DELETE /api/messages/:id',
-        'POST /api/command'
-      ],
-      profiles: [
-        'GET /api/user/profile',
-        'POST /api/user/profile',  // Added POST method
-        'PUT /api/user/profile',
-        'GET /api/user/profile/:username',
-        'GET /api/test-profile',
-        'GET /api/create-user-profiles-table'
-      ],
-      ai: [
-        'POST /api/ai/private',
-        'POST /api/ai/chat'
-      ],
-      privateMessages: [
-        'GET /api/private/conversations',
-        'GET /api/private/messages/:username',
-        'POST /api/private/messages',
-        'GET /api/private/unread',
-        'PUT /api/private/messages/read'
-      ],
-      users: [
-        'GET /api/users/all',
-        'GET /api/users/stats'
-      ],
-      posts: [
-        'GET /api/posts',
-        'POST /api/posts',
-        'POST /api/posts/:postId/comments',
-        'POST /api/posts/:postId/like',
-        'GET /api/posts/user/:username',
-        'DELETE /api/posts/:postId'
-      ],
-      debug: [
-        'GET /test-supabase',
-        'GET /debug-all-commands',
-        'GET /debug-private-messages',
-        'GET /health',
-        'GET /uptime',
-        'GET /api/health'
-      ],
-      frontendFixes: [
-        'GET /api/frontend-fix/original-content',
-        'GET /api/frontend-fix/notifications'
-      ]
-    }
-  });
 });
 
 // Graceful shutdown
