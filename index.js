@@ -106,8 +106,8 @@ const renderExternalUrl = process.env.RENDER_EXTERNAL_URL || 'https://message-ma
 // Configuration for OAuth providers - FIXED REDIRECT URI ISSUE
 const oauthConfig = {
   google: {
-    clientId: process.env.GOOGLE_CLIENT_ID || '393147848939-mmhpn1k0djeckfsk40r7ofhqj8fnh1d6.apps.googleusercontent.com',
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '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',
+    clientId: process.env.GOOGLE_CLIENT_ID || '393147848939-tuli37acqs69tan9htjiv1f7adai5g3d.apps.googleusercontent.com',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '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',
     // FIXED: Use exact URL that matches Google Cloud Console
     redirectUri: 'https://message-mate-lrem.onrender.com/api/auth/google/callback',
     authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
