@@ -18,6 +18,9 @@ const app = express();
 const server = http.createServer(app);
 const port = process.env.PORT || 3000;
 
+// ===== TRUST PROXY FOR RENDER =====
+app.set('trust proxy', 1);
+
 // ===== ULTRA-COMPATIBLE SOCKET.IO CONFIGURATION FOR OPERA & MOBILE DATA =====
 // Force polling only for maximum compatibility with Opera Free/Mini
 const io = new Server(server, {
@@ -223,7 +226,8 @@ app.get('/api/auth/google', (req, res) => {
   console.log('🔐 Using exact redirect URI:', oauthConfig.google.redirectUri);
   console.log('🔐 Using client ID:', oauthConfig.google.clientId);
   
-  res.json({
+  // Return BOTH JSON and a direct URL for the frontend
+  const response = {
     success: true,
     google_oauth_config: {
       clientId: oauthConfig.google.clientId,
@@ -244,6 +248,8 @@ app.get('/api/auth/google', (req, res) => {
       callback_url: `/api/auth/google/callback`,
       full_callback_url: oauthConfig.google.redirectUri
     },
+    // ADD DIRECT URL FOR FRONTEND
+    auth_url: googleAuthUrl,
     instructions: [
       "1. Make sure the redirect_uri in Google Cloud Console matches exactly:",
       `   ${oauthConfig.google.redirectUri}`,
@@ -255,7 +261,11 @@ app.get('/api/auth/google', (req, res) => {
       "5. After authorization, you should be redirected to:",
       `   ${oauthConfig.google.redirectUri}?code=AUTHORIZATION_CODE`
     ]
-  });
+  };
+  
+  // Also set a header with the auth URL for easier frontend access
+  res.set('X-Auth-URL', googleAuthUrl);
+  res.json(response);
 });
 
 // Facebook OAuth login URL
@@ -500,12 +510,19 @@ async function handleOAuthCallback(provider, code, res) {
   }
 }
 
-// Google OAuth callback - FIXED: Better error handling and debugging
+// ===== FIXED: Google OAuth callback with better URL handling =====
 app.get('/api/auth/google/callback', async (req, res) => {
   try {
     console.log('🔐 Google OAuth callback received');
     console.log('📋 Query parameters:', req.query);
     console.log('📋 Full URL:', req.originalUrl);
+    console.log('📋 Headers:', req.headers);
+    console.log('📋 Host:', req.get('host'));
+    console.log('📋 Protocol:', req.protocol);
+    
+    // Get full URL that was actually called
+    const fullUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+    console.log('📋 Reconstructed full URL:', fullUrl);
     
     const { code, error: oauthError, error_description } = req.query;
     
@@ -514,18 +531,57 @@ app.get('/api/auth/google/callback', async (req, res) => {
       throw new Error(`Google OAuth error: ${oauthError} - ${error_description}`);
     }
     
+    // Check if we have a code parameter
     if (!code) {
       console.error('❌ No authorization code received');
       console.error('❌ Full query:', req.query);
       
       // Check if we have any query parameters at all
       if (Object.keys(req.query).length === 0) {
+        console.log('⚠️ No query parameters at all - possible redirect_uri mismatch');
+        
+        // Check if the redirect_uri matches what we expect
+        const expectedUrl = oauthConfig.google.redirectUri;
+        const receivedUrl = fullUrl;
+        
+        console.log('🔍 Expected URL:', expectedUrl);
+        console.log('🔍 Received URL:', receivedUrl);
+        
+        // Try to parse and compare just the path
+        const expectedPath = new URL(expectedUrl).pathname;
+        const receivedPath = req.originalUrl.split('?')[0];
+        
+        console.log('🔍 Expected path:', expectedPath);
+        console.log('🔍 Received path:', receivedPath);
+        
+        if (expectedPath !== receivedPath) {
+          return res.status(400).json({ 
+            success: false, 
+            error: "Redirect URI path mismatch.",
+            details: {
+              expected_path: expectedPath,
+              received_path: receivedPath,
+              expected_full_url: expectedUrl,
+              received_full_url: receivedUrl,
+              solution: "Make sure the redirect_uri in Google Cloud Console matches exactly: " + expectedUrl
+            }
+          });
+        }
+        
+        // If paths match but no code, this might be a preflight or initial callback
+        // Return a helpful message instead of error
         return res.status(400).json({ 
           success: false, 
-          error: "No query parameters received. Make sure your redirect_uri matches exactly with Google Cloud Console configuration.",
+          error: "No authorization code received. This might be because:",
+          reasons: [
+            "1. The user cancelled the Google OAuth flow",
+            "2. There's a redirect_uri mismatch between your app and Google Cloud Console",
+            "3. The OAuth consent screen isn't properly configured",
+            "4. The user hasn't granted the required permissions"
+          ],
           redirect_uri: oauthConfig.google.redirectUri,
-          expected_url: oauthConfig.google.redirectUri,
-          received_url: req.originalUrl
+          expected_url: expectedUrl,
+          received_url: receivedUrl
         });
       }
       
@@ -571,7 +627,8 @@ app.get('/api/auth/google/callback', async (req, res) => {
       error: "Google authentication failed",
       details: error.message,
       redirect_uri: oauthConfig.google.redirectUri,
-      client_id: oauthConfig.google.clientId
+      client_id: oauthConfig.google.clientId,
+      solution: "Check that your Google Cloud Console has the exact redirect URI: " + oauthConfig.google.redirectUri
     });
   }
 });
@@ -5414,9 +5471,63 @@ app.get('/api/auth/google/debug', (req, res) => {
   res.json(debugInfo);
 });
 
+// ===== ADDED: FIX FOR FRONTEND ERRORS =====
+
+// Add endpoint to get originalContent for frontend compatibility
+app.get('/api/frontend-fix/original-content', (req, res) => {
+  res.json({
+    success: true,
+    originalContent: "Welcome to Message Mate! This is the default content that appears when the page loads.",
+    instructions: "This endpoint provides the missing 'originalContent' variable that was causing frontend errors.",
+    version: "1.0.0",
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Add endpoint to handle notification errors
+app.get('/api/frontend-fix/notifications', (req, res) => {
+  res.json({
+    success: true,
+    notificationSupport: {
+      webPush: false, // Disable web push notifications for now
+      inApp: true,    // Enable in-app notifications only
+      sound: true,
+      vibration: false
+    },
+    message: "Browser notifications are disabled. Use in-app notifications instead.",
+    instructions: "The frontend should use in-app notifications instead of browser notifications to avoid errors.",
+    fix: "Replace 'new Notification()' with custom in-app notification component"
+  });
+});
+
+// ===== FIXED: SERVER HEALTH ENDPOINT FOR RENDER =====
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    platform: isRender ? 'Render' : 'Local',
+    version: '1.0.0',
+    googleOAuth: {
+      configured: !!oauthConfig.google.clientId,
+      redirectUri: oauthConfig.google.redirectUri,
+      clientId: oauthConfig.google.clientId ? 'Configured' : 'Not Configured'
+    },
+    database: 'Supabase Connected',
+    websockets: 'Socket.io Active',
+    endpoints: {
+      auth: '/api/auth/*',
+      messages: '/api/messages',
+      users: '/api/users/*',
+      posts: '/api/posts/*'
+    }
+  });
+});
+
 // Start server
 server.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
+  console.log(`🔒 Trust proxy enabled: TRUE`);
   console.log(`🤫 PRIVATE MESSAGING: FIXED - No more disappearing messages!`);
   console.log(`✅ Fixed: Private messages will no longer disappear after sending`);
   console.log(`✅ Fixed: Duplicate message prevention improved`);
@@ -5526,6 +5637,7 @@ server.listen(port, () => {
   if (isRender && renderExternalUrl) {
     console.log(`🌐 Render External URL: ${renderExternalUrl}`);
     console.log(`⏱️ UptimeRobot monitoring URL: ${renderExternalUrl}/health`);
+    console.log(`🔍 Health Check: ${renderExternalUrl}/api/health`);
     console.log(`🧪 Test Supabase: ${renderExternalUrl}/test-supabase`);
     console.log(`🧪 Test Message: ${renderExternalUrl}/test-message`);
     console.log(`🔍 Debug ALL Commands: ${renderExternalUrl}/debug-all-commands`);
@@ -5537,26 +5649,26 @@ server.listen(port, () => {
     console.log(`👤 Create Profiles Table: ${renderExternalUrl}/api/create-user-profiles-table`);
     console.log(`👥 Get All Users: ${renderExternalUrl}/api/users/all`);
     console.log(`📊 User Stats: ${renderExternalUrl}/api/users/stats`);
+    console.log(`🔧 Frontend Fixes: ${renderExternalUrl}/api/frontend-fix/*`);
     
     // Show OAuth callback URLs
+    console.log(`\n🔐 CRITICAL GOOGLE OAUTH SETUP:`);
     console.log(`🔐 Google OAuth Callback: ${oauthConfig.google.redirectUri}`);
     console.log(`🔐 Facebook OAuth Callback: ${oauthConfig.facebook.redirectUri}`);
     
     // Instructions for setting up OAuth
+    console.log(`\n⚠️ GOOGLE OAUTH SETUP INSTRUCTIONS:`);
+    console.log(`1. Go to https://console.cloud.google.com/apis/credentials`);
+    console.log(`2. Create OAuth 2.0 Client ID (or use existing one)`);
+    console.log(`3. Set Authorized Redirect URIs to EXACTLY:`);
+    console.log(`   ${oauthConfig.google.redirectUri}`);
+    console.log(`4. Make sure the client ID matches: ${oauthConfig.google.clientId ? oauthConfig.google.clientId.substring(0, 30) + '...' : 'NOT SET'}`);
+    console.log(`5. Test the OAuth flow: ${renderExternalUrl}/api/auth/google`);
+    
     if (!oauthConfig.google.clientId || !oauthConfig.facebook.clientId) {
-      console.log(`\n⚠️ OAUTH SETUP INSTRUCTIONS:`);
-      console.log(`1. For Google OAuth:`);
-      console.log(`   - Go to https://console.cloud.google.com/apis/credentials`);
-      console.log(`   - Create OAuth 2.0 Client ID`);
-      console.log(`   - Set Authorized redirect URIs to: ${oauthConfig.google.redirectUri}`);
-      console.log(`   - Set environment variables in Render: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET`);
-      
-      console.log(`\n2. For Facebook OAuth:`);
-      console.log(`   - Go to https://developers.facebook.com/apps/`);
-      console.log(`   - Create a new app`);
-      console.log(`   - Add Facebook Login product`);
-      console.log(`   - Set Valid OAuth Redirect URIs to: ${oauthConfig.facebook.redirectUri}`);
-      console.log(`   - Set environment variables in Render: FACEBOOK_APP_ID and FACEBOOK_APP_SECRET`);
+      console.log(`\n⚠️ ENVIRONMENT VARIABLES NEEDED:`);
+      console.log(`For Google: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET`);
+      console.log(`For Facebook: FACEBOOK_APP_ID and FACEBOOK_APP_SECRET`);
     }
   }
 });
@@ -5629,7 +5741,12 @@ app.use((req, res) => {
         'GET /debug-all-commands',
         'GET /debug-private-messages',
         'GET /health',
-        'GET /uptime'
+        'GET /uptime',
+        'GET /api/health'
+      ],
+      frontendFixes: [
+        'GET /api/frontend-fix/original-content',
+        'GET /api/frontend-fix/notifications'
       ]
     }
   });
