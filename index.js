@@ -199,82 +199,7 @@ function generateDisplayName(provider, userData) {
   return `Social User`;
 }
 
-// ===== ADD MISSING ENDPOINTS FIRST (to fix the 404 error) =====
-
-// Add a catch-all route for unknown endpoints that returns available endpoints
-app.use((req, res, next) => {
-  // Only handle if no route matched
-  const availableEndpoints = {
-    authentication: [
-      "POST /api/register",
-      "POST /api/login",
-      "POST /api/check-username",
-      "GET /api/auth-test",
-      "GET /api/auth/google",
-      "GET /api/auth/facebook",
-      "GET /api/auth/oauth-info",
-      "GET /api/auth/google/debug"
-    ],
-    chat: [
-      "GET /api/messages",
-      "POST /api/messages",
-      "DELETE /api/messages/:id",
-      "POST /api/command"
-    ],
-    profiles: [
-      "GET /api/user/profile",
-      "POST /api/user/profile",
-      "PUT /api/user/profile",
-      "GET /api/user/profile/:username",
-      "GET /api/test-profile",
-      "GET /api/create-user-profiles-table"
-    ],
-    ai: [
-      "POST /api/ai/private",
-      "POST /api/ai/chat"
-    ],
-    privateMessages: [
-      "GET /api/private/conversations",
-      "GET /api/private/messages/:username",
-      "POST /api/private/messages",
-      "GET /api/private/unread",
-      "PUT /api/private/messages/read"
-    ],
-    users: [
-      "GET /api/users/all",
-      "GET /api/users/stats"
-    ],
-    posts: [
-      "GET /api/posts",
-      "POST /api/posts",
-      "POST /api/posts/:postId/comments",
-      "POST /api/posts/:postId/like",
-      "GET /api/posts/user/:username",
-      "DELETE /api/posts/:postId"
-    ],
-    debug: [
-      "GET /test-supabase",
-      "GET /debug-all-commands",
-      "GET /debug-private-messages",
-      "GET /health",
-      "GET /uptime",
-      "GET /api/health"
-    ],
-    frontendFixes: [
-      "GET /api/frontend-fix/original-content",
-      "GET /api/frontend-fix/notifications"
-    ]
-  };
-  
-  res.status(404).json({
-    success: false,
-    error: "Endpoint not found",
-    requestedEndpoint: `${req.method} ${req.originalUrl}`,
-    availableEndpoints: availableEndpoints
-  });
-});
-
-// ===== FIXED: GOOGLE OAUTH CALLBACK - MOVED BEFORE AUTH ROUTE =====
+// ===== FIXED: GOOGLE OAUTH CALLBACK =====
 app.get('/api/auth/google/callback', async (req, res) => {
   try {
     console.log('🔐 Google OAuth callback received');
@@ -522,7 +447,7 @@ app.get('/api/auth/facebook', (req, res) => {
 });
 
 // FIXED OAuth callback handler with better error handling
-async function handleOAuthCallback(provider, code, res) {
+async function handleOAuthCallback(provider, code) {
   try {
     let tokenResponse, userInfo;
     
@@ -751,7 +676,7 @@ app.get('/api/auth/facebook/callback', async (req, res) => {
       return res.status(400).json({ success: false, error: "Authorization code required" });
     }
     
-    const result = await handleOAuthCallback('facebook', code, res);
+    const result = await handleOAuthCallback('facebook', code);
     
     if (!result.success) {
       const frontendUrl = process.env.FRONTEND_URL || (isRender ? renderExternalUrl : `http://localhost:${port}`);
@@ -5343,7 +5268,7 @@ app.post('/api/auth/link-account', verifyToken, async (req, res) => {
     }
 
     // Handle OAuth callback to get provider data
-    const result = await handleOAuthCallback(provider, code, res);
+    const result = await handleOAuthCallback(provider, code);
     
     if (!result.success) {
       return res.status(400).json({ 
@@ -5626,6 +5551,78 @@ app.get('/api/health', (req, res) => {
       users: '/api/users/*',
       posts: '/api/posts/*'
     }
+  });
+});
+
+// ===== 404 HANDLER - MUST BE LAST =====
+app.use((req, res) => {
+  const availableEndpoints = {
+    authentication: [
+      "POST /api/register",
+      "POST /api/login",
+      "POST /api/check-username",
+      "GET /api/auth-test",
+      "GET /api/auth/google",
+      "GET /api/auth/facebook",
+      "GET /api/auth/oauth-info",
+      "GET /api/auth/google/debug"
+    ],
+    chat: [
+      "GET /api/messages",
+      "POST /api/messages",
+      "DELETE /api/messages/:id",
+      "POST /api/command"
+    ],
+    profiles: [
+      "GET /api/user/profile",
+      "POST /api/user/profile",
+      "PUT /api/user/profile",
+      "GET /api/user/profile/:username",
+      "GET /api/test-profile",
+      "GET /api/create-user-profiles-table"
+    ],
+    ai: [
+      "POST /api/ai/private",
+      "POST /api/ai/chat"
+    ],
+    privateMessages: [
+      "GET /api/private/conversations",
+      "GET /api/private/messages/:username",
+      "POST /api/private/messages",
+      "GET /api/private/unread",
+      "PUT /api/private/messages/read"
+    ],
+    users: [
+      "GET /api/users/all",
+      "GET /api/users/stats"
+    ],
+    posts: [
+      "GET /api/posts",
+      "POST /api/posts",
+      "POST /api/posts/:postId/comments",
+      "POST /api/posts/:postId/like",
+      "GET /api/posts/user/:username",
+      "DELETE /api/posts/:postId"
+    ],
+    debug: [
+      "GET /test-supabase",
+      "GET /debug-all-commands",
+      "GET /debug-private-messages",
+      "GET /health",
+      "GET /uptime",
+      "GET /api/health"
+    ],
+    frontendFixes: [
+      "GET /api/frontend-fix/original-content",
+      "GET /api/frontend-fix/notifications"
+    ]
+  };
+  
+  res.status(404).json({
+    success: false,
+    error: "Endpoint not found",
+    requestedEndpoint: `${req.method} ${req.originalUrl}`,
+    availableEndpoints: availableEndpoints
   });
 });
 
