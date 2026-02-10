@@ -839,7 +839,7 @@ app.post('/api/register', async (req, res) => {
       });
     }
 
-    // Validate username format
+    // Validate username format - FIXED: Added missing closing parenthesis
     if (!/^[a-zA-Z0-9_]+$/.test(username)) {
       return res.status(400).json({ 
         success: false, 
@@ -1110,8 +1110,8 @@ app.post('/api/auth/register', async (req, res) => {
       });
     }
 
-    // Validate username format
-    if (!/^[a-zA-Z0-9_]+$/.test(username) {
+    // Validate username format - FIXED: Added missing closing parenthesis
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
       return res.status(400).json({ 
         success: false, 
         error: "Username can only contain letters, numbers, and underscores" 
