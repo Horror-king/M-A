@@ -106,8 +106,8 @@ const renderExternalUrl = process.env.RENDER_EXTERNAL_URL || 'https://message-ma
 // Configuration for OAuth providers - FIXED REDIRECT URI ISSUE
 const oauthConfig = {
   google: {
-    clientId: process.env.GOOGLE_CLIENT_ID || '137236755468-3h8fgq72leqb1i2depoltv8ttrnodq9a.apps.googleusercontent.com',
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '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',
+    clientId: process.env.GOOGLE_CLIENT_ID || '393147848939-mmhpn1k0djeckfsk40r7ofhqj8fnh1d6.apps.googleusercontent.com',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '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',
     // FIXED: Use exact URL that matches Google Cloud Console
     redirectUri: 'https://message-mate-lrem.onrender.com/api/auth/google/callback',
     authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
@@ -198,6 +198,159 @@ function generateDisplayName(provider, userData) {
   }
   return `Social User`;
 }
+
+// ===== FIXED: GOOGLE OAUTH CALLBACK - MOVED BEFORE AUTH ROUTE =====
+app.get('/api/auth/google/callback', async (req, res) => {
+  try {
+    console.log('🔐 Google OAuth callback received');
+    console.log('📋 Query parameters:', req.query);
+    
+    const { code, error: oauthError, error_description } = req.query;
+    
+    if (oauthError) {
+      console.error('❌ Google OAuth error:', oauthError, error_description);
+      return res.status(400).json({
+        success: false,
+        error: `Google OAuth error: ${oauthError} - ${error_description}`
+      });
+    }
+    
+    if (!code) {
+      console.log('⚠️ No authorization code received');
+      return res.status(400).json({
+        success: false,
+        error: "No authorization code received",
+        message: "Please start the OAuth flow from /api/auth/google first",
+        redirect_uri: oauthConfig.google.redirectUri
+      });
+    }
+    
+    console.log('✅ Authorization code received, processing...');
+    
+    // Exchange code for token
+    const tokenParams = new URLSearchParams();
+    tokenParams.append('client_id', oauthConfig.google.clientId);
+    tokenParams.append('client_secret', oauthConfig.google.clientSecret);
+    tokenParams.append('code', code);
+    tokenParams.append('redirect_uri', oauthConfig.google.redirectUri);
+    tokenParams.append('grant_type', 'authorization_code');
+    
+    console.log('🔐 Exchanging code for token...');
+    const tokenResponse = await axios.post(
+      'https://oauth2.googleapis.com/token',
+      tokenParams.toString(),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      }
+    );
+    
+    if (!tokenResponse.data.access_token) {
+      throw new Error('No access token received from Google');
+    }
+    
+    // Get user info
+    const userInfo = await axios.get('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: {
+        Authorization: `Bearer ${tokenResponse.data.access_token}`,
+        Accept: 'application/json'
+      }
+    });
+    
+    const googleUser = userInfo.data;
+    console.log('✅ Google user info fetched:', googleUser.email || googleUser.id);
+    
+    // Check if user exists
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('*')
+      .eq('auth_provider', 'google')
+      .eq('provider_id', googleUser.id)
+      .limit(1);
+    
+    let user;
+    
+    if (existingUser && existingUser.length > 0) {
+      // Update existing user
+      user = existingUser[0];
+      await supabase
+        .from('users')
+        .update({
+          last_login: new Date().toISOString(),
+          avatar_url: googleUser.picture
+        })
+        .eq('id', user.id);
+    } else {
+      // Create new user
+      const username = googleUser.email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+      
+      // Ensure username is unique
+      let uniqueUsername = username;
+      let counter = 1;
+      while (true) {
+        const { data: checkUsers } = await supabase
+          .from('users')
+          .select('username')
+          .eq('username', uniqueUsername)
+          .limit(1);
+        
+        if (!checkUsers || checkUsers.length === 0) break;
+        uniqueUsername = `${username}_${counter}`;
+        counter++;
+      }
+      
+      const { data: newUser } = await supabase
+        .from('users')
+        .insert([{
+          username: uniqueUsername,
+          email: googleUser.email,
+          email_verified: googleUser.verified_email || false,
+          auth_provider: 'google',
+          provider_id: googleUser.id,
+          provider_data: googleUser,
+          avatar_url: googleUser.picture,
+          created_at: new Date().toISOString(),
+          last_login: new Date().toISOString(),
+          is_active: true
+        }])
+        .select();
+      
+      user = newUser[0];
+      
+      // Create profile
+      await supabase
+        .from('user_profiles')
+        .insert([{
+          user_id: user.id,
+          username: uniqueUsername,
+          display_name: googleUser.name || uniqueUsername,
+          avatar_url: googleUser.picture,
+          firstname: googleUser.given_name,
+          lastname: googleUser.family_name,
+          status: 'online'
+        }]);
+    }
+    
+    // Generate token
+    const token = generateToken(user);
+    
+    // Redirect to frontend
+    const frontendUrl = process.env.FRONTEND_URL || (isRender ? renderExternalUrl : `http://localhost:${port}`);
+    const redirectUrl = `${frontendUrl}/auth/callback?token=${token}&username=${user.username}&provider=google`;
+    
+    console.log('🔗 Redirecting to frontend:', redirectUrl);
+    res.redirect(redirectUrl);
+    
+  } catch (error) {
+    console.error('❌ Google OAuth callback error:', error);
+    
+    const frontendUrl = process.env.FRONTEND_URL || (isRender ? renderExternalUrl : `http://localhost:${port}`);
+    const errorRedirectUrl = `${frontendUrl}/auth/callback?error=${encodeURIComponent('Google authentication failed: ' + error.message)}`;
+    
+    res.redirect(errorRedirectUrl);
+  }
+});
 
 // ===== FIXED OAUTH AUTHENTICATION ENDPOINTS =====
 
@@ -509,129 +662,6 @@ async function handleOAuthCallback(provider, code, res) {
     throw error;
   }
 }
-
-// ===== FIXED: Google OAuth callback with better URL handling =====
-app.get('/api/auth/google/callback', async (req, res) => {
-  try {
-    console.log('🔐 Google OAuth callback received');
-    console.log('📋 Query parameters:', req.query);
-    console.log('📋 Full URL:', req.originalUrl);
-    console.log('📋 Headers:', req.headers);
-    console.log('📋 Host:', req.get('host'));
-    console.log('📋 Protocol:', req.protocol);
-    
-    // Get full URL that was actually called
-    const fullUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
-    console.log('📋 Reconstructed full URL:', fullUrl);
-    
-    const { code, error: oauthError, error_description } = req.query;
-    
-    if (oauthError) {
-      console.error('❌ Google OAuth error:', oauthError, error_description);
-      throw new Error(`Google OAuth error: ${oauthError} - ${error_description}`);
-    }
-    
-    // Check if we have a code parameter
-    if (!code) {
-      console.error('❌ No authorization code received');
-      console.error('❌ Full query:', req.query);
-      
-      // Check if we have any query parameters at all
-      if (Object.keys(req.query).length === 0) {
-        console.log('⚠️ No query parameters at all - possible redirect_uri mismatch');
-        
-        // Check if the redirect_uri matches what we expect
-        const expectedUrl = oauthConfig.google.redirectUri;
-        const receivedUrl = fullUrl;
-        
-        console.log('🔍 Expected URL:', expectedUrl);
-        console.log('🔍 Received URL:', receivedUrl);
-        
-        // Try to parse and compare just the path
-        const expectedPath = new URL(expectedUrl).pathname;
-        const receivedPath = req.originalUrl.split('?')[0];
-        
-        console.log('🔍 Expected path:', expectedPath);
-        console.log('🔍 Received path:', receivedPath);
-        
-        if (expectedPath !== receivedPath) {
-          return res.status(400).json({ 
-            success: false, 
-            error: "Redirect URI path mismatch.",
-            details: {
-              expected_path: expectedPath,
-              received_path: receivedPath,
-              expected_full_url: expectedUrl,
-              received_full_url: receivedUrl,
-              solution: "Make sure the redirect_uri in Google Cloud Console matches exactly: " + expectedUrl
-            }
-          });
-        }
-        
-        // If paths match but no code, this might be a preflight or initial callback
-        // Return a helpful message instead of error
-        return res.status(400).json({ 
-          success: false, 
-          error: "No authorization code received. This might be because:",
-          reasons: [
-            "1. The user cancelled the Google OAuth flow",
-            "2. There's a redirect_uri mismatch between your app and Google Cloud Console",
-            "3. The OAuth consent screen isn't properly configured",
-            "4. The user hasn't granted the required permissions"
-          ],
-          redirect_uri: oauthConfig.google.redirectUri,
-          expected_url: expectedUrl,
-          received_url: receivedUrl
-        });
-      }
-      
-      return res.status(400).json({ 
-        success: false, 
-        error: "Authorization code required",
-        query: req.query,
-        redirect_uri: oauthConfig.google.redirectUri
-      });
-    }
-    
-    console.log('✅ Authorization code received, processing...');
-    
-    const result = await handleOAuthCallback('google', code, res);
-    
-    if (!result.success) {
-      console.error('❌ OAuth callback failed:', result.error);
-      
-      // Instead of redirecting, return JSON for easier debugging
-      return res.status(400).json({
-        success: false,
-        error: result.error,
-        message: "OAuth authentication failed"
-      });
-    }
-    
-    console.log('✅ Google OAuth successful for user:', result.user.username);
-    
-    // Redirect to frontend with token
-    const frontendUrl = process.env.FRONTEND_URL || (isRender ? renderExternalUrl : `http://localhost:${port}`);
-    const redirectUrl = `${frontendUrl}/auth/callback?token=${result.token}&username=${result.user.username}&provider=google`;
-    
-    console.log('🔗 Redirecting to frontend:', redirectUrl);
-    res.redirect(redirectUrl);
-    
-  } catch (error) {
-    console.error('❌ Google OAuth callback error:', error);
-    console.error('❌ Error stack:', error.stack);
-    
-    // Return JSON error instead of redirecting for debugging
-    res.status(500).json({ 
-      success: false, 
-      error: "Google authentication failed",
-      details: error.message,
-      redirect_uri: oauthConfig.google.redirectUri,
-      client_id: oauthConfig.google.clientId,
-      solution: "Check that your Google Cloud Console has the exact redirect URI: " + oauthConfig.google.redirectUri
-    });
-  }
-});
 
 // Facebook OAuth callback
 app.get('/api/auth/facebook/callback', async (req, res) => {
@@ -1081,7 +1111,7 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     // Validate username format
-    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+    if (!/^[a-zA-Z0-9_]+$/.test(username) {
       return res.status(400).json({ 
         success: false, 
         error: "Username can only contain letters, numbers, and underscores" 
