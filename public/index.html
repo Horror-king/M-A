@@ -30,11 +30,7 @@
         gap: 12px;
         width: 100%;
     }
-    .highlighted-post {
-  background-color: rgba(66, 103, 178, 0.1); /* Light blue */
-  border-left: 4px solid #4267B2;
-  transition: background-color 0.3s ease;
-    }
+
     .oauth-btn {
         width: 100%;
         padding: 12px 20px;
@@ -5049,6 +5045,43 @@ function setupPasswordToggle() {
     }
 }
 
+// ===== PULL-TO-REFRESH PREVENTION =====
+// ADDED: Blocks the browser's native pull-to-refresh on our scrollable containers
+function preventPullToRefresh() {
+    // List all scrollable containers in your app
+    const scrollContainers = [
+        document.getElementById('chat-container'),
+        document.getElementById('private-ai-container'),
+        document.getElementById('private-chat-messages'),
+        document.getElementById('posts-container') ? document.getElementById('posts-container').querySelector('.posts-list') : null,
+        document.getElementById('all-users-container')
+    ].filter(el => el !== null);
+
+    scrollContainers.forEach(container => {
+        if (!container) return;
+        
+        let startY = 0;
+        
+        container.addEventListener('touchstart', (e) => {
+            startY = e.touches[0].clientY;
+        }, { passive: false });
+        
+        container.addEventListener('touchmove', (e) => {
+            // If we are at the top of the container and the user is pulling down
+            if (container.scrollTop <= 0) {
+                const touch = e.touches[0];
+                const currentY = touch.clientY;
+                const deltaY = currentY - startY;
+                
+                // deltaY > 0 = pulling downward beyond the top
+                if (deltaY > 0) {
+                    e.preventDefault(); // Block refresh
+                }
+            }
+        }, { passive: false });
+    });
+}
+
 // ===== GOOGLE OAUTH FUNCTIONS =====
 
 // NEW: Function to get OAuth configuration info from server
@@ -5994,6 +6027,9 @@ function initializeAllUsers() {
         // Users already loaded, just filter them
         filterUsers(currentFilter);
     }
+    
+    // ADDED: Prevent pull-to-refresh on the all-users container
+    setTimeout(preventPullToRefresh, 200);
 }
 
 // COMMENT OUT OR REMOVE THIS FUNCTION:
@@ -6388,6 +6424,9 @@ function renderAllUsers() {
         });
         
         console.log(`✅ Rendered ${filteredUsers.length} users`);
+        
+        // ADDED: Prevent pull-to-refresh on this container
+        preventPullToRefresh();
     }
 }
 
@@ -6796,6 +6835,9 @@ function showContainer(containerId) {
     
     const kebabDropdown = document.querySelector('.kebab-dropdown');
     if (kebabDropdown) kebabDropdown.classList.remove('active');
+    
+    // ADDED: Re-apply pull-to-refresh prevention when switching containers
+    setTimeout(preventPullToRefresh, 50);
 }
 
 // Posts functionality for client-side
@@ -7083,6 +7125,9 @@ function renderPosts() {
             pendingPostId = null;
         }, 100);
     }
+    
+    // ADDED: Prevent pull-to-refresh on posts container
+    preventPullToRefresh();
 }
 
 // UPDATED: Create post element with image URL detection - MODIFIED TO USE ACTUAL PROFILE AVATAR
@@ -8165,6 +8210,9 @@ window.addEventListener('load', function() {
             showAllUsersOnFirstVisit();
         }
     }, 1500);
+    
+    // ADDED: Run pull-to-refresh prevention after everything loads
+    setTimeout(preventPullToRefresh, 200);
 });
 
 // ===== MODIFIED: Welcome screen animation function (FIXED) =====
@@ -8269,6 +8317,9 @@ function initializeMainApp() {
     showSuccess(`Welcome back, ${currentUserSession?.username || 'User'}!`);
     
     console.log('✅ Main application initialized successfully');
+    
+    // ADDED: Prevent pull-to-refresh on all scrollable areas
+    preventPullToRefresh();
 }
 
 // ===== MODIFIED: DOMContentLoaded listener (FIXED) =====
@@ -10104,6 +10155,9 @@ function initializePrivateMessaging() {
     
     // Load unread counts
     loadUnreadCounts();
+    
+    // ADDED: Prevent pull-to-refresh on private messages container when it becomes visible
+    setTimeout(preventPullToRefresh, 200);
 }
 
 // ===== ADDED: USER PANEL VISIBILITY FUNCTIONS =====
@@ -10302,6 +10356,9 @@ async function openPrivateChat(username) {
     
     // Mark messages as read
     await markMessagesAsRead(username);
+    
+    // ADDED: Prevent pull-to-refresh on the private messages container
+    setTimeout(preventPullToRefresh, 100);
 }
 
 // Load private messages from API
@@ -12370,6 +12427,6 @@ document.addEventListener('click', function (e) {
 });
 
 // --- END OF JAVASCRIPT CODE ---
-    </script>
+</script>
 </body>
 </html>
