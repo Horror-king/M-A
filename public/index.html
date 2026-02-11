@@ -5131,7 +5131,7 @@ async function loginWithFacebook() {
     }
 }
 
-// NEW: Function to handle OAuth callback (should be called after redirect from OAuth provider)
+// ===== MODIFIED: Function to handle OAuth callback (FIXED) =====
 async function handleOAuthCallback() {
     console.log('🔄 Handling OAuth callback...');
     
@@ -5167,13 +5167,13 @@ async function handleOAuthCallback() {
         // Show success message
         showSuccess(`Welcome, ${username}! You've successfully logged in with ${provider}.`);
         
-        // Redirect to main app after short delay
-        setTimeout(() => {
-            // Clear URL parameters
-            window.history.replaceState({}, document.title, window.location.pathname);
-            // Initialize main app
-            initializeMainApp();
-        }, 1000);
+        // IMMEDIATELY initialize the main app WITHOUT delay
+        initializeMainApp();
+        
+        // Clear URL parameters to prevent re-triggering on refresh
+        window.history.replaceState({}, document.title, '/');
+        
+        return; // Exit early
     } else {
         // No OAuth parameters, just continue normally
         console.log('ℹ️ No OAuth callback parameters found, continuing with normal flow');
@@ -8124,8 +8124,17 @@ window.addEventListener('load', function() {
     }, 1500);
 });
 
-// NEW: Welcome screen animation function
+// ===== MODIFIED: Welcome screen animation function (FIXED) =====
 function animateWelcomeText() {
+    // Skip animation if already logged in or if OAuth callback parameters are present
+    const urlParams = new URLSearchParams(window.location.search);
+    if (currentUserSession !== null || urlParams.has('token')) {
+        console.log('⏭️ Skipping welcome animation, user already authenticated');
+        document.getElementById('welcome-screen').style.display = 'none';
+        initializeMainApp();
+        return;
+    }
+    
     const text = "MessageMate";
     const animatedText = document.getElementById('animated-text');
     
@@ -8166,13 +8175,25 @@ function animateWelcomeText() {
     }, 2500); // Total animation time: 2.5 seconds
 }
 
-// NEW: Function to initialize main app when user is already logged in
+// ===== MODIFIED: Function to initialize main app when user is already logged in (FIXED) =====
+let isAppInitialized = false;
+
 function initializeMainApp() {
+    if (isAppInitialized) {
+        console.log('⏭️ App already initialized, skipping');
+        return;
+    }
+    isAppInitialized = true;
+    
     console.log('🚀 Initializing main application for logged-in user...');
     
     // Show main interface elements
     document.querySelector('.menu').style.display = 'flex';
     document.querySelector('.news-toggle').style.display = 'block';
+    
+    // Ensure auth container is hidden
+    const authContainer = document.getElementById('auth-container');
+    if (authContainer) authContainer.style.display = 'none';
     
     initializeButtons();
     showContainer('chat');
@@ -8202,80 +8223,97 @@ function initializeMainApp() {
     console.log('✅ Main application initialized successfully');
 }
 
-// Initialize welcome screen animation when page loads
+// ===== MODIFIED: DOMContentLoaded listener (FIXED) =====
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize current year
     if (document.getElementById("year")) {
         document.getElementById("year").textContent = new Date().getFullYear();
     }
     
-    // First, try auto-login to check if user is already logged in
+    // FIRST: Check for OAuth callback parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('token') && urlParams.has('username')) {
+        // Handle OAuth callback immediately – this will initialize the app
+        handleOAuthCallback().catch(error => {
+            console.error('OAuth callback error:', error);
+            // If OAuth fails, fall back to normal flow
+            attemptAutoLogin().then(success => {
+                if (success) {
+                    console.log('✅ User auto-logged in successfully (fallback)');
+                    animateWelcomeText();
+                } else {
+                    console.log('❌ No valid session found, showing welcome then login');
+                    animateWelcomeText();
+                }
+            }).catch(console.error);
+        });
+        return; // Stop further initialization; OAuth will handle it
+    }
+    
+    // If no OAuth callback, try auto-login
     attemptAutoLogin().then(success => {
         if (success) {
             console.log('✅ User auto-logged in successfully');
-            // User is logged in - start the welcome animation
-            // The animation will detect the login status and skip auth screen
-            animateWelcomeText();
+            animateWelcomeText(); // This will skip animation because user is already logged in
         } else {
-            // User not logged in - start the welcome animation
             console.log('❌ No valid session found, showing welcome then login');
             animateWelcomeText();
         }
-        
-        // Initialize buttons and other common components
-        initializeButtons();
-        
-        // FIXED: Initialize online panel toggle
-        initializeOnlinePanelToggle();
-        
-        // Load user panel preference
-        loadUserPanelPreference();
-        
-        // Initialize password toggle
-        setupPasswordToggle();
-        
-        // NEW: Initialize OAuth buttons
-        initializeOAuth();
-        
-        // NEW: Check for OAuth callback
-        handleOAuthCallback();
-        
-        if ('Notification' in window) {
-            Notification.requestPermission().then(permission => {
-                notificationPermissionGranted = permission === 'granted';
-                console.log('📢 Notification permission:', permission);
-            });
-        }
-
-        initializeChat();
-        
-        // ADDED: Setup typing detection
-        setupTypingDetection();
-        setupTypingSocketEvents();
-
-        // Add optimized scroll event listener for main chat
-        if (elements.chatContainer) {
-            elements.chatContainer.addEventListener('scroll', throttle(updateScrollState, 100));
-        }
-
-        // Initialize Private AI input handler
-        if (elements.privateInput) {
-            elements.privateInput.addEventListener('input', () => {
-                autoResize(elements.privateInput);
-                const hasText = elements.privateInput.value.trim().length > 0;
-                elements.privateSendButton.disabled = !hasText;
-                elements.privateSendButton.classList.toggle('enabled', hasText);
-            });
-            elements.privateInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendPrivateMessage();
-                }
-            });
-        }
-
-        console.log('🎯 Application initialization complete');
+    }).catch(error => {
+        console.error('Auto-login error:', error);
+        animateWelcomeText();
     });
+    
+    // Initialize buttons and other common components
+    initializeButtons();
+    
+    // FIXED: Initialize online panel toggle
+    initializeOnlinePanelToggle();
+    
+    // Load user panel preference
+    loadUserPanelPreference();
+    
+    // Initialize password toggle
+    setupPasswordToggle();
+    
+    // NEW: Initialize OAuth buttons
+    initializeOAuth();
+    
+    if ('Notification' in window) {
+        Notification.requestPermission().then(permission => {
+            notificationPermissionGranted = permission === 'granted';
+            console.log('📢 Notification permission:', permission);
+        });
+    }
+
+    initializeChat();
+    
+    // ADDED: Setup typing detection
+    setupTypingDetection();
+    setupTypingSocketEvents();
+
+    // Add optimized scroll event listener for main chat
+    if (elements.chatContainer) {
+        elements.chatContainer.addEventListener('scroll', throttle(updateScrollState, 100));
+    }
+
+    // Initialize Private AI input handler
+    if (elements.privateInput) {
+        elements.privateInput.addEventListener('input', () => {
+            autoResize(elements.privateInput);
+            const hasText = elements.privateInput.value.trim().length > 0;
+            elements.privateSendButton.disabled = !hasText;
+            elements.privateSendButton.classList.toggle('enabled', hasText);
+        });
+        elements.privateInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendPrivateMessage();
+            }
+        });
+    }
+
+    console.log('🎯 Application initialization complete');
 });
 
 // ===== PERFORMANCE OPTIMIZATIONS =====
@@ -8837,6 +8875,8 @@ function saveUserSession(userData) {
     // Also store token for API calls
     if (userData.token) {
         localStorage.setItem('auth_token', userData.token);
+        // Also store username for quick access
+        localStorage.setItem('username', userData.username);
     }
     
     console.log('✅ User session saved for persistent login');
@@ -8847,6 +8887,7 @@ function clearUserSession() {
     sessionStorage.removeItem('currentUserSession');
     localStorage.removeItem('userSession');
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('username');
     // Clear profile cache on logout
     profileCache = {};
     console.log('✅ User session cleared');
