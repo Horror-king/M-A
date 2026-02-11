@@ -1,3 +1,4 @@
+// --- CUT HERE ---
 const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
@@ -5505,5 +5506,4 @@ process.on('uncaughtException', (err) => {
 // Export for testing
 module.exports = { app, server, io, supabase };
 
-// --- CUT HERE ---
 // (Your client-side JavaScript code remains unchanged and is not executed by Node.js)
