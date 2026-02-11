@@ -30,7 +30,11 @@
         gap: 12px;
         width: 100%;
     }
-
+    .highlighted-post {
+  background-color: rgba(66, 103, 178, 0.1); /* Light blue */
+  border-left: 4px solid #4267B2;
+  transition: background-color 0.3s ease;
+    }
     .oauth-btn {
         width: 100%;
         padding: 12px 20px;
@@ -5012,95 +5016,6 @@
     </div>
 <script>
 // --- CUT HERE ---
-// ===== PULL-TO-REFRESH PREVENTION - ENHANCED =====
-// ADDED: Global CSS to kill pull-to-refresh instantly
-function disablePullToRefreshGlobally() {
-    document.documentElement.style.overscrollBehavior = 'contain';
-    document.body.style.overscrollBehavior = 'contain';
-}
-// Call immediately – safe even before DOM is ready
-disablePullToRefreshGlobally();
-
-// ADDED: Flag to avoid duplicate listeners on same container
-const pullRefreshContainers = new WeakSet();
-
-function preventPullToRefresh() {
-    // List all scrollable containers in your app
-    const scrollContainers = [
-        document.getElementById('chat-container'),
-        document.getElementById('private-ai-container'),
-        document.getElementById('private-chat-messages'),
-        document.getElementById('posts-container') ? document.getElementById('posts-container').querySelector('.posts-list') : null,
-        document.getElementById('all-users-container'),
-        document.getElementById('users-list')?.parentElement, // private messages users panel
-        document.querySelector('.private-messages-panel') // private chat container
-    ].filter(el => el !== null && !pullRefreshContainers.has(el));
-
-    scrollContainers.forEach(container => {
-        if (!container) return;
-        
-        // Mark as handled
-        pullRefreshContainers.add(container);
-        
-        // Also apply CSS containment to kill any remaining overscroll effects
-        container.style.overscrollBehavior = 'contain';
-        
-        let startY = 0;
-        
-        container.addEventListener('touchstart', (e) => {
-            startY = e.touches[0].clientY;
-        }, { passive: true });
-        
-        container.addEventListener('touchmove', (e) => {
-            // Block refresh when at the very top AND pulling downward
-            if (container.scrollTop <= 0) {
-                const touch = e.touches[0];
-                const currentY = touch.clientY;
-                const deltaY = currentY - startY;
-                
-                if (deltaY > 0) {
-                    e.preventDefault();
-                }
-            }
-        }, { passive: false });
-    });
-}
-
-// ===== RE-APPLY AFTER ANY DOM UPDATE =====
-// Override or patch key functions that modify the UI
-const originalRenderMessages = renderMessages;
-renderMessages = function(messages, isFirstLoad) {
-    originalRenderMessages.call(this, messages, isFirstLoad);
-    preventPullToRefresh();
-};
-
-const originalRenderAllUsers = renderAllUsers;
-renderAllUsers = function() {
-    originalRenderAllUsers.call(this);
-    preventPullToRefresh();
-};
-
-const originalLoadPrivateMessages = loadPrivateMessages;
-loadPrivateMessages = async function(username) {
-    await originalLoadPrivateMessages.call(this, username);
-    preventPullToRefresh();
-};
-
-const originalShowContainer = showContainer;
-showContainer = function(containerId) {
-    originalShowContainer.call(this, containerId);
-    // Re-apply after a tiny delay to allow DOM to settle
-    setTimeout(preventPullToRefresh, 50);
-};
-
-const originalInitializeAllUsers = initializeAllUsers;
-initializeAllUsers = function() {
-    originalInitializeAllUsers.call(this);
-    preventPullToRefresh();
-};
-
-// --- EVERYTHING BELOW IS YOUR ORIGINAL CODE, UNCHANGED EXCEPT FOR THE ADDITIONS ABOVE ---
-
 // Add eye icon functionality for password field
 function setupPasswordToggle() {
     const passwordInput = document.getElementById('auth-password');
@@ -5259,14 +5174,6 @@ async function handleOAuthCallback() {
             welcomeScreen.style.display = 'none';
         }
         // --- End fix ---
-        
-        // Check for pending post link from sessionStorage
-        const storedPostId = sessionStorage.getItem('pendingPostId');
-        if (storedPostId) {
-            pendingPostId = storedPostId;
-            console.log('🔗 Restored pending post ID from session:', pendingPostId);
-            sessionStorage.removeItem('pendingPostId'); // Clear after retrieving
-        }
         
         // Show success message
         showSuccess(`Welcome, ${username}! You've successfully logged in with ${provider}.`);
@@ -6079,9 +5986,6 @@ function initializeAllUsers() {
         // Users already loaded, just filter them
         filterUsers(currentFilter);
     }
-    
-    // ADDED: Prevent pull-to-refresh on the all-users container
-    setTimeout(preventPullToRefresh, 200);
 }
 
 // COMMENT OUT OR REMOVE THIS FUNCTION:
@@ -6476,9 +6380,6 @@ function renderAllUsers() {
         });
         
         console.log(`✅ Rendered ${filteredUsers.length} users`);
-        
-        // ADDED: Prevent pull-to-refresh on this container
-        preventPullToRefresh();
     }
 }
 
@@ -6887,9 +6788,6 @@ function showContainer(containerId) {
     
     const kebabDropdown = document.querySelector('.kebab-dropdown');
     if (kebabDropdown) kebabDropdown.classList.remove('active');
-    
-    // ADDED: Re-apply pull-to-refresh prevention when switching containers
-    setTimeout(preventPullToRefresh, 50);
 }
 
 // Posts functionality for client-side
@@ -7177,9 +7075,6 @@ function renderPosts() {
             pendingPostId = null;
         }, 100);
     }
-    
-    // ADDED: Prevent pull-to-refresh on posts container
-    preventPullToRefresh();
 }
 
 // UPDATED: Create post element with image URL detection - MODIFIED TO USE ACTUAL PROFILE AVATAR
@@ -8262,9 +8157,6 @@ window.addEventListener('load', function() {
             showAllUsersOnFirstVisit();
         }
     }, 1500);
-    
-    // ADDED: Run pull-to-refresh prevention after everything loads
-    setTimeout(preventPullToRefresh, 200);
 });
 
 // ===== MODIFIED: Welcome screen animation function (FIXED) =====
@@ -8339,10 +8231,12 @@ function initializeMainApp() {
     if (authContainer) authContainer.style.display = 'none';
     
     initializeButtons();
+    showContainer('chat');
+    
     // IMPORTANT: Create profile section and load profile data
     updateProfileSection(); // Create the profile section first
     loadProfile(); // Then load the actual profile data from server
-
+    
     initializeChat();
 
     initSocket();
@@ -8358,20 +8252,10 @@ function initializeMainApp() {
         enableSQLEditorAccess();
     }
     
-    // Show the appropriate container based on pendingPostId
-    if (pendingPostId) {
-        showContainer('posts');
-    } else {
-        showContainer('chat');
-    }
-    
     // Show welcome message instead of login prompt
     showSuccess(`Welcome back, ${currentUserSession?.username || 'User'}!`);
     
     console.log('✅ Main application initialized successfully');
-    
-    // ADDED: Prevent pull-to-refresh on all scrollable areas
-    preventPullToRefresh();
 }
 
 // ===== MODIFIED: DOMContentLoaded listener (FIXED) =====
@@ -8405,13 +8289,6 @@ document.addEventListener('DOMContentLoaded', function() {
     attemptAutoLogin().then(success => {
         if (success) {
             console.log('✅ User auto-logged in successfully');
-            // Check for pending post link from sessionStorage
-            const storedPostId = sessionStorage.getItem('pendingPostId');
-            if (storedPostId) {
-                pendingPostId = storedPostId;
-                console.log('🔗 Restored pending post ID from session:', pendingPostId);
-                sessionStorage.removeItem('pendingPostId');
-            }
             animateWelcomeText(); // This will skip animation because user is already logged in
         } else {
             console.log('❌ No valid session found, showing welcome then login');
@@ -8473,11 +8350,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ===== POST SHARING: Check for shared post link =====
     if (urlParams.has('post')) {
-        const postId = urlParams.get('post');
-        pendingPostId = postId;
+        pendingPostId = urlParams.get('post');
         console.log('🔗 Shared post link detected, post ID:', pendingPostId);
-        // Store in sessionStorage to persist across redirects
-        sessionStorage.setItem('pendingPostId', postId);
+        // Ensure posts container is shown
+        showContainer('posts');
     }
 
     console.log('🎯 Application initialization complete');
@@ -9186,6 +9062,26 @@ async function sendPrivateMessage() {
     }, 1000);
 }
 
+// ===== NEW FUNCTION: Add touch event listeners to message element =====
+function addMessageTouchListeners(messageDiv) {
+    // Check if listeners already added to prevent duplicates
+    if (messageDiv.dataset.hasTouchListeners === 'true') {
+        return;
+    }
+    
+    messageDiv.addEventListener('touchstart', handleTouchStart);
+    messageDiv.addEventListener('touchend', handleTouchEnd);
+    messageDiv.addEventListener('touchmove', handleTouchMove);
+    messageDiv.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showMessageContextMenu(e, messageDiv);
+    });
+    
+    // Mark that listeners have been added
+    messageDiv.dataset.hasTouchListeners = 'true';
+}
+
+// --- CUT HERE ---
 // ===== NEW FUNCTION: Add touch event listeners to message element =====
 function addMessageTouchListeners(messageDiv) {
     // Check if listeners already added to prevent duplicates
@@ -10187,9 +10083,6 @@ function initializePrivateMessaging() {
     
     // Load unread counts
     loadUnreadCounts();
-    
-    // ADDED: Prevent pull-to-refresh on private messages container when it becomes visible
-    setTimeout(preventPullToRefresh, 200);
 }
 
 // ===== ADDED: USER PANEL VISIBILITY FUNCTIONS =====
@@ -10388,9 +10281,6 @@ async function openPrivateChat(username) {
     
     // Mark messages as read
     await markMessagesAsRead(username);
-    
-    // ADDED: Prevent pull-to-refresh on the private messages container
-    setTimeout(preventPullToRefresh, 100);
 }
 
 // Load private messages from API
@@ -12459,6 +12349,6 @@ document.addEventListener('click', function (e) {
 });
 
 // --- END OF JAVASCRIPT CODE ---
-</script>
+    </script>
 </body>
 </html>
