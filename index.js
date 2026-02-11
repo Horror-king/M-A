@@ -18,9 +18,6 @@ const app = express();
 const server = http.createServer(app);
 const port = process.env.PORT || 3000;
 
-// ===== TRUST PROXY FOR RENDER =====
-app.set('trust proxy', 1);
-
 // ===== ULTRA-COMPATIBLE SOCKET.IO CONFIGURATION FOR OPERA & MOBILE DATA =====
 // Force polling only for maximum compatibility with Opera Free/Mini
 const io = new Server(server, {
@@ -100,20 +97,18 @@ const upload = multer({
 
 // Render-specific configuration
 const isRender = process.env.RENDER === 'true';
-const renderExternalUrl = process.env.RENDER_EXTERNAL_URL || 'https://message-mate-lrem.onrender.com';
+const renderExternalUrl = process.env.RENDER_EXTERNAL_URL;
 
-// ===== FIXED GOOGLE AND FACEBOOK AUTH CONFIGURATION =====
-// Configuration for OAuth providers - FIXED REDIRECT URI ISSUE
+// ===== GOOGLE AND FACEBOOK AUTH CONFIGURATION =====
+// Configuration for OAuth providers
 const oauthConfig = {
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID || '393147848939-mmhpn1k0djeckfsk40r7ofhqj8fnh1d6.apps.googleusercontent.com',
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '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',
-    // FIXED: Use exact URL that matches Google Cloud Console
-    redirectUri: 'https://message-mate-lrem.onrender.com/api/auth/google/callback',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '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',
+    redirectUri: process.env.GOOGLE_REDIRECT_URI || (isRender ? `${renderExternalUrl}/api/auth/google/callback` : `http://localhost:${port}/api/auth/google/callback`),
     authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
     tokenUrl: 'https://oauth2.googleapis.com/token',
-    userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
-    scope: 'profile email'
+    userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo'
   },
   facebook: {
     clientId: process.env.FACEBOOK_APP_ID || '',
@@ -121,8 +116,7 @@ const oauthConfig = {
     redirectUri: process.env.FACEBOOK_REDIRECT_URI || (isRender ? `${renderExternalUrl}/api/auth/facebook/callback` : `http://localhost:${port}/api/auth/facebook/callback`),
     authUrl: 'https://www.facebook.com/v12.0/dialog/oauth',
     tokenUrl: 'https://graph.facebook.com/v12.0/oauth/access_token',
-    userInfoUrl: 'https://graph.facebook.com/v12.0/me',
-    scope: 'email,public_profile'
+    userInfoUrl: 'https://graph.facebook.com/v12.0/me'
   }
 };
 
@@ -199,162 +193,9 @@ function generateDisplayName(provider, userData) {
   return `Social User`;
 }
 
-// ===== FIXED: GOOGLE OAUTH CALLBACK =====
-app.get('/api/auth/google/callback', async (req, res) => {
-  try {
-    console.log('🔐 Google OAuth callback received');
-    console.log('📋 Query parameters:', req.query);
-    
-    const { code, error: oauthError, error_description } = req.query;
-    
-    if (oauthError) {
-      console.error('❌ Google OAuth error:', oauthError, error_description);
-      return res.status(400).json({
-        success: false,
-        error: `Google OAuth error: ${oauthError} - ${error_description}`
-      });
-    }
-    
-    if (!code) {
-      console.log('⚠️ No authorization code received');
-      return res.status(400).json({
-        success: false,
-        error: "No authorization code received",
-        message: "Please start the OAuth flow from /api/auth/google first",
-        redirect_uri: oauthConfig.google.redirectUri
-      });
-    }
-    
-    console.log('✅ Authorization code received, processing...');
-    
-    // Exchange code for token
-    const tokenParams = new URLSearchParams();
-    tokenParams.append('client_id', oauthConfig.google.clientId);
-    tokenParams.append('client_secret', oauthConfig.google.clientSecret);
-    tokenParams.append('code', code);
-    tokenParams.append('redirect_uri', oauthConfig.google.redirectUri);
-    tokenParams.append('grant_type', 'authorization_code');
-    
-    console.log('🔐 Exchanging code for token...');
-    const tokenResponse = await axios.post(
-      'https://oauth2.googleapis.com/token',
-      tokenParams.toString(),
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
-      }
-    );
-    
-    if (!tokenResponse.data.access_token) {
-      throw new Error('No access token received from Google');
-    }
-    
-    // Get user info
-    const userInfo = await axios.get('https://www.googleapis.com/oauth2/v2/userinfo', {
-      headers: {
-        Authorization: `Bearer ${tokenResponse.data.access_token}`,
-        Accept: 'application/json'
-      }
-    });
-    
-    const googleUser = userInfo.data;
-    console.log('✅ Google user info fetched:', googleUser.email || googleUser.id);
-    
-    // Check if user exists
-    const { data: existingUser } = await supabase
-      .from('users')
-      .select('*')
-      .eq('auth_provider', 'google')
-      .eq('provider_id', googleUser.id)
-      .limit(1);
-    
-    let user;
-    
-    if (existingUser && existingUser.length > 0) {
-      // Update existing user
-      user = existingUser[0];
-      await supabase
-        .from('users')
-        .update({
-          last_login: new Date().toISOString(),
-          avatar_url: googleUser.picture
-        })
-        .eq('id', user.id);
-    } else {
-      // Create new user
-      const username = googleUser.email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
-      
-      // Ensure username is unique
-      let uniqueUsername = username;
-      let counter = 1;
-      while (true) {
-        const { data: checkUsers } = await supabase
-          .from('users')
-          .select('username')
-          .eq('username', uniqueUsername)
-          .limit(1);
-        
-        if (!checkUsers || checkUsers.length === 0) break;
-        uniqueUsername = `${username}_${counter}`;
-        counter++;
-      }
-      
-      const { data: newUser } = await supabase
-        .from('users')
-        .insert([{
-          username: uniqueUsername,
-          email: googleUser.email,
-          email_verified: googleUser.verified_email || false,
-          auth_provider: 'google',
-          provider_id: googleUser.id,
-          provider_data: googleUser,
-          avatar_url: googleUser.picture,
-          created_at: new Date().toISOString(),
-          last_login: new Date().toISOString(),
-          is_active: true
-        }])
-        .select();
-      
-      user = newUser[0];
-      
-      // Create profile
-      await supabase
-        .from('user_profiles')
-        .insert([{
-          user_id: user.id,
-          username: uniqueUsername,
-          display_name: googleUser.name || uniqueUsername,
-          avatar_url: googleUser.picture,
-          firstname: googleUser.given_name,
-          lastname: googleUser.family_name,
-          status: 'online'
-        }]);
-    }
-    
-    // Generate token
-    const token = generateToken(user);
-    
-    // Redirect to frontend
-    const frontendUrl = process.env.FRONTEND_URL || (isRender ? renderExternalUrl : `http://localhost:${port}`);
-    const redirectUrl = `${frontendUrl}/auth/callback?token=${token}&username=${user.username}&provider=google`;
-    
-    console.log('🔗 Redirecting to frontend:', redirectUrl);
-    res.redirect(redirectUrl);
-    
-  } catch (error) {
-    console.error('❌ Google OAuth callback error:', error);
-    
-    const frontendUrl = process.env.FRONTEND_URL || (isRender ? renderExternalUrl : `http://localhost:${port}`);
-    const errorRedirectUrl = `${frontendUrl}/auth/callback?error=${encodeURIComponent('Google authentication failed: ' + error.message)}`;
-    
-    res.redirect(errorRedirectUrl);
-  }
-});
+// ===== OAUTH AUTHENTICATION ENDPOINTS =====
 
-// ===== FIXED OAUTH AUTHENTICATION ENDPOINTS =====
-
-// Google OAuth login URL - FIXED: Use exact redirect URI
+// Google OAuth login URL
 app.get('/api/auth/google', (req, res) => {
   if (!oauthConfig.google.clientId) {
     return res.status(400).json({ 
@@ -363,62 +204,18 @@ app.get('/api/auth/google', (req, res) => {
     });
   }
   
-  // FIXED: Build the URL properly with exact redirect_uri
-  const params = new URLSearchParams({
-    client_id: oauthConfig.google.clientId,
-    redirect_uri: oauthConfig.google.redirectUri,
-    response_type: 'code',
-    scope: oauthConfig.google.scope,
-    access_type: 'offline',
-    prompt: 'consent'
-  });
+  const googleAuthUrl = new URL(oauthConfig.google.authUrl);
+  googleAuthUrl.searchParams.append('client_id', oauthConfig.google.clientId);
+  googleAuthUrl.searchParams.append('redirect_uri', oauthConfig.google.redirectUri);
+  googleAuthUrl.searchParams.append('response_type', 'code');
+  googleAuthUrl.searchParams.append('scope', 'profile email');
+  googleAuthUrl.searchParams.append('access_type', 'offline');
+  googleAuthUrl.searchParams.append('prompt', 'consent');
   
-  const googleAuthUrl = `${oauthConfig.google.authUrl}?${params.toString()}`;
-  
-  console.log('🔐 Google OAuth URL generated:', googleAuthUrl);
-  console.log('🔐 Using exact redirect URI:', oauthConfig.google.redirectUri);
-  console.log('🔐 Using client ID:', oauthConfig.google.clientId);
-  
-  // Return BOTH JSON and a direct URL for the frontend
-  const response = {
+  res.json({
     success: true,
-    google_oauth_config: {
-      clientId: oauthConfig.google.clientId,
-      clientIdShort: oauthConfig.google.clientId ? oauthConfig.google.clientId.substring(0, 20) + '...' : 'Not set',
-      redirectUri: oauthConfig.google.redirectUri,
-      authUrl: oauthConfig.google.authUrl,
-      tokenUrl: oauthConfig.google.tokenUrl,
-      userInfoUrl: oauthConfig.google.userInfoUrl
-    },
-    environment: {
-      isRender: isRender,
-      renderExternalUrl: renderExternalUrl,
-      port: port,
-      node_env: process.env.NODE_ENV || 'production'
-    },
-    endpoints: {
-      auth_url: `/api/auth/google`,
-      callback_url: `/api/auth/google/callback`,
-      full_callback_url: oauthConfig.google.redirectUri
-    },
-    // ADD DIRECT URL FOR FRONTEND
-    auth_url: googleAuthUrl,
-    instructions: [
-      "1. Make sure the redirect_uri in Google Cloud Console matches exactly:",
-      `   ${oauthConfig.google.redirectUri}`,
-      "2. Make sure the client ID matches:",
-      `   ${oauthConfig.google.clientId}`,
-      "3. Make sure you've added the redirect URI to Authorized Redirect URIs in Google Cloud Console",
-      "4. Test the auth URL:",
-      `   ${renderExternalUrl}/api/auth/google`,
-      "5. After authorization, you should be redirected to:",
-      `   ${oauthConfig.google.redirectUri}?code=AUTHORIZATION_CODE`
-    ]
-  };
-  
-  // Also set a header with the auth URL for easier frontend access
-  res.set('X-Auth-URL', googleAuthUrl);
-  res.json(response);
+    auth_url: googleAuthUrl.toString()
+  });
 });
 
 // Facebook OAuth login URL
@@ -430,86 +227,56 @@ app.get('/api/auth/facebook', (req, res) => {
     });
   }
   
-  const params = new URLSearchParams({
-    client_id: oauthConfig.facebook.clientId,
-    redirect_uri: oauthConfig.facebook.redirectUri,
-    response_type: 'code',
-    scope: oauthConfig.facebook.scope,
-    state: crypto.randomBytes(16).toString('hex')
-  });
-  
-  const facebookAuthUrl = `${oauthConfig.facebook.authUrl}?${params.toString()}`;
+  const facebookAuthUrl = new URL(oauthConfig.facebook.authUrl);
+  facebookAuthUrl.searchParams.append('client_id', oauthConfig.facebook.clientId);
+  facebookAuthUrl.searchParams.append('redirect_uri', oauthConfig.facebook.redirectUri);
+  facebookAuthUrl.searchParams.append('response_type', 'code');
+  facebookAuthUrl.searchParams.append('scope', 'email,public_profile');
+  facebookAuthUrl.searchParams.append('state', crypto.randomBytes(16).toString('hex'));
   
   res.json({
     success: true,
-    auth_url: facebookAuthUrl
+    auth_url: facebookAuthUrl.toString()
   });
 });
 
-// FIXED OAuth callback handler with better error handling
-async function handleOAuthCallback(provider, code) {
+// OAuth callback handler
+async function handleOAuthCallback(provider, code, res) {
   try {
     let tokenResponse, userInfo;
     
-    console.log(`🔐 Processing ${provider} OAuth callback with code:`, code.substring(0, 20) + '...');
-    console.log(`🔐 Using redirect URI:`, oauthConfig[provider].redirectUri);
-    console.log(`🔐 Using client ID:`, oauthConfig[provider].clientId);
-    
     if (provider === 'google') {
-      // Exchange code for access token - FIXED: Using URLSearchParams for proper encoding
-      const tokenParams = new URLSearchParams();
-      tokenParams.append('client_id', oauthConfig.google.clientId);
-      tokenParams.append('client_secret', oauthConfig.google.clientSecret);
-      tokenParams.append('code', code);
-      tokenParams.append('redirect_uri', oauthConfig.google.redirectUri);
-      tokenParams.append('grant_type', 'authorization_code');
-      
-      console.log('🔐 Making token exchange request to Google...');
-      
-      tokenResponse = await axios.post(oauthConfig.google.tokenUrl, tokenParams.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
+      // Exchange code for access token
+      tokenResponse = await axios.post(oauthConfig.google.tokenUrl, {
+        client_id: oauthConfig.google.clientId,
+        client_secret: oauthConfig.google.clientSecret,
+        code: code,
+        redirect_uri: oauthConfig.google.redirectUri,
+        grant_type: 'authorization_code'
       });
-      
-      console.log('✅ Google token exchange successful');
-      
-      if (!tokenResponse.data.access_token) {
-        throw new Error('No access token received from Google');
-      }
       
       // Get user info from Google
       userInfo = await axios.get(oauthConfig.google.userInfoUrl, {
-        headers: { 
-          Authorization: `Bearer ${tokenResponse.data.access_token}`,
-          Accept: 'application/json'
+        headers: { Authorization: `Bearer ${tokenResponse.data.access_token}` }
+      });
+    } else if (provider === 'facebook') {
+      // Exchange code for access token
+      tokenResponse = await axios.get(oauthConfig.facebook.tokenUrl, {
+        params: {
+          client_id: oauthConfig.facebook.clientId,
+          client_secret: oauthConfig.facebook.clientSecret,
+          code: code,
+          redirect_uri: oauthConfig.facebook.redirectUri
         }
       });
       
-      console.log('✅ Google user info fetched:', userInfo.data.email || userInfo.data.id);
-      
-    } else if (provider === 'facebook') {
-      // Exchange code for access token
-      const tokenParams = new URLSearchParams({
-        client_id: oauthConfig.facebook.clientId,
-        client_secret: oauthConfig.facebook.clientSecret,
-        code: code,
-        redirect_uri: oauthConfig.facebook.redirectUri
-      });
-      
-      tokenResponse = await axios.get(`${oauthConfig.facebook.tokenUrl}?${tokenParams.toString()}`);
-      
-      if (!tokenResponse.data.access_token) {
-        throw new Error('No access token received from Facebook');
-      }
-      
       // Get user info from Facebook
-      const userInfoParams = new URLSearchParams({
-        fields: 'id,name,email,picture.type(large),first_name,last_name',
-        access_token: tokenResponse.data.access_token
+      userInfo = await axios.get(oauthConfig.facebook.userInfoUrl, {
+        params: {
+          fields: 'id,name,email,picture.type(large),first_name,last_name',
+          access_token: tokenResponse.data.access_token
+        }
       });
-      
-      userInfo = await axios.get(`${oauthConfig.facebook.userInfoUrl}?${userInfoParams.toString()}`);
     }
     
     const providerUser = userInfo.data;
@@ -649,19 +416,47 @@ async function handleOAuthCallback(provider, code) {
     };
     
   } catch (error) {
-    console.error(`❌ ${provider} OAuth error:`, error.response?.data || error.message);
-    console.error(`❌ ${provider} OAuth error details:`, {
-      message: error.message,
-      code: error.code,
-      response: error.response?.data
-    });
-    
-    if (error.response?.data) {
-      throw new Error(`${provider} OAuth error: ${JSON.stringify(error.response.data)}`);
-    }
+    console.error(`❌ ${provider} OAuth error:`, error);
     throw error;
   }
 }
+
+// Google OAuth callback
+app.get('/api/auth/google/callback', async (req, res) => {
+  try {
+    const { code, error: oauthError } = req.query;
+    
+    if (oauthError) {
+      throw new Error(`Google OAuth error: ${oauthError}`);
+    }
+    
+    if (!code) {
+      return res.status(400).json({ success: false, error: "Authorization code required" });
+    }
+    
+    const result = await handleOAuthCallback('google', code, res);
+    
+    if (!result.success) {
+      const frontendUrl = process.env.FRONTEND_URL || (isRender ? renderExternalUrl : `http://localhost:${port}`);
+      const errorRedirectUrl = `${frontendUrl}/auth/callback?error=${encodeURIComponent(result.error)}`;
+      return res.redirect(errorRedirectUrl);
+    }
+    
+    // Redirect to frontend with token
+    const frontendUrl = process.env.FRONTEND_URL || (isRender ? renderExternalUrl : `http://localhost:${port}`);
+    const redirectUrl = `${frontendUrl}/auth/callback?token=${result.token}&username=${result.user.username}&provider=google`;
+    
+    res.redirect(redirectUrl);
+    
+  } catch (error) {
+    console.error('❌ Google OAuth callback error:', error);
+    
+    const frontendUrl = process.env.FRONTEND_URL || (isRender ? renderExternalUrl : `http://localhost:${port}`);
+    const errorRedirectUrl = `${frontendUrl}/auth/callback?error=${encodeURIComponent('Google authentication failed')}`;
+    
+    res.redirect(errorRedirectUrl);
+  }
+});
 
 // Facebook OAuth callback
 app.get('/api/auth/facebook/callback', async (req, res) => {
@@ -676,7 +471,7 @@ app.get('/api/auth/facebook/callback', async (req, res) => {
       return res.status(400).json({ success: false, error: "Authorization code required" });
     }
     
-    const result = await handleOAuthCallback('facebook', code);
+    const result = await handleOAuthCallback('facebook', code, res);
     
     if (!result.success) {
       const frontendUrl = process.env.FRONTEND_URL || (isRender ? renderExternalUrl : `http://localhost:${port}`);
@@ -839,7 +634,7 @@ app.post('/api/register', async (req, res) => {
       });
     }
 
-    // Validate username format - FIXED: Added missing closing parenthesis
+    // Validate username format
     if (!/^[a-zA-Z0-9_]+$/.test(username)) {
       return res.status(400).json({ 
         success: false, 
@@ -1110,7 +905,7 @@ app.post('/api/auth/register', async (req, res) => {
       });
     }
 
-    // Validate username format - FIXED: Added missing closing parenthesis
+    // Validate username format
     if (!/^[a-zA-Z0-9_]+$/.test(username)) {
       return res.status(400).json({ 
         success: false, 
@@ -5268,7 +5063,7 @@ app.post('/api/auth/link-account', verifyToken, async (req, res) => {
     }
 
     // Handle OAuth callback to get provider data
-    const result = await handleOAuthCallback(provider, code);
+    const result = await handleOAuthCallback(provider, code, res);
     
     if (!result.success) {
       return res.status(400).json({ 
@@ -5462,174 +5257,9 @@ app.post('/api/auth/set-password', verifyToken, async (req, res) => {
   }
 });
 
-// ===== NEW ENDPOINT: Debug Google OAuth Configuration =====
-app.get('/api/auth/google/debug', (req, res) => {
-  const debugInfo = {
-    success: true,
-    google_oauth_config: {
-      clientId: oauthConfig.google.clientId,
-      clientIdShort: oauthConfig.google.clientId ? oauthConfig.google.clientId.substring(0, 20) + '...' : 'Not set',
-      redirectUri: oauthConfig.google.redirectUri,
-      authUrl: oauthConfig.google.authUrl,
-      tokenUrl: oauthConfig.google.tokenUrl,
-      userInfoUrl: oauthConfig.google.userInfoUrl
-    },
-    environment: {
-      isRender: isRender,
-      renderExternalUrl: renderExternalUrl,
-      port: port,
-      node_env: process.env.NODE_ENV || 'development'
-    },
-    endpoints: {
-      auth_url: `/api/auth/google`,
-      callback_url: `/api/auth/google/callback`,
-      full_callback_url: oauthConfig.google.redirectUri
-    },
-    instructions: [
-      "1. Make sure the redirect_uri in Google Cloud Console matches exactly:",
-      `   ${oauthConfig.google.redirectUri}`,
-      "2. Make sure the client ID matches:",
-      `   ${oauthConfig.google.clientId}`,
-      "3. Make sure you've added the redirect URI to Authorized Redirect URIs in Google Cloud Console",
-      "4. Test the auth URL:",
-      `   ${renderExternalUrl || `http://localhost:${port}`}/api/auth/google`,
-      "5. After authorization, you should be redirected to:",
-      `   ${oauthConfig.google.redirectUri}?code=AUTHORIZATION_CODE`
-    ]
-  };
-  
-  res.json(debugInfo);
-});
-
-// ===== ADDED: FIX FOR FRONTEND ERRORS =====
-
-// Add endpoint to get originalContent for frontend compatibility
-app.get('/api/frontend-fix/original-content', (req, res) => {
-  res.json({
-    success: true,
-    originalContent: "Welcome to Message Mate! This is the default content that appears when the page loads.",
-    instructions: "This endpoint provides the missing 'originalContent' variable that was causing frontend errors.",
-    version: "1.0.0",
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Add endpoint to handle notification errors
-app.get('/api/frontend-fix/notifications', (req, res) => {
-  res.json({
-    success: true,
-    notificationSupport: {
-      webPush: false, // Disable web push notifications for now
-      inApp: true,    // Enable in-app notifications only
-      sound: true,
-      vibration: false
-    },
-    message: "Browser notifications are disabled. Use in-app notifications instead.",
-    instructions: "The frontend should use in-app notifications instead of browser notifications to avoid errors.",
-    fix: "Replace 'new Notification()' with custom in-app notification component"
-  });
-});
-
-// ===== FIXED: SERVER HEALTH ENDPOINT FOR RENDER =====
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    platform: isRender ? 'Render' : 'Local',
-    version: '1.0.0',
-    googleOAuth: {
-      configured: !!oauthConfig.google.clientId,
-      redirectUri: oauthConfig.google.redirectUri,
-      clientId: oauthConfig.google.clientId ? 'Configured' : 'Not Configured'
-    },
-    database: 'Supabase Connected',
-    websockets: 'Socket.io Active',
-    endpoints: {
-      auth: '/api/auth/*',
-      messages: '/api/messages',
-      users: '/api/users/*',
-      posts: '/api/posts/*'
-    }
-  });
-});
-
-// ===== 404 HANDLER - MUST BE LAST =====
-app.use((req, res) => {
-  const availableEndpoints = {
-    authentication: [
-      "POST /api/register",
-      "POST /api/login",
-      "POST /api/check-username",
-      "GET /api/auth-test",
-      "GET /api/auth/google",
-      "GET /api/auth/facebook",
-      "GET /api/auth/oauth-info",
-      "GET /api/auth/google/debug"
-    ],
-    chat: [
-      "GET /api/messages",
-      "POST /api/messages",
-      "DELETE /api/messages/:id",
-      "POST /api/command"
-    ],
-    profiles: [
-      "GET /api/user/profile",
-      "POST /api/user/profile",
-      "PUT /api/user/profile",
-      "GET /api/user/profile/:username",
-      "GET /api/test-profile",
-      "GET /api/create-user-profiles-table"
-    ],
-    ai: [
-      "POST /api/ai/private",
-      "POST /api/ai/chat"
-    ],
-    privateMessages: [
-      "GET /api/private/conversations",
-      "GET /api/private/messages/:username",
-      "POST /api/private/messages",
-      "GET /api/private/unread",
-      "PUT /api/private/messages/read"
-    ],
-    users: [
-      "GET /api/users/all",
-      "GET /api/users/stats"
-    ],
-    posts: [
-      "GET /api/posts",
-      "POST /api/posts",
-      "POST /api/posts/:postId/comments",
-      "POST /api/posts/:postId/like",
-      "GET /api/posts/user/:username",
-      "DELETE /api/posts/:postId"
-    ],
-    debug: [
-      "GET /test-supabase",
-      "GET /debug-all-commands",
-      "GET /debug-private-messages",
-      "GET /health",
-      "GET /uptime",
-      "GET /api/health"
-    ],
-    frontendFixes: [
-      "GET /api/frontend-fix/original-content",
-      "GET /api/frontend-fix/notifications"
-    ]
-  };
-  
-  res.status(404).json({
-    success: false,
-    error: "Endpoint not found",
-    requestedEndpoint: `${req.method} ${req.originalUrl}`,
-    availableEndpoints: availableEndpoints
-  });
-});
-
 // Start server
 server.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
-  console.log(`🔒 Trust proxy enabled: TRUE`);
   console.log(`🤫 PRIVATE MESSAGING: FIXED - No more disappearing messages!`);
   console.log(`✅ Fixed: Private messages will no longer disappear after sending`);
   console.log(`✅ Fixed: Duplicate message prevention improved`);
@@ -5659,7 +5289,6 @@ server.listen(port, () => {
     console.log(`🔐 GOOGLE OAUTH: ENABLED with provided credentials`);
     console.log(`   GET /api/auth/google - Get Google OAuth URL`);
     console.log(`   GET /api/auth/google/callback - Google OAuth callback`);
-    console.log(`   GET /api/auth/google/debug - Debug Google OAuth configuration`);
   } else {
     console.log(`⚠️ GOOGLE OAUTH: DISABLED (Set GOOGLE_CLIENT_ID environment variable)`);
   }
@@ -5739,7 +5368,6 @@ server.listen(port, () => {
   if (isRender && renderExternalUrl) {
     console.log(`🌐 Render External URL: ${renderExternalUrl}`);
     console.log(`⏱️ UptimeRobot monitoring URL: ${renderExternalUrl}/health`);
-    console.log(`🔍 Health Check: ${renderExternalUrl}/api/health`);
     console.log(`🧪 Test Supabase: ${renderExternalUrl}/test-supabase`);
     console.log(`🧪 Test Message: ${renderExternalUrl}/test-message`);
     console.log(`🔍 Debug ALL Commands: ${renderExternalUrl}/debug-all-commands`);
@@ -5751,28 +5379,101 @@ server.listen(port, () => {
     console.log(`👤 Create Profiles Table: ${renderExternalUrl}/api/create-user-profiles-table`);
     console.log(`👥 Get All Users: ${renderExternalUrl}/api/users/all`);
     console.log(`📊 User Stats: ${renderExternalUrl}/api/users/stats`);
-    console.log(`🔧 Frontend Fixes: ${renderExternalUrl}/api/frontend-fix/*`);
     
     // Show OAuth callback URLs
-    console.log(`\n🔐 CRITICAL GOOGLE OAUTH SETUP:`);
     console.log(`🔐 Google OAuth Callback: ${oauthConfig.google.redirectUri}`);
     console.log(`🔐 Facebook OAuth Callback: ${oauthConfig.facebook.redirectUri}`);
     
     // Instructions for setting up OAuth
-    console.log(`\n⚠️ GOOGLE OAUTH SETUP INSTRUCTIONS:`);
-    console.log(`1. Go to https://console.cloud.google.com/apis/credentials`);
-    console.log(`2. Create OAuth 2.0 Client ID (or use existing one)`);
-    console.log(`3. Set Authorized Redirect URIs to EXACTLY:`);
-    console.log(`   ${oauthConfig.google.redirectUri}`);
-    console.log(`4. Make sure the client ID matches: ${oauthConfig.google.clientId ? oauthConfig.google.clientId.substring(0, 30) + '...' : 'NOT SET'}`);
-    console.log(`5. Test the OAuth flow: ${renderExternalUrl}/api/auth/google`);
-    
     if (!oauthConfig.google.clientId || !oauthConfig.facebook.clientId) {
-      console.log(`\n⚠️ ENVIRONMENT VARIABLES NEEDED:`);
-      console.log(`For Google: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET`);
-      console.log(`For Facebook: FACEBOOK_APP_ID and FACEBOOK_APP_SECRET`);
+      console.log(`\n⚠️ OAUTH SETUP INSTRUCTIONS:`);
+      console.log(`1. For Google OAuth:`);
+      console.log(`   - Go to https://console.cloud.google.com/apis/credentials`);
+      console.log(`   - Create OAuth 2.0 Client ID`);
+      console.log(`   - Set Authorized redirect URIs to: ${oauthConfig.google.redirectUri}`);
+      console.log(`   - Set environment variables in Render: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET`);
+      
+      console.log(`\n2. For Facebook OAuth:`);
+      console.log(`   - Go to https://developers.facebook.com/apps/`);
+      console.log(`   - Create a new app`);
+      console.log(`   - Add Facebook Login product`);
+      console.log(`   - Set Valid OAuth Redirect URIs to: ${oauthConfig.facebook.redirectUri}`);
+      console.log(`   - Set environment variables in Render: FACEBOOK_APP_ID and FACEBOOK_APP_SECRET`);
     }
   }
+});
+
+// Add error handling middleware
+app.use((err, req, res, next) => {
+  console.error('❌ Global Error Handler:', err);
+  res.status(err.status || 500).json({
+    success: false,
+    error: err.message || 'Internal server error',
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
+});
+
+// 404 route handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'Endpoint not found',
+    availableEndpoints: {
+      authentication: [
+        'POST /api/register',
+        'POST /api/login', 
+        'POST /api/check-username',
+        'GET /api/auth-test',
+        'GET /api/auth/google',
+        'GET /api/auth/facebook',
+        'GET /api/auth/oauth-info'
+      ],
+      chat: [
+        'GET /api/messages',
+        'POST /api/messages',
+        'DELETE /api/messages/:id',
+        'POST /api/command'
+      ],
+      profiles: [
+        'GET /api/user/profile',
+        'POST /api/user/profile',  // Added POST method
+        'PUT /api/user/profile',
+        'GET /api/user/profile/:username',
+        'GET /api/test-profile',
+        'GET /api/create-user-profiles-table'
+      ],
+      ai: [
+        'POST /api/ai/private',
+        'POST /api/ai/chat'
+      ],
+      privateMessages: [
+        'GET /api/private/conversations',
+        'GET /api/private/messages/:username',
+        'POST /api/private/messages',
+        'GET /api/private/unread',
+        'PUT /api/private/messages/read'
+      ],
+      users: [
+        'GET /api/users/all',
+        'GET /api/users/stats'
+      ],
+      posts: [
+        'GET /api/posts',
+        'POST /api/posts',
+        'POST /api/posts/:postId/comments',
+        'POST /api/posts/:postId/like',
+        'GET /api/posts/user/:username',
+        'DELETE /api/posts/:postId'
+      ],
+      debug: [
+        'GET /test-supabase',
+        'GET /debug-all-commands',
+        'GET /debug-private-messages',
+        'GET /health',
+        'GET /uptime'
+      ]
+    }
+  });
 });
 
 // Graceful shutdown
