@@ -5164,6 +5164,13 @@ async function handleOAuthCallback() {
             auth_provider: provider || 'google'
         });
         
+        // --- FIX: Hide welcome screen immediately ---
+        const welcomeScreen = document.getElementById('welcome-screen');
+        if (welcomeScreen) {
+            welcomeScreen.style.display = 'none';
+        }
+        // --- End fix ---
+        
         // Show success message
         showSuccess(`Welcome, ${username}! You've successfully logged in with ${provider}.`);
         
@@ -12306,6 +12313,6 @@ document.addEventListener('click', function (e) {
 });
 
 // --- END OF JAVASCRIPT CODE ---
-</script>
+    </script>
 </body>
 </html>
