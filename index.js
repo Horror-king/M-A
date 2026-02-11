@@ -5413,8 +5413,16 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 route handler
+// ===== MODIFIED: 404 route handler - SPA support for OAuth callback =====
 app.use((req, res) => {
+  // If it's a GET request and the client accepts HTML, serve the SPA entry point
+  // This allows client-side routing to handle /auth/callback and other SPA routes
+  if (req.method === 'GET' && req.accepts('html')) {
+    // Make sure index.html exists in the 'public' folder
+    return res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  }
+  
+  // Otherwise, respond with JSON error
   res.status(404).json({
     success: false,
     error: 'Endpoint not found',
@@ -5436,7 +5444,7 @@ app.use((req, res) => {
       ],
       profiles: [
         'GET /api/user/profile',
-        'POST /api/user/profile',  // Added POST method
+        'POST /api/user/profile',
         'PUT /api/user/profile',
         'GET /api/user/profile/:username',
         'GET /api/test-profile',
@@ -5496,3 +5504,6 @@ process.on('uncaughtException', (err) => {
 
 // Export for testing
 module.exports = { app, server, io, supabase };
+
+// --- CUT HERE ---
+// (Your client-side JavaScript code remains unchanged and is not executed by Node.js)
