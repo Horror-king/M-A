@@ -5175,6 +5175,14 @@ async function handleOAuthCallback() {
         }
         // --- End fix ---
         
+        // Check for pending post link from sessionStorage
+        const storedPostId = sessionStorage.getItem('pendingPostId');
+        if (storedPostId) {
+            pendingPostId = storedPostId;
+            console.log('🔗 Restored pending post ID from session:', pendingPostId);
+            sessionStorage.removeItem('pendingPostId'); // Clear after retrieving
+        }
+        
         // Show success message
         showSuccess(`Welcome, ${username}! You've successfully logged in with ${provider}.`);
         
@@ -8231,12 +8239,10 @@ function initializeMainApp() {
     if (authContainer) authContainer.style.display = 'none';
     
     initializeButtons();
-    showContainer('chat');
-    
     // IMPORTANT: Create profile section and load profile data
     updateProfileSection(); // Create the profile section first
     loadProfile(); // Then load the actual profile data from server
-    
+
     initializeChat();
 
     initSocket();
@@ -8250,6 +8256,13 @@ function initializeMainApp() {
     
     if (hasVerifiedCode()) {
         enableSQLEditorAccess();
+    }
+    
+    // Show the appropriate container based on pendingPostId
+    if (pendingPostId) {
+        showContainer('posts');
+    } else {
+        showContainer('chat');
     }
     
     // Show welcome message instead of login prompt
@@ -8289,6 +8302,13 @@ document.addEventListener('DOMContentLoaded', function() {
     attemptAutoLogin().then(success => {
         if (success) {
             console.log('✅ User auto-logged in successfully');
+            // Check for pending post link from sessionStorage
+            const storedPostId = sessionStorage.getItem('pendingPostId');
+            if (storedPostId) {
+                pendingPostId = storedPostId;
+                console.log('🔗 Restored pending post ID from session:', pendingPostId);
+                sessionStorage.removeItem('pendingPostId');
+            }
             animateWelcomeText(); // This will skip animation because user is already logged in
         } else {
             console.log('❌ No valid session found, showing welcome then login');
@@ -8350,10 +8370,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ===== POST SHARING: Check for shared post link =====
     if (urlParams.has('post')) {
-        pendingPostId = urlParams.get('post');
+        const postId = urlParams.get('post');
+        pendingPostId = postId;
         console.log('🔗 Shared post link detected, post ID:', pendingPostId);
-        // Ensure posts container is shown
-        showContainer('posts');
+        // Store in sessionStorage to persist across redirects
+        sessionStorage.setItem('pendingPostId', postId);
     }
 
     console.log('🎯 Application initialization complete');
