@@ -30,7 +30,11 @@
         gap: 12px;
         width: 100%;
     }
-
+    .highlighted-post {
+  background-color: rgba(66, 103, 178, 0.1); /* Light blue */
+  border-left: 4px solid #4267B2;
+  transition: background-color 0.3s ease;
+    }
     .oauth-btn {
         width: 100%;
         padding: 12px 20px;
@@ -5920,6 +5924,9 @@ let isUsersLoaded = false;
 let usersLoadStarted = false; // Track if load has started
 let usersRefreshInterval = null;
 
+// ===== POST SHARING =====
+let pendingPostId = null;
+
 // Add this function to show all users on first visit
 function showAllUsersOnFirstVisit() {
     // Check if it's the first visit
@@ -7048,6 +7055,26 @@ function renderPosts() {
         const postElement = createPostElement(post);
         postsList.appendChild(postElement);
     });
+
+    // ===== POST SHARING: Handle shared post link =====
+    if (pendingPostId) {
+        // Give time for DOM to update
+        setTimeout(() => {
+            const targetPost = document.querySelector(`[data-post-id="${pendingPostId}"]`);
+            if (targetPost) {
+                // Scroll to post
+                targetPost.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Highlight it
+                targetPost.classList.add('highlighted-post');
+                // Remove highlight after 3 seconds
+                setTimeout(() => {
+                    targetPost.classList.remove('highlighted-post');
+                }, 3000);
+                console.log(`🔗 Scrolled to shared post: ${pendingPostId}`);
+            }
+            pendingPostId = null;
+        }, 100);
+    }
 }
 
 // UPDATED: Create post element with image URL detection - MODIFIED TO USE ACTUAL PROFILE AVATAR
@@ -7506,20 +7533,21 @@ function handleCommentKeypress(event, postId) {
     }
 }
 
-// Share a post
+// ===== MODIFIED: Share post - copy shareable link =====
 function sharePost(postId) {
     const post = posts.find(p => p.id === postId);
     if (!post) return;
     
-    // In a real app, this would open a share dialog
-    // For now, we'll just copy the post content to clipboard
-    const shareText = `${post.author}: ${post.content}`;
+    // Construct shareable URL
+    const url = new URL(window.location.href);
+    url.searchParams.set('post', postId);
+    const shareUrl = url.href;
     
-    navigator.clipboard.writeText(shareText).then(() => {
-        showSuccess('Post content copied to clipboard!');
+    navigator.clipboard.writeText(shareUrl).then(() => {
+        showSuccess('Post link copied to clipboard!');
     }).catch(err => {
         console.error('Failed to copy: ', err);
-        showError('Failed to share post');
+        showError('Failed to copy post link');
     });
 }
 
@@ -8318,6 +8346,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 sendPrivateMessage();
             }
         });
+    }
+
+    // ===== POST SHARING: Check for shared post link =====
+    if (urlParams.has('post')) {
+        pendingPostId = urlParams.get('post');
+        console.log('🔗 Shared post link detected, post ID:', pendingPostId);
+        // Ensure posts container is shown
+        showContainer('posts');
     }
 
     console.log('🎯 Application initialization complete');
