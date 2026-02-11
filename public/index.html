@@ -5012,6 +5012,95 @@
     </div>
 <script>
 // --- CUT HERE ---
+// ===== PULL-TO-REFRESH PREVENTION - ENHANCED =====
+// ADDED: Global CSS to kill pull-to-refresh instantly
+function disablePullToRefreshGlobally() {
+    document.documentElement.style.overscrollBehavior = 'contain';
+    document.body.style.overscrollBehavior = 'contain';
+}
+// Call immediately – safe even before DOM is ready
+disablePullToRefreshGlobally();
+
+// ADDED: Flag to avoid duplicate listeners on same container
+const pullRefreshContainers = new WeakSet();
+
+function preventPullToRefresh() {
+    // List all scrollable containers in your app
+    const scrollContainers = [
+        document.getElementById('chat-container'),
+        document.getElementById('private-ai-container'),
+        document.getElementById('private-chat-messages'),
+        document.getElementById('posts-container') ? document.getElementById('posts-container').querySelector('.posts-list') : null,
+        document.getElementById('all-users-container'),
+        document.getElementById('users-list')?.parentElement, // private messages users panel
+        document.querySelector('.private-messages-panel') // private chat container
+    ].filter(el => el !== null && !pullRefreshContainers.has(el));
+
+    scrollContainers.forEach(container => {
+        if (!container) return;
+        
+        // Mark as handled
+        pullRefreshContainers.add(container);
+        
+        // Also apply CSS containment to kill any remaining overscroll effects
+        container.style.overscrollBehavior = 'contain';
+        
+        let startY = 0;
+        
+        container.addEventListener('touchstart', (e) => {
+            startY = e.touches[0].clientY;
+        }, { passive: true });
+        
+        container.addEventListener('touchmove', (e) => {
+            // Block refresh when at the very top AND pulling downward
+            if (container.scrollTop <= 0) {
+                const touch = e.touches[0];
+                const currentY = touch.clientY;
+                const deltaY = currentY - startY;
+                
+                if (deltaY > 0) {
+                    e.preventDefault();
+                }
+            }
+        }, { passive: false });
+    });
+}
+
+// ===== RE-APPLY AFTER ANY DOM UPDATE =====
+// Override or patch key functions that modify the UI
+const originalRenderMessages = renderMessages;
+renderMessages = function(messages, isFirstLoad) {
+    originalRenderMessages.call(this, messages, isFirstLoad);
+    preventPullToRefresh();
+};
+
+const originalRenderAllUsers = renderAllUsers;
+renderAllUsers = function() {
+    originalRenderAllUsers.call(this);
+    preventPullToRefresh();
+};
+
+const originalLoadPrivateMessages = loadPrivateMessages;
+loadPrivateMessages = async function(username) {
+    await originalLoadPrivateMessages.call(this, username);
+    preventPullToRefresh();
+};
+
+const originalShowContainer = showContainer;
+showContainer = function(containerId) {
+    originalShowContainer.call(this, containerId);
+    // Re-apply after a tiny delay to allow DOM to settle
+    setTimeout(preventPullToRefresh, 50);
+};
+
+const originalInitializeAllUsers = initializeAllUsers;
+initializeAllUsers = function() {
+    originalInitializeAllUsers.call(this);
+    preventPullToRefresh();
+};
+
+// --- EVERYTHING BELOW IS YOUR ORIGINAL CODE, UNCHANGED EXCEPT FOR THE ADDITIONS ABOVE ---
+
 // Add eye icon functionality for password field
 function setupPasswordToggle() {
     const passwordInput = document.getElementById('auth-password');
@@ -5043,43 +5132,6 @@ function setupPasswordToggle() {
             }
         });
     }
-}
-
-// ===== PULL-TO-REFRESH PREVENTION =====
-// ADDED: Blocks the browser's native pull-to-refresh on our scrollable containers
-function preventPullToRefresh() {
-    // List all scrollable containers in your app
-    const scrollContainers = [
-        document.getElementById('chat-container'),
-        document.getElementById('private-ai-container'),
-        document.getElementById('private-chat-messages'),
-        document.getElementById('posts-container') ? document.getElementById('posts-container').querySelector('.posts-list') : null,
-        document.getElementById('all-users-container')
-    ].filter(el => el !== null);
-
-    scrollContainers.forEach(container => {
-        if (!container) return;
-        
-        let startY = 0;
-        
-        container.addEventListener('touchstart', (e) => {
-            startY = e.touches[0].clientY;
-        }, { passive: false });
-        
-        container.addEventListener('touchmove', (e) => {
-            // If we are at the top of the container and the user is pulling down
-            if (container.scrollTop <= 0) {
-                const touch = e.touches[0];
-                const currentY = touch.clientY;
-                const deltaY = currentY - startY;
-                
-                // deltaY > 0 = pulling downward beyond the top
-                if (deltaY > 0) {
-                    e.preventDefault(); // Block refresh
-                }
-            }
-        }, { passive: false });
-    });
 }
 
 // ===== GOOGLE OAUTH FUNCTIONS =====
@@ -9134,26 +9186,6 @@ async function sendPrivateMessage() {
     }, 1000);
 }
 
-// ===== NEW FUNCTION: Add touch event listeners to message element =====
-function addMessageTouchListeners(messageDiv) {
-    // Check if listeners already added to prevent duplicates
-    if (messageDiv.dataset.hasTouchListeners === 'true') {
-        return;
-    }
-    
-    messageDiv.addEventListener('touchstart', handleTouchStart);
-    messageDiv.addEventListener('touchend', handleTouchEnd);
-    messageDiv.addEventListener('touchmove', handleTouchMove);
-    messageDiv.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        showMessageContextMenu(e, messageDiv);
-    });
-    
-    // Mark that listeners have been added
-    messageDiv.dataset.hasTouchListeners = 'true';
-}
-
-// --- CUT HERE ---
 // ===== NEW FUNCTION: Add touch event listeners to message element =====
 function addMessageTouchListeners(messageDiv) {
     // Check if listeners already added to prevent duplicates
