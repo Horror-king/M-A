@@ -5011,6 +5011,40 @@
         </div>
     </div>
 <script>
+// --- CUT HERE ---
+// Add eye icon functionality for password field
+function setupPasswordToggle() {
+    const passwordInput = document.getElementById('auth-password');
+    const toggleButton = document.getElementById('toggle-password');
+    const eyeIcon = toggleButton.querySelector('i');
+    
+    if (passwordInput && toggleButton) {
+        toggleButton.addEventListener('click', function() {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            
+            // Toggle the eye icon
+            if (type === 'text') {
+                eyeIcon.classList.remove('fa-eye');
+                eyeIcon.classList.add('fa-eye-slash');
+                toggleButton.title = "Hide password";
+            } else {
+                eyeIcon.classList.remove('fa-eye-slash');
+                eyeIcon.classList.add('fa-eye');
+                toggleButton.title = "Show password";
+            }
+        });
+        
+        // Also allow toggling on Enter key when focused on password field
+        passwordInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && document.activeElement === passwordInput) {
+                e.preventDefault();
+                toggleButton.click();
+            }
+        });
+    }
+}
+
 // ===== GOOGLE OAUTH FUNCTIONS =====
 
 // NEW: Function to get OAuth configuration info from server
