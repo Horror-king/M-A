@@ -1985,13 +1985,31 @@ app.post('/api/messages', async (req, res) => {
   }
 });
 
-// DELETE messages endpoint that client expects - FIXED FOR OPERA MINI
-app.delete('/api/messages/:id', async (req, res) => {
+// DELETE messages endpoint that client expects - MODIFIED: Added auth and Admin0 permission
+app.delete('/api/messages/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
-    
-    console.log('🗑️ Deleting message with ID:', id);
-    
+    const username = req.user.username;
+
+    console.log('🗑️ Deleting message with ID:', id, 'by user:', username);
+
+    // Fetch the message to check ownership
+    const { data: message, error: fetchError } = await supabase
+      .from('chatter')
+      .select('username')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !message) {
+      console.error('❌ Message not found or fetch error:', fetchError);
+      return res.status(404).json({ success: false, error: 'Message not found' });
+    }
+
+    // Allow if user is Admin0 or the message owner
+    if (username !== 'Admin0' && message.username !== username) {
+      return res.status(403).json({ success: false, error: 'You can only delete your own messages' });
+    }
+
     const { error } = await supabase
       .from('chatter')
       .delete()
@@ -2002,7 +2020,7 @@ app.delete('/api/messages/:id', async (req, res) => {
       throw error;
     }
     
-    // Broadcast deletion via Socket.io - Use polling for Opera Mini compatibility
+    // Broadcast deletion via Socket.io
     console.log('📢 Broadcasting message deletion to all clients');
     io.emit('message-deleted', id);
     
@@ -2384,7 +2402,7 @@ app.get('/api/test-profile', async (req, res) => {
     }
     
     console.log('🧪 Test profile endpoint for:', username);
-    
+
     // Test if we can query the table
     const { data: profiles, error } = await supabase
       .from('user_profiles')
@@ -4076,13 +4094,31 @@ app.post('/upload', upload.single('image'), async (req, res) => {
   }
 });
 
-// DELETE messages (legacy endpoint) - FIXED FOR OPERA MINI
-app.delete('/messages/:id', async (req, res) => {
+// DELETE messages (legacy endpoint) - MODIFIED: Added auth and Admin0 permission
+app.delete('/messages/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
-    
-    console.log('🗑️ Deleting message (legacy) with ID:', id);
-    
+    const username = req.user.username;
+
+    console.log('🗑️ Deleting message (legacy) with ID:', id, 'by user:', username);
+
+    // Fetch the message to check ownership
+    const { data: message, error: fetchError } = await supabase
+      .from('chatter')
+      .select('username')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !message) {
+      console.error('❌ Message not found or fetch error:', fetchError);
+      return res.status(404).json({ success: false, error: 'Message not found' });
+    }
+
+    // Allow if user is Admin0 or the message owner
+    if (username !== 'Admin0' && message.username !== username) {
+      return res.status(403).json({ success: false, error: 'You can only delete your own messages' });
+    }
+
     const { error } = await supabase
       .from('chatter')
       .delete()
@@ -5341,6 +5377,8 @@ server.listen(port, () => {
   console.log(`   DELETE /api/messages/:id - Delete message (client-compatible) - OPERA MINI FIXED`);
   console.log(`   GET /api/messages/:id - Get message by ID (NEW!)`);
   console.log(`   PUT /api/messages/:id - Update message (NEW!)`);
+  console.log(`   **MODIFIED: /api/messages/:id - Now requires authentication and allows Admin0 to delete any message**`);
+  console.log(`   **MODIFIED: /messages/:id - Now requires authentication and allows Admin0 to delete any message**`);
   console.log(`📝 POSTS SYSTEM: ENABLED via Supabase`);
   console.log(`   GET /api/create-posts-table - Check posts table (NEW!)`);
   console.log(`   POST /api/create-posts-table - Create posts table if needed`);
