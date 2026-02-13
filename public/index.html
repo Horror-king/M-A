@@ -4383,6 +4383,37 @@
             min-width: 70px;
         }
     }
+
+    /* === ADDED: Reply preview container styles === */
+    #reply-preview-container {
+        background: #e3f2fd;
+        border-left: 4px solid #2196f3;
+        padding: 8px 12px;
+        margin: 4px 10px;
+        border-radius: 8px;
+        font-size: 14px;
+        display: none;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .reply-preview {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .reply-preview button {
+        background: transparent;
+        border: none;
+        font-size: 18px;
+        cursor: pointer;
+        color: #555;
+        padding: 0 6px;
+    }
+
+    .reply-preview button:hover {
+        color: #f44336;
+    }
     </style>
 </head>
 <body>
@@ -9599,6 +9630,9 @@ function copyToClipboard(text, button) {
 function showReplyPreview() {
     if (!elements.replyPreview) return;
     
+    // Make container visible
+    elements.replyPreview.style.display = 'block';
+    
     // Check if the replied-to message still exists in the DOM
     let messageExists = replyToMessageId && document.querySelector(`[data-id="${replyToMessageId}"]`);
     
@@ -9606,20 +9640,16 @@ function showReplyPreview() {
         // Message was deleted, show warning
         elements.replyPreview.innerHTML = `
             <div class="reply-preview" style="background-color: #ffebee; border-left-color: #f44336;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="color:#d32f2f;">The message you replied to was deleted.</span>
-                    <button onclick="clearReply()" style="margin-left:5px; font-size:16px; padding:2px 8px; border-radius:50%; border:none; background:transparent; cursor:pointer;" title="Cancel reply">&times;</button>
-                </div>
+                <span style="color:#d32f2f;">The message you replied to was deleted.</span>
+                <button onclick="clearReply()" title="Cancel reply">&times;</button>
             </div>
         `;
     } else {
-        // Normal reply preview with icon cancel button
+        // Normal reply preview with cancel button
         elements.replyPreview.innerHTML = `
             <div class="reply-preview" data-reply-id="${replyToMessageId || ''}">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span>Replying to: ${replyToText ? replyToText.substring(0, 80) : 'a message'}</span>
-                    <button onclick="clearReply()" style="margin-left:5px; font-size:16px; padding:2px 8px; border-radius:50%; border:none; background:transparent; cursor:pointer;" title="Cancel reply">&times;</button>
-                </div>
+                <span>Replying to: ${replyToText ? replyToText.substring(0, 80) : 'a message'}</span>
+                <button onclick="clearReply()" title="Cancel reply">&times;</button>
             </div>
         `;
     }
@@ -9631,7 +9661,7 @@ function clearReply() {
     replyToMessageId = null;
     if (elements.replyPreview) {
         elements.replyPreview.style.display = 'none';
-        elements.replyPreview.textContent = '';
+        elements.replyPreview.innerHTML = '';
     }
 }
 
