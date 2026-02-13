@@ -8266,6 +8266,9 @@ function initializeMainApp() {
     // Show welcome message instead of login prompt
     showSuccess(`Welcome back, ${currentUserSession?.username || 'User'}!`);
     
+    // [FIX] Apply user panel visibility after login
+    updateUserPanelVisibility();
+    
     console.log('✅ Main application initialized successfully');
 }
 
@@ -8325,6 +8328,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Load user panel preference
     loadUserPanelPreference();
+    // [FIX] Apply the loaded preference to the UI immediately
+    updateUserPanelVisibility();
     
     // Initialize password toggle
     setupPasswordToggle();
@@ -10143,7 +10148,7 @@ function loadUserPanelPreference() {
     } else {
         userPanelVisible = true; // Default to visible
     }
-    updateUserPanelVisibility();
+    // Do NOT call updateUserPanelVisibility here; we'll call it separately after loading
 }
 
 function updateUserPanelToggleButton() {
