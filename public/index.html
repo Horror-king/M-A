@@ -7967,6 +7967,11 @@ function initSocket() {
                     messageElement.remove();
                     showSuccess('Message deleted (by another user)');
                 }
+                
+                // === NEW: Check if this message was the one being replied to ===
+                if (replyToMessageId && replyToMessageId === messageId) {
+                    updateReplyPreviewDeleted();
+                }
             }
         );
         
@@ -8053,6 +8058,11 @@ function initSocket() {
             messageElement.remove();
             showSuccess('Message deleted (by another user)');
         }
+        
+        // === NEW: Check if this message was the one being replied to ===
+        if (replyToMessageId && replyToMessageId === messageId) {
+            updateReplyPreviewDeleted();
+        }
     });
 
     // UPDATED: User status updates with lastSeen
@@ -8122,6 +8132,23 @@ function initSocket() {
     });
 }
 
+// === NEW: Helper function to update reply preview when original message is deleted ===
+function updateReplyPreviewDeleted() {
+    if (elements.replyPreview) {
+        elements.replyPreview.innerHTML = `
+            <div class="reply-preview" style="background-color: #ffebee; border-left-color: #f44336;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="color:#d32f2f;">The message you replied to was deleted.</span>
+                    <button onclick="clearReply()" style="margin-left:5px; font-size:12px; padding:2px 5px;">Cancel</button>
+                </div>
+            </div>
+        `;
+        // Optionally disable send button
+        // elements.sendButton.disabled = true;
+        // elements.sendButton.classList.remove('enabled');
+    }
+}
+
 // MODIFIED: Update the delete button handler in showMessageContextMenu
 // In the delete button creation section, replace the onclick handler:
 const deleteButton = document.createElement('button');
@@ -8141,6 +8168,10 @@ deleteButton.onclick = async () => {
             message.remove();
             showSuccess('Message deleted successfully');
             
+            // === NEW: Check if this was the replied-to message ===
+            if (replyToMessageId && replyToMessageId === messageId) {
+                updateReplyPreviewDeleted();
+            }
         } else {
             throw new Error('Delete failed');
         }
@@ -8150,6 +8181,10 @@ deleteButton.onclick = async () => {
         // Even if server delete fails, remove from UI for better UX
         message.remove();
         showSuccess('Message removed locally');
+        
+        if (replyToMessageId && replyToMessageId === messageId) {
+            updateReplyPreviewDeleted();
+        }
     }
     contextMenu.remove();
 };
@@ -8266,9 +8301,6 @@ function initializeMainApp() {
     // Show welcome message instead of login prompt
     showSuccess(`Welcome back, ${currentUserSession?.username || 'User'}!`);
     
-    // [FIX] Apply user panel visibility after login
-    updateUserPanelVisibility();
-    
     console.log('✅ Main application initialized successfully');
 }
 
@@ -8328,8 +8360,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Load user panel preference
     loadUserPanelPreference();
-    // [FIX] Apply the loaded preference to the UI immediately
-    updateUserPanelVisibility();
     
     // Initialize password toggle
     setupPasswordToggle();
@@ -8537,6 +8567,7 @@ const elements = {
 };
 
 let replyToText = null;
+let replyToMessageId = null; // NEW: store ID of the message being replied to
 
 // ===== MODIFIED: AVATAR URL HELPER FUNCTION =====
 function getAvatarUrl(username) {
@@ -9401,6 +9432,7 @@ function showMessageContextMenu(e, message) {
     replyButton.textContent = 'Reply';
     replyButton.onclick = () => {
         replyToText = messageText;
+        replyToMessageId = messageId; // NEW: store the ID of the message we're replying to
         elements.messageInput.focus();
         showReplyPreview();
         contextMenu.remove();
@@ -9432,6 +9464,10 @@ function showMessageContextMenu(e, message) {
                     message.remove();
                     showSuccess('Message deleted successfully');
                     
+                    // NEW: Check if this was the replied-to message
+                    if (replyToMessageId && replyToMessageId === messageId) {
+                        updateReplyPreviewDeleted();
+                    }
                 } else {
                     throw new Error('Delete failed');
                 }
@@ -9441,6 +9477,10 @@ function showMessageContextMenu(e, message) {
                 // Even if server delete fails, remove from UI for better UX
                 message.remove();
                 showSuccess('Message removed locally');
+                
+                if (replyToMessageId && replyToMessageId === messageId) {
+                    updateReplyPreviewDeleted();
+                }
             }
             contextMenu.remove();
         };
@@ -9515,6 +9555,7 @@ function showPrivateMessageContextMenu(e, message) {
     replyButton.textContent = 'Reply';
     replyButton.onclick = () => {
         replyToText = messageText;
+        replyToMessageId = message.dataset.id || null; // NEW: store ID
         elements.messageInput.focus();
         showReplyPreview();
         contextMenu.remove();
@@ -9554,18 +9595,40 @@ function copyToClipboard(text, button) {
     }, 2000);  
 }
 
+// ===== MODIFIED: showReplyPreview with ID and cancel button =====
 function showReplyPreview() {
     if (!elements.replyPreview) return;
-    elements.replyPreview.innerHTML = `
-        <div class="reply-preview">
-            Replying to: ${replyToText.substring(0, 80)}
-            <button onclick="clearReply()" style="float:right; font-size:12px;">✕</button>
-        </div>
-    `;
+    
+    // Check if the replied-to message still exists in the DOM
+    let messageExists = replyToMessageId && document.querySelector(`[data-id="${replyToMessageId}"]`);
+    
+    if (!messageExists && replyToMessageId) {
+        // Message was deleted, show warning
+        elements.replyPreview.innerHTML = `
+            <div class="reply-preview" style="background-color: #ffebee; border-left-color: #f44336;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="color:#d32f2f;">The message you replied to was deleted.</span>
+                    <button onclick="clearReply()" style="margin-left:5px; font-size:12px; padding:2px 5px;">Cancel</button>
+                </div>
+            </div>
+        `;
+    } else {
+        // Normal reply preview
+        elements.replyPreview.innerHTML = `
+            <div class="reply-preview" data-reply-id="${replyToMessageId || ''}">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>Replying to: ${replyToText ? replyToText.substring(0, 80) : 'a message'}</span>
+                    <button onclick="clearReply()" style="margin-left:5px; font-size:12px; padding:2px 5px;">Cancel</button>
+                </div>
+            </div>
+        `;
+    }
 }
 
+// ===== MODIFIED: clearReply to reset both text and ID =====
 function clearReply() {
     replyToText = null;
+    replyToMessageId = null;
     if (elements.replyPreview) {
         elements.replyPreview.style.display = 'none';
         elements.replyPreview.textContent = '';
@@ -10148,7 +10211,7 @@ function loadUserPanelPreference() {
     } else {
         userPanelVisible = true; // Default to visible
     }
-    // Do NOT call updateUserPanelVisibility here; we'll call it separately after loading
+    updateUserPanelVisibility();
 }
 
 function updateUserPanelToggleButton() {
