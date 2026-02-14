@@ -366,10 +366,10 @@
         position: relative;
     }
 
-    /* FIXED: Increased default bottom padding for messages to prevent overlap with input */
+    /* FIXED: Dynamic padding for online users panel states */
     .chat-messages, #private-ai-container {
         flex: 1;
-        padding: 5px 10px 120px 10px; /* Default padding: 120px ensures enough space even with reply preview */
+        padding: 5px 10px 80px 10px; /* Default padding when panel is collapsed */
         overflow-y: auto;
         height: 100%;
         display: flex;
@@ -389,19 +389,20 @@
         max-width: 100%; /* Ensure doesn't exceed container */
     }
 
-    /* When online panel is expanded - increase bottom padding even more */
+    /* When online panel is expanded - increase bottom padding */
     .online-users-panel:not(.collapsed) ~ .chat-container .chat-messages,
     .online-users-panel:not(.collapsed) ~ .chat-container #private-ai-container {
         padding-bottom: 183px !important; /* Increased padding when panel is expanded */
     }
 
-    /* When online panel is collapsed - use increased default (or custom) */
+    /* When online panel is collapsed - use default padding */
     .online-users-panel.collapsed ~ .chat-container .chat-messages,
     .online-users-panel.collapsed ~ .chat-container #private-ai-container {
-        padding-bottom: 120px !important; /* Matches default, ensures no overlap */
+        padding-bottom: 117px !important; /* Normal padding when panel is collapsed */
     }
 
     .online-users-panel:not(.collapsed) {
+        /* This will make the chat container adjust automatically */
         height: auto !important;
     }
     /* User status indicator styles */
@@ -454,15 +455,14 @@
             box-shadow: 0 0 0 0 rgba(49, 162, 76, 0);
         }
     }
-    /* FIXED: Chat input positioning - now uses flex column to keep preview inside */
+    /* FIXED: Chat input positioning */
     .chat-input {
-        display: none; /* controlled by JS */
-        flex-direction: column;
-        align-items: stretch;
+        display: none;
+        align-items: center;
         padding: 5px;
         border-top: 1px solid #e4e6eb;
         background-color: white;
-        position: relative; /* stays at bottom of flex container */
+        position: fixed;
         bottom: 0;
         left: 0;
         width: 100%;
@@ -471,6 +471,9 @@
         z-index: 1000;
         height: auto;
         min-height: 55px;
+        /* ADDED: flex column for reply preview */
+        flex-direction: column;
+        align-items: stretch;
     }
 
     /* FIXED: Private messages container adjustments */
@@ -835,30 +838,31 @@
         }
     }
 
-    /* Mobile responsive adjustments — increased bottom padding to accommodate reply preview inside input */
+    /* Mobile responsive adjustments */
     @media (max-width: 480px) {
         .chat-messages, #private-ai-container {
-            padding-bottom: 120px; /* unified safe value */
+            padding-bottom: 79px; /* Slightly less on mobile when collapsed */
         }
         
         .online-users-panel:not(.collapsed) ~ .chat-container .chat-messages,
         .online-users-panel:not(.collapsed) ~ .chat-container #private-ai-container {
-            padding-bottom: 200px !important; /* enough for expanded panel + preview */
+            padding-bottom: 160px; /* Slightly less on mobile when expanded */
         }
         
         .online-users-panel.collapsed ~ .chat-container .chat-messages,
         .online-users-panel.collapsed ~ .chat-container #private-ai-container {
-            padding-bottom: 120px !important; /* same as default */
+            padding-bottom: 75px; /* Slightly less on mobile when collapsed */
         }
         
         .online-users-panel {
-            max-height: 180px;
+            max-height: 180px; /* Slightly smaller on mobile */
         }
         
         .online-users-panel.collapsed {
-            max-height: 40px;
+            max-height: 40px; /* Smaller collapsed height on mobile */
         }
 
+        /* NEW: Mobile adjustments for welcome screen */
         .animated-logo {
             font-size: 2.5rem;
         }
@@ -867,6 +871,7 @@
             font-size: 1rem;
         }
 
+        /* OAuth button adjustments for mobile */
         .oauth-btn {
             padding: 10px 15px;
             font-size: 14px;
@@ -1297,6 +1302,7 @@
             margin-bottom: 5px;
         }
         
+        /* Ensure tables don't cause horizontal scroll */
         .sql-result-table {
             font-size: 12px;
             display: block;
@@ -1347,18 +1353,22 @@
         border-radius: 10px;
         object-fit: cover;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        /* REMOVE transitions that cause slow reveal */
         transition: none !important;
         opacity: 1 !important;
         animation: none !important;
+        /* Force immediate rendering */
         visibility: visible !important;
-        max-width: 100%;
+        max-width: 100%; /* Prevent image overflow */
     }
 
+    /* Ensure images are always fully visible */
     .message img[src] {
         opacity: 1 !important;
         visibility: visible !important;
     }
 
+    /* Preload helper for images */
     .img-preload {
         position: absolute;
         opacity: 0;
@@ -1367,6 +1377,7 @@
         height: 0;
     }
 
+    /* Rest of your existing styles remain the same */
     body {
         font-family: Arial, sans-serif;
         background-color: #f0f2f5;
@@ -1374,7 +1385,7 @@
         height: 100vh;
         display: flex;
         flex-direction: column;
-        overflow-x: hidden;
+        overflow-x: hidden; /* Prevent horizontal scroll */
     }
 
     .loader {
@@ -1564,7 +1575,7 @@
     html, body {
         overflow: auto;
         height: 100%;
-        overflow-x: hidden;
+        overflow-x: hidden; /* Prevent horizontal scroll */
     }
 
     /* Improved message styling with better avatar alignment */
@@ -1621,23 +1632,24 @@
         word-break: break-word;
     }
 
+    /* Improved avatar styling */
     .message .avatar {
-        width: 26px;
-        height: 26px;
+        width: 26px; /* Changed from 28px */
+        height: 26px; /* Changed from 28px */
         border-radius: 50%;
         flex-shrink: 0;
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
         align-self: flex-start;
-        margin-top: 6px;
-        cursor: pointer;
+        margin-top: 6px; /* Changed from 10px */
+        cursor: pointer; /* ADDED: Make avatar clickable */
     }
 
     .message.sent .avatar {
         display: block;
         order: 2;
-        margin-top: 6px;
+        margin-top: 6px; /* Changed from 10px */
     }
 
     .message .avatar img {
@@ -1647,6 +1659,7 @@
         display: block;
     }
 
+    /* Improved username with status indicator */
     .message .username {
         font-size: 0.68rem;
         font-weight: bold;
@@ -1656,9 +1669,11 @@
         display: flex;
         align-items: center;
         gap: 5px;
-        cursor: pointer;
+        cursor: pointer; /* ADDED: Make username clickable */
     }
 
+    /* MODIFIED: Status indicator in messages - shows online dot or time ago when offline */
+    /* Updated status indicator styles */
     .user-status-indicator.online {
         background-color: #4CAF50;
         box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
@@ -1669,6 +1684,7 @@
         box-shadow: none;
     }
 
+    /* Last seen text for offline users */
     .last-seen-text {
         font-size: 0.65rem;
         color: #999;
@@ -1676,6 +1692,8 @@
         font-style: italic;
     }
 
+
+    /* In the directory-user-status section */
     .directory-user-status .status-dot {
         width: 8px;
         height: 8px;
@@ -1692,6 +1710,7 @@
         background: #bcc0c4;
     }
 
+    /* In user profile popup */
     .user-status-indicator.online-dot {
         width: 8px;
         height: 8px;
@@ -1705,22 +1724,25 @@
         background-color: #FFC107;
     }
 
+    /* Message body improvements */
     .message-body {
         display: flex;
         flex-direction: column;
         flex-grow: 1;
-        min-width: 0;
+        min-width: 0; /* Prevent flex overflow */
     }
 
+    /* Received messages (left aligned) */
     .message.received {
         align-self: flex-start;
-        margin-left: -10px;
+        margin-left: -10px; /* Changed from -15px */
         flex-direction: row;
     }
 
+    /* Sent messages (right aligned) - HIDE AVATAR FOR SENT MESSAGES */
     .message.sent {
         align-self: flex-end;
-        margin-right: -10px;
+        margin-right: -10px; /* Changed from -15px */
         flex-direction: row;
         justify-content: flex-end;
     }
@@ -1729,6 +1751,7 @@
         order: 1;
     }
 
+    /* Hide avatar and username for sent messages */
     .message.sent .avatar {
         display: none !important;
     }
@@ -1834,6 +1857,7 @@
         color: #4267B2;
     }
 
+    /* Fix for Private AI send button */
     #private-ai .chat-input button.enabled i {
         color: #4267B2 !important;
     }
@@ -1856,8 +1880,9 @@
         max-width: 300px;
         text-align: center;
     }
+    /* Also update the username input to match */
     .auth-box input {
-        width: 100%;
+        width: 100%; /* Changed from 90% to 100% */
         height: 57px;
         padding: 0 20px;
         margin-bottom: 20px;
@@ -1867,7 +1892,7 @@
         outline: none;
         font-size: 16px;
         transition: 0.2s ease;
-        box-sizing: border-box;
+        box-sizing: border-box; /* Added for consistency */
     }
 
     .auth-box input:focus {
@@ -2296,7 +2321,7 @@
         border: 1px solid transparent;
         position: relative;
         flex-shrink: 0;
-        cursor: pointer;
+        cursor: pointer; /* ADDED: Make online user clickable */
     }
 
     .online-user:hover {
@@ -2430,6 +2455,7 @@
             height: 36px;
         }
         
+        /* FIXED: Help container mobile responsiveness */
         .help-container {
             padding: 10px;
         }
@@ -2454,6 +2480,7 @@
         -webkit-tap-highlight-color: transparent;
     }
 
+    /* Ensure private AI messages have the same touch behavior as main chat messages */
     #private-ai-container .message {
         touch-action: none;
         -webkit-user-select: none;
@@ -2715,6 +2742,7 @@
             gap: 15px;
         }
         
+        /* FIXED: Help container mobile responsiveness */
         .help-container {
             padding: 15px;
             width: 100vw;
@@ -4359,19 +4387,18 @@
         }
     }
 
-    /* === ADDED: Reply preview container styles (now inside chat-input) === */
+    /* === ADDED: Reply preview container styles (inside chat-input) === */
     #reply-preview-container,
     #private-reply-preview-container {
         background: #e3f2fd;
         border-left: 4px solid #2196f3;
         padding: 8px 12px;
-        margin: 0 0 5px 0; /* margin bottom to separate from textarea */
+        margin: 0 0 5px 0;
         border-radius: 8px;
         font-size: 14px;
         display: none;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         flex-shrink: 0;
-        z-index: 10;
     }
 
     .reply-preview {
@@ -4411,16 +4438,6 @@
 
     .reply-preview button i {
         font-size: 16px;
-    }
-
-    /* Ensure the preview sits above the input */
-    .main-chat-interface {
-        position: relative;
-    }
-
-    .chat-container {
-        flex: 1;
-        min-height: 0;
     }
     </style>
 </head>
@@ -4616,7 +4633,6 @@
     </div>
 
     <!-- MODIFIED: Chat container with collapsible online users panel -->
-    <!-- REPLY PREVIEW CONTAINER MOVED INSIDE .chat-input -->
     <div id="chat" class="main-chat-interface container" style="display: none;">
         <div class="online-users-panel" id="online-users-panel">
             <div class="online-users-header">
@@ -4633,11 +4649,15 @@
         
         <div class="chat-container">
             <div class="chat-messages" id="chat-container"></div>
+            
+            <!-- ADDED: Typing Indicator -->
             <div id="typing-indicator"></div>
+            
+            <!-- removed old preview container from here -->
         </div>
         
-        <!-- REPLY PREVIEW CONTAINER (now inside chat-input) -->
         <div class="chat-input" style="display: none;">
+            <!-- REPLY PREVIEW CONTAINER MOVED INSIDE CHAT-INPUT -->
             <div id="reply-preview-container"></div>
             <textarea id="user-input" placeholder="Type your message..."></textarea>
             <button id="send-button" onclick="sendMessage()" disabled>
@@ -4653,7 +4673,6 @@
     </div>
     
     <!-- MODIFIED: Private AI container with collapsible online users panel -->
-    <!-- PRIVATE REPLY PREVIEW CONTAINER MOVED INSIDE .chat-input -->
     <div id="private-ai" class="main-chat-interface container" style="display: none;">
         <div class="online-users-panel" id="private-online-users-panel">
             <div class="online-users-header">
@@ -4670,10 +4689,11 @@
         
         <div class="chat-container">
             <div class="chat-messages" id="private-ai-container"></div>
+            <!-- removed old private preview container -->
         </div>
         
-        <!-- PRIVATE REPLY PREVIEW CONTAINER (now inside chat-input) -->
         <div class="chat-input" style="display: none;">
+            <!-- PRIVATE REPLY PREVIEW CONTAINER INSIDE CHAT-INPUT -->
             <div id="private-reply-preview-container"></div>
             <textarea id="private-user-input" placeholder="Type your private message..."></textarea>
             <button id="private-send-button" onclick="sendPrivateMessage()" disabled>
@@ -5050,8 +5070,8 @@
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
-<script>
-// --- CUT HERE ---
+    <script>
+   // --- CUT HERE ---
 // --- CUT HERE ---
 // Add eye icon functionality for password field
 function setupPasswordToggle() {
@@ -12504,6 +12524,6 @@ document.addEventListener('click', function (e) {
 });
 
 // --- END OF JAVASCRIPT CODE ---
-</script>
+    </script>
 </body>
 </html>
