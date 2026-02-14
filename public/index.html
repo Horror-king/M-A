@@ -4409,10 +4409,15 @@
         cursor: pointer;
         color: #555;
         padding: 0 6px;
+        transition: color 0.2s;
     }
 
     .reply-preview button:hover {
         color: #f44336;
+    }
+
+    .reply-preview button i {
+        font-size: 16px;
     }
     </style>
 </head>
@@ -9641,7 +9646,7 @@ function showReplyPreview() {
         elements.replyPreview.innerHTML = `
             <div class="reply-preview" style="background-color: #ffebee; border-left-color: #f44336;">
                 <span style="color:#d32f2f;">The message you replied to was deleted.</span>
-                <button onclick="clearReply()" title="Cancel reply">&times;</button>
+                <button onclick="clearReply()" title="Cancel reply"><i class="fas fa-times"></i></button>
             </div>
         `;
     } else {
@@ -9649,7 +9654,7 @@ function showReplyPreview() {
         elements.replyPreview.innerHTML = `
             <div class="reply-preview" data-reply-id="${replyToMessageId || ''}">
                 <span>Replying to: ${replyToText ? replyToText.substring(0, 80) : 'a message'}</span>
-                <button onclick="clearReply()" title="Cancel reply">&times;</button>
+                <button onclick="clearReply()" title="Cancel reply"><i class="fas fa-times"></i></button>
             </div>
         `;
     }
