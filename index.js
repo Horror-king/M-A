@@ -135,6 +135,94 @@ app.use(express.json({ limit: '1mb' })); // Small payload for mobile
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(express.static('public'));
 
+// ===== HELPER: Escape HTML for meta tags =====
+function escapeHtml(unsafe) {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// ===== ROOT ROUTE – SERVE INDEX.HTML WITH DYNAMIC META TAGS FOR SHARED POSTS =====
+app.get('/', async (req, res) => {
+  try {
+    const postId = req.query.post;
+    let meta = {
+      title: 'MessageMate',
+      description: 'Chat smarter with MessageMate – Hassan powered messaging companion.',
+      image: 'https://i.ibb.co/p6LrrNRK/1746227326721.jpg',
+      url: req.protocol + '://' + req.get('host')
+    };
+
+    if (postId) {
+      try {
+        // Fetch post from Supabase
+        const { data: post, error: postError } = await supabase
+          .from('posts')
+          .select('*')
+          .eq('id', postId)
+          .single();
+
+        if (!postError && post) {
+          // Fetch author's profile to get avatar
+          const { data: profile, error: profileError } = await supabase
+            .from('user_profiles')
+            .select('avatar_url')
+            .eq('username', post.author_username)
+            .single();
+
+          const authorAvatar = (!profileError && profile) ? profile.avatar_url : null;
+
+          // Build meta tags
+          meta.title = `Post by ${post.author_username}`;
+          meta.description = post.content.substring(0, 200);
+          meta.url += `/?post=${postId}`;
+
+          // If post has an image, use it; otherwise fallback to author's avatar or default
+          if (post.media_url && post.media_type === 'image') {
+            meta.image = post.media_url;
+          } else if (authorAvatar) {
+            meta.image = authorAvatar;
+          }
+          // else keep default image
+        }
+      } catch (err) {
+        console.error('Error fetching post for meta tags:', err);
+      }
+    }
+
+    // Read the HTML file
+    const htmlPath = path.join(__dirname, 'public', 'index.html');
+    let html = await fs.readFile(htmlPath, 'utf8');
+
+    // Generate the meta tags to inject
+    const metaTags = `
+      <meta property="og:title" content="${escapeHtml(meta.title)}" />
+      <meta property="og:description" content="${escapeHtml(meta.description)}" />
+      <meta property="og:image" content="${escapeHtml(meta.image)}" />
+      <meta property="og:url" content="${escapeHtml(meta.url)}" />
+      <meta property="og:type" content="article" />
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content="${escapeHtml(meta.title)}" />
+      <meta name="twitter:description" content="${escapeHtml(meta.description)}" />
+    `;
+
+    // Replace the placeholder block
+    html = html.replace(
+      /<!-- POST_META_START -->[\s\S]*?<!-- POST_META_END -->/,
+      `<!-- POST_META_START -->\n${metaTags}\n<!-- POST_META_END -->`
+    );
+
+    res.send(html);
+  } catch (err) {
+    console.error('Error serving index.html:', err);
+    // Fallback: send the original file
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  }
+});
+
 // ===== ENHANCED USER AUTHENTICATION SYSTEM WITH OAUTH =====
 
 // Better password hashing function using crypto
@@ -5542,5 +5630,3 @@ process.on('uncaughtException', (err) => {
 
 // Export for testing
 module.exports = { app, server, io, supabase };
-
-// (Your client-side JavaScript code remains unchanged and is not executed by Node.js)
