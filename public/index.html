@@ -455,10 +455,11 @@
             box-shadow: 0 0 0 0 rgba(49, 162, 76, 0);
         }
     }
-    /* FIXED: Chat input positioning */
+    /* FIXED: Chat input positioning - now uses flex column to keep preview inside */
     .chat-input {
-        display: none;
-        align-items: center;
+        display: none; /* controlled by JS */
+        flex-direction: column;
+        align-items: stretch;
         padding: 5px;
         border-top: 1px solid #e4e6eb;
         background-color: white;
@@ -835,20 +836,20 @@
         }
     }
 
-    /* Mobile responsive adjustments */
+    /* Mobile responsive adjustments — increased bottom padding to accommodate reply preview inside input */
     @media (max-width: 480px) {
         .chat-messages, #private-ai-container {
-            padding-bottom: 79px; /* Slightly less on mobile when collapsed */
+            padding-bottom: 119px; /* increased from 79px */
         }
         
         .online-users-panel:not(.collapsed) ~ .chat-container .chat-messages,
         .online-users-panel:not(.collapsed) ~ .chat-container #private-ai-container {
-            padding-bottom: 160px; /* Slightly less on mobile when expanded */
+            padding-bottom: 200px !important; /* increased from 160px */
         }
         
         .online-users-panel.collapsed ~ .chat-container .chat-messages,
         .online-users-panel.collapsed ~ .chat-container #private-ai-container {
-            padding-bottom: 75px; /* Slightly less on mobile when collapsed */
+            padding-bottom: 115px !important; /* increased from 75px */
         }
         
         .online-users-panel {
@@ -4384,13 +4385,13 @@
         }
     }
 
-    /* === ADDED: Reply preview container styles === */
+    /* === ADDED: Reply preview container styles (now inside chat-input) === */
     #reply-preview-container,
     #private-reply-preview-container {
         background: #e3f2fd;
         border-left: 4px solid #2196f3;
         padding: 8px 12px;
-        margin: 4px 10px;
+        margin: 0 0 5px 0; /* margin bottom to separate from textarea */
         border-radius: 8px;
         font-size: 14px;
         display: none;
@@ -4641,6 +4642,7 @@
     </div>
 
     <!-- MODIFIED: Chat container with collapsible online users panel -->
+    <!-- REPLY PREVIEW CONTAINER MOVED INSIDE .chat-input -->
     <div id="chat" class="main-chat-interface container" style="display: none;">
         <div class="online-users-panel" id="online-users-panel">
             <div class="online-users-header">
@@ -4660,10 +4662,9 @@
             <div id="typing-indicator"></div>
         </div>
         
-        <!-- REPLY PREVIEW CONTAINER (now outside chat-container) -->
-        <div id="reply-preview-container"></div>
-        
+        <!-- REPLY PREVIEW CONTAINER (now inside chat-input) -->
         <div class="chat-input" style="display: none;">
+            <div id="reply-preview-container"></div>
             <textarea id="user-input" placeholder="Type your message..."></textarea>
             <button id="send-button" onclick="sendMessage()" disabled>
                 <i class="fas fa-paper-plane"></i>
@@ -4678,6 +4679,7 @@
     </div>
     
     <!-- MODIFIED: Private AI container with collapsible online users panel -->
+    <!-- PRIVATE REPLY PREVIEW CONTAINER MOVED INSIDE .chat-input -->
     <div id="private-ai" class="main-chat-interface container" style="display: none;">
         <div class="online-users-panel" id="private-online-users-panel">
             <div class="online-users-header">
@@ -4696,10 +4698,9 @@
             <div class="chat-messages" id="private-ai-container"></div>
         </div>
         
-        <!-- PRIVATE REPLY PREVIEW CONTAINER -->
-        <div id="private-reply-preview-container"></div>
-        
+        <!-- PRIVATE REPLY PREVIEW CONTAINER (now inside chat-input) -->
         <div class="chat-input" style="display: none;">
+            <div id="private-reply-preview-container"></div>
             <textarea id="private-user-input" placeholder="Type your private message..."></textarea>
             <button id="private-send-button" onclick="sendPrivateMessage()" disabled>
                 <i class="fas fa-paper-plane"></i>
@@ -12529,7 +12530,6 @@ document.addEventListener('click', function (e) {
 });
 
 // --- END OF JAVASCRIPT CODE ---
-
 </script>
 </body>
 </html>
