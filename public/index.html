@@ -366,10 +366,10 @@
         position: relative;
     }
 
-    /* FIXED: Dynamic padding for online users panel states */
+    /* FIXED: Increased default bottom padding for messages to prevent overlap with input */
     .chat-messages, #private-ai-container {
         flex: 1;
-        padding: 5px 10px 80px 10px; /* Default padding when panel is collapsed */
+        padding: 5px 10px 120px 10px; /* Default padding: 120px ensures enough space even with reply preview */
         overflow-y: auto;
         height: 100%;
         display: flex;
@@ -389,20 +389,19 @@
         max-width: 100%; /* Ensure doesn't exceed container */
     }
 
-    /* When online panel is expanded - increase bottom padding */
+    /* When online panel is expanded - increase bottom padding even more */
     .online-users-panel:not(.collapsed) ~ .chat-container .chat-messages,
     .online-users-panel:not(.collapsed) ~ .chat-container #private-ai-container {
         padding-bottom: 183px !important; /* Increased padding when panel is expanded */
     }
 
-    /* When online panel is collapsed - use default padding */
+    /* When online panel is collapsed - use increased default (or custom) */
     .online-users-panel.collapsed ~ .chat-container .chat-messages,
     .online-users-panel.collapsed ~ .chat-container #private-ai-container {
-        padding-bottom: 117px !important; /* Normal padding when panel is collapsed */
+        padding-bottom: 120px !important; /* Matches default, ensures no overlap */
     }
 
     .online-users-panel:not(.collapsed) {
-        /* This will make the chat container adjust automatically */
         height: auto !important;
     }
     /* User status indicator styles */
@@ -463,7 +462,7 @@
         padding: 5px;
         border-top: 1px solid #e4e6eb;
         background-color: white;
-        position: relative; /* changed from fixed to relative */
+        position: relative; /* stays at bottom of flex container */
         bottom: 0;
         left: 0;
         width: 100%;
@@ -839,28 +838,27 @@
     /* Mobile responsive adjustments — increased bottom padding to accommodate reply preview inside input */
     @media (max-width: 480px) {
         .chat-messages, #private-ai-container {
-            padding-bottom: 119px; /* increased from 79px */
+            padding-bottom: 120px; /* unified safe value */
         }
         
         .online-users-panel:not(.collapsed) ~ .chat-container .chat-messages,
         .online-users-panel:not(.collapsed) ~ .chat-container #private-ai-container {
-            padding-bottom: 200px !important; /* increased from 160px */
+            padding-bottom: 200px !important; /* enough for expanded panel + preview */
         }
         
         .online-users-panel.collapsed ~ .chat-container .chat-messages,
         .online-users-panel.collapsed ~ .chat-container #private-ai-container {
-            padding-bottom: 115px !important; /* increased from 75px */
+            padding-bottom: 120px !important; /* same as default */
         }
         
         .online-users-panel {
-            max-height: 180px; /* Slightly smaller on mobile */
+            max-height: 180px;
         }
         
         .online-users-panel.collapsed {
-            max-height: 40px; /* Smaller collapsed height on mobile */
+            max-height: 40px;
         }
 
-        /* NEW: Mobile adjustments for welcome screen */
         .animated-logo {
             font-size: 2.5rem;
         }
@@ -869,7 +867,6 @@
             font-size: 1rem;
         }
 
-        /* OAuth button adjustments for mobile */
         .oauth-btn {
             padding: 10px 15px;
             font-size: 14px;
@@ -1300,7 +1297,6 @@
             margin-bottom: 5px;
         }
         
-        /* Ensure tables don't cause horizontal scroll */
         .sql-result-table {
             font-size: 12px;
             display: block;
@@ -1351,22 +1347,18 @@
         border-radius: 10px;
         object-fit: cover;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        /* REMOVE transitions that cause slow reveal */
         transition: none !important;
         opacity: 1 !important;
         animation: none !important;
-        /* Force immediate rendering */
         visibility: visible !important;
-        max-width: 100%; /* Prevent image overflow */
+        max-width: 100%;
     }
 
-    /* Ensure images are always fully visible */
     .message img[src] {
         opacity: 1 !important;
         visibility: visible !important;
     }
 
-    /* Preload helper for images */
     .img-preload {
         position: absolute;
         opacity: 0;
@@ -1375,7 +1367,6 @@
         height: 0;
     }
 
-    /* Rest of your existing styles remain the same */
     body {
         font-family: Arial, sans-serif;
         background-color: #f0f2f5;
@@ -1383,7 +1374,7 @@
         height: 100vh;
         display: flex;
         flex-direction: column;
-        overflow-x: hidden; /* Prevent horizontal scroll */
+        overflow-x: hidden;
     }
 
     .loader {
@@ -1573,7 +1564,7 @@
     html, body {
         overflow: auto;
         height: 100%;
-        overflow-x: hidden; /* Prevent horizontal scroll */
+        overflow-x: hidden;
     }
 
     /* Improved message styling with better avatar alignment */
@@ -1630,24 +1621,23 @@
         word-break: break-word;
     }
 
-    /* Improved avatar styling */
     .message .avatar {
-        width: 26px; /* Changed from 28px */
-        height: 26px; /* Changed from 28px */
+        width: 26px;
+        height: 26px;
         border-radius: 50%;
         flex-shrink: 0;
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
         align-self: flex-start;
-        margin-top: 6px; /* Changed from 10px */
-        cursor: pointer; /* ADDED: Make avatar clickable */
+        margin-top: 6px;
+        cursor: pointer;
     }
 
     .message.sent .avatar {
         display: block;
         order: 2;
-        margin-top: 6px; /* Changed from 10px */
+        margin-top: 6px;
     }
 
     .message .avatar img {
@@ -1657,7 +1647,6 @@
         display: block;
     }
 
-    /* Improved username with status indicator */
     .message .username {
         font-size: 0.68rem;
         font-weight: bold;
@@ -1667,11 +1656,9 @@
         display: flex;
         align-items: center;
         gap: 5px;
-        cursor: pointer; /* ADDED: Make username clickable */
+        cursor: pointer;
     }
 
-    /* MODIFIED: Status indicator in messages - shows online dot or time ago when offline */
-    /* Updated status indicator styles */
     .user-status-indicator.online {
         background-color: #4CAF50;
         box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
@@ -1682,7 +1669,6 @@
         box-shadow: none;
     }
 
-    /* Last seen text for offline users */
     .last-seen-text {
         font-size: 0.65rem;
         color: #999;
@@ -1690,8 +1676,6 @@
         font-style: italic;
     }
 
-
-    /* In the directory-user-status section */
     .directory-user-status .status-dot {
         width: 8px;
         height: 8px;
@@ -1708,7 +1692,6 @@
         background: #bcc0c4;
     }
 
-    /* In user profile popup */
     .user-status-indicator.online-dot {
         width: 8px;
         height: 8px;
@@ -1722,25 +1705,22 @@
         background-color: #FFC107;
     }
 
-    /* Message body improvements */
     .message-body {
         display: flex;
         flex-direction: column;
         flex-grow: 1;
-        min-width: 0; /* Prevent flex overflow */
+        min-width: 0;
     }
 
-    /* Received messages (left aligned) */
     .message.received {
         align-self: flex-start;
-        margin-left: -10px; /* Changed from -15px */
+        margin-left: -10px;
         flex-direction: row;
     }
 
-    /* Sent messages (right aligned) - HIDE AVATAR FOR SENT MESSAGES */
     .message.sent {
         align-self: flex-end;
-        margin-right: -10px; /* Changed from -15px */
+        margin-right: -10px;
         flex-direction: row;
         justify-content: flex-end;
     }
@@ -1749,7 +1729,6 @@
         order: 1;
     }
 
-    /* Hide avatar and username for sent messages */
     .message.sent .avatar {
         display: none !important;
     }
@@ -1855,7 +1834,6 @@
         color: #4267B2;
     }
 
-    /* Fix for Private AI send button */
     #private-ai .chat-input button.enabled i {
         color: #4267B2 !important;
     }
@@ -1878,9 +1856,8 @@
         max-width: 300px;
         text-align: center;
     }
-    /* Also update the username input to match */
     .auth-box input {
-        width: 100%; /* Changed from 90% to 100% */
+        width: 100%;
         height: 57px;
         padding: 0 20px;
         margin-bottom: 20px;
@@ -1890,7 +1867,7 @@
         outline: none;
         font-size: 16px;
         transition: 0.2s ease;
-        box-sizing: border-box; /* Added for consistency */
+        box-sizing: border-box;
     }
 
     .auth-box input:focus {
@@ -2319,7 +2296,7 @@
         border: 1px solid transparent;
         position: relative;
         flex-shrink: 0;
-        cursor: pointer; /* ADDED: Make online user clickable */
+        cursor: pointer;
     }
 
     .online-user:hover {
@@ -2453,7 +2430,6 @@
             height: 36px;
         }
         
-        /* FIXED: Help container mobile responsiveness */
         .help-container {
             padding: 10px;
         }
@@ -2478,7 +2454,6 @@
         -webkit-tap-highlight-color: transparent;
     }
 
-    /* Ensure private AI messages have the same touch behavior as main chat messages */
     #private-ai-container .message {
         touch-action: none;
         -webkit-user-select: none;
@@ -2740,7 +2715,6 @@
             gap: 15px;
         }
         
-        /* FIXED: Help container mobile responsiveness */
         .help-container {
             padding: 15px;
             width: 100vw;
