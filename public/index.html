@@ -4782,12 +4782,18 @@
                     </div>
                 </div>
                 
-                <!-- FIXED: Changed ID to avoid conflict -->
+                <!-- MODIFIED: Private messages chat input with paper icon -->
                 <div class="private-chat-input chat-input" style="display: none;" id="private-chat-input">
-                    <textarea id="private-message-input" placeholder="Type your private message..."></textarea>
-                    <button id="private-messages-send-button" onclick="sendPrivateMessageToUser()" disabled>
-                        <i class="fas fa-paper-plane"></i>
-                    </button>
+                    <!-- If you need a reply preview container here, add it similarly -->
+                    <div class="chat-input-row">
+                        <button class="attach-btn" id="attach-btn-private-msg" onclick="attachFilePrivateMsg()" type="button">
+                            <i class="fas fa-paperclip"></i>
+                        </button>
+                        <textarea id="private-message-input" placeholder="Type your private message..."></textarea>
+                        <button id="private-messages-send-button" onclick="sendPrivateMessageToUser()" disabled>
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -5107,7 +5113,7 @@
         </div>
     </div>
     <script>
-     // --- CUT HERE ---
+    // --- CUT HERE ---
 // --- CUT HERE ---
 // Add eye icon functionality for password field
 function setupPasswordToggle() {
