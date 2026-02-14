@@ -462,7 +462,7 @@
         padding: 5px;
         border-top: 1px solid #e4e6eb;
         background-color: white;
-        position: fixed;
+        position: relative; /* changed from fixed to relative */
         bottom: 0;
         left: 0;
         width: 100%;
@@ -4385,7 +4385,8 @@
     }
 
     /* === ADDED: Reply preview container styles === */
-    #reply-preview-container {
+    #reply-preview-container,
+    #private-reply-preview-container {
         background: #e3f2fd;
         border-left: 4px solid #2196f3;
         padding: 8px 12px;
@@ -4394,28 +4395,38 @@
         font-size: 14px;
         display: none;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        flex-shrink: 0;
+        z-index: 10;
     }
 
     .reply-preview {
         display: flex;
         justify-content: space-between;
         align-items: center;
+        width: 100%;
+    }
+
+    .reply-preview span {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .reply-preview button {
         background: transparent;
         border: none;
-        font-size: 18px;
         cursor: pointer;
         color: #555;
-        padding: 0 6px;
         border-radius: 50%;
-        width: 24px;
-        height: 24px;
+        width: 28px;
+        height: 28px;
         display: flex;
         align-items: center;
         justify-content: center;
         transition: background-color 0.2s, color 0.2s;
+        margin-left: 8px;
+        flex-shrink: 0;
     }
 
     .reply-preview button:hover {
@@ -4425,6 +4436,16 @@
 
     .reply-preview button i {
         font-size: 16px;
+    }
+
+    /* Ensure the preview sits above the input */
+    .main-chat-interface {
+        position: relative;
+    }
+
+    .chat-container {
+        flex: 1;
+        min-height: 0;
     }
     </style>
 </head>
@@ -4636,12 +4657,11 @@
         
         <div class="chat-container">
             <div class="chat-messages" id="chat-container"></div>
-            
-            <!-- ADDED: Typing Indicator -->
             <div id="typing-indicator"></div>
-            
-            <div id="reply-preview-container"></div>
         </div>
+        
+        <!-- REPLY PREVIEW CONTAINER (now outside chat-container) -->
+        <div id="reply-preview-container"></div>
         
         <div class="chat-input" style="display: none;">
             <textarea id="user-input" placeholder="Type your message..."></textarea>
@@ -4674,8 +4694,10 @@
         
         <div class="chat-container">
             <div class="chat-messages" id="private-ai-container"></div>
-            <div id="private-reply-preview-container"></div>
         </div>
+        
+        <!-- PRIVATE REPLY PREVIEW CONTAINER -->
+        <div id="private-reply-preview-container"></div>
         
         <div class="chat-input" style="display: none;">
             <textarea id="private-user-input" placeholder="Type your private message..."></textarea>
@@ -5054,6 +5076,7 @@
         </div>
     </div>
 <script>
+// --- CUT HERE ---
 // --- CUT HERE ---
 // Add eye icon functionality for password field
 function setupPasswordToggle() {
@@ -12506,6 +12529,7 @@ document.addEventListener('click', function (e) {
 });
 
 // --- END OF JAVASCRIPT CODE ---
+
 </script>
 </body>
 </html>
