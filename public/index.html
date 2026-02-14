@@ -476,6 +476,30 @@
         align-items: stretch;
     }
 
+    /* NEW: Row inside chat input for icon, textarea, send button */
+    .chat-input-row {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        gap: 5px;
+    }
+
+    /* NEW: Attach button style */
+    .attach-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0 8px;
+        color: #888;
+        font-size: 20px;
+        transition: color 0.3s;
+        flex-shrink: 0;
+    }
+
+    .attach-btn:hover {
+        color: #4267B2;
+    }
+
     /* FIXED: Private messages container adjustments */
     .private-chat-messages {
         flex: 1;
@@ -4656,13 +4680,19 @@
             <!-- removed old preview container from here -->
         </div>
         
+        <!-- MODIFIED: Chat input with paper icon -->
         <div class="chat-input" style="display: none;">
             <!-- REPLY PREVIEW CONTAINER MOVED INSIDE CHAT-INPUT -->
             <div id="reply-preview-container"></div>
-            <textarea id="user-input" placeholder="Type your message..."></textarea>
-            <button id="send-button" onclick="sendMessage()" disabled>
-                <i class="fas fa-paper-plane"></i>
-            </button>
+            <div class="chat-input-row">
+                <button class="attach-btn" id="attach-btn-main" onclick="attachFile()" type="button">
+                    <i class="fas fa-paperclip"></i>
+                </button>
+                <textarea id="user-input" placeholder="Type your message..."></textarea>
+                <button id="send-button" onclick="sendMessage()" disabled>
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
         </div>
         
         <!-- FIXED: Scroll to bottom button specifically for main chat -->
@@ -4692,13 +4722,19 @@
             <!-- removed old private preview container -->
         </div>
         
+        <!-- MODIFIED: Private AI chat input with paper icon -->
         <div class="chat-input" style="display: none;">
             <!-- PRIVATE REPLY PREVIEW CONTAINER INSIDE CHAT-INPUT -->
             <div id="private-reply-preview-container"></div>
-            <textarea id="private-user-input" placeholder="Type your private message..."></textarea>
-            <button id="private-send-button" onclick="sendPrivateMessage()" disabled>
-                <i class="fas fa-paper-plane"></i>
-            </button>
+            <div class="chat-input-row">
+                <button class="attach-btn" id="attach-btn-private" onclick="attachFilePrivate()" type="button">
+                    <i class="fas fa-paperclip"></i>
+                </button>
+                <textarea id="private-user-input" placeholder="Type your private message..."></textarea>
+                <button id="private-send-button" onclick="sendPrivateMessage()" disabled>
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
         </div>
         
         <!-- FIXED: Go to top button specifically for private AI -->
@@ -5071,7 +5107,7 @@
         </div>
     </div>
     <script>
-   // --- CUT HERE ---
+     // --- CUT HERE ---
 // --- CUT HERE ---
 // Add eye icon functionality for password field
 function setupPasswordToggle() {
