@@ -4409,10 +4409,17 @@
         cursor: pointer;
         color: #555;
         padding: 0 6px;
-        transition: color 0.2s;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background-color 0.2s, color 0.2s;
     }
 
     .reply-preview button:hover {
+        background-color: rgba(0,0,0,0.1);
         color: #f44336;
     }
 
@@ -9655,6 +9662,32 @@ function showReplyPreview() {
             <div class="reply-preview" data-reply-id="${replyToMessageId || ''}">
                 <span>Replying to: ${replyToText ? replyToText.substring(0, 80) : 'a message'}</span>
                 <button onclick="clearReply()" title="Cancel reply"><i class="fas fa-times"></i></button>
+            </div>
+        `;
+    }
+}
+
+// ===== MODIFIED: showPrivateReplyPreview with icon cancel button =====
+function showPrivateReplyPreview() {
+    const privatePreview = document.getElementById('private-reply-preview-container');
+    if (!privatePreview) return;
+    
+    privatePreview.style.display = 'block';
+    
+    let messageExists = privateReplyToMessageId && document.querySelector(`[data-id="${privateReplyToMessageId}"]`);
+    
+    if (!messageExists && privateReplyToMessageId) {
+        privatePreview.innerHTML = `
+            <div class="reply-preview" style="background-color: #ffebee; border-left-color: #f44336;">
+                <span style="color:#d32f2f;">The message you replied to was deleted.</span>
+                <button onclick="clearPrivateReply()" title="Cancel reply"><i class="fas fa-times"></i></button>
+            </div>
+        `;
+    } else {
+        privatePreview.innerHTML = `
+            <div class="reply-preview" data-reply-id="${privateReplyToMessageId || ''}">
+                <span>Replying to: ${privateReplyToText ? privateReplyToText.substring(0, 80) : 'a message'}</span>
+                <button onclick="clearPrivateReply()" title="Cancel reply"><i class="fas fa-times"></i></button>
             </div>
         `;
     }
