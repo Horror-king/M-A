@@ -52,6 +52,32 @@ const io = new Server(server, {
 const onlineUsers = new Map();
 const onlineStatusTimeout = 300000; // 5 minutes = 300000 milliseconds
 
+// ===== MODIFICATION START: Permanent bot users (24/7 online) =====
+const PERMANENT_ONLINE_USERS = ['AI', 'Bot']; // Add any other bot usernames here
+
+// Function to add/keep permanent bot users online
+function addPermanentOnlineUsers() {
+  const now = Date.now();
+  PERMANENT_ONLINE_USERS.forEach(username => {
+    onlineUsers.set(username, {
+      socketId: 'permanent-bot-socket',
+      username: username,
+      lastSeen: now,
+      isOnline: true
+    });
+  });
+  // Broadcast updated online list
+  const onlineUsersArray = Array.from(onlineUsers.keys());
+  io.emit('user-status-change', { 
+    username: 'SYSTEM', 
+    status: 'online', 
+    onlineUsers: onlineUsersArray,
+    permanent: PERMANENT_ONLINE_USERS // optional extra info
+  });
+  console.log('🤖 Permanent bot users added to online list:', PERMANENT_ONLINE_USERS);
+}
+// ===== MODIFICATION END =====
+
 // Global setup
 global.GoatBot = { config };
 global.utils = {
@@ -5017,6 +5043,14 @@ setInterval(() => {
   const removedUsers = [];
   
   for (let [username, data] of onlineUsers.entries()) {
+    // ===== MODIFICATION START: Skip permanent bot users =====
+    if (PERMANENT_ONLINE_USERS.includes(username)) {
+      // Update their lastSeen to keep them fresh
+      data.lastSeen = now;
+      data.isOnline = true;
+      continue;
+    }
+    // ===== MODIFICATION END =====
     // 5 minute timeout (300000 milliseconds) for mobile
     if (now - data.lastSeen > onlineStatusTimeout) {
       console.log('⏰ Removing inactive user (5 minutes):', username);
@@ -5381,6 +5415,14 @@ app.post('/api/auth/set-password', verifyToken, async (req, res) => {
   }
 });
 
+// ===== MODIFICATION START: Add permanent bot users at server start =====
+addPermanentOnlineUsers();
+// Refresh bot online status every 5 minutes
+setInterval(() => {
+  addPermanentOnlineUsers();
+}, 5 * 60 * 1000);
+// ===== MODIFICATION END =====
+
 // Start server
 server.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
@@ -5490,6 +5532,10 @@ server.listen(port, () => {
   console.log(`👋 FIRST VISIT FEATURE:`);
   console.log(`   When a user joins for the first time, they will automatically see all signed-up users`);
   console.log(`   This helps new users discover and connect with other members`);
+
+  // ===== MODIFICATION START: Log permanent online users =====
+  console.log(`🤖 PERMANENT ONLINE USERS:`, PERMANENT_ONLINE_USERS.join(', '));
+  // ===== MODIFICATION END =====
 
   if (isRender && renderExternalUrl) {
     console.log(`🌐 Render External URL: ${renderExternalUrl}`);
