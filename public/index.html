@@ -556,16 +556,16 @@
         transform: rotate(180deg);
     }
 
-    /* NEW: All Users Container Styles */
-    #all-users {
+    /* NEW: All Users Container Styles (with main-chat-interface class added) */
+    #all-users.main-chat-interface {
         background: #f0f2f5;
         padding: 0;
         overflow-x: hidden; /* Prevent horizontal scroll */
         display: flex;
         flex-direction: column;
-        height: 100vh;
+        height: calc(100vh - 50px);
         width: 100%;
-        max-width: 100vw;
+        max-width: 600px;
         box-sizing: border-box;
     }
 
@@ -4574,7 +4574,7 @@
         <a href="#" onclick="showContainer('private-messages')">Private Messages</a>
         <!-- ADDED: Posts Feed Link -->
         <a href="#" onclick="showContainer('posts')"><i class="fas fa-newspaper"></i> Posts Feed</a>
-        <!-- NEW: All Users Link -->
+        <!-- NEW: All Users Link (now with main-chat-interface class for proper hiding) -->
         <a href="#" onclick="showContainer('all-users')"><i class="fas fa-users"></i> All Users</a>
         <a href="#" onclick="showContainer('profile')">Edit Profile</a>
         <a href="#" onclick="showContainer('about')">About</a>
@@ -4641,8 +4641,8 @@
         </div>
     </div>
 
-    <!-- NEW: All Users Container (FIXED SCROLLING) -->
-    <div id="all-users" class="container" style="display: none;">
+    <!-- NEW: All Users Container (with main-chat-interface class added) -->
+    <div id="all-users" class="main-chat-interface container" style="display: none;">
         <div class="all-users-header">
             <h2>All Users</h2>
         </div>
@@ -5122,6 +5122,8 @@
             <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
+
+    <!-- ========== ORIGINAL JAVASCRIPT (UNCHANGED) ========== -->
     <script>
     // --- CUT HERE ---
 // --- CUT HERE ---
