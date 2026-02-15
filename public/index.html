@@ -9963,6 +9963,9 @@ function showSettings() {
 
 // ===== ENHANCED LOGOUT FUNCTION =====
 function logout() {
+    // Reset initialization flag so next login re-initializes properly
+    isAppInitialized = false;
+    
     const username = currentUserSession?.username;
     
     // Notify server that user is going offline
