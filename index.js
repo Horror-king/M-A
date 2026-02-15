@@ -52,7 +52,7 @@ const io = new Server(server, {
 const onlineUsers = new Map();
 const onlineStatusTimeout = 300000; // 5 minutes = 300000 milliseconds
 
-// ===== MODIFICATION START: Permanent bot users (24/7 online) =====
+// ===== PERMANENT BOT USERS (ALWAYS ONLINE, GREEN DOT) =====
 const PERMANENT_ONLINE_USERS = ['AI', 'Bot']; // Add any other bot usernames here
 
 // Function to add/keep permanent bot users online
@@ -66,7 +66,7 @@ function addPermanentOnlineUsers() {
       isOnline: true
     });
   });
-  // Broadcast updated online list
+  // Broadcast updated online list (without lastSeen for bots)
   const onlineUsersArray = Array.from(onlineUsers.keys());
   io.emit('user-status-change', { 
     username: 'SYSTEM', 
@@ -76,7 +76,7 @@ function addPermanentOnlineUsers() {
   });
   console.log('🤖 Permanent bot users added to online list:', PERMANENT_ONLINE_USERS);
 }
-// ===== MODIFICATION END =====
+// ===== END PERMANENT BOT USERS =====
 
 // Global setup
 global.GoatBot = { config };
@@ -1784,11 +1784,33 @@ async function updateProfileHandler(req, res) {
   }
 }
 
-// Get user profile by username (for profile popups) - FIXED
+// Get user profile by username (for profile popups) - FIXED with bot override
 app.get('/api/user/profile/:username', async (req, res) => {
   try {
     const { username } = req.params;
     console.log('📋 Loading profile for user:', username);
+
+    // ===== OVERRIDE FOR PERMANENT BOTS =====
+    if (PERMANENT_ONLINE_USERS.includes(username)) {
+      return res.json({
+        success: true,
+        profile: {
+          username: username,
+          firstname: '',
+          lastname: '',
+          bio: '',
+          age: null,
+          gender: '',
+          location: '',
+          interests: '',
+          avatar: `https://i.pravatar.cc/150?u=${username}`,
+          display_name: username,
+          status: 'online',
+          last_active: null,
+          last_seen: null
+        }
+      });
+    }
 
     const { data: profiles, error } = await supabase
       .from('user_profiles')
@@ -1983,7 +2005,7 @@ app.post('/api/ai/chat', async (req, res) => {
 
 // ===== ADD MESSAGES ENDPOINTS TO MATCH CLIENT =====
 
-// GET messages endpoint - UPDATED TO INCLUDE USER STATUS
+// GET messages endpoint - UPDATED TO INCLUDE USER STATUS (with bot override)
 app.get('/api/messages', async (req, res) => {
   try {
     const { data: messages, error: messagesError } = await supabase
@@ -2014,11 +2036,21 @@ app.get('/api/messages', async (req, res) => {
     }
 
     // Combine messages with user status
-    const messagesWithStatus = messages.map(msg => ({
-      ...msg,
-      user_status: profileMap[msg.username]?.status || 'offline',
-      last_seen: profileMap[msg.username]?.last_seen || null
-    }));
+    const messagesWithStatus = messages.map(msg => {
+      // ===== OVERRIDE FOR PERMANENT BOTS =====
+      if (PERMANENT_ONLINE_USERS.includes(msg.username)) {
+        return {
+          ...msg,
+          user_status: 'online',
+          last_seen: null
+        };
+      }
+      return {
+        ...msg,
+        user_status: profileMap[msg.username]?.status || 'offline',
+        last_seen: profileMap[msg.username]?.last_seen || null
+      };
+    });
 
     res.json(messagesWithStatus || []);
   } catch (err) {
@@ -2153,7 +2185,7 @@ app.delete('/api/messages/:id', verifyToken, async (req, res) => {
 
 // ===== GET ALL SIGNED-UP USERS =====
 
-// Get all users with their profiles (for user directory)
+// Get all users with their profiles (for user directory) with bot override
 app.get('/api/users/all', async (req, res) => {
     try {
         console.log('👥 Fetching all users for directory...');
@@ -2204,6 +2236,9 @@ app.get('/api/users/all', async (req, res) => {
         const allUsersData = users.map(user => {
             const profile = profileMap[user.username] || {};
             
+            // ===== OVERRIDE FOR PERMANENT BOTS =====
+            const isBot = PERMANENT_ONLINE_USERS.includes(user.username);
+            
             return {
                 // User table fields
                 username: user.username,
@@ -2225,7 +2260,9 @@ app.get('/api/users/all', async (req, res) => {
                 interests: profile.interests || '',
                 avatar: profile.avatar_url || user.avatar_url || `https://i.pravatar.cc/150?u=${user.username}`,
                 display_name: profile.display_name || user.username,
-                status: 'offline', // Default status, could be enhanced with real-time tracking
+                // ===== BOT OVERRIDE =====
+                status: isBot ? 'online' : (profile.status || 'offline'),
+                last_seen: isBot ? null : (profile.last_active || user.last_login),
                 
                 // Activity counts (to be populated)
                 message_count: 0, // Placeholder
@@ -4765,7 +4802,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('user-away', (username) => {
-    if (username && onlineUsers.has(username)) {
+    if (username && onlineUsers.has(username) && !PERMANENT_ONLINE_USERS.includes(username)) {
       console.log('⏸️ User away:', username);
       
       // Update last seen but keep user in list
@@ -4784,7 +4821,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('user-offline', (username) => {
-    if (username) {
+    if (username && !PERMANENT_ONLINE_USERS.includes(username)) {
       console.log('🔴 User offline (manual):', username);
       removeUserFromOnlineList(username);
     }
@@ -4950,7 +4987,9 @@ io.on('connection', (socket) => {
         data.isOnline = false;
         
         // Update last_active in database
-        updateUserLastActive(username);
+        if (!PERMANENT_ONLINE_USERS.includes(username)) {
+          updateUserLastActive(username);
+        }
         
         console.log('⏸️ User marked as inactive:', username, 'Last seen:', new Date(userLastSeen).toLocaleString());
         break;
@@ -4958,7 +4997,7 @@ io.on('connection', (socket) => {
     }
     
     // If user was found, broadcast their offline status with last seen
-    if (foundUsername) {
+    if (foundUsername && !PERMANENT_ONLINE_USERS.includes(foundUsername)) {
       // Update the online users map
       const userData = onlineUsers.get(foundUsername);
       
@@ -5166,11 +5205,20 @@ io.on('connection', (socket) => {
   });
 });
 
-// NEW: Get user's last seen time
+// NEW: Get user's last seen time (with bot override)
 app.get('/api/user/last-seen/:username', async (req, res) => {
   try {
     const { username } = req.params;
     
+    // ===== OVERRIDE FOR PERMANENT BOTS =====
+    if (PERMANENT_ONLINE_USERS.includes(username)) {
+      return res.json({ 
+        username: username,
+        status: 'online',
+        last_seen: null
+      });
+    }
+
     const { data: profiles, error } = await supabase
       .from('user_profiles')
       .select('last_active, status')
@@ -5415,11 +5463,87 @@ app.post('/api/auth/set-password', verifyToken, async (req, res) => {
   }
 });
 
+// ===== ENSURE BOT USERS EXIST IN DATABASE =====
+async function ensureBotUsersExist() {
+  try {
+    for (const username of PERMANENT_ONLINE_USERS) {
+      // Check if user exists
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('username', username)
+        .limit(1);
+
+      if (!existingUser || existingUser.length === 0) {
+        // Insert user with a dummy password (never used)
+        const { data: newUser, error: userError } = await supabase
+          .from('users')
+          .insert([{
+            username,
+            password_hash: hashPassword('bot-placeholder'),
+            auth_provider: 'local',
+            created_at: new Date().toISOString(),
+            last_login: new Date().toISOString(),
+            is_active: true,
+            avatar_url: `https://i.pravatar.cc/150?u=${username}`
+          }])
+          .select();
+        if (userError) {
+          console.error(`❌ Failed to create user ${username}:`, userError);
+          continue;
+        }
+        console.log(`✅ Created user entry for bot: ${username}`);
+      }
+
+      // Now ensure profile exists with status 'online' and last_active = null
+      const { data: existingProfile } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .eq('username', username)
+        .limit(1);
+
+      if (!existingProfile || existingProfile.length === 0) {
+        // Get user_id
+        const { data: user } = await supabase
+          .from('users')
+          .select('id')
+          .eq('username', username)
+          .single();
+
+        if (user) {
+          await supabase
+            .from('user_profiles')
+            .insert([{
+              user_id: user.id,
+              username,
+              display_name: username,
+              avatar_url: `https://i.pravatar.cc/150?u=${username}`,
+              status: 'online',
+              last_active: null  // no last seen
+            }]);
+          console.log(`✅ Created profile for bot: ${username} with status online`);
+        }
+      } else {
+        // Update existing profile to online and clear last_active
+        await supabase
+          .from('user_profiles')
+          .update({ status: 'online', last_active: null })
+          .eq('username', username);
+        console.log(`✅ Updated profile for bot: ${username} to online and cleared last_active`);
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error ensuring bot users exist:', error);
+  }
+}
+
 // ===== MODIFICATION START: Add permanent bot users at server start =====
 addPermanentOnlineUsers();
+ensureBotUsersExist();
 // Refresh bot online status every 5 minutes
 setInterval(() => {
   addPermanentOnlineUsers();
+  ensureBotUsersExist();
 }, 5 * 60 * 1000);
 // ===== MODIFICATION END =====
 
