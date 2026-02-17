@@ -2121,6 +2121,30 @@ app.post('/api/messages', async (req, res) => {
       .single();
 
     if (!userError && user && user.banned) {
+      // Broadcast a system message that this user is banned
+      const banMessage = `🚫 User @${username} has been banned and cannot send messages.`;
+      const systemMsg = {
+        content: banMessage,
+        username: 'System',
+        image_url: null,
+        reply_to: null,
+        created_at: new Date().toISOString()
+      };
+      
+      // Save the system message to the database
+      const { data: savedSystemMsg, error: saveError } = await supabase
+        .from('chatter')
+        .insert([systemMsg])
+        .select();
+      
+      if (!saveError && savedSystemMsg && savedSystemMsg[0]) {
+        // Emit to all clients via Socket.io
+        io.emit('new-message', savedSystemMsg[0]);
+      } else {
+        // If saving fails, at least broadcast a simple event (optional)
+        io.emit('system-message', banMessage);
+      }
+      
       return res.status(403).json({ error: "You are banned and cannot send messages." });
     }
 
@@ -4239,6 +4263,30 @@ app.post('/messages', async (req, res) => {
       .single();
 
     if (!userError && user && user.banned) {
+      // Broadcast a system message that this user is banned
+      const banMessage = `🚫 User @${username} has been banned and cannot send messages.`;
+      const systemMsg = {
+        content: banMessage,
+        username: 'System',
+        image_url: null,
+        reply_to: null,
+        created_at: new Date().toISOString()
+      };
+      
+      // Save the system message to the database
+      const { data: savedSystemMsg, error: saveError } = await supabase
+        .from('chatter')
+        .insert([systemMsg])
+        .select();
+      
+      if (!saveError && savedSystemMsg && savedSystemMsg[0]) {
+        // Emit to all clients via Socket.io
+        io.emit('new-message', savedSystemMsg[0]);
+      } else {
+        // If saving fails, at least broadcast a simple event (optional)
+        io.emit('system-message', banMessage);
+      }
+      
       return res.status(403).json({ error: "You are banned and cannot send messages." });
     }
 
