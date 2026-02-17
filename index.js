@@ -481,7 +481,8 @@ async function handleOAuthCallback(provider, code, res) {
         avatar_url: provider === 'google' ? providerUser.picture : (providerUser.picture?.data?.url || null),
         created_at: new Date().toISOString(),
         last_login: new Date().toISOString(),
-        is_active: true
+        is_active: true,
+        banned: false
       };
       
       const { data: newUser, error: createError } = await supabase
@@ -811,7 +812,8 @@ app.post('/api/register', async (req, res) => {
           created_at: new Date().toISOString(),
           last_login: new Date().toISOString(),
           is_active: true,
-          avatar_url: `https://i.pravatar.cc/150?u=${username}`
+          avatar_url: `https://i.pravatar.cc/150?u=${username}`,
+          banned: false
         }
       ])
       .select();
@@ -901,6 +903,14 @@ app.post('/api/login', async (req, res) => {
     }
 
     const user = users[0];
+
+    // Check if user is banned
+    if (user.banned) {
+      return res.status(403).json({ 
+        success: false, 
+        error: "Your account has been banned." 
+      });
+    }
 
     // Check if user is using OAuth (no password)
     if (user.auth_provider !== 'local' && !user.password_hash) {
@@ -1080,7 +1090,8 @@ app.post('/api/auth/register', async (req, res) => {
           created_at: new Date().toISOString(),
           last_login: new Date().toISOString(),
           is_active: true,
-          avatar_url: `https://i.pravatar.cc/150?u=${username}`
+          avatar_url: `https://i.pravatar.cc/150?u=${username}`,
+          banned: false
         }
       ])
       .select();
@@ -1170,6 +1181,14 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const user = users[0];
+
+    // Check if user is banned
+    if (user.banned) {
+      return res.status(403).json({ 
+        success: false, 
+        error: "Your account has been banned." 
+      });
+    }
 
     // Check if user is using OAuth (no password)
     if (user.auth_provider !== 'local' && !user.password_hash) {
@@ -1281,6 +1300,14 @@ app.post('/api/auth/auto-login', verifyToken, async (req, res) => {
     }
 
     const user = users[0];
+
+    // Check if user is banned
+    if (user.banned) {
+      return res.status(403).json({ 
+        success: false, 
+        error: "Your account has been banned." 
+      });
+    }
 
     // Update last login
     await supabase
@@ -1485,7 +1512,7 @@ app.get('/api/user/profile', verifyToken, async (req, res) => {
     // First get user info
     const { data: users, error: userError } = await supabase
       .from('users')
-      .select('id, username, email, auth_provider, created_at, last_login, avatar_url, provider_data')
+      .select('id, username, email, auth_provider, created_at, last_login, avatar_url, provider_data, banned')
       .ilike('username', username)
       .limit(1);
 
@@ -1579,6 +1606,7 @@ app.get('/api/user/profile', verifyToken, async (req, res) => {
       last_login: user.last_login,
       avatar_url: user.avatar_url,
       provider_data: user.provider_data,
+      banned: user.banned || false,
       
       // Profile fields with defaults
       firstname: profileData.firstname || '',
@@ -2084,6 +2112,18 @@ app.post('/api/messages', async (req, res) => {
       return res.status(400).json({ error: "Username is required" });
     }
 
+    // === CHECK IF USER IS BANNED ===
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('banned')
+      .ilike('username', username)
+      .limit(1)
+      .single();
+
+    if (!userError && user && user.banned) {
+      return res.status(403).json({ error: "You are banned and cannot send messages." });
+    }
+
     // FIXED: Proper data preparation for regular messages
     const insertData = {
       content: (content && content.trim() !== '') ? content.trim() : '',
@@ -2202,7 +2242,7 @@ app.get('/api/users/all', async (req, res) => {
         // Get all users from users table
         const { data: users, error: usersError } = await supabase
             .from('users')
-            .select('id, username, email, auth_provider, created_at, last_login, avatar_url, provider_data')
+            .select('id, username, email, auth_provider, created_at, last_login, avatar_url, provider_data, banned')
             .order('created_at', { ascending: false });
         
         if (usersError) {
@@ -2258,6 +2298,7 @@ app.get('/api/users/all', async (req, res) => {
                 last_login: user.last_login,
                 avatar_url: user.avatar_url,
                 provider_data: user.provider_data,
+                banned: user.banned || false,
                 
                 // Profile fields with defaults
                 firstname: profile.firstname || '',
@@ -2646,6 +2687,21 @@ app.post('/api/private/messages', async (req, res) => {
       });
     }
 
+    // === CHECK IF SENDER IS BANNED ===
+    const { data: sender, error: senderError } = await supabase
+      .from('users')
+      .select('banned')
+      .ilike('username', sender_username)
+      .limit(1)
+      .single();
+
+    if (!senderError && sender && sender.banned) {
+      return res.status(403).json({ 
+        success: false,
+        error: "You are banned and cannot send messages." 
+      });
+    }
+
     // ✅ FIXED: Generate unique ID to track message
     const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
@@ -3021,6 +3077,18 @@ app.post('/api/posts', async (req, res) => {
 
     if (!author_username || !content) {
       return res.status(400).json({ error: "Author and content are required" });
+    }
+
+    // === CHECK IF AUTHOR IS BANNED ===
+    const { data: author, error: authorError } = await supabase
+      .from('users')
+      .select('banned')
+      .ilike('username', author_username)
+      .limit(1)
+      .single();
+
+    if (!authorError && author && author.banned) {
+      return res.status(403).json({ error: "You are banned and cannot create posts." });
     }
 
     const postData = {
@@ -4162,6 +4230,18 @@ app.post('/messages', async (req, res) => {
       return res.status(400).json({ error: "Username is required" });
     }
 
+    // === CHECK IF USER IS BANNED ===
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('banned')
+      .ilike('username', username)
+      .limit(1)
+      .single();
+
+    if (!userError && user && user.banned) {
+      return res.status(403).json({ error: "You are banned and cannot send messages." });
+    }
+
     // FIXED: Proper data preparation for regular messages
     const insertData = {
       content: (content && content.trim() !== '') ? content.trim() : '',
@@ -4736,6 +4816,52 @@ app.get('/online-users', (req, res) => {
   const onlineUsersArray = Array.from(onlineUsers.keys());
   console.log('Current online users:', onlineUsersArray);
   res.json(onlineUsersArray);
+});
+
+// ===== NEW: BLOCK USER ENDPOINT (Admin only) =====
+app.post('/api/admin/block/:username', verifyToken, async (req, res) => {
+  try {
+    const adminUsername = req.user.username;
+    const targetUsername = req.params.username;
+
+    // Only Admin0 can block
+    if (adminUsername !== 'Admin0') {
+      return res.status(403).json({ success: false, error: 'Only Admin0 can block users.' });
+    }
+
+    // Check if target exists
+    const { data: user, error: findError } = await supabase
+      .from('users')
+      .select('id')
+      .ilike('username', targetUsername)
+      .limit(1)
+      .single();
+
+    if (findError || !user) {
+      return res.status(404).json({ success: false, error: 'User not found.' });
+    }
+
+    // Block the user (set banned = true)
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ banned: true })
+      .eq('id', user.id);
+
+    if (updateError) {
+      console.error('❌ Error blocking user:', updateError);
+      return res.status(500).json({ success: false, error: 'Database error.' });
+    }
+
+    // Optionally kick the user from online list
+    onlineUsers.delete(targetUsername);
+    io.emit('user-status-change', { username: targetUsername, status: 'offline', lastSeen: new Date().toISOString() });
+
+    console.log(`🚫 User ${targetUsername} blocked by Admin0.`);
+    res.json({ success: true, message: `User @${targetUsername} has been blocked.` });
+  } catch (error) {
+    console.error('❌ Block endpoint error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error.' });
+  }
 });
 
 // ===== ENHANCED SOCKET.IO REAL-TIME MESSAGING - OPERA FIXED =====
@@ -5494,7 +5620,8 @@ async function ensureBotUsersExist() {
             created_at: new Date().toISOString(),
             last_login: new Date().toISOString(),
             is_active: true,
-            avatar_url: `https://i.pravatar.cc/150?u=${username}`
+            avatar_url: `https://i.pravatar.cc/150?u=${username}`,
+            banned: false
           }])
           .select();
         if (userError) {
