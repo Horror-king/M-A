@@ -1656,6 +1656,15 @@ async function updateProfileHandler(req, res) {
       });
     }
 
+    // MODIFICATION START: Validate display_name if provided
+    if (profileData.display_name && !validateHumanName(profileData.display_name)) {
+      return res.status(400).json({
+        success: false,
+        error: "Display name must be a valid human name (2-50 characters, letters, spaces, dots, hyphens, apostrophes, must contain a vowel, no repeating characters, no bad words)"
+      });
+    }
+    // MODIFICATION END
+
     // First get user ID
     const { data: users, error: userError } = await supabase
       .from('users')
