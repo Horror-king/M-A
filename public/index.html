@@ -4465,6 +4465,64 @@
     .reply-preview button i {
         font-size: 16px;
     }
+    /* ADDED: Styles for post three‑dot menu */
+    .post-header-actions {
+        position: relative;
+        margin-left: auto;
+    }
+    .post-menu-btn {
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        padding: 8px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #65676b;
+        transition: background-color 0.2s;
+    }
+    .post-menu-btn:hover {
+        background-color: #f0f2f5;
+    }
+    .post-dropdown {
+        position: absolute;
+        right: 0;
+        top: 100%;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+        min-width: 150px;
+        z-index: 100;
+        display: none;
+        border: 1px solid #e4e6eb;
+    }
+    .post-dropdown.active {
+        display: block;
+    }
+    .post-dropdown button {
+        width: 100%;
+        background: none;
+        border: none;
+        padding: 10px 16px;
+        text-align: left;
+        cursor: pointer;
+        font-size: 14px;
+        color: #1c1e21;
+        transition: background-color 0.2s;
+    }
+    .post-dropdown button:hover {
+        background-color: #f0f2f5;
+    }
+    .post-dropdown .delete-btn {
+        color: #ff4444;
+    }
+    .post-dropdown .delete-btn:hover {
+        background-color: #ffeaea;
+    }
+    .post-dropdown .privacy-btn {
+        color: #4267B2;
+    }
     </style>
 </head>
 <body>
@@ -6923,11 +6981,11 @@ function initializePosts() {
     }
 }
 
-// Load posts from server
+// MODIFIED: Load posts from server (with current user for filtering)
 async function loadPosts() {
     try {
         const currentUser = currentUserSession?.username;
-        const response = await fetch(`/api/posts?username=${currentUser}`);
+        const response = await fetch(`/api/posts?username=${currentUser || ''}`);
         
         if (response.ok) {
             posts = await response.json();
@@ -7134,6 +7192,198 @@ function processContentForMultipleImages(content) {
     };
 }
 
+// ===== MODIFIED: Create post element with three-dot menu =====
+function createPostElement(post) {
+    const postDiv = document.createElement('div');
+    postDiv.className = 'post-card';
+    postDiv.dataset.postId = post.id;
+
+    const timeAgo = formatPostTime(post.timestamp);
+    const userProfile = getUserProfile(post.author);
+    const currentUsername = currentUserSession?.username;
+    const isAuthor = currentUsername === post.author;
+    const isAdmin = currentUsername === 'Admin0';
+
+    // Determine which options appear
+    let menuItems = '';
+    if (isAuthor || isAdmin) {
+        menuItems += `<button class="delete-btn" onclick="deletePost('${post.id}')"><i class="fas fa-trash"></i> Delete</button>`;
+    }
+    if (isAuthor) {
+        const privacyText = post.visibility === 'private' ? 'Make Public' : 'Make Private';
+        menuItems += `<button class="privacy-btn" onclick="togglePostPrivacy('${post.id}', '${post.visibility}')"><i class="fas fa-${post.visibility === 'private' ? 'globe' : 'lock'}"></i> ${privacyText}</button>`;
+    }
+
+    postDiv.innerHTML = `
+        <div class="post-header">
+            <img class="post-author-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/50?u=${post.author}`}" alt="${post.author}">
+            <div class="post-author-info">
+                <div class="post-author-name">${userProfile.display_name || userProfile.displayName || post.author}</div>
+                <div class="post-meta">
+                    <span class="post-time">${timeAgo}</span>
+                    <span>•</span>
+                    <span class="post-visibility">${post.visibility === 'private' ? 'Private' : 'Public'}</span>
+                </div>
+            </div>
+            ${menuItems ? `
+            <div class="post-header-actions">
+                <button class="post-menu-btn" onclick="togglePostMenu(this)">
+                    <i class="fas fa-ellipsis-v"></i>
+                </button>
+                <div class="post-dropdown">
+                    ${menuItems}
+                </div>
+            </div>
+            ` : ''}
+        </div>
+        ${post.content ? `<div class="post-content">${escapeHtml(post.content)}</div>` : ''}
+        ${post.media ? `
+            <div class="post-media">
+                ${post.media.type === 'image' ? 
+                    `<div class="post-image-container">
+                        <img src="${post.media.url}" alt="Post image" onclick="openZoom('${post.media.url}')" loading="lazy">
+                    </div>` : 
+                    `<video controls><source src="${post.media.url}" type="video/mp4">Your browser does not support the video tag.</video>`
+                }
+            </div>
+        ` : ''}
+        <div class="post-stats">
+            <div class="post-likes" onclick="likePost('${post.id}')">
+                <i class="fas fa-thumbs-up"></i> ${post.likes || 0}
+            </div>
+            <div class="post-comments-count" onclick="toggleComments('${post.id}')">
+                ${post.comments ? post.comments.length : 0} comments
+            </div>
+        </div>
+        <div class="post-actions">
+            <button class="post-action like" onclick="likePost('${post.id}')">
+                <i class="${post.userLiked ? 'fas' : 'far'} fa-thumbs-up"></i> Like
+            </button>
+            <button class="post-action" onclick="toggleComments('${post.id}')">
+                <i class="far fa-comment"></i> Comment
+            </button>
+            <button class="post-action" onclick="sharePost('${post.id}')">
+                <i class="far fa-share-square"></i> Share
+            </button>
+        </div>
+        <div class="post-comments" id="comments-${post.id}" style="display: none;">
+            <div class="comments-header">
+                <span class="comments-title">Comments</span>
+                <button class="close-comments" onclick="closeComments('${post.id}')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="comments-list" id="comments-list-${post.id}">
+                ${post.comments ? post.comments.map(comment => {
+                    const commentAuthorProfile = getUserProfile(comment.author_username || comment.author);
+                    return `
+                    <div class="comment">
+                        <img class="comment-avatar" src="${commentAuthorProfile.avatar || `https://i.pravatar.cc/32?u=${comment.author_username || comment.author}`}" alt="${comment.author_username || comment.author}">
+                        <div class="comment-content">
+                            <div class="comment-author">${commentAuthorProfile.display_name || commentAuthorProfile.displayName || (comment.author_username || comment.author)}</div>
+                            <div class="comment-text">${escapeHtml(comment.content || comment.text)}</div>
+                        </div>
+                    </div>
+                `}).join('') : '<div class="no-comments">No comments yet</div>'}
+            </div>
+            <div class="comment-input">
+                <input type="text" id="comment-input-${post.id}" placeholder="Write a comment..." onkeypress="handleCommentKeypress(event, '${post.id}')">
+                <button onclick="addCommentFromInput('${post.id}')">Post</button>
+            </div>
+        </div>
+    `;
+
+    return postDiv;
+}
+
+// ===== NEW: Toggle post dropdown menu =====
+function togglePostMenu(button) {
+    document.querySelectorAll('.post-dropdown.active').forEach(d => d.classList.remove('active'));
+    const dropdown = button.nextElementSibling;
+    if (dropdown) {
+        dropdown.classList.toggle('active');
+        const closeDropdown = (e) => {
+            if (!dropdown.contains(e.target) && e.target !== button) {
+                dropdown.classList.remove('active');
+                document.removeEventListener('click', closeDropdown);
+            }
+        };
+        setTimeout(() => {
+            document.addEventListener('click', closeDropdown);
+        }, 0);
+    }
+}
+
+// ===== NEW: Toggle post privacy =====
+async function togglePostPrivacy(postId, currentVisibility) {
+    const newVisibility = currentVisibility === 'private' ? 'public' : 'private';
+    const token = localStorage.getItem('auth_token');
+    try {
+        const response = await fetch(`/api/posts/${postId}/visibility`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': token ? `Bearer ${token}` : ''
+            },
+            body: JSON.stringify({ visibility: newVisibility })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to change visibility');
+        }
+
+        const data = await response.json();
+        showSuccess(`Post is now ${data.visibility}`);
+        // The post will be updated via socket or we can update locally
+        // Update the post in the local array
+        const postIndex = posts.findIndex(p => p.id === postId);
+        if (postIndex !== -1) {
+            posts[postIndex].visibility = newVisibility;
+        }
+        // Re-render to update visibility label and dropdown
+        renderPosts();
+    } catch (error) {
+        console.error('Privacy toggle error:', error);
+        showError(error.message);
+    }
+}
+
+// ===== NEW: Delete post function =====
+async function deletePost(postId) {
+    if (!confirm('Are you sure you want to delete this post? This action cannot be undone.')) {
+        return;
+    }
+
+    const token = localStorage.getItem('auth_token');
+    try {
+        const response = await fetch(`/api/posts/${postId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': token ? `Bearer ${token}` : ''
+            },
+            body: JSON.stringify({ username: currentUserSession?.username })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to delete post');
+        }
+
+        // Remove from local array and UI
+        posts = posts.filter(p => p.id !== postId);
+        const postElement = document.querySelector(`[data-post-id="${postId}"]`);
+        if (postElement) {
+            postElement.remove();
+        }
+        showSuccess('Post deleted successfully');
+    } catch (error) {
+        console.error('Delete post error:', error);
+        showError(error.message);
+    }
+}
+
 // Render all posts
 function renderPosts() {
     const postsContainer = document.getElementById('posts-container');
@@ -7186,90 +7436,6 @@ function renderPosts() {
             pendingPostId = null;
         }, 100);
     }
-}
-
-// UPDATED: Create post element with image URL detection - MODIFIED TO USE ACTUAL PROFILE AVATAR
-function createPostElement(post) {
-    const postDiv = document.createElement('div');
-    postDiv.className = 'post-card';
-    postDiv.dataset.postId = post.id;
-    
-    const timeAgo = formatPostTime(post.timestamp);
-    
-    // Fetch user profile to get actual avatar - MODIFIED: Use getUserProfile which gets from cache/server
-    const userProfile = getUserProfile(post.author);
-    
-    postDiv.innerHTML = `
-        <div class="post-header">
-            <img class="post-author-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/50?u=${post.author}`}" alt="${post.author}">
-            <div class="post-author-info">
-                <div class="post-author-name">${userProfile.display_name || userProfile.displayName || post.author}</div>
-                <div class="post-meta">
-                    <span class="post-time">${timeAgo}</span>
-                    <span>•</span>
-                    <span class="post-visibility">Public</span>
-                </div>
-            </div>
-        </div>
-        ${post.content ? `<div class="post-content">${escapeHtml(post.content)}</div>` : ''}
-        ${post.media ? `
-            <div class="post-media">
-                ${post.media.type === 'image' ? 
-                    `<div class="post-image-container">
-                        <img src="${post.media.url}" alt="Post image" onclick="openZoom('${post.media.url}')" loading="lazy">
-                    </div>` : 
-                    `<video controls><source src="${post.media.url}" type="video/mp4">Your browser does not support the video tag.</video>`
-                }
-            </div>
-        ` : ''}
-        <div class="post-stats">
-            <div class="post-likes" onclick="likePost('${post.id}')">
-                <i class="fas fa-thumbs-up"></i> ${post.likes || 0}
-            </div>
-            <div class="post-comments-count" onclick="toggleComments('${post.id}')">
-                ${post.comments ? post.comments.length : 0} comments
-            </div>
-        </div>
-        <div class="post-actions">
-            <button class="post-action like" onclick="likePost('${post.id}')">
-                <i class="${post.userLiked ? 'fas' : 'far'} fa-thumbs-up"></i> Like
-            </button>
-            <button class="post-action" onclick="toggleComments('${post.id}')">
-                <i class="far fa-comment"></i> Comment
-            </button>
-            <button class="post-action" onclick="sharePost('${post.id}')">
-                <i class="far fa-share-square"></i> Share
-            </button>
-        </div>
-        <div class="post-comments" id="comments-${post.id}" style="display: none;">
-            <div class="comments-header">
-                <span class="comments-title">Comments</span>
-                <button class="close-comments" onclick="closeComments('${post.id}')">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="comments-list" id="comments-list-${post.id}">
-                ${post.comments ? post.comments.map(comment => {
-                    // Fetch comment author's profile for avatar - MODIFIED: Use getUserProfile
-                    const commentAuthorProfile = getUserProfile(comment.author_username || comment.author);
-                    return `
-                    <div class="comment">
-                        <img class="comment-avatar" src="${commentAuthorProfile.avatar || `https://i.pravatar.cc/32?u=${comment.author_username || comment.author}`}" alt="${comment.author_username || comment.author}">
-                        <div class="comment-content">
-                            <div class="comment-author">${commentAuthorProfile.display_name || commentAuthorProfile.displayName || (comment.author_username || comment.author)}</div>
-                            <div class="comment-text">${escapeHtml(comment.content || comment.text)}</div>
-                        </div>
-                    </div>
-                `}).join('') : '<div class="no-comments">No comments yet</div>'}
-            </div>
-            <div class="comment-input">
-                <input type="text" id="comment-input-${post.id}" placeholder="Write a comment..." onkeypress="handleCommentKeypress(event, '${post.id}')">
-                <button onclick="addCommentFromInput('${post.id}')">Post</button>
-            </div>
-        </div>
-    `;
-    
-    return postDiv;
 }
 
 // Create a new post
@@ -8074,7 +8240,7 @@ async function blockUser(usernameToBlock) {
     }
 }
 
-// ===== FIXED: initSocket function with room join =====
+// ===== FIXED: initSocket function with room join and post events =====
 function initSocket() {
     console.log('🔌 Initializing socket connection...');
     
@@ -8242,6 +8408,26 @@ function initSocket() {
     socket.on('user-typing-stop', (data) => {
         console.log('💤 User stopped typing:', data.username);
         hideTypingIndicator(data.username);
+    });
+
+    // ===== NEW: Post deletion event =====
+    socket.on('post-deleted', (postId) => {
+        console.log('🗑️ Post deleted via socket:', postId);
+        posts = posts.filter(p => p.id !== postId);
+        const postElement = document.querySelector(`[data-post-id="${postId}"]`);
+        if (postElement) {
+            postElement.remove();
+        }
+    });
+
+    // ===== NEW: Post visibility change event =====
+    socket.on('post-visibility-changed', (updatedPost) => {
+        console.log('👁️ Post visibility changed via socket:', updatedPost);
+        const index = posts.findIndex(p => p.id === updatedPost.id);
+        if (index !== -1) {
+            posts[index] = updatedPost;
+        }
+        renderPosts(); // re-render to update visibility label and maybe hide for non-author
     });
 
     socket.on('disconnect', (reason) => {
