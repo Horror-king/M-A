@@ -3027,27 +3027,43 @@ app.post('/api/create-posts-table', async (req, res) => {
   }
 });
 
-// Get all posts with comments and like status
+// ===== MODIFIED: Get all posts with comments and like status, filtering by visibility =====
 app.get('/api/posts', async (req, res) => {
   try {
-    const { username } = req.query; // Current user for like status
-    
+    const { username } = req.query; // Current user for like status and visibility filtering
+
     console.log('📝 Fetching posts from Supabase...');
 
     // Get posts with author info
-    const { data: posts, error: postsError } = await supabase
+    let query = supabase
       .from('posts')
       .select('*')
       .order('created_at', { ascending: false });
+
+    // If a username is provided, we'll filter in code (because SQL filtering with OR is tricky)
+    // If no username (unauthenticated), only public posts
+    if (!username) {
+      query = query.eq('visibility', 'public');
+    }
+
+    const { data: posts, error: postsError } = await query;
 
     if (postsError) {
       console.error('❌ Error fetching posts:', postsError);
       return res.status(500).json({ error: 'Failed to fetch posts' });
     }
 
+    // Filter posts: if username is provided, show public posts + private posts authored by that user
+    let filteredPosts = posts;
+    if (username) {
+      filteredPosts = posts.filter(post => 
+        post.visibility === 'public' || post.author_username === username
+      );
+    }
+
     // For each post, get comments and check if current user liked it
     const postsWithDetails = await Promise.all(
-      (posts || []).map(async (post) => {
+      (filteredPosts || []).map(async (post) => {
         // Get comments for this post
         const { data: comments } = await supabase
           .from('post_comments')
@@ -3121,7 +3137,8 @@ app.post('/api/posts', async (req, res) => {
       media_url: media_url || null,
       media_type: media_type || null,
       likes_count: 0,
-      comments_count: 0
+      comments_count: 0,
+      visibility: 'public' // default public
     };
 
     const { data: post, error } = await supabase
@@ -3348,19 +3365,20 @@ app.get('/api/posts/user/:username', async (req, res) => {
   }
 });
 
-// Delete a post (only by author)
-app.delete('/api/posts/:postId', async (req, res) => {
+// ===== MODIFIED: Delete a post (only by author or Admin0) =====
+app.delete('/api/posts/:postId', verifyToken, async (req, res) => {
   try {
     const { postId } = req.params;
     const { username } = req.body; // Current user trying to delete
+    const requesterUsername = req.user.username; // from token
 
-    console.log('🗑️ Deleting post:', { postId, username });
+    console.log('🗑️ Deleting post:', { postId, username, requesterUsername });
 
     if (!username) {
       return res.status(400).json({ error: "Username is required" });
     }
 
-    // First, verify the post exists and user is the author
+    // First, verify the post exists and get its author
     const { data: post, error: postError } = await supabase
       .from('posts')
       .select('author_username')
@@ -3371,7 +3389,11 @@ app.delete('/api/posts/:postId', async (req, res) => {
       return res.status(404).json({ error: "Post not found" });
     }
 
-    if (post.author_username !== username) {
+    // Allow deletion if:
+    // 1. The user is the author, OR
+    // 2. The user is Admin0
+    const isAdmin = requesterUsername === 'Admin0';
+    if (post.author_username !== username && !isAdmin) {
       return res.status(403).json({ error: "You can only delete your own posts" });
     }
 
@@ -3388,11 +3410,62 @@ app.delete('/api/posts/:postId', async (req, res) => {
 
     console.log('✅ Post deleted successfully');
 
+    // Broadcast deletion to all clients
+    io.emit('post-deleted', postId);
+
     res.json({ success: true, message: "Post deleted successfully" });
 
   } catch (error) {
     console.error('❌ Error deleting post:', error);
     res.status(500).json({ error: "Failed to delete post: " + error.message });
+  }
+});
+
+// ===== NEW: Change post visibility (only author) =====
+app.patch('/api/posts/:postId/visibility', verifyToken, async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const { visibility } = req.body;
+    const username = req.user.username;
+
+    if (!['public', 'private'].includes(visibility)) {
+      return res.status(400).json({ error: "Visibility must be 'public' or 'private'" });
+    }
+
+    // Verify post exists and user is the author
+    const { data: post, error: fetchError } = await supabase
+      .from('posts')
+      .select('author_username')
+      .eq('id', postId)
+      .single();
+
+    if (fetchError || !post) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+
+    if (post.author_username !== username) {
+      return res.status(403).json({ error: "Only the author can change visibility" });
+    }
+
+    // Update visibility
+    const { data: updatedPost, error: updateError } = await supabase
+      .from('posts')
+      .update({ visibility, updated_at: new Date().toISOString() })
+      .eq('id', postId)
+      .select();
+
+    if (updateError) {
+      console.error('❌ Error updating post visibility:', updateError);
+      return res.status(500).json({ error: "Failed to update visibility" });
+    }
+
+    // Broadcast the change
+    io.emit('post-visibility-changed', updatedPost[0]);
+
+    res.json({ success: true, visibility: updatedPost[0].visibility });
+  } catch (error) {
+    console.error('❌ Visibility change error:', error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
