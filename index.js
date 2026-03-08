@@ -4912,6 +4912,56 @@ app.post('/api/admin/block/:username', verifyToken, async (req, res) => {
   }
 });
 
+// ===== NEW: Clear all messages (Admin only) =====
+app.post('/api/admin/clear-all-messages', verifyToken, async (req, res) => {
+  try {
+    const adminUsername = req.user.username;
+
+    // Only Admin0 can perform this action
+    if (adminUsername !== 'Admin0') {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Only Admin0 can clear all messages.' 
+      });
+    }
+
+    console.log('🧹 Admin0 is clearing all public messages...');
+
+    // Delete all messages from the chatter table
+    const { error } = await supabase
+      .from('chatter')
+      .delete()
+      .neq('id', 0); // deletes everything
+
+    if (error) {
+      console.error('❌ Error deleting all messages:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Database error: ' + error.message 
+      });
+    }
+
+    console.log('✅ All public messages have been deleted.');
+
+    // Broadcast to all clients that they should clear their chat containers
+    io.emit('clear-all-messages', { 
+      message: 'All public messages have been cleared by Admin0.' 
+    });
+
+    res.json({ 
+      success: true, 
+      message: 'All public messages cleared successfully.' 
+    });
+
+  } catch (error) {
+    console.error('❌ Clear all messages error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error: ' + error.message 
+    });
+  }
+});
+
 // ===== ENHANCED SOCKET.IO REAL-TIME MESSAGING - OPERA FIXED =====
 
 // Socket.io connection handling - 5 MINUTE ONLINE STATUS for mobile
