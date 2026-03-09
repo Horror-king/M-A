@@ -1667,6 +1667,19 @@ app.post('/api/user/profile', verifyToken, async (req, res) => {
   await updateProfileHandler(req, res);
 });
 
+// ===== ADD MISSING VALIDATE HUMAN NAME FUNCTION =====
+function validateHumanName(name) {
+    if (!name || typeof name !== 'string') return false;
+    if (name.length < 2 || name.length > 50) return false;
+    // Allow letters, spaces, dots, hyphens, apostrophes
+    if (!/^[a-zA-Z\s\.\-\']+$/.test(name)) return false;
+    // Must contain at least one vowel
+    if (!/[aeiouAEIOU]/.test(name)) return false;
+    // Check for repeating characters (no more than 3 same in a row)
+    if (/(.)\1{3,}/.test(name)) return false;
+    return true;
+}
+
 // Profile update handler function - FIXED FOR NEW SCHEMA
 async function updateProfileHandler(req, res) {
   try {
