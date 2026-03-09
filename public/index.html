@@ -4757,6 +4757,9 @@
             </div>
         </div>
         
+        <!-- hidden file input for image uploads (main chat) -->
+        <input type="file" id="image-upload-main" accept="image/*" style="display: none;">
+        
         <!-- FIXED: Scroll to bottom button specifically for main chat -->
         <div class="scroll-to-bottom-btn" id="scrollToBottomBtn">
             <i class="fas fa-chevron-down"></i>
@@ -9437,6 +9440,16 @@ function batchMessageRender(messages, renderFunction) {
         }, 3000);
     }
 
+    // ===== NEW: Show info message =====
+    function showInfo(message) {
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'info-message';
+        infoDiv.textContent = message;
+        infoDiv.style.cssText = 'background:#e7f3ff;color:#0066cc;padding:5px;border-radius:4px;margin:5px;text-align:center;';
+        document.body.appendChild(infoDiv);
+        setTimeout(() => infoDiv.remove(), 2000);
+    }
+
     function autoResize(textarea) {
         if (textarea) {
             textarea.style.height = 'auto';
@@ -10552,6 +10565,57 @@ function batchMessageRender(messages, renderFunction) {
             });
         }
         loadMessages();
+    }
+
+    // ===== IMAGE UPLOAD HANDLER =====
+    async function attachFile() {
+        const fileInput = document.getElementById('image-upload-main');
+        fileInput.click();
+        fileInput.onchange = async function() {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('image', file);
+
+            try {
+                showInfo('Uploading image...');
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error('Upload failed');
+                const data = await response.json();
+                const imageUrl = data.imageUrl;
+
+                // Send a message containing the image URL
+                const content = `📷 Image: ${imageUrl}`;  // embed URL in message
+                const username = currentUserSession?.username;
+                if (!username) return showError('You must be logged in');
+
+                const payload = { content, username, image_url: imageUrl, reply_to: null };
+                const token = localStorage.getItem('auth_token');
+                const msgRes = await fetch('/api/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': token ? `Bearer ${token}` : ''
+                    },
+                    body: JSON.stringify(payload)
+                });
+                if (!msgRes.ok) throw new Error('Failed to send image message');
+                const savedMsg = await msgRes.json();
+
+                // Display immediately (will also come via socket)
+                displayMessage(savedMsg.content, 'sent', null, savedMsg.username, savedMsg.id, true);
+
+                fileInput.value = ''; // reset
+            } catch (err) {
+                console.error('Upload error:', err);
+                showError('Image upload failed: ' + err.message);
+            }
+        };
     }
 
     // --- CUT HERE ---
