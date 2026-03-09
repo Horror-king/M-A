@@ -5432,7 +5432,7 @@ class OperaMiniMessenger {
   }
 
   // Send message (works on Opera Mini)
-  async sendMessage(content, username) {
+  async sendMessage(content, username, imageUrl = null) {
     try {
       const response = await fetch('/api/messages', {
         method: 'POST',
@@ -5442,7 +5442,7 @@ class OperaMiniMessenger {
         body: JSON.stringify({
           content: content,
           username: username,
-          image_url: '',
+          image_url: imageUrl,
           reply_to: ''
         })
       });
@@ -5736,8 +5736,8 @@ async function updateAllMessagesFromUser(username, status, lastSeen) {
     });
 }
 
-// FIXED: Create message element with last seen for offline users - SIMPLIFIED VERSION
-function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null, status = 'offline', lastSeen = null) {
+// ===== MODIFIED: createMessageElement now accepts imageUrl =====
+function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null, status = 'offline', lastSeen = null, imageUrl = null) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${sender}`;
     if (messageId) messageDiv.dataset.id = messageId;
@@ -5952,6 +5952,20 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
         if (pastebinMatches.length > 0 || rawGithubMatches.length > 0) {
             processRawContentUrls([...pastebinMatches, ...rawGithubMatches]);
         }
+
+        // ===== NEW: If an imageUrl was provided, display the image =====
+        if (imageUrl) {
+            const img = new Image();
+            img.src = imageUrl;
+            img.alt = "uploaded image";
+            img.loading = "lazy";
+            img.style.maxWidth = "100%";
+            img.style.borderRadius = "8px";
+            img.style.marginTop = "5px";
+            img.style.cursor = "pointer";
+            img.onclick = () => openZoom(img.src);
+            contentDiv.appendChild(img);
+        }
         
         messageBody.appendChild(contentDiv);
         messageDiv.appendChild(messageBody);
@@ -5968,14 +5982,27 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
         const textDiv = document.createElement('div');
         textDiv.textContent = text;
         contentDiv.appendChild(textDiv);
+        // ===== NEW: If an imageUrl was provided, display the image =====
+        if (imageUrl) {
+            const img = new Image();
+            img.src = imageUrl;
+            img.alt = "uploaded image";
+            img.loading = "lazy";
+            img.style.maxWidth = "100%";
+            img.style.borderRadius = "8px";
+            img.style.marginTop = "5px";
+            img.style.cursor = "pointer";
+            img.onclick = () => openZoom(img.src);
+            contentDiv.appendChild(img);
+        }
         messageDiv.appendChild(contentDiv);
     }
     
     return messageDiv;
 }
 
-// FIXED: Display message with status and lastSeen - REMOVED ASYNC/AWAIT
-function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true, status = 'offline', lastSeen = null) {
+// ===== MODIFIED: displayMessage now accepts imageUrl =====
+function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true, status = 'offline', lastSeen = null, imageUrl = null) {
     if (!elements.chatContainer) return;
     
     // Check if message already exists to prevent duplicates
@@ -5988,7 +6015,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
         return;
     }
     
-    const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId, status, lastSeen);
+    const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId, status, lastSeen, imageUrl);
     
     // Add event listeners to ALL messages
     addMessageTouchListeners(messageDiv);
@@ -6012,7 +6039,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
     }
 }
 
-// FIXED: Render messages with status and lastSeen from server response - SIMPLIFIED
+// ===== MODIFIED: renderMessages now passes image_url =====
 function renderMessages(messages, isFirstLoad = false) {
     if (!elements.chatContainer) return;
     
@@ -6055,7 +6082,8 @@ function renderMessages(messages, isFirstLoad = false) {
             msg.username, 
             msg.id, 
             status, 
-            lastSeen
+            lastSeen,
+            msg.image_url  // <-- Pass image_url
         );
         
         // ADD TOUCH LISTENERS TO ALL MESSAGES (including loaded ones)
@@ -6085,1948 +6113,7 @@ function renderMessages(messages, isFirstLoad = false) {
     });
 }
 
-// ===== NEW: ALL USERS FUNCTIONALITY =====
-
-// Variables for all users functionality
-let allUsersList = [];
-let filteredUsers = [];
-let currentFilter = 'all';
-let currentSearchQuery = '';
-let isUsersLoaded = false;
-let usersLoadStarted = false; // Track if load has started
-let usersRefreshInterval = null;
-
-// ===== POST SHARING =====
-let pendingPostId = null;
-
-// Add this function to show all users on first visit
-function showAllUsersOnFirstVisit() {
-    // Check if it's the first visit
-    const hasVisitedBefore = localStorage.getItem('hasVisitedBefore');
-    
-    if (!hasVisitedBefore) {
-        console.log('👋 First time user detected, showing all users');
-        
-        // Mark as visited
-        localStorage.setItem('hasVisitedBefore', 'true');
-        
-        // Show the all-users container after a short delay
-        setTimeout(() => {
-            showContainer('all-users');
-            
-            // Show a welcome message
-            setTimeout(() => {
-                showSuccess('Welcome! Here are all the users who have signed up. You can browse and connect with them.');
-            }, 500);
-        }, 1000);
-    }
-}
-
-// Initialize all users functionality - IMMEDIATELY without delay
-function initializeAllUsers() {
-    console.log('👥 Initializing all users directory...');
-    
-    // Don't create container - use existing HTML structure
-    // Remove any existing loading state
-    const loadingElements = document.querySelectorAll('.no-users-found, .users-loading');
-    loadingElements.forEach(el => el.remove());
-    
-    // Setup UI components immediately
-    setupAllUsersSearch();
-    setupAllUsersFilters();
-    
-    // Start loading users in background if not already loaded
-    if (!isUsersLoaded && !usersLoadStarted) {
-        usersLoadStarted = true;
-        
-        // Show initial loading state in the existing container
-        const container = document.getElementById('all-users-container');
-        if (container) {
-            container.innerHTML = `
-                <div class="users-loading" style="text-align: center; padding: 40px;">
-                    <div class="loading-spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid #4267B2; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px;"></div>
-                    <p style="color: #65676b;">Loading users...</p>
-                </div>
-            `;
-        }
-        
-        // Load users without blocking UI
-        setTimeout(() => {
-            loadAllUsers();
-        }, 50); // Tiny delay to ensure UI is rendered first
-    } else if (isUsersLoaded) {
-        // Users already loaded, just filter them
-        filterUsers(currentFilter);
-    }
-}
-
-// COMMENT OUT OR REMOVE THIS FUNCTION:
-function createAllUsersContainer() {
-    const allUsersSection = document.getElementById('all-users');
-    if (!allUsersSection) return;
-    
-    // Remove existing structure if any
-    const existingMainContainer = allUsersSection.querySelector('.all-users-main-container');
-    if (existingMainContainer) {
-        existingMainContainer.remove();
-    }
-    
-    // ... rest of the function ...
-}
-
-// Show loading state
-function renderAllUsersLoading() {
-    const container = document.getElementById('all-users-container');
-    if (!container) return;
-    
-    container.innerHTML = `
-        <div class="users-loading">
-            <div class="loading-spinner"></div>
-            <p>Loading users...</p>
-        </div>
-    `;
-}
-
-// Load all users from server - OPTIMIZED for speed
-async function loadAllUsers() {
-    try {
-        console.log('🔄 Loading users from server...');
-        
-        const token = localStorage.getItem('auth_token');
-        const response = await fetch('/api/users/all', {
-            method: 'GET',
-            headers: {
-                'Authorization': token ? `Bearer ${token}` : '',
-                'Content-Type': 'application/json'
-            },
-            cache: 'no-cache'
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            console.log('📊 Users data received:', data);
-            
-            if (data.success && data.users) {
-                console.log(`✅ Loaded ${data.users.length} users from server`);
-                allUsersList = data.users;
-                
-                // Fetch last seen status for all users
-                await updateAllUsersStatus();
-                
-                // Update stats display
-                updateUserStats(data.total_count || allUsersList.length, data.new_users || 0);
-                
-                // Mark as loaded
-                isUsersLoaded = true;
-                
-                // Filter and render immediately
-                filterUsers(currentFilter);
-                
-                console.log('✅ Users loaded and displayed successfully');
-            } else {
-                console.log('⚠️ Server data format issue');
-                // Show empty state instead of sample users
-                showNoUsersFound();
-            }
-        } else {
-            console.log('⚠️ Server error');
-            // Show empty state instead of sample users
-            showNoUsersFound();
-        }
-    } catch (error) {
-        console.error('Error loading all users:', error);
-        // Show empty state instead of sample users
-        showNoUsersFound();
-    }
-}
-
-// Add this helper function
-function showNoUsersFound() {
-    const container = document.getElementById('all-users-container');
-    if (container) {
-        container.innerHTML = `
-            <div class="no-users-found">
-                <i class="fas fa-users" style="font-size: 48px; color: #ddd; margin-bottom: 15px;"></i>
-                <p>No users found or failed to load</p>
-                <button onclick="loadAllUsers()" class="filter-btn" style="margin-top: 15px;">
-                    Try Again
-                </button>
-            </div>
-        `;
-    }
-    isUsersLoaded = false;
-    usersLoadStarted = false;
-}
-
-// Update status for all users
-async function updateAllUsersStatus() {
-    console.log('🔄 Updating status for all users...');
-    
-    const promises = allUsersList.map(async (user) => {
-        const lastSeenData = await fetchUserLastSeen(user.username);
-        
-        // Update user status based on last seen
-        const now = new Date();
-        const lastSeen = new Date(lastSeenData.last_seen || user.last_login);
-        const diffMinutes = (now - lastSeen) / (1000 * 60);
-        
-        // If user was active in the last 5 minutes, consider them online
-        if (diffMinutes <= 5 && lastSeenData.status !== 'offline') {
-            user.status = 'online';
-        } else {
-            user.status = 'offline';
-        }
-        
-        user.last_seen = lastSeenData.last_seen || user.last_login;
-        
-        // Cache profile
-        if (!profileCache[user.username]) {
-            profileCache[user.username] = {
-                username: user.username,
-                firstname: user.firstname || '',
-                lastname: user.lastname || '',
-                bio: user.bio || '',
-                age: user.age || '',
-                gender: user.gender || '',
-                location: user.location || '',
-                interests: user.interests || '',
-                avatar: user.avatar || `https://i.pravatar.cc/150?u=${user.username}`,
-                display_name: user.display_name || user.username,
-                status: user.status,
-                created_at: user.created_at || new Date().toISOString(),
-                last_active: user.last_seen || new Date().toISOString(),
-                message_count: user.message_count || 0,
-                post_count: user.post_count || 0
-            };
-        }
-        
-        return user;
-    });
-    
-    allUsersList = await Promise.all(promises);
-    console.log('✅ All users status updated');
-}
-
-// Update user statistics display
-function updateUserStats(totalUsers, newUsers) {
-    const statsElement = document.getElementById('all-users-stats');
-    if (statsElement) {
-        statsElement.innerHTML = `
-            <div class="user-stat-item">
-                <i class="fas fa-users"></i>
-                <span>${totalUsers} Total Users</span>
-            </div>
-            <div class="user-stat-item">
-                <i class="fas fa-circle online"></i>
-                <span>${allUsersList.filter(u => u.status === 'online').length} Online Now</span>
-            </div>
-            ${newUsers > 0 ? `
-                <div class="user-stat-item new-users">
-                    <i class="fas fa-user-plus"></i>
-                    <span>${newUsers} New This Week</span>
-                </div>
-            ` : ''}
-        `;
-    }
-}
-
-// Show sample users (for demo purposes) - OPTIMIZED
-async function showSampleUsers() {
-    console.log('👥 Loading sample users...');
-    
-    // Create sample users array using your actual data structure
-    const sampleUsers = [
-        {
-            username: 'Purity',
-            display_name: 'Purity',
-            bio: '',
-            age: null,
-            gender: '',
-            location: '',
-            interests: '',
-            status: 'online', // Changed to online for demo
-            created_at: '2026-01-17T09:05:49.554+00:00',
-            last_login: '2026-01-17T17:48:49.543+00:00',
-            message_count: 0,
-            post_count: 0,
-            join_date: '2026-01-17T09:05:49.554+00:00',
-            is_new_user: false
-        },
-        {
-            username: 'Boluayanf',
-            display_name: 'Boluayanf',
-            bio: '',
-            age: null,
-            gender: '',
-            location: '',
-            interests: '',
-            status: 'online',
-            created_at: '2026-01-15T16:15:38.741+00:00',
-            last_login: '2026-01-20T13:10:22.455+00:00',
-            message_count: 0,
-            post_count: 0,
-            join_date: '2026-01-15T16:15:38.741+00:00',
-            is_new_user: false
-        },
-        {
-            username: 'Admin',
-            display_name: 'Admin',
-            bio: 'Web dev',
-            age: null,
-            gender: '',
-            location: '',
-            interests: '',
-            status: 'online',
-            created_at: '2025-10-17T17:40:48.808+00:00',
-            last_login: '2026-01-26T14:49:46.282+00:00',
-            message_count: 15,
-            post_count: 3,
-            join_date: '2025-10-17T17:40:48.808+00:00',
-            is_new_user: false
-        },
-        {
-            username: 'Bot',
-            display_name: 'Bot',
-            bio: 'Hassan chat-bot',
-            age: null,
-            gender: '',
-            location: '',
-            interests: '',
-            status: 'online',
-            created_at: '2025-10-19T03:11:11.542+00:00',
-            last_login: '2026-01-18T13:00:45.825+00:00',
-            message_count: 28,
-            post_count: 13,
-            join_date: '2025-10-19T03:11:11.542+00:00',
-            is_new_user: false
-        },
-        {
-            username: 'Tony',
-            display_name: 'Tony',
-            bio: '',
-            age: null,
-            gender: '',
-            location: '',
-            interests: '',
-            status: 'offline',
-            created_at: '2025-10-20T15:07:27.173+00:00',
-            last_login: '2026-01-26T21:47:50.107+00:00',
-            message_count: 5,
-            post_count: 0,
-            join_date: '2025-10-20T15:07:27.173+00:00',
-            is_new_user: false
-        },
-        {
-            username: 'testuser',
-            display_name: 'testuser',
-            bio: '',
-            age: null,
-            gender: '',
-            location: '',
-            interests: '',
-            status: 'offline',
-            created_at: '2025-12-26T10:23:48.541085+00:00',
-            last_login: '2025-12-26T10:23:48.541085+00:00',
-            message_count: 0,
-            post_count: 0,
-            join_date: '2025-12-26T10:23:48.541085+00:00',
-            is_new_user: false
-        }
-    ];
-    
-    allUsersList = sampleUsers.map(user => ({
-        ...user,
-        avatar: user.username === 'Bot' ? 'https://i.ibb.co/pvTzjSmJ/1767010794043.jpg' :
-                user.username === 'Admin' ? 'https://i.ibb.co/6cc65wpZ/Screenshot-20260105-190457-Opera-Mini.jpg' :
-                `https://i.pravatar.cc/150?u=${user.username}`
-    }));
-    
-    // Update stats
-    updateUserStats(allUsersList.length, 2);
-    
-    // Mark as loaded
-    isUsersLoaded = true;
-    
-    // Filter and render immediately
-    filterUsers(currentFilter);
-    
-    console.log('✅ Sample users loaded and displayed');
-}
-
-// Filter users based on criteria - OPTIMIZED
-function filterUsers(filterType) {
-    currentFilter = filterType;
-    
-    // Update filter button states
-    document.querySelectorAll('.filter-btn').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    
-    const activeBtn = document.querySelector(`.filter-btn[onclick="filterUsers('${filterType}')"]`);
-    if (activeBtn) {
-        activeBtn.classList.add('active');
-    }
-    
-    // Apply filters
-    let filtered = [...allUsersList];
-    
-    switch (filterType) {
-        case 'online':
-            filtered = filtered.filter(user => user.status === 'online');
-            break;
-        case 'new':
-            // Show users created in last 7 days
-            const weekAgo = new Date();
-            weekAgo.setDate(weekAgo.getDate() - 7);
-            filtered = filtered.filter(user => {
-                const userDate = new Date(user.created_at || user.join_date);
-                return userDate > weekAgo;
-            });
-            break;
-        case 'active':
-            // Show users with most messages and posts
-            filtered = filtered.sort((a, b) => {
-                const aScore = (a.message_count || 0) + (a.post_count || 0);
-                const bScore = (b.message_count || 0) + (b.post_count || 0);
-                return bScore - aScore;
-            }).slice(0, 20); // Top 20 active users
-            break;
-        case 'all':
-        default:
-            // Show all users
-            break;
-    }
-    
-    // Apply search filter if any
-    if (currentSearchQuery) {
-        filtered = filtered.filter(user => 
-            (user.display_name?.toLowerCase() || user.username.toLowerCase()).includes(currentSearchQuery) ||
-            (user.bio?.toLowerCase() || '').includes(currentSearchQuery) ||
-            (user.interests?.toLowerCase() || '').includes(currentSearchQuery) ||
-            (user.location?.toLowerCase() || '').includes(currentSearchQuery)
-        );
-    }
-    
-    filteredUsers = filtered;
-    renderAllUsers();
-}
-
-// Render all users in the container - OPTIMIZED for immediate display
-function renderAllUsers() {
-    const container = document.getElementById('all-users-container');
-    if (!container) return;
-    
-    // If no users loaded yet and not loading, show empty state
-    if (filteredUsers.length === 0 && isUsersLoaded) {
-        container.innerHTML = `
-            <div class="no-users-found">
-                <i class="fas fa-users" style="font-size: 48px; color: #ddd; margin-bottom: 15px;"></i>
-                <p>No users found matching your criteria</p>
-                <button onclick="filterUsers('all')" class="filter-btn" style="margin-top: 15px;">
-                    Show All Users
-                </button>
-            </div>
-        `;
-        return;
-    }
-    
-    // If users are still loading
-    if (!isUsersLoaded) {
-        container.innerHTML = `
-            <div class="users-loading">
-                <div class="loading-spinner"></div>
-                <p>Loading users...</p>
-            </div>
-        `;
-        return;
-    }
-    
-    // If users are loaded, show them immediately
-    if (filteredUsers.length > 0) {
-        container.innerHTML = '';
-        
-        // Render all users immediately
-        filteredUsers.forEach(user => {
-            const userCard = createUserCard(user);
-            container.appendChild(userCard);
-        });
-        
-        console.log(`✅ Rendered ${filteredUsers.length} users`);
-    }
-}
-
-// Create user card element
-function createUserCard(user) {
-    const card = document.createElement('div');
-    card.className = 'user-directory-card';
-    
-    // Calculate time since joined
-    const joinDate = new Date(user.created_at || user.join_date);
-    const now = new Date();
-    const diffTime = Math.abs(now - joinDate);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    const timeJoined = diffDays === 1 ? 'Today' : 
-                       diffDays < 7 ? `${diffDays} days ago` : 
-                       joinDate.toLocaleDateString();
-    
-    // Status color
-    let statusColor = '#bcc0c4';
-    let statusText = 'Offline';
-    
-    switch (user.status) {
-        case 'online':
-            statusColor = '#31a24c';
-            statusText = 'Online Now';
-            break;
-        case 'away':
-            statusColor = '#f7b928';
-            statusText = 'Away';
-            break;
-        case 'offline':
-        default:
-            statusColor = '#bcc0c4';
-            statusText = 'Offline';
-    }
-    
-    // Activity score
-    const activityScore = (user.message_count || 0) + (user.post_count || 0);
-    let activityLevel = 'New';
-    if (activityScore > 50) activityLevel = 'Very Active';
-    else if (activityScore > 20) activityLevel = 'Active';
-    else if (activityScore > 5) activityLevel = 'Regular';
-    
-    // Check if user is new (joined in last 7 days)
-    const isNewUser = diffDays <= 7 || user.is_new_user;
-    
-    card.innerHTML = `
-        <div class="directory-user-header">
-            <img src="${user.avatar || `https://i.pravatar.cc/150?u=${user.username}`}" 
-                 alt="${user.display_name || user.username}" 
-                 class="directory-user-avatar"
-                 onerror="this.src='https://i.pravatar.cc/150?u=default'">
-            ${isNewUser ? '<span class="new-user-badge">NEW</span>' : ''}
-        </div>
-        
-        <div class="directory-user-info">
-            <div class="directory-user-name">
-                ${user.display_name || user.username}
-                <span class="directory-user-details">@${user.username}</span>
-            </div>
-            
-            <div class="directory-user-details">
-                ${user.bio || 'No bio yet'}
-            </div>
-            
-            <div class="user-stats">
-                <div class="user-stat">
-                    <i class="fas fa-comment"></i>
-                    <span>${user.message_count || 0} messages</span>
-                </div>
-                <div class="user-stat">
-                    <i class="fas fa-newspaper"></i>
-                    <span>${user.post_count || 0} posts</span>
-                </div>
-                <div class="user-stat">
-                    <i class="fas fa-chart-line"></i>
-                    <span>${activityLevel}</span>
-                </div>
-            </div>
-            
-            <div class="directory-user-status">
-                <span class="status-dot" style="background-color: ${statusColor};"></span>
-                <span>${statusText}</span>
-                ${user.status === 'offline' && user.last_seen ? `<span>• Last seen ${formatLastSeen(user.last_seen)}</span>` : ''}
-                <span>• Joined ${timeJoined}</span>
-                ${user.location ? `<span>• ${user.location}</span>` : ''}
-            </div>
-        </div>
-        
-        <div class="directory-user-actions">
-            <button class="directory-action-btn profile" onclick="showUserProfile('${user.username}')">
-                <i class="fas fa-user"></i> Profile
-            </button>
-            <button class="directory-action-btn message" onclick="openPrivateChatFromDirectory('${user.username}')">
-                <i class="fas fa-comment"></i> Message
-            </button>
-        </div>
-    `;
-    
-    return card;
-}
-
-// Setup search functionality for all users
-function setupAllUsersSearch() {
-    const searchInput = document.getElementById('all-users-search');
-    if (!searchInput) return;
-    
-    let searchTimeout;
-    
-    searchInput.addEventListener('input', function() {
-        clearTimeout(searchTimeout);
-        
-        searchTimeout = setTimeout(() => {
-            currentSearchQuery = this.value.toLowerCase().trim();
-            filterUsers(currentFilter);
-        }, 300);
-    });
-    
-    // Clear search button
-    const searchContainer = document.querySelector('.all-users-search-container');
-    if (searchContainer) {
-        searchContainer.style.position = 'relative';
-        
-        const clearBtn = document.createElement('button');
-        clearBtn.innerHTML = '<i class="fas fa-times"></i>';
-        clearBtn.style.cssText = `
-            position: absolute;
-            right: 25px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            color: #65676b;
-            cursor: pointer;
-            padding: 5px;
-            display: none;
-        `;
-        
-        searchContainer.appendChild(clearBtn);
-        
-        searchInput.addEventListener('input', function() {
-            clearBtn.style.display = this.value ? 'block' : 'none';
-        });
-        
-        clearBtn.addEventListener('click', function() {
-            searchInput.value = '';
-            currentSearchQuery = '';
-            filterUsers(currentFilter);
-            clearBtn.style.display = 'none';
-            searchInput.focus();
-        });
-    }
-}
-
-// Setup filter buttons for all users
-function setupAllUsersFilters() {
-    const filterButtons = document.getElementById('filter-buttons');
-    if (!filterButtons) return;
-    
-    // Make sure filter buttons exist
-    if (!filterButtons.querySelector('.filter-btn')) {
-        filterButtons.innerHTML = `
-            <button class="filter-btn active" onclick="filterUsers('all')">All Users</button>
-            <button class="filter-btn" onclick="filterUsers('online')">Online Now</button>
-            <button class="filter-btn" onclick="filterUsers('new')">New Users</button>
-            <button class="filter-btn" onclick="filterUsers('active')">Most Active</button>
-        `;
-    }
-}
-
-// Open private chat from user directory
-function openPrivateChatFromDirectory(username) {
-    // Switch to private messages container
-    showContainer('private-messages');
-    
-    // Wait for container to be visible, then open chat
-    setTimeout(() => {
-        openPrivateChat(username);
-    }, 100);
-}
-
-// Refresh all users list periodically - optimized
-function startAllUsersRefresh() {
-    // Clear any existing interval first
-    if (usersRefreshInterval) {
-        clearInterval(usersRefreshInterval);
-    }
-    
-    // Refresh every 30 seconds, but only if container is visible
-    usersRefreshInterval = setInterval(() => {
-        if (document.getElementById('all-users') && 
-            document.getElementById('all-users').style.display === 'block' &&
-            isUsersLoaded) {
-            
-            console.log('🔄 Refreshing users data...');
-            updateAllUsersStatus();
-            filterUsers(currentFilter);
-        }
-    }, 30000); // 30 seconds
-}
-
-// Add this to the initialization code
-function onUserLoginSuccess(username) {
-    console.log('✅ User logged in successfully:', username);
-    
-    // Save to currentUserSession
-    currentUserSession = {
-        username: username,
-        token: localStorage.getItem('auth_token'),
-        isLoggedIn: true
-    };
-    
-    // Show success message
-    showSuccess(`Welcome back, ${username}!`);
-    
-    // Check if first visit and show all users
-    showAllUsersOnFirstVisit();
-}
-
-// MODIFIED: Modify the showContainer function to initialize all users when showing the container
-function showContainer(containerId) {
-    console.log('🔄 Showing container:', containerId);
-    
-    // Hide all containers
-    document.querySelectorAll('.main-chat-interface').forEach(container => {
-        container.style.display = 'none';
-    });
-    
-    // Hide all info containers (INCLUDING PROFILE CONTAINER)
-    document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container, .profile-container').forEach(container => {
-        container.style.display = 'none';
-    });
-    
-    // Hide all chat inputs
-    document.querySelectorAll('.chat-input').forEach(input => {
-        input.style.display = 'none';
-    });
-    
-    // Show the selected container
-    const container = document.getElementById(containerId);
-    if (container) {
-        container.style.display = 'block';
-        
-        // Show the appropriate chat input
-        if (containerId === 'chat' || containerId === 'private-ai') {
-            const chatInput = container.querySelector('.chat-input');
-            if (chatInput) chatInput.style.display = 'flex';
-        }
-        
-        // For private messages, only show users panel initially
-        if (containerId === 'private-messages') {
-            showUsersPanel();
-            initializePrivateMessaging();
-        }
-        
-        // Load profile data when showing profile container
-        if (containerId === 'profile') {
-            loadProfile();
-        }
-        
-        // Initialize secret code if showing that container
-        if (containerId === 'secret-code') {
-            resetSecretCodeForm();
-            initializeSecretCodeVerification();
-        }
-        
-        // Initialize SQL editor if showing that container
-        if (containerId === 'sql-editor-container') {
-            // Check if user has verified the secret code
-            if (!hasVerifiedCode()) {
-                showError('Access denied. Please verify the secret code first.');
-                showContainer('secret-code');
-                return;
-            }
-            initializeSQLEditor();
-        }
-        
-        // FIXED: Enhanced posts initialization - ensure create post box is always visible
-        if (containerId === 'posts') {
-            console.log('📝 Initializing posts feed...');
-            // Create posts container if it doesn't exist
-            createPostsContainer();
-            // Force re-initialization of create post box
-            initializePosts();
-            
-            // Double-check the create post box is visible
-            setTimeout(() => {
-                const createPostBox = document.querySelector('.create-post-box');
-                if (!createPostBox) {
-                    console.log('🔄 Create post box not found, re-creating...');
-                    setupCreatePostBox();
-                } else {
-                    console.log('✅ Create post box is visible');
-                }
-                
-                // Ensure posts are rendered
-                renderPosts();
-            }, 100);
-        }
-        
-        // NEW: Initialize all users when showing the all-users container - IMMEDIATELY
-        if (containerId === 'all-users') {
-            console.log('👥 Initializing all users directory...');
-            // DO NOT call createAllUsersContainer() - use existing HTML
-            initializeAllUsers();
-            
-            // Start auto-refresh for online status updates
-            startAllUsersRefresh();
-        }
-    }
-    
-    // Show overlay for non-chat containers
-    const overlay = document.getElementById('overlay');
-    if (overlay) {
-        if (containerId === 'chat' || containerId === 'private-ai' || containerId === 'private-messages' || containerId === 'posts' || containerId === 'all-users') {
-            overlay.style.display = 'none';
-        } else {
-            overlay.style.display = 'block';
-        }
-    }
-    
-    // Handle button visibility based on container
-    if (containerId === 'chat') {
-        console.log('Showing main chat container');
-        // Re-initialize scroll button for main chat
-        setTimeout(() => {
-            initializeButtons();
-            // FIXED: Force scroll to bottom when switching to chat
-            setTimeout(() => {
-                forceScrollToBottom('chat-container');
-                updateScrollState();
-            }, 200);
-        }, 100);
-        
-        // Show main chat scroll button, hide private AI button
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'flex';
-            updateScrollState();
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    } else if (containerId === 'private-ai') {
-        // Show private AI button, hide main chat scroll button
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'flex';
-            handlePrivateScroll();
-        }
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        // Attach scroll event for private container
-        if (privateContainer) {
-            privateContainer.addEventListener('scroll', handlePrivateScroll);
-            setTimeout(handlePrivateScroll, 100);
-            // FIXED: Scroll to bottom when switching to private AI
-            setTimeout(() => forceScrollToBottom('private-ai-container'), 200);
-        }
-    } else if (containerId === 'private-messages') {
-        // Hide both buttons for private messages
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    } else if (containerId === 'posts') {
-        // Hide both buttons for posts feed
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    } else if (containerId === 'all-users') {
-        // Hide both buttons for all users directory
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    } else {
-        // For other containers, hide both buttons
-        if (scrollToBottomBtn) {
-            scrollToBottomBtn.style.display = 'none';
-            scrollToBottomBtn.classList.remove('visible');
-        }
-        if (privateGoTopBtn) {
-            privateGoTopBtn.style.display = 'none';
-            privateGoTopBtn.classList.remove('visible');
-        }
-    }
-
-    // Close dropdown menu when switching containers
-    const dropdown = document.getElementById('dropdown');
-    if (dropdown) dropdown.style.display = 'none';
-    
-    const kebabDropdown = document.querySelector('.kebab-dropdown');
-    if (kebabDropdown) kebabDropdown.classList.remove('active');
-}
-
-// Posts functionality for client-side
-let posts = [];
-let lastUpdateTimestamp = null;
-let currentPostMedia = [];
-
-// Initialize posts functionality
-function initializePosts() {
-    loadPosts();
-    setupPostInputHandlers();
-    setupCreatePostBox();
-    
-    // Start polling for updates every 5 seconds
-    setInterval(pollForPostUpdates, 5000);
-    
-    // Listen for real-time post updates
-    if (typeof socket !== 'undefined' && socket) {
-        socket.on('new-post', (post) => {
-            addPostToFeed(post);
-        });
-    }
-}
-
-// MODIFIED: Load posts from server (with current user for filtering)
-async function loadPosts() {
-    try {
-        const currentUser = currentUserSession?.username;
-        const response = await fetch(`/api/posts?username=${currentUser || ''}`);
-        
-        if (response.ok) {
-            posts = await response.json();
-            renderPosts();
-            lastUpdateTimestamp = new Date().toISOString();
-        } else {
-            console.error('Failed to load posts');
-            // Fallback to localStorage if server fails
-            loadPostsFromLocalStorage();
-        }
-    } catch (error) {
-        console.error('Error loading posts:', error);
-        // Fallback to localStorage if server fails
-        loadPostsFromLocalStorage();
-    }
-}
-
-// Fallback: Load posts from localStorage
-function loadPostsFromLocalStorage() {
-    const localPosts = JSON.parse(localStorage.getItem('messageMatePosts')) || [];
-    if (localPosts.length > 0) {
-        posts = localPosts;
-        renderPosts();
-        showInfo('Using locally saved posts (server unavailable)');
-    }
-}
-
-// Poll for new posts and updates
-async function pollForPostUpdates() {
-    try {
-        const response = await fetch(`/api/posts/updates?lastUpdate=${lastUpdateTimestamp}`);
-        
-        if (response.ok) {
-            const data = await response.json();
-            if (data.success && data.posts.length > 0) {
-                // Update existing posts or add new ones
-                data.posts.forEach(updatedPost => {
-                    const existingIndex = posts.findIndex(p => p.id === updatedPost.id);
-                    if (existingIndex >= 0) {
-                        // Update existing post
-                        posts[existingIndex] = updatedPost;
-                    } else {
-                        // Add new post to beginning
-                        posts.unshift(updatedPost);
-                    }
-                });
-                
-                renderPosts();
-                lastUpdateTimestamp = data.timestamp;
-            }
-        }
-    } catch (error) {
-        console.error('Error polling for updates:', error);
-    }
-}
-
-// FIXED: Setup Facebook-style create post box - Now in separate container
-function setupCreatePostBox() {
-    const createPostBoxContainer = document.getElementById('create-post-box-container');
-    if (!createPostBoxContainer) {
-        console.error('Create post box container not found');
-        return;
-    }
-    
-    // Remove existing create post box if it exists
-    const existingBox = createPostBoxContainer.querySelector('.create-post-box');
-    if (existingBox) existingBox.remove();
-    
-    // Get current user info
-    const currentUser = currentUserSession?.username;
-    if (!currentUser) {
-        console.error('No user logged in');
-        return;
-    }
-    
-    const userProfile = getUserProfile(currentUser);
-    
-    // Create Facebook-style create post box
-    const createPostBox = document.createElement('div');
-    createPostBox.className = 'create-post-box';
-    createPostBox.onclick = openCreatePostModal; // Make entire box clickable
-    
-    createPostBox.innerHTML = `
-        <div class="create-post-header">
-            <img class="create-post-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/50?u=${currentUser}`}" alt="Your Avatar">
-            <div class="create-post-input">
-                What's on your mind?
-            </div>
-        </div>
-        <div class="create-post-actions">
-            <div class="create-post-action" onclick="event.stopPropagation(); openImageUpload()">
-                <i class="fas fa-image" style="color: #45bd62;"></i>
-                Photo
-            </div>
-            <div class="create-post-action" onclick="event.stopPropagation(); openVideoUpload()">
-                <i class="fas fa-video" style="color: #f5533d;"></i>
-                Video
-            </div>
-            <div class="create-post-action" onclick="event.stopPropagation(); openLocationShare()">
-                <i class="fas fa-map-marker-alt" style="color: #f7b928;"></i>
-                Location
-            </div>
-        </div>
-    `;
-    
-    createPostBoxContainer.appendChild(createPostBox);
-    console.log('✅ Create post box setup complete in separate container');
-}
-
-// Create posts container if it doesn't exist
-function createPostsContainer() {
-    const postsSection = document.getElementById('posts');
-    if (!postsSection) return;
-    
-    // Remove existing structure if any
-    const existingMainContainer = postsSection.querySelector('.posts-main-container');
-    if (existingMainContainer) {
-        existingMainContainer.remove();
-    }
-    
-    // Create main container
-    const mainContainer = document.createElement('div');
-    mainContainer.className = 'posts-main-container';
-    
-    // Create create post box container
-    const createPostBoxContainer = document.createElement('div');
-    createPostBoxContainer.id = 'create-post-box-container';
-    createPostBoxContainer.className = 'create-post-box-container';
-    
-    // Create posts container (scrollable)
-    const postsContainer = document.createElement('div');
-    postsContainer.id = 'posts-container';
-    postsContainer.className = 'posts-container';
-    
-    mainContainer.appendChild(createPostBoxContainer);
-    mainContainer.appendChild(postsContainer);
-    
-    postsSection.appendChild(mainContainer);
-    console.log('✅ Posts container structure created');
-}
-
-// NEW: Function to detect and convert image URLs in text
-function processContentWithImages(content) {
-    if (!content) return '';
-    
-    // Regular expression to match image URLs
-    const imageUrlRegex = /(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|bmp|webp|svg))(\?[^\s]*)?/gi;
-    
-    // Split content by image URLs
-    const parts = content.split(imageUrlRegex);
-    
-    // If no images found, return original content
-    if (parts.length <= 1) {
-        return escapeHtml(content);
-    }
-    
-    let processedContent = '';
-    let isImage = false;
-    
-    for (let i = 0; i < parts.length; i++) {
-        if (parts[i] === undefined) continue;
-        
-        // Every 3rd part starting from index 1 is an image URL (due to regex groups)
-        if ((i % 3 === 1) && parts[i]) {
-            const imageUrl = parts[i] + (parts[i+1] || '') + (parts[i+2] || '');
-            processedContent += `<div class="post-content-image">
-                <img src="${escapeHtml(imageUrl)}" alt="Post image" onclick="openZoom('${escapeHtml(imageUrl)}')" loading="lazy">
-            </div>`;
-            // Skip the next two parts (file extension and query params)
-            i += 2;
-            isImage = true;
-        } else if (parts[i] && parts[i].trim()) {
-            // Regular text content
-            processedContent += `<div class="post-text-content">${escapeHtml(parts[i])}</div>`;
-            isImage = false;
-        }
-    }
-    
-    return processedContent;
-}
-
-// NEW: Function to detect and convert multiple image URLs in text
-function processContentForMultipleImages(content) {
-    if (!content) return { text: '', images: [] };
-    
-    // Regular expression to match image URLs
-    const imageUrlRegex = /(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|bmp|webp|svg))(\?[^\s]*)?/gi;
-    
-    const images = [];
-    let textContent = content;
-    
-    // Find all image URLs
-    let match;
-    while ((match = imageUrlRegex.exec(content)) !== null) {
-        const fullUrl = match[0];
-        images.push(fullUrl);
-        // Replace the URL with a marker in text content
-        textContent = textContent.replace(fullUrl, ` [IMAGE_${images.length - 1}] `);
-    }
-    
-    return {
-        text: escapeHtml(textContent).replace(/\[IMAGE_(\d+)\]/g, ''),
-        images: images
-    };
-}
-
-// ===== MODIFIED: Create post element with three-dot menu =====
-function createPostElement(post) {
-    const postDiv = document.createElement('div');
-    postDiv.className = 'post-card';
-    postDiv.dataset.postId = post.id;
-
-    const timeAgo = formatPostTime(post.timestamp);
-    const userProfile = getUserProfile(post.author);
-    const currentUsername = currentUserSession?.username;
-    const isAuthor = currentUsername === post.author;
-    const isAdmin = currentUsername === 'Admin0';
-
-    // Determine which options appear
-    let menuItems = '';
-    if (isAuthor || isAdmin) {
-        menuItems += `<button class="delete-btn" onclick="deletePost('${post.id}')"><i class="fas fa-trash"></i> Delete</button>`;
-    }
-    if (isAuthor) {
-        const privacyText = post.visibility === 'private' ? 'Make Public' : 'Make Private';
-        menuItems += `<button class="privacy-btn" onclick="togglePostPrivacy('${post.id}', '${post.visibility}')"><i class="fas fa-${post.visibility === 'private' ? 'globe' : 'lock'}"></i> ${privacyText}</button>`;
-    }
-
-    postDiv.innerHTML = `
-        <div class="post-header">
-            <img class="post-author-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/50?u=${post.author}`}" alt="${post.author}">
-            <div class="post-author-info">
-                <div class="post-author-name">${userProfile.display_name || userProfile.displayName || post.author}</div>
-                <div class="post-meta">
-                    <span class="post-time">${timeAgo}</span>
-                    <span>•</span>
-                    <span class="post-visibility">${post.visibility === 'private' ? 'Private' : 'Public'}</span>
-                </div>
-            </div>
-            ${menuItems ? `
-            <div class="post-header-actions">
-                <button class="post-menu-btn" onclick="togglePostMenu(this)">
-                    <i class="fas fa-ellipsis-v"></i>
-                </button>
-                <div class="post-dropdown">
-                    ${menuItems}
-                </div>
-            </div>
-            ` : ''}
-        </div>
-        ${post.content ? `<div class="post-content">${escapeHtml(post.content)}</div>` : ''}
-        ${post.media ? `
-            <div class="post-media">
-                ${post.media.type === 'image' ? 
-                    `<div class="post-image-container">
-                        <img src="${post.media.url}" alt="Post image" onclick="openZoom('${post.media.url}')" loading="lazy">
-                    </div>` : 
-                    `<video controls><source src="${post.media.url}" type="video/mp4">Your browser does not support the video tag.</video>`
-                }
-            </div>
-        ` : ''}
-        <div class="post-stats">
-            <div class="post-likes" onclick="likePost('${post.id}')">
-                <i class="fas fa-thumbs-up"></i> ${post.likes || 0}
-            </div>
-            <div class="post-comments-count" onclick="toggleComments('${post.id}')">
-                ${post.comments ? post.comments.length : 0} comments
-            </div>
-        </div>
-        <div class="post-actions">
-            <button class="post-action like" onclick="likePost('${post.id}')">
-                <i class="${post.userLiked ? 'fas' : 'far'} fa-thumbs-up"></i> Like
-            </button>
-            <button class="post-action" onclick="toggleComments('${post.id}')">
-                <i class="far fa-comment"></i> Comment
-            </button>
-            <button class="post-action" onclick="sharePost('${post.id}')">
-                <i class="far fa-share-square"></i> Share
-            </button>
-        </div>
-        <div class="post-comments" id="comments-${post.id}" style="display: none;">
-            <div class="comments-header">
-                <span class="comments-title">Comments</span>
-                <button class="close-comments" onclick="closeComments('${post.id}')">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="comments-list" id="comments-list-${post.id}">
-                ${post.comments ? post.comments.map(comment => {
-                    const commentAuthorProfile = getUserProfile(comment.author_username || comment.author);
-                    return `
-                    <div class="comment">
-                        <img class="comment-avatar" src="${commentAuthorProfile.avatar || `https://i.pravatar.cc/32?u=${comment.author_username || comment.author}`}" alt="${comment.author_username || comment.author}">
-                        <div class="comment-content">
-                            <div class="comment-author">${commentAuthorProfile.display_name || commentAuthorProfile.displayName || (comment.author_username || comment.author)}</div>
-                            <div class="comment-text">${escapeHtml(comment.content || comment.text)}</div>
-                        </div>
-                    </div>
-                `}).join('') : '<div class="no-comments">No comments yet</div>'}
-            </div>
-            <div class="comment-input">
-                <input type="text" id="comment-input-${post.id}" placeholder="Write a comment..." onkeypress="handleCommentKeypress(event, '${post.id}')">
-                <button onclick="addCommentFromInput('${post.id}')">Post</button>
-            </div>
-        </div>
-    `;
-
-    return postDiv;
-}
-
-// ===== NEW: Toggle post dropdown menu =====
-function togglePostMenu(button) {
-    document.querySelectorAll('.post-dropdown.active').forEach(d => d.classList.remove('active'));
-    const dropdown = button.nextElementSibling;
-    if (dropdown) {
-        dropdown.classList.toggle('active');
-        const closeDropdown = (e) => {
-            if (!dropdown.contains(e.target) && e.target !== button) {
-                dropdown.classList.remove('active');
-                document.removeEventListener('click', closeDropdown);
-            }
-        };
-        setTimeout(() => {
-            document.addEventListener('click', closeDropdown);
-        }, 0);
-    }
-}
-
-// ===== NEW: Toggle post privacy =====
-async function togglePostPrivacy(postId, currentVisibility) {
-    const newVisibility = currentVisibility === 'private' ? 'public' : 'private';
-    const token = localStorage.getItem('auth_token');
-    try {
-        const response = await fetch(`/api/posts/${postId}/visibility`, {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': token ? `Bearer ${token}` : ''
-            },
-            body: JSON.stringify({ visibility: newVisibility })
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to change visibility');
-        }
-
-        const data = await response.json();
-        showSuccess(`Post is now ${data.visibility}`);
-        // The post will be updated via socket or we can update locally
-        // Update the post in the local array
-        const postIndex = posts.findIndex(p => p.id === postId);
-        if (postIndex !== -1) {
-            posts[postIndex].visibility = newVisibility;
-        }
-        // Re-render to update visibility label and dropdown
-        renderPosts();
-    } catch (error) {
-        console.error('Privacy toggle error:', error);
-        showError(error.message);
-    }
-}
-
-// ===== NEW: Delete post function =====
-async function deletePost(postId) {
-    if (!confirm('Are you sure you want to delete this post? This action cannot be undone.')) {
-        return;
-    }
-
-    const token = localStorage.getItem('auth_token');
-    try {
-        const response = await fetch(`/api/posts/${postId}`, {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': token ? `Bearer ${token}` : ''
-            },
-            body: JSON.stringify({ username: currentUserSession?.username })
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to delete post');
-        }
-
-        // Remove from local array and UI
-        posts = posts.filter(p => p.id !== postId);
-        const postElement = document.querySelector(`[data-post-id="${postId}"]`);
-        if (postElement) {
-            postElement.remove();
-        }
-        showSuccess('Post deleted successfully');
-    } catch (error) {
-        console.error('Delete post error:', error);
-        showError(error.message);
-    }
-}
-
-// Render all posts
-function renderPosts() {
-    const postsContainer = document.getElementById('posts-container');
-    if (!postsContainer) {
-        console.error('Posts container not found');
-        // Try to create it
-        createPostsContainer();
-        return;
-    }
-    
-    // Create posts list if it doesn't exist
-    let postsList = postsContainer.querySelector('.posts-list');
-    if (!postsList) {
-        postsList = document.createElement('div');
-        postsList.className = 'posts-list';
-        postsContainer.appendChild(postsList);
-    }
-    
-    postsList.innerHTML = '';
-    
-    if (posts.length === 0) {
-        // REMOVED: "No posts yet" message - we don't show anything when there are no posts
-        return;
-    }
-    
-    // Sort posts by timestamp (newest first)
-    const sortedPosts = [...posts].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    
-    sortedPosts.forEach(post => {
-        const postElement = createPostElement(post);
-        postsList.appendChild(postElement);
-    });
-
-    // ===== POST SHARING: Handle shared post link =====
-    if (pendingPostId) {
-        // Give time for DOM to update
-        setTimeout(() => {
-            const targetPost = document.querySelector(`[data-post-id="${pendingPostId}"]`);
-            if (targetPost) {
-                // Scroll to post
-                targetPost.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                // Highlight it
-                targetPost.classList.add('highlighted-post');
-                // Remove highlight after 3 seconds
-                setTimeout(() => {
-                    targetPost.classList.remove('highlighted-post');
-                }, 3000);
-                console.log(`🔗 Scrolled to shared post: ${pendingPostId}`);
-            }
-            pendingPostId = null;
-        }, 100);
-    }
-}
-
-// Create a new post
-async function createPost() {
-    const content = document.getElementById('post-content').value.trim();
-    const author = currentUserSession?.username;
-    
-    if (!author) {
-        showError('You must be logged in to create a post');
-        return;
-    }
-    
-    if (!content && currentPostMedia.length === 0) {
-        showError('Post content cannot be empty');
-        return;
-    }
-    
-    try {
-        const postData = {
-            author_username: author,
-            content: content
-        };
-        
-        // Add media if present
-        if (currentPostMedia.length > 0) {
-            postData.media = currentPostMedia[0];
-        }
-        
-        const response = await fetch('/api/posts', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
-            },
-            body: JSON.stringify(postData)
-        });
-        
-        if (response.ok) {
-            const newPost = await response.json();
-            
-            // Add to local posts array
-            posts.unshift(newPost);
-            renderPosts();
-            
-            // Also save to localStorage as backup
-            savePostsToLocalStorage();
-            
-            // Close modal and reset form
-            closeCreatePostModal();
-            showSuccess('Post published successfully!');
-        } else {
-            const error = await response.json();
-            showError(error.error || 'Failed to create post');
-            
-            // Fallback: Create post locally
-            createPostLocally(content, author);
-        }
-    } catch (error) {
-        console.error('Error creating post:', error);
-        showError('Failed to create post. Saving locally.');
-        
-        // Fallback: Create post locally
-        createPostLocally(content, author);
-    }
-}
-
-// Fallback: Create post locally
-function createPostLocally(content, author) {
-    const newPost = {
-        id: generatePostId(),
-        author: author,
-        content: content,
-        media: currentPostMedia.length > 0 ? currentPostMedia[0] : null,
-        timestamp: new Date().toISOString(),
-        likes: 0,
-        comments: []
-    };
-    
-    // Add to posts array
-    posts.unshift(newPost);
-    
-    // Save to localStorage
-    savePostsToLocalStorage();
-    
-    // Add to feed
-    addPostToFeed(newPost);
-    
-    // Close modal
-    closeCreatePostModal();
-    
-    // Show success message
-    showSuccess('Post published locally!');
-}
-
-// Save posts to localStorage
-function savePostsToLocalStorage() {
-    localStorage.setItem('messageMatePosts', JSON.stringify(posts));
-}
-
-// Like a post
-async function likePost(postId) {
-    const username = currentUserSession?.username;
-    
-    if (!username) {
-        showError('You must be logged in to like posts');
-        return;
-    }
-    
-    try {
-        const response = await fetch(`/api/posts/${postId}/like`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
-            },
-            body: JSON.stringify({ username })
-        });
-        
-        if (response.ok) {
-            const result = await response.json();
-            
-            // Update local post data
-            const postIndex = posts.findIndex(p => p.id === postId);
-            if (postIndex >= 0) {
-                posts[postIndex].likes = result.likesCount;
-                posts[postIndex].userLiked = result.userLiked;
-                
-                // Update UI
-                updatePostLikesUI(postId, result.likesCount, result.userLiked);
-                
-                // Save to localStorage
-                savePostsToLocalStorage();
-            }
-        } else {
-            const error = await response.json();
-            showError(error.error || 'Failed to like post');
-            
-            // Fallback: Like post locally
-            likePostLocally(postId);
-        }
-    } catch (error) {
-        console.error('Error liking post:', error);
-        showError('Failed to like post. Liking locally.');
-        
-        // Fallback: Like post locally
-        likePostLocally(postId);
-    }
-}
-
-// Fallback: Like post locally
-function likePostLocally(postId) {
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
-    
-    // Toggle like
-    if (!post.likes) post.likes = 0;
-    post.likes += 1;
-    post.userLiked = true;
-    
-    // Update localStorage
-    savePostsToLocalStorage();
-    
-    // Update UI
-    updatePostLikesUI(postId, post.likes, true);
-    
-    // Show animation or feedback
-    showSuccess('Liked!');
-}
-
-// Update post likes UI
-function updatePostLikesUI(postId, likesCount, userLiked) {
-    const postElement = document.querySelector(`[data-post-id="${postId}"]`);
-    if (postElement) {
-        const likesElement = postElement.querySelector('.post-likes');
-        const likeButton = postElement.querySelector('.post-action.like i');
-        
-        if (likesElement) {
-            likesElement.innerHTML = `<i class="fas fa-thumbs-up"></i> ${likesCount}`;
-        }
-        
-        if (likeButton) {
-            likeButton.className = userLiked ? 'fas fa-thumbs-up' : 'far fa-thumbs-up';
-        }
-    }
-}
-
-// Add comment to post
-async function addComment(postId, text) {
-    const username = currentUserSession?.username;
-    
-    if (!username) {
-        showError('You must be logged in to comment');
-        return;
-    }
-    
-    try {
-        const response = await fetch(`/api/posts/${postId}/comments`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : ''
-            },
-            body: JSON.stringify({
-                author_username: username,
-                content: text
-            })
-        });
-        
-        if (response.ok) {
-            const newComment = await response.json();
-            
-            // Update local post data
-            const postIndex = posts.findIndex(p => p.id === postId);
-            if (postIndex >= 0) {
-                if (!posts[postIndex].comments) {
-                    posts[postIndex].comments = [];
-                }
-                posts[postIndex].comments.push(newComment);
-                
-                // Update UI
-                updateCommentsUI(postId);
-                
-                // Save to localStorage
-                savePostsToLocalStorage();
-            }
-        } else {
-            const error = await response.json();
-            showError(error.error || 'Failed to add comment');
-            
-            // Fallback: Add comment locally
-            addCommentLocally(postId, text, username);
-        }
-    } catch (error) {
-        console.error('Error adding comment:', error);
-        showError('Failed to add comment. Adding locally.');
-        
-        // Fallback: Add comment locally
-        addCommentLocally(postId, text, username);
-    }
-}
-
-// Fallback: Add comment locally
-function addCommentLocally(postId, text, username) {
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
-    
-    // Initialize comments array if needed
-    if (!post.comments) post.comments = [];
-    
-    // Add new comment
-    const newComment = {
-        author: username,
-        text: text,
-        timestamp: new Date().toISOString()
-    };
-    
-    post.comments.push(newComment);
-    
-    // Update localStorage
-    savePostsToLocalStorage();
-    
-    // Update UI
-    updateCommentsUI(postId);
-}
-
-// Update comments UI
-function updateCommentsUI(postId) {
-    const postIndex = posts.findIndex(p => p.id === postId);
-    if (postIndex < 0) return;
-    
-    const post = posts[postIndex];
-    const postElement = document.querySelector(`[data-post-id="${postId}"]`);
-    
-    if (postElement) {
-        // Update comments count
-        const commentsCount = postElement.querySelector('.post-comments-count');
-        if (commentsCount) {
-            commentsCount.textContent = `${post.comments ? post.comments.length : 0} comments`;
-        }
-        
-        // Update comments list
-        const commentsList = document.getElementById(`comments-list-${postId}`);
-        if (commentsList) {
-            commentsList.innerHTML = '';
-            
-            if (post.comments && post.comments.length > 0) {
-                post.comments.forEach(comment => {
-                    const commentElement = document.createElement('div');
-                    commentElement.className = 'comment';
-                    
-                    // Fetch comment author's profile for avatar - MODIFIED: Use getUserProfile
-                    const userProfile = getUserProfile(comment.author_username || comment.author);
-                    
-                    commentElement.innerHTML = `
-                        <img class="comment-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/32?u=${comment.author_username || comment.author}`}" alt="${comment.author_username || comment.author}">
-                        <div class="comment-content">
-                            <div class="comment-author">${userProfile.display_name || userProfile.displayName || (comment.author_username || comment.author)}</div>
-                            <div class="comment-text">${escapeHtml(comment.content || comment.text)}</div>
-                        </div>
-                    `;
-                    
-                    commentsList.appendChild(commentElement);
-                });
-            } else {
-                commentsList.innerHTML = '<div class="no-comments">No comments yet</div>';
-            }
-        }
-        
-        // Ensure comments section is visible when adding a comment
-        const commentsSection = document.getElementById(`comments-${postId}`);
-        if (commentsSection) {
-            commentsSection.style.display = 'block';
-        }
-    }
-}
-
-// Toggle comments visibility (like Facebook)
-function toggleComments(postId) {
-    const commentsSection = document.getElementById(`comments-${postId}`);
-    const commentInput = document.getElementById(`comment-input-${postId}`);
-    
-    if (commentsSection) {
-        if (commentsSection.style.display === 'none') {
-            // Show comments
-            commentsSection.style.display = 'block';
-            
-            // Focus the comment input after a short delay
-            setTimeout(() => {
-                if (commentInput) {
-                    commentInput.focus();
-                }
-            }, 100);
-        } else {
-            // Hide comments
-            commentsSection.style.display = 'none';
-        }
-    }
-}
-
-// Close comments section
-function closeComments(postId) {
-    const commentsSection = document.getElementById(`comments-${postId}`);
-    if (commentsSection) {
-        commentsSection.style.display = 'none';
-    }
-}
-
-// Add comment from input
-function addCommentFromInput(postId) {
-    const postElement = document.querySelector(`[data-post-id="${postId}"]`);
-    if (!postElement) return;
-    
-    const input = document.getElementById(`comment-input-${postId}`);
-    const text = input.value.trim();
-    
-    if (text) {
-        addComment(postId, text);
-        input.value = '';
-    }
-}
-
-// Handle comment keypress
-function handleCommentKeypress(event, postId) {
-    if (event.key === 'Enter') {
-        const input = event.target;
-        const text = input.value.trim();
-        
-        if (text) {
-            addComment(postId, text);
-            input.value = '';
-        }
-    }
-}
-
-// ===== MODIFIED: Share post - copy shareable link =====
-function sharePost(postId) {
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
-    
-    // Construct shareable URL
-    const url = new URL(window.location.href);
-    url.searchParams.set('post', postId);
-    const shareUrl = url.href;
-    
-    navigator.clipboard.writeText(shareUrl).then(() => {
-        showSuccess('Post link copied to clipboard!');
-    }).catch(err => {
-        console.error('Failed to copy: ', err);
-        showError('Failed to copy post link');
-    });
-}
-
-// Add post to feed (for real-time updates)
-function addPostToFeed(post) {
-    const postsContainer = document.getElementById('posts-container');
-    if (!postsContainer) return;
-    
-    let postsList = postsContainer.querySelector('.posts-list');
-    if (!postsList) {
-        postsList = document.createElement('div');
-        postsList.className = 'posts-list';
-        postsContainer.appendChild(postsList);
-    }
-    
-    // Check if post already exists
-    const existingPost = document.querySelector(`[data-post-id="${post.id}"]`);
-    if (existingPost) return;
-    
-    // Add to beginning of feed
-    const postElement = createPostElement(post);
-    postsList.insertBefore(postElement, postsList.firstChild);
-}
-
-// Generate unique post ID
-function generatePostId() {
-    return 'post_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-}
-
-// Open create post modal
-function openCreatePostModal() {
-    const modal = document.getElementById('create-post-modal');
-    if (modal) {
-        modal.style.display = 'flex';
-        
-        // Set author info
-        const currentUser = currentUserSession?.username;
-        if (currentUser) {
-            const userProfile = getUserProfile(currentUser);
-            document.getElementById('post-author-avatar').src = userProfile.avatar || `https://i.pravatar.cc/50?u=${currentUser}`;
-            document.getElementById('post-author-name').textContent = userProfile.display_name || userProfile.displayName || currentUser;
-        }
-        
-        // Reset form
-        document.getElementById('post-content').value = '';
-        document.getElementById('post-char-count').textContent = '0';
-        document.getElementById('post-media-preview').innerHTML = '';
-        document.getElementById('submit-post-btn').disabled = true;
-        currentPostMedia = [];
-    }
-}
-
-// Close create post modal
-function closeCreatePostModal() {
-    const modal = document.getElementById('create-post-modal');
-    if (modal) {
-        modal.style.display = 'none';
-    }
-}
-
-// Setup post input handlers
-function setupPostInputHandlers() {
-    const postContent = document.getElementById('post-content');
-    
-    if (postContent) {
-        postContent.addEventListener('input', function() {
-            const charCount = this.value.length;
-            document.getElementById('post-char-count').textContent = charCount;
-            
-            // Enable/disable submit button
-            const submitBtn = document.getElementById('submit-post-btn');
-            if (submitBtn) {
-                submitBtn.disabled = charCount === 0 && currentPostMedia.length === 0;
-            }
-        });
-    }
-    
-    // Close modal when clicking outside
-    const modal = document.getElementById('create-post-modal');
-    if (modal) {
-        modal.addEventListener('click', function(e) {
-            if (e.target === modal) {
-                closeCreatePostModal();
-            }
-        });
-    }
-}
-
-// Media upload functions (simplified for demo)
-function openImageUpload() {
-    // In a real app, this would open a file picker
-    // For demo purposes, we'll use a placeholder
-    const imageUrl = prompt('Enter image URL (for demo purposes):');
-    if (imageUrl) {
-        addMediaToPost('image', imageUrl);
-    }
-}
-
-function openVideoUpload() {
-    // In a real app, this would open a file picker
-    // For demo purposes, we'll use a placeholder
-    const videoUrl = prompt('Enter video URL (for demo purposes):');
-    if (videoUrl) {
-        addMediaToPost('video', videoUrl);
-    }
-}
-
-function openLocationShare() {
-    // This would use the Geolocation API in a real app
-    alert('Location sharing would be implemented here in a real app');
-}
-
-// Add media to post
-function addMediaToPost(type, url) {
-    // For simplicity, we'll only allow one media item per post
-    currentPostMedia = [{ type, url }];
-    
-    const previewContainer = document.getElementById('post-media-preview');
-    if (previewContainer) {
-        previewContainer.innerHTML = `
-            <div class="media-preview-item">
-                ${type === 'image' ? 
-                    `<img src="${url}" alt="Preview">` : 
-                    `<video controls><source src="${url}" type="video/mp4">Your browser does not support the video tag.</video>`
-                }
-                <button class="remove-media" onclick="removeMedia()">×</button>
-            </div>
-        `;
-    }
-    
-    // Enable submit button if there's media
-    const submitBtn = document.getElementById('submit-post-btn');
-    if (submitBtn) {
-        submitBtn.disabled = false;
-    }
-}
-
-// Remove media from post
-function removeMedia() {
-    currentPostMedia = [];
-    const previewContainer = document.getElementById('post-media-preview');
-    if (previewContainer) {
-        previewContainer.innerHTML = '';
-    }
-    
-    // Disable submit button if no content
-    const content = document.getElementById('post-content').value.trim();
-    const submitBtn = document.getElementById('submit-post-btn');
-    if (submitBtn && !content) {
-        submitBtn.disabled = true;
-    }
-}
-
-// Utility functions
-function formatPostTime(timestamp) {
-    const now = new Date();
-    const postTime = new Date(timestamp);
-    const diffMs = now - postTime;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-    
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    
-    return postTime.toLocaleDateString();
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// MODIFIED: Get user profile - updated to fetch from cache/server and return proper profile object
-function getUserProfile(username) {
-    // First check if we have the profile in cache
-    if (profileCache[username]) {
-        return profileCache[username];
-    }
-    
-    // Check local storage for profiles
-    const profiles = JSON.parse(localStorage.getItem('userProfiles')) || {};
-    if (profiles[username]) {
-        return profiles[username];
-    }
-    
-    // Return default profile with proper structure
-    return { 
-        username: username,
-        display_name: username,
-        displayName: username, // Keep both for compatibility
-        avatar: `https://i.pravatar.cc/50?u=${username}`
-    };
-}
-
-// MODIFIED: sendMessage function to use OperaMiniMessenger when on Opera Mini
+// ===== MODIFIED: sendMessage to pass imageUrl if present =====
 async function sendMessage() {
     if (isSending || isProcessingCommand) return;
     isSending = true;
@@ -8092,6 +6179,7 @@ async function sendMessage() {
         elements.sendButton.disabled = true;
         elements.sendButton.classList.remove('enabled');
         
+        // No imageUrl for regular text messages
         const payload = { 
             content, 
             username, 
@@ -8134,8 +6222,7 @@ async function sendMessage() {
         }
         
         // Display message with the actual ID from server
-        // Note: Status will be updated via Socket.io real-time updates
-        displayMessage(savedMessage.content, 'sent', savedMessage.reply_to, savedMessage.username, savedMessage.id, true);
+        displayMessage(savedMessage.content, 'sent', savedMessage.reply_to, savedMessage.username, savedMessage.id, true, 'offline', null, savedMessage.image_url);
         
         // Clear input immediately for better UX
         elements.messageInput.value = '';
@@ -8163,7 +6250,58 @@ async function sendMessage() {
     }
 }
 
-// MODIFIED: deleteMessageContext function in context menu to use OperaMiniMessenger
+// ===== MODIFIED: attachFile to send empty content + image_url =====
+async function attachFile() {
+    const fileInput = document.getElementById('image-upload-main');
+    fileInput.click();
+    fileInput.onchange = async function() {
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('image', file);
+
+        try {
+            showInfo('Uploading image...');
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) throw new Error('Upload failed');
+            const data = await response.json();
+            const imageUrl = data.imageUrl;
+
+            // Send a message with empty content and the image_url
+            const content = '';  // empty content
+            const username = currentUserSession?.username;
+            if (!username) return showError('You must be logged in');
+
+            const payload = { content, username, image_url: imageUrl, reply_to: null };
+            const token = localStorage.getItem('auth_token');
+            const msgRes = await fetch('/api/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': token ? `Bearer ${token}` : ''
+                },
+                body: JSON.stringify(payload)
+            });
+            if (!msgRes.ok) throw new Error('Failed to send image message');
+            const savedMsg = await msgRes.json();
+
+            // Display immediately (will also come via socket)
+            displayMessage(savedMsg.content, 'sent', null, savedMsg.username, savedMsg.id, true, 'offline', null, savedMsg.image_url);
+
+            fileInput.value = ''; // reset
+        } catch (err) {
+            console.error('Upload error:', err);
+            showError('Image upload failed: ' + err.message);
+        }
+    };
+}
+
+// ===== MODIFIED: deleteMessageContext function in context menu to use OperaMiniMessenger =====
 async function deleteMessageContext(messageId, username) {
     try {
         console.log('Deleting message:', messageId, 'Username:', username);
@@ -8243,7 +6381,7 @@ async function blockUser(usernameToBlock) {
     }
 }
 
-// ===== FIXED: initSocket function with room join and post events =====
+// ===== MODIFIED: initSocket function with room join and post events =====
 function initSocket() {
     console.log('🔌 Initializing socket connection...');
     
@@ -8263,7 +6401,10 @@ function initSocket() {
                         message.reply_to, 
                         message.username, 
                         message.id, 
-                        true
+                        true,
+                        message.user_status,
+                        message.last_seen,
+                        message.image_url
                     );
                     
                     if (document.visibilityState !== 'visible' && !isOwnMessage) {
@@ -8347,7 +6488,10 @@ function initSocket() {
                 message.reply_to, 
                 message.username, 
                 message.id, 
-                true
+                true,
+                message.user_status,
+                message.last_seen,
+                message.image_url
             );
             
             if (document.visibilityState !== 'visible' && !isOwnMessage) {
@@ -10567,9 +8711,19 @@ function batchMessageRender(messages, renderFunction) {
         loadMessages();
     }
 
-    // ===== IMAGE UPLOAD HANDLER =====
-    async function attachFile() {
-        const fileInput = document.getElementById('image-upload-main');
+    // ===== MODIFIED: attachFile for private chat (similar to main chat) =====
+    async function attachFilePrivate() {
+        const fileInput = document.getElementById('image-upload-private');
+        if (!fileInput) {
+            // create hidden file input if not present
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.id = 'image-upload-private';
+            input.accept = 'image/*';
+            input.style.display = 'none';
+            document.body.appendChild(input);
+            fileInput = input;
+        }
         fileInput.click();
         fileInput.onchange = async function() {
             const file = fileInput.files[0];
@@ -10589,28 +8743,99 @@ function batchMessageRender(messages, renderFunction) {
                 const data = await response.json();
                 const imageUrl = data.imageUrl;
 
-                // Send a message containing the image URL
-                const content = `📷 Image: ${imageUrl}`;  // embed URL in message
+                // Send a private AI message with image
+                const content = '';  // empty content
                 const username = currentUserSession?.username;
                 if (!username) return showError('You must be logged in');
 
-                const payload = { content, username, image_url: imageUrl, reply_to: null };
-                const token = localStorage.getItem('auth_token');
-                const msgRes = await fetch('/api/messages', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': token ? `Bearer ${token}` : ''
-                    },
-                    body: JSON.stringify(payload)
-                });
-                if (!msgRes.ok) throw new Error('Failed to send image message');
-                const savedMsg = await msgRes.json();
+                // For private AI, we need a different endpoint or handle differently.
+                // Here we'll send it as a normal private message to the AI room? 
+                // Actually private AI uses socket 'send-private-message' (see line 4235). 
+                // We'll implement a socket emit with imageUrl.
 
-                // Display immediately (will also come via socket)
-                displayMessage(savedMsg.content, 'sent', null, savedMsg.username, savedMsg.id, true);
+                if (socket) {
+                    socket.emit('send-private-message-socket', {
+                        sender_username: username,
+                        receiver_username: 'Private AI', // special
+                        content: '',
+                        image_url: imageUrl
+                    });
+                } else {
+                    showError('Socket not available');
+                }
 
                 fileInput.value = ''; // reset
+            } catch (err) {
+                console.error('Upload error:', err);
+                showError('Image upload failed: ' + err.message);
+            }
+        };
+    }
+
+    // ===== MODIFIED: attachFile for private messages between users =====
+    async function attachFilePrivateMsg() {
+        const fileInput = document.getElementById('image-upload-private-msg');
+        if (!fileInput) {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.id = 'image-upload-private-msg';
+            input.accept = 'image/*';
+            input.style.display = 'none';
+            document.body.appendChild(input);
+            fileInput = input;
+        }
+        fileInput.click();
+        fileInput.onchange = async function() {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('image', file);
+
+            try {
+                showInfo('Uploading image...');
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error('Upload failed');
+                const data = await response.json();
+                const imageUrl = data.imageUrl;
+
+                // Send private user message with image
+                const currentUser = currentUserSession?.username;
+                if (!currentUser || !currentPrivateChatUser) {
+                    showError('Select a user to message');
+                    return;
+                }
+
+                if (socket) {
+                    socket.emit('send-private-message-socket', {
+                        sender_username: currentUser,
+                        receiver_username: currentPrivateChatUser,
+                        content: '',
+                        image_url: imageUrl
+                    });
+                } else {
+                    // fallback HTTP
+                    const token = localStorage.getItem('auth_token');
+                    await fetch('/api/private/messages', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': token ? `Bearer ${token}` : ''
+                        },
+                        body: JSON.stringify({
+                            sender_username: currentUser,
+                            receiver_username: currentPrivateChatUser,
+                            content: '',
+                            image_url: imageUrl
+                        })
+                    });
+                }
+
+                fileInput.value = '';
             } catch (err) {
                 console.error('Upload error:', err);
                 showError('Image upload failed: ' + err.message);
@@ -10890,7 +9115,8 @@ async function loadPrivateMessages(username) {
                 message.content, 
                 message.sender_username === currentUser ? 'sent' : 'received',
                 message.created_at,
-                message.sender_username
+                message.sender_username,
+                message.image_url
             );
         }
         
@@ -10905,8 +9131,8 @@ async function loadPrivateMessages(username) {
     }
 }
 
-// Display private user message
-function displayPrivateUserMessage(text, sender, timestamp, username) {
+// MODIFIED: Display private user message with image support
+function displayPrivateUserMessage(text, sender, timestamp, username, imageUrl = null) {
     const messagesContainer = document.getElementById('private-chat-messages');
     if (!messagesContainer) return;
     
@@ -10915,8 +9141,13 @@ function displayPrivateUserMessage(text, sender, timestamp, username) {
     
     const time = formatMessageTime(timestamp);
     
+    let contentHtml = text;
+    if (imageUrl) {
+        contentHtml = `<img src="${imageUrl}" style="max-width:100%; border-radius:8px; margin-bottom:5px; cursor:pointer;" onclick="openZoom('${imageUrl}')">` + (text ? '<br>' + text : '');
+    }
+    
     messageDiv.innerHTML = `
-        <div class="message-content">${text}</div>
+        <div class="message-content">${contentHtml}</div>
         <div class="message-time">${time}</div>
     `;
     
@@ -10968,13 +9199,13 @@ async function sendPrivateMessageToUser() {
     try {
         const token = localStorage.getItem('auth_token');
         
-        // Send via HTTP or Socket.io
+        // Send via Socket.io for real-time delivery (with imageUrl = null)
         if (socket) {
-            // Send via Socket.io for real-time delivery
             socket.emit('send-private-message-socket', {
                 sender_username: currentUser,
                 receiver_username: currentPrivateChatUser,
-                content: content
+                content: content,
+                image_url: null
             });
         } else {
             // Fallback to HTTP
@@ -10987,7 +9218,8 @@ async function sendPrivateMessageToUser() {
                 body: JSON.stringify({
                     sender_username: currentUser,
                     receiver_username: currentPrivateChatUser,
-                    content: content
+                    content: content,
+                    image_url: null
                 })
             });
             
@@ -11020,7 +9252,7 @@ async function sendPrivateMessageToUser() {
     }
 }
 
-// MODIFIED: Handle new private message with duplicate check
+// MODIFIED: Handle new private message with duplicate check and image
 function handleNewPrivateMessage(message) {
     const currentUser = currentUserSession?.username;
     
@@ -11042,7 +9274,7 @@ function handleNewPrivateMessage(message) {
              currentPrivateChatUser === message.receiver_username)) {
             
             const senderType = message.sender_username === currentUser ? 'sent' : 'received';
-            displayPrivateUserMessage(message.content, senderType, message.created_at, message.sender_username);
+            displayPrivateUserMessage(message.content, senderType, message.created_at, message.sender_username, message.image_url);
             
             // Mark as read if we're the receiver
             if (message.receiver_username === currentUser) {
