@@ -8120,25 +8120,30 @@ async function sendMessage() {
         elements.sendButton.disabled = true;
         elements.sendButton.classList.remove('enabled');
         
-        const payload = { 
-            content, 
-            username, 
-            reply_to: replyToText || null 
-        };
+        // ===== NEW: Auto‑detect if content is a standalone image URL =====
+        const imageUrlRegex = /^(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp|bmp|svg))(?:\?[^\s]*)?$/i;
+        let payload;
+        if (imageUrlRegex.test(content)) {
+            // It's an image URL → send as image message (empty content)
+            payload = { content: '', username, image_url: content, reply_to: replyToText || null };
+        } else {
+            payload = { content, username, image_url: '', reply_to: replyToText || null };
+        }
         
         // Use OperaMiniMessenger for Opera Mini, otherwise use regular fetch
         let savedMessage;
         if (operaMessenger.isOperaMini) {
-            const result = await operaMessenger.sendMessage(content, username);
+            const result = await operaMessenger.sendMessage(payload.content, username);
             if (result.error) {
                 throw new Error(result.error);
             }
             // Create a simple message object for Opera Mini
             savedMessage = {
-                content: content,
+                content: payload.content,
                 username: username,
                 reply_to: replyToText || null,
-                id: result.id || Date.now().toString()
+                id: result.id || Date.now().toString(),
+                image_url: payload.image_url
             };
         } else {
             // Original fetch code for non-Opera Mini browsers
@@ -8162,8 +8167,7 @@ async function sendMessage() {
         }
         
         // Display message with the actual ID from server
-        // Note: Status will be updated via Socket.io real-time updates
-        displayMessage(savedMessage.content, 'sent', savedMessage.reply_to, savedMessage.username, savedMessage.id, true);
+        displayMessage(savedMessage.content, 'sent', savedMessage.reply_to, savedMessage.username, savedMessage.id, true, null, null, savedMessage.image_url);
         
         // Clear input immediately for better UX
         elements.messageInput.value = '';
@@ -8172,7 +8176,7 @@ async function sendMessage() {
 
         // Only get AI response if it's NOT a command
         const PREFIX = '!';
-        if (!content.startsWith(PREFIX)) {
+        if (!content.startsWith(PREFIX) && !imageUrlRegex.test(content)) {
             fetchChatResponse(content);
         }
         
