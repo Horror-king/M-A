@@ -4432,7 +4432,7 @@ app.post('/messages', async (req, res) => {
   }
 });
 
-// Image upload endpoint
+// ===== FIXED IMAGE UPLOAD ENDPOINT – uses correct bucket name 'chat_images' =====
 app.post('/upload', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -4443,19 +4443,25 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     const fileName = `${Date.now()}-${req.file.originalname}`;
     const filePath = `images/${fileName}`;
 
-    // Upload to Supabase Storage
+    // Upload to Supabase Storage – bucket name fixed to match your actual bucket 'chat_images'
     const { data, error } = await supabase.storage
-      .from('chat-images')
+      .from('chat_images')               // ✅ changed from 'chat-images'
       .upload(filePath, fileBuffer, {
         contentType: req.file.mimetype,
         upsert: false
       });
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Supabase storage error:', error);
+      return res.status(500).json({ 
+        error: 'Storage upload failed', 
+        details: error.message 
+      });
+    }
 
-    // Get public URL
+    // Get public URL – use same bucket name
     const { data: urlData } = supabase.storage
-      .from('chat-images')
+      .from('chat_images')               // ✅ changed from 'chat-images'
       .getPublicUrl(filePath);
 
     res.json({ 
@@ -4463,8 +4469,11 @@ app.post('/upload', upload.single('image'), async (req, res) => {
       message: 'Image uploaded successfully'
     });
   } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({ error: error.message || 'Failed to upload image' });
+    console.error('❌ Upload endpoint error:', error);
+    res.status(500).json({ 
+      error: 'Upload failed', 
+      details: error.message 
+    });
   }
 });
 
