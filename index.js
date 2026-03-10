@@ -4777,8 +4777,8 @@ app.post('/test-message', async (req, res) => {
 // ===== MODIFIED: Command API handler with prefix-free support for private AI =====
 app.post("/api/command", async (req, res) => {
   try {
-    let { message, source = 'main-chat' } = req.body;
-    console.log('📨 Received command:', { message, source });
+    let { message, source = 'main-chat', reply_to } = req.body;
+    console.log('📨 Received command:', { message, source, reply_to });
     
     if (!message) return res.status(400).json({ reply: "❌ Message is required" });
 
@@ -4892,7 +4892,7 @@ app.post("/api/command", async (req, res) => {
     else {
       console.log('🤖 Processing EXCLUSIVELY as Bot command');
       responder = 'Bot';
-      
+
       const command = commands[cmd.commandName];
       if (!command) {
         finalReply = "❌ Command not found";
@@ -4900,11 +4900,19 @@ app.post("/api/command", async (req, res) => {
         finalReply = "❌ This command does not support execution";
       } else {
         const replies = [];
+        // Prepare event object with messageReply if reply_to was provided
+        const event = { body: cmd.text };
+        if (reply_to) {
+          event.messageReply = { id: reply_to };
+        }
+
         await command.onStart({
           api: {
-            sendMessage: (msg) => replies.push(typeof msg === "string" ? msg : JSON.stringify(msg))
+            sendMessage: (msg) => replies.push(typeof msg === "string" ? msg : JSON.stringify(msg)),
+            supabase: supabase,
+            io: io
           },
-          event: { body: cmd.text },
+          event: event,
           args: cmd.args,
           message: {
             reply: (content) => replies.push(content)
