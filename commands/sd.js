@@ -1,6 +1,6 @@
 const axios = require("axios");
 
-// Configuration – you can move these to environment variables for security
+// Configuration – move these to environment variables for security
 const API_URL = "https://fahim-api-demo.onrender.com/ai/aiease/v1";
 const API_COOKIE =
   "connect.sid=s%3A7sKKv8NJgIs6k3gb4DVeDiPAQNr1cyUE.m%2BNmkn%2BHDCqttRUhpW5sm9vjshuCccz3nNSoC3FBQK8";
@@ -65,7 +65,6 @@ module.exports = {
   },
 
   onStart: async function ({ api, event, args }) {
-    // api must contain supabase and io (injected by your command handler)
     const { supabase, io } = api;
     if (!supabase || !io) {
       console.error("❌ sd command: missing supabase or io in api");
@@ -74,12 +73,14 @@ module.exports = {
 
     const input = args.join(" ").trim();
     if (!input) {
-      return; // silent fail – you could send a message if you prefer
+      console.log("sd command: no input");
+      return;
     }
 
     const parsed = parseFlags(input);
     if (!parsed.prompt) {
-      return; // silent fail
+      console.log("sd command: no prompt after parsing");
+      return;
     }
 
     const prompt = parsed.prompt;
@@ -96,11 +97,10 @@ module.exports = {
       qualityText = `📐 Quality: ${quality}\n`;
     }
 
-    // --- Get image URL from the replied message (if any) ---
+    // --- Get image URL from the replied message ---
     let imageUrls = [];
     if (event.messageReply && event.messageReply.id) {
       try {
-        // Fetch the replied message from the database
         const { data: repliedMsg, error } = await supabase
           .from('chatter')
           .select('*')
@@ -108,11 +108,9 @@ module.exports = {
           .single();
 
         if (!error && repliedMsg) {
-          // If the message has an image_url, use it
           if (repliedMsg.image_url) {
             imageUrls.push(repliedMsg.image_url);
           } else {
-            // Otherwise try to extract image URLs from the content
             const urlRegex = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp|bmp|svg))/gi;
             const matches = repliedMsg.content.match(urlRegex);
             if (matches) {
@@ -125,10 +123,8 @@ module.exports = {
       }
     }
 
-    // If no image was found, we cannot proceed
     if (imageUrls.length === 0) {
-      // You could send an error message here
-      console.log("sd command: no image to edit");
+      console.log("sd command: no image found to edit");
       return;
     }
 
@@ -139,13 +135,13 @@ module.exports = {
     apiUrl += `&url=${encodeURIComponent(imageUrls.join(","))}`;
 
     try {
-      // Call the external image editing API
+      console.log("🔄 Calling external API:", apiUrl);
       const res = await axios.get(apiUrl, {
         headers: {
           Cookie: API_COOKIE,
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
         },
-        timeout: 60000 // 60 seconds
+        timeout: 60000
       });
 
       if (!res.data?.success || !Array.isArray(res.data.images) || !res.data.images[0]) {
@@ -153,7 +149,7 @@ module.exports = {
         return;
       }
 
-      const externalImageUrl = res.data.images[0]; // This is a URL from the external API
+      const externalImageUrl = res.data.images[0];
 
       // --- Download the generated image ---
       const imageResponse = await axios.get(externalImageUrl, { responseType: 'arraybuffer' });
@@ -174,17 +170,17 @@ module.exports = {
         return;
       }
 
-      // Get public URL of the uploaded image
       const { data: urlData } = supabase.storage
         .from('chat_images')
         .getPublicUrl(filePath);
 
       const publicUrl = urlData.publicUrl;
+      console.log("✅ Image uploaded to:", publicUrl);
 
       // --- Prepare the bot's response message ---
       const botMessage = {
         content: `✅ | ${realModel} Result\n\n🧠 Prompt: ${prompt}\n⚙ Model: ${realModel}\n🖼 Ratio: ${ratio || "Auto (API)"}\n${qualityText}${imageUrls.length ? `🧩 Images used: ${imageUrls.length}\n` : ""}`,
-        username: 'Bot',   // or 'AI' – make sure this user exists in your system
+        username: 'Bot',
         image_url: publicUrl,
         reply_to: null,
         created_at: new Date().toISOString()
@@ -201,12 +197,11 @@ module.exports = {
         return;
       }
 
-      // --- Broadcast the new message to all clients via Socket.io ---
+      console.log("✅ Bot message saved, broadcasting via socket...");
       io.emit('new-message', savedMsg[0]);
 
     } catch (error) {
       console.error("❌ sd command error:", error);
-      // Optionally send an error message
     }
   }
 };
