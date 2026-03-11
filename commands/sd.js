@@ -51,21 +51,21 @@ module.exports = {
   config: {
     name: "sd",
     aliases: ["seedream"],
-    version: "1.9",
+    version: "1.11",
     role: 0,
-    author: "Debug",
+    author: "Hassan",
     countDown: 5,
     category: "image",
     guide: {
-      en: "{pn} a cute cat --model sd_4.5"
+      en:
+        "{pn} a cute cat --model sd_4.5 --quality 4k\n" +
+        "Reply to an image + {pn} combine them --model nano_banana --ar 3:2"
     }
   },
 
   onStart: async function ({ message, event, args, api }) {
-    console.log("⚡ sd command started");
     try {
       const input = args.join(" ").trim();
-      console.log("Input:", input);
       if (!input) {
         return message.reply("❌ | Please provide a prompt.");
       }
@@ -87,12 +87,9 @@ module.exports = {
         qualityText = `📐 Quality: ${quality}\n`;
       }
 
-      console.log("Prompt:", prompt, "Model:", realModel, "Ratio:", ratio);
-
-      // --- Get image URL from replied message ---
+      // --- Get image URL from replied message (if any) ---
       let imageUrls = [];
       if (event.messageReply && event.messageReply.id) {
-        console.log("Fetching replied message ID:", event.messageReply.id);
         try {
           const { supabase } = api;
           const { data: repliedMsg, error } = await supabase
@@ -104,66 +101,70 @@ module.exports = {
           if (!error && repliedMsg) {
             if (repliedMsg.image_url) {
               imageUrls.push(repliedMsg.image_url);
-              console.log("Found image_url:", repliedMsg.image_url);
             } else {
               const urlRegex = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp|bmp|svg))/gi;
               const matches = repliedMsg.content.match(urlRegex);
               if (matches) {
                 imageUrls.push(...matches.slice(0, 10));
-                console.log("Found URLs in content:", matches);
               }
             }
-          } else {
-            console.log("Replied message not found or error:", error);
           }
         } catch (err) {
           console.error("Error fetching replied message:", err);
         }
       }
 
-      // --- Build API URL ---
+      // --- Build external API URL ---
       let apiUrl = `${API_URL}?prompt=${encodeURIComponent(prompt)}&model=${realModel}`;
       if (ratio) apiUrl += `&ratio=${ratio}`;
       apiUrl += qualityParam;
       if (imageUrls.length > 0) {
         apiUrl += `&url=${encodeURIComponent(imageUrls.join(","))}`;
       }
-      console.log("External API URL:", apiUrl);
 
-      // Send processing message
-      const processingMsg = await message.reply("🎨 | Generating image, please wait...");
-      console.log("Processing message sent, ID:", processingMsg.messageID);
+      // Send a processing message (will remain, no unsend)
+      const processingMsg = await message.reply("🎨 | Generating image, please wait... (this may take up to 2 minutes)");
 
-      // Call external API
-      console.log("Calling external API...");
+      // Call the external API with increased timeout
       const res = await axios.get(apiUrl, {
         headers: {
           Cookie: API_COOKIE,
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
         },
-        timeout: 60000,
+        timeout: 120000, // 120 seconds
+        validateStatus: () => true, // don't throw on any status
         responseType: 'arraybuffer'
       });
 
-      const contentType = res.headers['content-type'];
-      console.log("API response status:", res.status, "Content-Type:", contentType);
-
-      if (!contentType || !contentType.startsWith('image/')) {
-        let errorText = res.data.toString();
+      // Check if response is JSON (error) or image
+      const contentType = res.headers['content-type'] || '';
+      if (contentType.includes('application/json') || contentType.includes('text/plain')) {
+        // Try to parse JSON
+        let errorMsg = "Unknown API error";
         try {
-          const json = JSON.parse(errorText);
-          if (json.error) errorText = json.error;
-        } catch (e) {}
-        await message.reply(`❌ | API error: ${errorText}`);
-        await message.unsend(processingMsg.messageID);
+          const json = JSON.parse(res.data.toString());
+          if (json.success === true && Array.isArray(json.images) && json.images[0] === "") {
+            errorMsg = "The API returned an empty image. This might be due to invalid parameters or server overload.";
+          } else if (json.error) {
+            errorMsg = json.error;
+          } else {
+            errorMsg = JSON.stringify(json);
+          }
+        } catch (e) {
+          errorMsg = res.data.toString().substring(0, 200);
+        }
+        await message.reply(`❌ | API error: ${errorMsg}`);
+        return;
+      }
+
+      if (!contentType.startsWith('image/')) {
+        await message.reply("❌ | Unexpected response from API (not an image).");
         return;
       }
 
       const imageBuffer = Buffer.from(res.data, 'binary');
-      console.log("Image buffer size:", imageBuffer.length);
 
       // Upload to Imgur
-      console.log("Uploading to Imgur...");
       const form = new FormData();
       form.append('image', imageBuffer.toString('base64'));
       form.append('type', 'base64');
@@ -176,14 +177,11 @@ module.exports = {
       });
 
       if (!imgurResponse.data.success) {
-        console.log("Imgur upload failed:", imgurResponse.data);
         await message.reply("❌ | Failed to upload image to Imgur.");
-        await message.unsend(processingMsg.messageID);
         return;
       }
 
       const imgUrl = imgurResponse.data.data.link;
-      console.log("Imgur URL:", imgUrl);
 
       // Reply with result
       const replyText =
@@ -196,15 +194,14 @@ module.exports = {
         `\n${imgUrl}`;
 
       await message.reply(replyText);
-      await message.unsend(processingMsg.messageID);
-      console.log("✅ Command completed successfully");
 
     } catch (error) {
       console.error("❌ sd command error:", error);
-      // Try to reply with error
-      try {
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        await message.reply("❌ | The image generation took too long. Please try again later or use a simpler prompt.");
+      } else {
         await message.reply(`❌ | Error: ${error.message}`);
-      } catch (e) {}
+      }
     }
   }
 };
