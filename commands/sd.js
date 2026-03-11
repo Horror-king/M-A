@@ -51,7 +51,7 @@ module.exports = {
   config: {
     name: "sd",
     aliases: ["seedream"],
-    version: "1.11",
+    version: "1.12",
     role: 0,
     author: "Hassan",
     countDown: 5,
@@ -114,7 +114,7 @@ module.exports = {
         }
       }
 
-      // --- Build external API URL ---
+      // --- Build the external API URL ---
       let apiUrl = `${API_URL}?prompt=${encodeURIComponent(prompt)}&model=${realModel}`;
       if (ratio) apiUrl += `&ratio=${ratio}`;
       apiUrl += qualityParam;
@@ -122,47 +122,44 @@ module.exports = {
         apiUrl += `&url=${encodeURIComponent(imageUrls.join(","))}`;
       }
 
-      // Send a processing message (will remain, no unsend)
+      // Send processing message
       const processingMsg = await message.reply("🎨 | Generating image, please wait... (this may take up to 2 minutes)");
 
-      // Call the external API with increased timeout
+      // Call the external API – it returns JSON
       const res = await axios.get(apiUrl, {
         headers: {
           Cookie: API_COOKIE,
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
         },
-        timeout: 120000, // 120 seconds
-        validateStatus: () => true, // don't throw on any status
-        responseType: 'arraybuffer'
+        timeout: 120000,
+        validateStatus: () => true
       });
 
-      // Check if response is JSON (error) or image
-      const contentType = res.headers['content-type'] || '';
-      if (contentType.includes('application/json') || contentType.includes('text/plain')) {
-        // Try to parse JSON
-        let errorMsg = "Unknown API error";
-        try {
-          const json = JSON.parse(res.data.toString());
-          if (json.success === true && Array.isArray(json.images) && json.images[0] === "") {
-            errorMsg = "The API returned an empty image. This might be due to invalid parameters or server overload.";
-          } else if (json.error) {
-            errorMsg = json.error;
-          } else {
-            errorMsg = JSON.stringify(json);
-          }
-        } catch (e) {
-          errorMsg = res.data.toString().substring(0, 200);
-        }
+      // Check if the response is JSON with an image URL
+      const data = res.data;
+      if (!data || typeof data !== 'object') {
+        await message.reply("❌ | Invalid API response.");
+        return;
+      }
+
+      if (!data.success || !Array.isArray(data.images) || data.images.length === 0) {
+        const errorMsg = data.message || data.error || "Unknown API error";
         await message.reply(`❌ | API error: ${errorMsg}`);
         return;
       }
 
-      if (!contentType.startsWith('image/')) {
-        await message.reply("❌ | Unexpected response from API (not an image).");
+      const externalImageUrl = data.images[0];
+      if (!externalImageUrl || externalImageUrl === "") {
+        await message.reply("❌ | API returned an empty image URL.");
         return;
       }
 
-      const imageBuffer = Buffer.from(res.data, 'binary');
+      // Download the image
+      const imageRes = await axios.get(externalImageUrl, {
+        responseType: 'arraybuffer',
+        timeout: 30000
+      });
+      const imageBuffer = Buffer.from(imageRes.data, 'binary');
 
       // Upload to Imgur
       const form = new FormData();
