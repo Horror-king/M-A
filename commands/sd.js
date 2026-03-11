@@ -1,9 +1,8 @@
-const axios = require("axios");
+const axios = require('axios');
+const FormData = require('form-data');
 
-// Configuration – move these to environment variables for security
 const API_URL = "https://fahim-api-demo.onrender.com/ai/aiease/v1";
-const API_COOKIE =
-  "connect.sid=s%3A7sKKv8NJgIs6k3gb4DVeDiPAQNr1cyUE.m%2BNmkn%2BHDCqttRUhpW5sm9vjshuCccz3nNSoC3FBQK8";
+const API_COOKIE = "connect.sid=s%3A7sKKv8NJgIs6k3gb4DVeDiPAQNr1cyUE.m%2BNmkn%2BHDCqttRUhpW5sm9vjshuCccz3nNSoC3FBQK8";
 
 const ALLOWED_RATIOS = [
   "1:1", "5:4", "4:5", "4:3", "3:4",
@@ -52,35 +51,27 @@ module.exports = {
   config: {
     name: "sd",
     aliases: ["seedream"],
-    version: "1.8",
+    version: "1.9",
     role: 0,
-    author: "S M Fahim",
+    author: "S M Fahim (adapted by Hassan)",
     countDown: 5,
     category: "image",
     guide: {
       en:
         "{pn} a cute cat --model sd_4.5 --quality 4k\n" +
-        "Reply images + {pn} combine them --model nano_banana --ar 3:2"
+        "Reply to an image + {pn} combine them --model nano_banana --ar 3:2"
     }
   },
 
-  onStart: async function ({ api, event, args }) {
-    const { supabase, io } = api;
-    if (!supabase || !io) {
-      console.error("❌ sd command: missing supabase or io in api");
-      return;
-    }
-
+  onStart: async function ({ message, event, args, api }) {
     const input = args.join(" ").trim();
     if (!input) {
-      console.log("sd command: no input");
-      return;
+      return message.reply("❌ | Please provide a prompt.");
     }
 
     const parsed = parseFlags(input);
     if (!parsed.prompt) {
-      console.log("sd command: no prompt after parsing");
-      return;
+      return message.reply("❌ | Prompt cannot be empty.");
     }
 
     const prompt = parsed.prompt;
@@ -97,10 +88,12 @@ module.exports = {
       qualityText = `📐 Quality: ${quality}\n`;
     }
 
-    // --- Get image URL from the replied message ---
+    // --- Get image URL from the replied message (if any) ---
     let imageUrls = [];
     if (event.messageReply && event.messageReply.id) {
       try {
+        // Fetch the replied message from the database using the provided supabase instance
+        const { supabase } = api; // supabase is available in the api object
         const { data: repliedMsg, error } = await supabase
           .from('chatter')
           .select('*')
@@ -111,6 +104,7 @@ module.exports = {
           if (repliedMsg.image_url) {
             imageUrls.push(repliedMsg.image_url);
           } else {
+            // Fallback: extract image URLs from the content
             const urlRegex = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp|bmp|svg))/gi;
             const matches = repliedMsg.content.match(urlRegex);
             if (matches) {
@@ -123,16 +117,16 @@ module.exports = {
       }
     }
 
-    if (imageUrls.length === 0) {
-      console.log("sd command: no image found to edit");
-      return;
-    }
-
     // --- Build the external API URL ---
     let apiUrl = `${API_URL}?prompt=${encodeURIComponent(prompt)}&model=${realModel}`;
     if (ratio) apiUrl += `&ratio=${ratio}`;
     apiUrl += qualityParam;
-    apiUrl += `&url=${encodeURIComponent(imageUrls.join(","))}`;
+    if (imageUrls.length > 0) {
+      apiUrl += `&url=${encodeURIComponent(imageUrls.join(","))}`;
+    }
+
+    // Notify user that processing has started
+    const processingMsg = await message.reply("🎨 | Generating image, please wait...");
 
     try {
       console.log("🔄 Calling external API:", apiUrl);
@@ -141,67 +135,68 @@ module.exports = {
           Cookie: API_COOKIE,
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
         },
-        timeout: 60000
+        timeout: 60000,
+        responseType: 'arraybuffer' // fetch as binary
       });
 
-      if (!res.data?.success || !Array.isArray(res.data.images) || !res.data.images[0]) {
-        console.error("❌ API response missing image:", res.data);
+      // The API returns an image directly (not JSON). Check content-type.
+      const contentType = res.headers['content-type'];
+      if (!contentType || !contentType.startsWith('image/')) {
+        // If it's JSON, there was an error
+        let errorText = res.data.toString();
+        try {
+          const json = JSON.parse(errorText);
+          if (json.error) errorText = json.error;
+        } catch (e) {}
+        await message.reply(`❌ | API error: ${errorText}`);
+        await message.unsend(processingMsg.messageID);
         return;
       }
 
-      const externalImageUrl = res.data.images[0];
+      const imageBuffer = Buffer.from(res.data, 'binary');
 
-      // --- Download the generated image ---
-      const imageResponse = await axios.get(externalImageUrl, { responseType: 'arraybuffer' });
-      const imageBuffer = Buffer.from(imageResponse.data, 'binary');
+      // --- Upload to Imgur ---
+      const form = new FormData();
+      form.append('image', imageBuffer.toString('base64'));
+      form.append('type', 'base64');
 
-      // --- Upload to your Supabase storage ---
-      const fileName = `sd_${Date.now()}.png`;
-      const filePath = `sd/${fileName}`;
-      const { error: uploadError } = await supabase.storage
-        .from('chat_images')
-        .upload(filePath, imageBuffer, {
-          contentType: 'image/png',
-          upsert: false
-        });
+      const imgurResponse = await axios.post('https://api.imgur.com/3/image', form, {
+        headers: {
+          ...form.getHeaders(),
+          'Authorization': 'Client-ID 225899c9a3312bd'
+        }
+      });
 
-      if (uploadError) {
-        console.error("❌ Upload error:", uploadError);
+      if (!imgurResponse.data.success) {
+        await message.reply("❌ | Failed to upload image to Imgur.");
+        await message.unsend(processingMsg.messageID);
         return;
       }
 
-      const { data: urlData } = supabase.storage
-        .from('chat_images')
-        .getPublicUrl(filePath);
+      const imgUrl = imgurResponse.data.data.link;
 
-      const publicUrl = urlData.publicUrl;
-      console.log("✅ Image uploaded to:", publicUrl);
+      // Build the reply message
+      const replyText =
+        `✅ | ${realModel} Result\n\n` +
+        `🧠 Prompt: ${prompt}\n` +
+        `⚙ Model: ${realModel}\n` +
+        `🖼 Ratio: ${ratio || "Auto (API)"}\n` +
+        qualityText +
+        (imageUrls.length ? `🧩 Images used: ${imageUrls.length}\n` : "") +
+        `\n${imgUrl}`;
 
-      // --- Prepare the bot's response message ---
-      const botMessage = {
-        content: `✅ | ${realModel} Result\n\n🧠 Prompt: ${prompt}\n⚙ Model: ${realModel}\n🖼 Ratio: ${ratio || "Auto (API)"}\n${qualityText}${imageUrls.length ? `🧩 Images used: ${imageUrls.length}\n` : ""}`,
-        username: 'Bot',
-        image_url: publicUrl,
-        reply_to: null,
-        created_at: new Date().toISOString()
-      };
-
-      // --- Save the message to the database ---
-      const { data: savedMsg, error: insertError } = await supabase
-        .from('chatter')
-        .insert([botMessage])
-        .select();
-
-      if (insertError) {
-        console.error("❌ Error saving bot message:", insertError);
-        return;
-      }
-
-      console.log("✅ Bot message saved, broadcasting via socket...");
-      io.emit('new-message', savedMsg[0]);
+      await message.reply(replyText);
+      await message.unsend(processingMsg.messageID); // remove the "processing" message
 
     } catch (error) {
       console.error("❌ sd command error:", error);
+      await message.reply("❌ | Image generation failed. Please try again later.");
+      await message.unsend(processingMsg.messageID);
     }
+  },
+
+  // Optional: allow using the command in onChat as well
+  onChat: async function ({ message, event, args, api }) {
+    return this.onStart({ message, event, args, api });
   }
 };
