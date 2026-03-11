@@ -63,7 +63,7 @@ module.exports = {
     }
   },
 
-  onStart: async function ({ message, event, args }) {
+  onStart: async function ({ message, event, args, api }) {
     try {
       const input = args.join(" ").trim();
       if (!input) {
@@ -87,25 +87,30 @@ module.exports = {
         qualityText = `📐 Quality: ${quality}\n`;
       }
 
-      // --- Get image URL from the replied message (if any) ---
+      // --- Get image URL from replied message (if any) ---
       let imageUrls = [];
       if (event.messageReply && event.messageReply.id) {
         try {
-          // In a real environment you would fetch the message from your database.
-          // Since we don't have supabase here, we'll assume the replied message's
-          // content contains the image URL, or you can implement a fetch.
-          // For simplicity, we'll rely on the user to paste an image URL in the reply.
-          // But if you have the message content from the event, you can extract it:
-          const repliedContent = event.messageReply.body || event.messageReply.text;
-          if (repliedContent) {
-            const urlRegex = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp|bmp|svg))/gi;
-            const matches = repliedContent.match(urlRegex);
-            if (matches) {
-              imageUrls.push(...matches.slice(0, 10));
+          const { supabase } = api;
+          const { data: repliedMsg, error } = await supabase
+            .from('chatter')
+            .select('*')
+            .eq('id', event.messageReply.id)
+            .single();
+
+          if (!error && repliedMsg) {
+            if (repliedMsg.image_url) {
+              imageUrls.push(repliedMsg.image_url);
+            } else {
+              const urlRegex = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp|bmp|svg))/gi;
+              const matches = repliedMsg.content.match(urlRegex);
+              if (matches) {
+                imageUrls.push(...matches.slice(0, 10));
+              }
             }
           }
         } catch (err) {
-          console.error("Error extracting image from reply:", err);
+          console.error("Error fetching replied message:", err);
         }
       }
 
@@ -117,17 +122,17 @@ module.exports = {
         apiUrl += `&url=${encodeURIComponent(imageUrls.join(","))}`;
       }
 
-      // Send a processing message
-      await message.reply("🎨 | Generating image, please wait...");
+      // Send processing message
+      await message.reply("🎨 | Generating image, please wait... (this may take up to 2 minutes)");
 
-      // Call the external API – it returns JSON with an image URL
+      // Call the external API – it returns JSON
       const res = await axios.get(apiUrl, {
         headers: {
           Cookie: API_COOKIE,
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
         },
-        timeout: 120000, // 2 minutes
-        validateStatus: () => true // don't throw on any status
+        timeout: 120000,
+        validateStatus: () => true
       });
 
       const data = res.data;
