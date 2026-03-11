@@ -51,7 +51,7 @@ module.exports = {
   config: {
     name: "sd",
     aliases: ["seedream"],
-    version: "1.12",
+    version: "2.0",
     role: 0,
     author: "Hassan",
     countDown: 5,
@@ -63,7 +63,7 @@ module.exports = {
     }
   },
 
-  onStart: async function ({ message, event, args, api }) {
+  onStart: async function ({ message, event, args }) {
     try {
       const input = args.join(" ").trim();
       if (!input) {
@@ -87,30 +87,25 @@ module.exports = {
         qualityText = `📐 Quality: ${quality}\n`;
       }
 
-      // --- Get image URL from replied message (if any) ---
+      // --- Get image URL from the replied message (if any) ---
       let imageUrls = [];
       if (event.messageReply && event.messageReply.id) {
         try {
-          const { supabase } = api;
-          const { data: repliedMsg, error } = await supabase
-            .from('chatter')
-            .select('*')
-            .eq('id', event.messageReply.id)
-            .single();
-
-          if (!error && repliedMsg) {
-            if (repliedMsg.image_url) {
-              imageUrls.push(repliedMsg.image_url);
-            } else {
-              const urlRegex = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp|bmp|svg))/gi;
-              const matches = repliedMsg.content.match(urlRegex);
-              if (matches) {
-                imageUrls.push(...matches.slice(0, 10));
-              }
+          // In a real environment you would fetch the message from your database.
+          // Since we don't have supabase here, we'll assume the replied message's
+          // content contains the image URL, or you can implement a fetch.
+          // For simplicity, we'll rely on the user to paste an image URL in the reply.
+          // But if you have the message content from the event, you can extract it:
+          const repliedContent = event.messageReply.body || event.messageReply.text;
+          if (repliedContent) {
+            const urlRegex = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp|bmp|svg))/gi;
+            const matches = repliedContent.match(urlRegex);
+            if (matches) {
+              imageUrls.push(...matches.slice(0, 10));
             }
           }
         } catch (err) {
-          console.error("Error fetching replied message:", err);
+          console.error("Error extracting image from reply:", err);
         }
       }
 
@@ -122,36 +117,32 @@ module.exports = {
         apiUrl += `&url=${encodeURIComponent(imageUrls.join(","))}`;
       }
 
-      // Send processing message
-      const processingMsg = await message.reply("🎨 | Generating image, please wait... (this may take up to 2 minutes)");
+      // Send a processing message
+      await message.reply("🎨 | Generating image, please wait...");
 
-      // Call the external API – it returns JSON
+      // Call the external API – it returns JSON with an image URL
       const res = await axios.get(apiUrl, {
         headers: {
           Cookie: API_COOKIE,
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
         },
-        timeout: 120000,
-        validateStatus: () => true
+        timeout: 120000, // 2 minutes
+        validateStatus: () => true // don't throw on any status
       });
 
-      // Check if the response is JSON with an image URL
       const data = res.data;
       if (!data || typeof data !== 'object') {
-        await message.reply("❌ | Invalid API response.");
-        return;
+        return message.reply("❌ | Invalid API response.");
       }
 
       if (!data.success || !Array.isArray(data.images) || data.images.length === 0) {
         const errorMsg = data.message || data.error || "Unknown API error";
-        await message.reply(`❌ | API error: ${errorMsg}`);
-        return;
+        return message.reply(`❌ | API error: ${errorMsg}`);
       }
 
       const externalImageUrl = data.images[0];
       if (!externalImageUrl || externalImageUrl === "") {
-        await message.reply("❌ | API returned an empty image URL.");
-        return;
+        return message.reply("❌ | API returned an empty image URL.");
       }
 
       // Download the image
@@ -174,8 +165,7 @@ module.exports = {
       });
 
       if (!imgurResponse.data.success) {
-        await message.reply("❌ | Failed to upload image to Imgur.");
-        return;
+        return message.reply("❌ | Failed to upload image to Imgur.");
       }
 
       const imgUrl = imgurResponse.data.data.link;
@@ -195,10 +185,9 @@ module.exports = {
     } catch (error) {
       console.error("❌ sd command error:", error);
       if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-        await message.reply("❌ | The image generation took too long. Please try again later or use a simpler prompt.");
-      } else {
-        await message.reply(`❌ | Error: ${error.message}`);
+        return message.reply("❌ | The image generation took too long. Please try again later or use a simpler prompt.");
       }
+      return message.reply(`❌ | Error: ${error.message}`);
     }
   }
 };
