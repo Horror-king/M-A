@@ -51,7 +51,7 @@ module.exports = {
   config: {
     name: "sd",
     aliases: ["seedream"],
-    version: "2.3",
+    version: "2.4",
     role: 0,
     author: "Hassan",
     countDown: 5,
@@ -59,7 +59,8 @@ module.exports = {
     guide: {
       en:
         "{pn} a cute cat --model sd_4.5 --quality 4k\n" +
-        "Reply to an image + {pn} combine them --model nano_banana --ar 3:2"
+        "Reply to an image + {pn} edit it --model sd_4.5\n" +
+        "Reply to multiple images + {pn} combine them --model nano_banana --ar 3:2"
     }
   },
 
@@ -105,7 +106,6 @@ module.exports = {
               imageUrls.push(repliedMsg.image_url);
               console.log("📸 Using image_url from database:", repliedMsg.image_url);
             } else {
-              // Fallback: try to extract from content
               const urlRegex = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp|bmp|svg))/gi;
               const matches = repliedMsg.content.match(urlRegex);
               if (matches && matches.length > 0) {
@@ -123,9 +123,18 @@ module.exports = {
         }
       }
 
-      // --- Warn if using nano_banana with only one image ---
-      if (realModel === "kie_nano_banana" && imageUrls.length === 1) {
-        return message.reply("⚠️ The nano_banana model is designed for combining multiple images. Please use sd_4.0 or sd_4.5 for single image editing, or reply with at least two images.");
+      // --- Validate model usage ---
+      if (realModel === "kie_nano_banana") {
+        if (imageUrls.length < 2) {
+          return message.reply(
+            "⚠️ The `nano_banana` model is for **combining multiple images**.\n" +
+            "For editing a single image, please use `sd_4.0` or `sd_4.5`.\n\n" +
+            "Example: `!sd turn this into a cartoon --model sd_4.5`"
+          );
+        }
+      } else if (imageUrls.length > 0 && imageUrls.length < 2) {
+        // This is the normal single-image editing case – perfect.
+        console.log("✅ Single image edit mode.");
       }
 
       // --- Build the external API URL ---
@@ -151,7 +160,7 @@ module.exports = {
           Cookie: API_COOKIE,
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
         },
-        timeout: 240000, // 4 minutes
+        timeout: 240000,
         validateStatus: () => true
       });
 
