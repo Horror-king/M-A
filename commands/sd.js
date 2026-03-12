@@ -51,7 +51,7 @@ module.exports = {
   config: {
     name: "sd",
     aliases: ["seedream"],
-    version: "2.5",                     // updated version
+    version: "2.7",                     // fixed image edit on reply
     role: 0,
     author: "Hassan",
     countDown: 5,
@@ -90,36 +90,58 @@ module.exports = {
 
       // --- Get image URL from replied message (if any) ---
       let imageUrls = [];
-      if (event.messageReply && event.messageReply.id) {
-        console.log(`🔍 Fetching replied message ID: ${event.messageReply.id}`);
+      let isReplying = false;
+
+      if (event.messageReply) {
+        isReplying = true;
+
+        // 1. Try to get the replied message ID (GoatBot uses messageID, not id)
+        const replyId = event.messageReply.messageID || event.messageReply.id;
+        console.log(`🔍 Fetching replied message ID: ${replyId}`);
+
+        // 2. Attempt database lookup via Supabase (original method)
         try {
           const { supabase } = api;
           const { data: repliedMsg, error } = await supabase
             .from('chatter')
             .select('*')
-            .eq('id', event.messageReply.id)
+            .eq('id', replyId)
             .single();
 
           if (!error && repliedMsg) {
-            console.log("✅ Replied message found:", repliedMsg.id);
+            console.log("✅ Replied message found in DB:", repliedMsg.id);
+
+            // First try the dedicated image_url field (for uploaded images)
             if (repliedMsg.image_url) {
               imageUrls.push(repliedMsg.image_url);
               console.log("📸 Using image_url from database:", repliedMsg.image_url);
             } else {
+              // Fallback: extract image URLs from the message content
               const urlRegex = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp|bmp|svg))/gi;
               const matches = repliedMsg.content.match(urlRegex);
               if (matches && matches.length > 0) {
                 imageUrls.push(...matches.slice(0, 10));
-                console.log("📸 Extracted URLs from content:", matches);
+                console.log("📸 Extracted URLs from DB content:", matches);
               } else {
-                console.log("⚠️ No image URL found in replied message.");
+                console.log("⚠️ No image URL found in DB message.");
               }
             }
           } else {
-            console.log("❌ Replied message not found or error:", error);
+            console.log("⚠️ Replied message not found in DB or error:", error?.message);
           }
         } catch (err) {
-          console.error("❌ Error fetching replied message:", err);
+          console.error("❌ Error fetching replied message from DB:", err);
+        }
+
+        // 3. If still no image URL, try to extract from the event's replied message body directly
+        if (imageUrls.length === 0 && event.messageReply.body) {
+          console.log("🔍 Trying direct extraction from event.messageReply.body");
+          const urlRegex = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp|bmp|svg))/gi;
+          const matches = event.messageReply.body.match(urlRegex);
+          if (matches && matches.length > 0) {
+            imageUrls.push(...matches.slice(0, 10));
+            console.log("📸 Extracted URLs from event body:", matches);
+          }
         }
       }
 
@@ -134,15 +156,23 @@ module.exports = {
         }
       } else {
         // Editing models (sd_4.0 / sd_4.5)
+        if (isReplying && imageUrls.length === 0) {
+          return message.reply(
+            "❌ You replied to a message, but I couldn't find any image in it.\n" +
+            "Make sure you're replying to a message that contains an image (either uploaded or a direct link)."
+          );
+        }
+
         if (imageUrls.length > 0) {
           if (imageUrls.length > 1) {
             // More than one image found: warn and use only the first one
             message.reply(`⚠️ Multiple images detected. Only the **first** image will be used for editing. (Found ${imageUrls.length} images)`);
             imageUrls = [imageUrls[0]];
           }
-          console.log("✅ Single image edit mode.");
+          console.log("✅ Single image edit mode. URL:", imageUrls[0]);
+        } else {
+          console.log("ℹ️ No image URL provided – generating new image from prompt only.");
         }
-        // If no image, it's a normal generation (no reply)
       }
 
       // --- Build the external API URL ---
@@ -152,8 +182,6 @@ module.exports = {
       if (imageUrls.length > 0) {
         apiUrl += `&url=${encodeURIComponent(imageUrls.join(","))}`;
         console.log("✅ Including image URL(s) in API request:", imageUrls);
-      } else {
-        console.log("ℹ️ No image URL provided – generating new image from prompt only.");
       }
       console.log("🌐 Final external API URL:", apiUrl);
 
