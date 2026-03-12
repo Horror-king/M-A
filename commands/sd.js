@@ -51,7 +51,7 @@ module.exports = {
   config: {
     name: "sd",
     aliases: ["seedream"],
-    version: "2.4",
+    version: "2.5",                     // updated version
     role: 0,
     author: "Hassan",
     countDown: 5,
@@ -59,7 +59,7 @@ module.exports = {
     guide: {
       en:
         "{pn} a cute cat --model sd_4.5 --quality 4k\n" +
-        "Reply to an image + {pn} edit it --model sd_4.5\n" +
+        "Reply to an image with {pn} edit it --model sd_4.5  (edits that single image)\n" +
         "Reply to multiple images + {pn} combine them --model nano_banana --ar 3:2"
     }
   },
@@ -123,18 +123,26 @@ module.exports = {
         }
       }
 
-      // --- Validate model usage ---
+      // --- Validate model usage and image count ---
       if (realModel === "kie_nano_banana") {
+        // Combining model
         if (imageUrls.length < 2) {
           return message.reply(
             "⚠️ The `nano_banana` model is for **combining multiple images**.\n" +
-            "For editing a single image, please use `sd_4.0` or `sd_4.5`.\n\n" +
-            "Example: `!sd turn this into a cartoon --model sd_4.5`"
+            "You need at least two images. For editing a single image, please use `sd_4.0` or `sd_4.5`."
           );
         }
-      } else if (imageUrls.length > 0 && imageUrls.length < 2) {
-        // This is the normal single-image editing case – perfect.
-        console.log("✅ Single image edit mode.");
+      } else {
+        // Editing models (sd_4.0 / sd_4.5)
+        if (imageUrls.length > 0) {
+          if (imageUrls.length > 1) {
+            // More than one image found: warn and use only the first one
+            message.reply(`⚠️ Multiple images detected. Only the **first** image will be used for editing. (Found ${imageUrls.length} images)`);
+            imageUrls = [imageUrls[0]];
+          }
+          console.log("✅ Single image edit mode.");
+        }
+        // If no image, it's a normal generation (no reply)
       }
 
       // --- Build the external API URL ---
@@ -143,14 +151,14 @@ module.exports = {
       apiUrl += qualityParam;
       if (imageUrls.length > 0) {
         apiUrl += `&url=${encodeURIComponent(imageUrls.join(","))}`;
-        console.log("✅ Including image URL in API request:", imageUrls);
+        console.log("✅ Including image URL(s) in API request:", imageUrls);
       } else {
         console.log("ℹ️ No image URL provided – generating new image from prompt only.");
       }
       console.log("🌐 Final external API URL:", apiUrl);
 
       // Send processing message
-      const processingMsg = await message.reply("🎨 | Generating image, please wait... (this may take up to 4 minutes)");
+      const processingMsg = await message.reply("🎨 | Generating/editing image, please wait... (this may take up to 4 minutes)");
       console.log("⏳ Processing message sent, ID:", processingMsg.messageID);
 
       // Call the external API
