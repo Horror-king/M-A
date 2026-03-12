@@ -51,7 +51,7 @@ module.exports = {
   config: {
     name: "sd",
     aliases: ["seedream"],
-    version: "2.7",                     // fixed image edit on reply
+    version: "3.1",                     // added debug output on failure
     role: 0,
     author: "Hassan",
     countDown: 5,
@@ -77,7 +77,7 @@ module.exports = {
       }
 
       const prompt = parsed.prompt;
-      const modelKey = parsed.model || "sd_4.5"; // default to sd_4.5
+      const modelKey = parsed.model || "sd_4.5";
       const realModel = MODEL_MAP[modelKey] || MODEL_MAP["sd_4.5"];
       const ratio = parsed.ratio && ALLOWED_RATIOS.includes(parsed.ratio) ? parsed.ratio : null;
 
@@ -88,66 +88,48 @@ module.exports = {
         qualityText = `📐 Quality: ${quality}\n`;
       }
 
-      // --- Get image URL from replied message (if any) ---
+      // --- Get image URL from replied message directly (no database) ---
       let imageUrls = [];
       let isReplying = false;
+      let debugInfo = {};
 
       if (event.messageReply) {
         isReplying = true;
+        console.log("🔍 Replied message detected");
 
-        // 1. Try to get the replied message ID (GoatBot uses messageID, not id)
-        const replyId = event.messageReply.messageID || event.messageReply.id;
-        console.log(`🔍 Fetching replied message ID: ${replyId}`);
+        // Collect debug info
+        debugInfo = {
+          messageID: event.messageReply.messageID,
+          hasAttachments: !!(event.messageReply.attachments && event.messageReply.attachments.length),
+          attachments: event.messageReply.attachments ? event.messageReply.attachments.map(a => ({ type: a.type, url: a.url })) : [],
+          body: event.messageReply.body ? event.messageReply.body.substring(0, 200) : null,
+        };
 
-        // 2. Attempt database lookup via Supabase (original method)
-        try {
-          const { supabase } = api;
-          const { data: repliedMsg, error } = await supabase
-            .from('chatter')
-            .select('*')
-            .eq('id', replyId)
-            .single();
-
-          if (!error && repliedMsg) {
-            console.log("✅ Replied message found in DB:", repliedMsg.id);
-
-            // First try the dedicated image_url field (for uploaded images)
-            if (repliedMsg.image_url) {
-              imageUrls.push(repliedMsg.image_url);
-              console.log("📸 Using image_url from database:", repliedMsg.image_url);
-            } else {
-              // Fallback: extract image URLs from the message content
-              const urlRegex = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp|bmp|svg))/gi;
-              const matches = repliedMsg.content.match(urlRegex);
-              if (matches && matches.length > 0) {
-                imageUrls.push(...matches.slice(0, 10));
-                console.log("📸 Extracted URLs from DB content:", matches);
-              } else {
-                console.log("⚠️ No image URL found in DB message.");
-              }
+        // 1. Check attachments (for uploaded images)
+        if (event.messageReply.attachments && event.messageReply.attachments.length > 0) {
+          for (let att of event.messageReply.attachments) {
+            if (att.type === "photo" || (att.type === "image" && att.url)) {
+              imageUrls.push(att.url);
+              console.log("📸 Found image in attachment:", att.url);
             }
-          } else {
-            console.log("⚠️ Replied message not found in DB or error:", error?.message);
           }
-        } catch (err) {
-          console.error("❌ Error fetching replied message from DB:", err);
         }
 
-        // 3. If still no image URL, try to extract from the event's replied message body directly
+        // 2. If no attachments, try to extract from message body
         if (imageUrls.length === 0 && event.messageReply.body) {
-          console.log("🔍 Trying direct extraction from event.messageReply.body");
           const urlRegex = /(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp|bmp|svg))/gi;
           const matches = event.messageReply.body.match(urlRegex);
           if (matches && matches.length > 0) {
-            imageUrls.push(...matches.slice(0, 10));
-            console.log("📸 Extracted URLs from event body:", matches);
+            imageUrls.push(...matches);
+            console.log("📸 Found image URLs in body:", matches);
           }
         }
+
+        console.log(`📸 Total images found: ${imageUrls.length}`);
       }
 
       // --- Validate model usage and image count ---
       if (realModel === "kie_nano_banana") {
-        // Combining model
         if (imageUrls.length < 2) {
           return message.reply(
             "⚠️ The `nano_banana` model is for **combining multiple images**.\n" +
@@ -155,17 +137,24 @@ module.exports = {
           );
         }
       } else {
-        // Editing models (sd_4.0 / sd_4.5)
         if (isReplying && imageUrls.length === 0) {
-          return message.reply(
-            "❌ You replied to a message, but I couldn't find any image in it.\n" +
-            "Make sure you're replying to a message that contains an image (either uploaded or a direct link)."
-          );
+          // Send debug info to help user understand why no image was found
+          const debugText = `
+❌ **No image found in your reply.**
+
+Here's what I received from the replied message:
+- Message ID: \`${debugInfo.messageID || 'unknown'}\`
+- Has attachments: ${debugInfo.hasAttachments ? '✅' : '❌'}
+- Attachments: ${debugInfo.attachments.length ? JSON.stringify(debugInfo.attachments, null, 2) : 'none'}
+- Body snippet: ${debugInfo.body ? `"${debugInfo.body}"` : 'empty'}
+
+Make sure you're replying to a message that contains an uploaded image or a direct image link (ending with .jpg, .png, etc.).
+          `;
+          return message.reply(debugText);
         }
 
         if (imageUrls.length > 0) {
           if (imageUrls.length > 1) {
-            // More than one image found: warn and use only the first one
             message.reply(`⚠️ Multiple images detected. Only the **first** image will be used for editing. (Found ${imageUrls.length} images)`);
             imageUrls = [imageUrls[0]];
           }
@@ -201,7 +190,6 @@ module.exports = {
       });
 
       console.log("📥 API response received. Status:", res.status);
-      console.log("📦 Response headers:", JSON.stringify(res.headers, null, 2));
 
       const data = res.data;
       if (!data || typeof data !== 'object') {
