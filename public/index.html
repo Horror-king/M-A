@@ -1645,27 +1645,35 @@
         background-color: #dcf8c6;
     }
 
-    /* MODIFIED: reply-preview inside message bubbles – now supports an image */
+    /* MODIFIED: reply-preview inside message bubbles – now stacks image above text */
     .reply-preview {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
         font-size: 0.8em;
         color: #555;
         background-color: #eee;
-        padding: 4px 8px;
+        padding: 8px;
         border-left: 3px solid #888;
         margin-bottom: 4px;
         border-radius: 5px;
-        max-width: 90%;
+        max-width: 100%;
         white-space: pre-wrap;
         word-break: break-word;
     }
     .reply-preview .reply-image {
-        width: 60px;  /* smaller preview */
+        width: 60px;
         height: 60px;
         object-fit: cover;
         border-radius: 6px;
-        margin-right: 8px;
+        margin-bottom: 4px;
         opacity: 0.5;  /* faded */
         border: 1px solid #ccc;
+        align-self: center;
+    }
+    .reply-preview span {
+        max-width: 100%;
+        overflow-wrap: break-word;
     }
 
     /* Improved avatar styling */
@@ -5848,7 +5856,7 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
                 const img = document.createElement('img');
                 img.src = replyImage;
                 img.alt = "replied image";
-                img.className = "reply-image"; // styled in CSS: width 60px, opacity 0.5, etc.
+                img.className = "reply-image"; // styled in CSS
                 replyBubble.appendChild(img);
             }
             
