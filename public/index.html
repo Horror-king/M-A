@@ -1645,6 +1645,7 @@
         background-color: #dcf8c6;
     }
 
+    /* MODIFIED: reply-preview inside message bubbles – now supports an image */
     .reply-preview {
         font-size: 0.8em;
         color: #555;
@@ -1656,6 +1657,15 @@
         max-width: 90%;
         white-space: pre-wrap;
         word-break: break-word;
+    }
+    .reply-preview .reply-image {
+        width: 60px;  /* smaller preview */
+        height: 60px;
+        object-fit: cover;
+        border-radius: 6px;
+        margin-right: 8px;
+        opacity: 0.5;  /* faded */
+        border: 1px solid #ccc;
     }
 
     /* Improved avatar styling */
@@ -5735,7 +5745,7 @@ async function updateAllMessagesFromUser(username, status, lastSeen) {
     });
 }
 
-// ===== MODIFIED: createMessageElement to accept image_url and store it in dataset =====
+// ===== MODIFIED: createMessageElement to handle reply with image preview =====
 function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null, status = 'offline', lastSeen = null, image_url = null) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${sender}`;
@@ -5743,7 +5753,7 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
     messageDiv.dataset.content = text;
     messageDiv.dataset.username = username;
     messageDiv.dataset.timestamp = Date.now();
-    if (image_url) messageDiv.dataset.imageUrl = image_url; // ADDED: store image URL in dataset
+    if (image_url) messageDiv.dataset.imageUrl = image_url; // store own image URL
 
     // Only create avatar for received messages
     if (sender === 'received') {
@@ -5814,14 +5824,42 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
 
         const contentDiv = document.createElement('div');
         contentDiv.className = 'content';
+        
+        // ===== MODIFIED: Handle reply preview with possible image =====
         if (repliedTo) {
             const replyBubble = document.createElement('div');
             replyBubble.className = 'reply-preview';
-            replyBubble.textContent = repliedTo;
+            
+            // Check if repliedTo is a JSON string containing an image URL
+            let replyText = repliedTo;
+            let replyImage = null;
+            try {
+                const parsed = JSON.parse(repliedTo);
+                if (parsed && typeof parsed === 'object' && parsed.image && parsed.text) {
+                    replyText = parsed.text;
+                    replyImage = parsed.image;
+                }
+            } catch (e) {
+                // not JSON, normal reply text
+            }
+            
+            if (replyImage) {
+                // Show image preview with small size and faded opacity
+                const img = document.createElement('img');
+                img.src = replyImage;
+                img.alt = "replied image";
+                img.className = "reply-image"; // styled in CSS: width 60px, opacity 0.5, etc.
+                replyBubble.appendChild(img);
+            }
+            
+            const span = document.createElement('span');
+            span.textContent = replyText.substring(0, 80) + (replyText.length > 80 ? '...' : '');
+            replyBubble.appendChild(span);
+            
             contentDiv.appendChild(replyBubble);
         }
 
-        // ===== MODIFIED: Handle image_url if provided =====
+        // ===== MODIFIED: Handle own image_url if provided =====
         if (image_url) {
             const img = new Image();
             img.src = image_url;
@@ -5973,13 +6011,40 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
         // For sent messages - simpler structure without avatar/username
         const contentDiv = document.createElement('div');
         contentDiv.className = 'content';
+        // ===== MODIFIED: Handle reply preview with possible image =====
         if (repliedTo) {
             const replyBubble = document.createElement('div');
             replyBubble.className = 'reply-preview';
-            replyBubble.textContent = repliedTo;
+            
+            // Check if repliedTo is a JSON string containing an image URL
+            let replyText = repliedTo;
+            let replyImage = null;
+            try {
+                const parsed = JSON.parse(repliedTo);
+                if (parsed && typeof parsed === 'object' && parsed.image && parsed.text) {
+                    replyText = parsed.text;
+                    replyImage = parsed.image;
+                }
+            } catch (e) {
+                // not JSON, normal reply text
+            }
+            
+            if (replyImage) {
+                // Show image preview with small size and faded opacity
+                const img = document.createElement('img');
+                img.src = replyImage;
+                img.alt = "replied image";
+                img.className = "reply-image"; // styled in CSS
+                replyBubble.appendChild(img);
+            }
+            
+            const span = document.createElement('span');
+            span.textContent = replyText.substring(0, 80) + (replyText.length > 80 ? '...' : '');
+            replyBubble.appendChild(span);
+            
             contentDiv.appendChild(replyBubble);
         }
-        // ===== MODIFIED: Handle image_url if provided =====
+        // ===== MODIFIED: Handle own image_url if provided =====
         if (image_url) {
             const img = new Image();
             img.src = image_url;
@@ -8124,24 +8189,34 @@ async function sendMessage() {
         const imageUrlRegex = /^(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp|bmp|svg))(?:\?[^\s]*)?$/i;
         let payload;
         
-        // ===== MODIFICATION START: Handle reply to image for commands =====
+        // ===== MODIFICATION START: Handle reply to image =====
         let finalContent = content;
         let finalImageUrl = '';
         
-        // If replying to an image and the content starts with a command prefix, transform it
+        // If replying to an image, embed the image URL in the reply_to field (as JSON)
+        let replyToPayload = null;
+        if (replyToText) {
+            if (replyToImageUrl) {
+                // Store both text and image URL
+                replyToPayload = JSON.stringify({ text: replyToText, image: replyToImageUrl });
+            } else {
+                replyToPayload = replyToText;
+            }
+        }
+        
+        // Also handle command transformation (as before)
         const PREFIX = '!';
-        if (replyToMessageId && replyToImageUrl && content.startsWith(PREFIX)) {
+        if (replyToImageUrl && content.startsWith(PREFIX)) {
             // Automatically format as: !sd [image_url] | [command]
             finalContent = `${content} | ${replyToImageUrl}`;
             console.log('🖼️ Reply to image detected, transformed command:', finalContent);
-            // We'll still send image_url as empty, because the command will parse the URL from the text
         }
         
         if (imageUrlRegex.test(finalContent)) {
             // It's an image URL → send as image message (empty content)
-            payload = { content: '', username, image_url: finalContent, reply_to: replyToText || null };
+            payload = { content: '', username, image_url: finalContent, reply_to: replyToPayload };
         } else {
-            payload = { content: finalContent, username, image_url: '', reply_to: replyToText || null };
+            payload = { content: finalContent, username, image_url: '', reply_to: replyToPayload };
         }
         
         // Use OperaMiniMessenger for Opera Mini, otherwise use regular fetch
@@ -8155,7 +8230,7 @@ async function sendMessage() {
             savedMessage = {
                 content: payload.content,
                 username: username,
-                reply_to: replyToText || null,
+                reply_to: replyToPayload,
                 id: result.id || Date.now().toString(),
                 image_url: payload.image_url
             };
@@ -10064,7 +10139,7 @@ function batchMessageRender(messages, renderFunction) {
             if (replyToImageUrl) {
                 previewHtml = `
                     <div style="display: flex; align-items: center; gap: 10px;">
-                        <img src="${replyToImageUrl}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;">
+                        <img src="${replyToImageUrl}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px; opacity:0.7;">
                         <span>${replyToText ? replyToText.substring(0, 80) : 'a message'}</span>
                     </div>
                 `;
