@@ -1626,12 +1626,6 @@
         box-sizing: border-box;
     }
 
-    /* Fade effect for replied-to messages */
-    .message.replied-fade {
-        opacity: 0.5;
-        transition: opacity 0.3s;
-    }
-
     .content {
         user-select: none;
         flex-grow: 1;
@@ -5185,7 +5179,6 @@
     </div>
     <script>
     // --- CUT HERE ---
-// --- CUT HERE ---
 // Add eye icon functionality for password field
 function setupPasswordToggle() {
     const passwordInput = document.getElementById('auth-password');
@@ -8189,14 +8182,6 @@ async function sendMessage() {
         
         // Display message with the actual ID from server
         displayMessage(savedMessage.content, 'sent', savedMessage.reply_to, savedMessage.username, savedMessage.id, true, null, null, savedMessage.image_url);
-        
-        // ===== MODIFICATION: Fade the original replied message if we replied to an image =====
-        if (replyToMessageId && replyToImageUrl) {
-            const originalMessage = document.querySelector(`[data-id="${replyToMessageId}"]`);
-            if (originalMessage) {
-                originalMessage.classList.add('replied-fade');
-            }
-        }
         
         // Clear input immediately for better UX
         elements.messageInput.value = '';
