@@ -5736,8 +5736,8 @@ async function updateAllMessagesFromUser(username, status, lastSeen) {
     });
 }
 
-// ===== MODIFIED: createMessageElement to accept image_url and enhanced reply preview =====
-function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null, status = 'offline', lastSeen = null, image_url = null) {
+// ===== MODIFIED: createMessageElement to accept image_url and replyImageUrl =====
+function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null, status = 'offline', lastSeen = null, image_url = null, replyImageUrl = null) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${sender}`;
     if (messageId) messageDiv.dataset.id = messageId;
@@ -5814,50 +5814,35 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
 
         const contentDiv = document.createElement('div');
         contentDiv.className = 'content';
-        // ===== MODIFIED: Reply preview with optional image =====
+        // ===== MODIFIED: Reply preview with image thumbnail =====
         if (repliedTo) {
             const replyBubble = document.createElement('div');
             replyBubble.className = 'reply-preview';
-            
-            let replyText = repliedTo;
-            let replyImageUrl = null;
-            // Try to parse as JSON (our custom format)
-            if (typeof repliedTo === 'string' && repliedTo.startsWith('{')) {
-                try {
-                    const parsed = JSON.parse(repliedTo);
-                    if (parsed && typeof parsed === 'object') {
-                        replyText = parsed.text || '';
-                        replyImageUrl = parsed.image_url || null;
-                    }
-                } catch (e) {
-                    // Not JSON, keep as plain text
-                }
-            }
-            
-            // Style the reply bubble
-            replyBubble.style.display = 'flex';
-            replyBubble.style.flexDirection = 'column';
-            replyBubble.style.alignItems = 'flex-start';
-            replyBubble.style.gap = '4px';
-            
             if (replyImageUrl) {
-                const imgContainer = document.createElement('div');
-                imgContainer.style.marginBottom = '4px';
+                // Create container with image and text
+                const replyContainer = document.createElement('div');
+                replyContainer.style.display = 'flex';
+                replyContainer.style.alignItems = 'center';
+                replyContainer.style.gap = '5px';
+                replyContainer.style.marginBottom = '3px';
                 const img = document.createElement('img');
                 img.src = replyImageUrl;
-                img.alt = "reply preview";
-                img.style.width = "60px";
-                img.style.height = "60px";
-                img.style.objectFit = "cover";
-                img.style.borderRadius = "4px";
-                imgContainer.appendChild(img);
-                replyBubble.appendChild(imgContainer);
+                img.style.width = '40px';
+                img.style.height = '40px';
+                img.style.objectFit = 'cover';
+                img.style.borderRadius = '4px';
+                const textSpan = document.createElement('span');
+                textSpan.style.flex = '1';
+                textSpan.style.overflow = 'hidden';
+                textSpan.style.textOverflow = 'ellipsis';
+                textSpan.style.whiteSpace = 'nowrap';
+                textSpan.textContent = repliedTo;
+                replyContainer.appendChild(img);
+                replyContainer.appendChild(textSpan);
+                replyBubble.appendChild(replyContainer);
+            } else {
+                replyBubble.textContent = repliedTo;
             }
-            
-            const textSpan = document.createElement('span');
-            textSpan.textContent = replyText || (replyImageUrl ? "Image" : "");
-            replyBubble.appendChild(textSpan);
-            
             contentDiv.appendChild(replyBubble);
         }
 
@@ -6013,46 +5998,34 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
         // For sent messages - simpler structure without avatar/username
         const contentDiv = document.createElement('div');
         contentDiv.className = 'content';
-        // ===== MODIFIED: Reply preview with optional image for sent messages too =====
+        // ===== MODIFIED: Reply preview with image thumbnail =====
         if (repliedTo) {
             const replyBubble = document.createElement('div');
             replyBubble.className = 'reply-preview';
-            
-            let replyText = repliedTo;
-            let replyImageUrl = null;
-            if (typeof repliedTo === 'string' && repliedTo.startsWith('{')) {
-                try {
-                    const parsed = JSON.parse(repliedTo);
-                    if (parsed && typeof parsed === 'object') {
-                        replyText = parsed.text || '';
-                        replyImageUrl = parsed.image_url || null;
-                    }
-                } catch (e) {}
-            }
-            
-            replyBubble.style.display = 'flex';
-            replyBubble.style.flexDirection = 'column';
-            replyBubble.style.alignItems = 'flex-start';
-            replyBubble.style.gap = '4px';
-            
             if (replyImageUrl) {
-                const imgContainer = document.createElement('div');
-                imgContainer.style.marginBottom = '4px';
+                const replyContainer = document.createElement('div');
+                replyContainer.style.display = 'flex';
+                replyContainer.style.alignItems = 'center';
+                replyContainer.style.gap = '5px';
+                replyContainer.style.marginBottom = '3px';
                 const img = document.createElement('img');
                 img.src = replyImageUrl;
-                img.alt = "reply preview";
-                img.style.width = "60px";
-                img.style.height = "60px";
-                img.style.objectFit = "cover";
-                img.style.borderRadius = "4px";
-                imgContainer.appendChild(img);
-                replyBubble.appendChild(imgContainer);
+                img.style.width = '40px';
+                img.style.height = '40px';
+                img.style.objectFit = 'cover';
+                img.style.borderRadius = '4px';
+                const textSpan = document.createElement('span');
+                textSpan.style.flex = '1';
+                textSpan.style.overflow = 'hidden';
+                textSpan.style.textOverflow = 'ellipsis';
+                textSpan.style.whiteSpace = 'nowrap';
+                textSpan.textContent = repliedTo;
+                replyContainer.appendChild(img);
+                replyContainer.appendChild(textSpan);
+                replyBubble.appendChild(replyContainer);
+            } else {
+                replyBubble.textContent = repliedTo;
             }
-            
-            const textSpan = document.createElement('span');
-            textSpan.textContent = replyText || (replyImageUrl ? "Image" : "");
-            replyBubble.appendChild(textSpan);
-            
             contentDiv.appendChild(replyBubble);
         }
         // ===== MODIFIED: Handle image_url if provided =====
@@ -6077,8 +6050,8 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
     return messageDiv;
 }
 
-// ===== MODIFIED: displayMessage to accept image_url =====
-function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true, status = 'offline', lastSeen = null, image_url = null) {
+// ===== MODIFIED: displayMessage to accept image_url and replyImageUrl =====
+function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true, status = 'offline', lastSeen = null, image_url = null, replyImageUrl = null) {
     if (!elements.chatContainer) return;
     
     // Check if message already exists to prevent duplicates
@@ -6091,7 +6064,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
         return;
     }
     
-    const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId, status, lastSeen, image_url);
+    const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId, status, lastSeen, image_url, replyImageUrl);
     
     // Add event listeners to ALL messages
     addMessageTouchListeners(messageDiv);
@@ -6115,7 +6088,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
     }
 }
 
-// ===== MODIFIED: renderMessages to include image_url =====
+// ===== MODIFIED: renderMessages to include image_url and replyImageUrl =====
 function renderMessages(messages, isFirstLoad = false) {
     if (!elements.chatContainer) return;
     
@@ -6151,6 +6124,15 @@ function renderMessages(messages, isFirstLoad = false) {
             usersToUpdate.add(msg.username);
         }
         
+        // Attempt to retrieve reply image URL from pending map if this message is a reply
+        let replyImageUrl = null;
+        if (msg.reply_to && pendingReplyImages[msg.id]) {
+            replyImageUrl = pendingReplyImages[msg.id];
+        } else if (msg.reply_to && msg.reply_image_url) {
+            // If server provides it
+            replyImageUrl = msg.reply_image_url;
+        }
+        
         const messageDiv = createMessageElement(
             msg.content, 
             isOwn ? 'sent' : 'received', 
@@ -6159,7 +6141,8 @@ function renderMessages(messages, isFirstLoad = false) {
             msg.id, 
             status, 
             lastSeen,
-            msg.image_url // Pass image_url
+            msg.image_url, // Pass image_url
+            replyImageUrl   // Pass replyImageUrl
         );
         
         // ADD TOUCH LISTENERS TO ALL MESSAGES (including loaded ones)
@@ -8130,7 +8113,7 @@ function getUserProfile(username) {
     };
 }
 
-// ===== MODIFIED: sendMessage function to use OperaMiniMessenger when on Opera Mini =====
+// ===== MODIFIED: sendMessage function to use OperaMiniMessenger when on Opera Mini and handle reply image =====
 async function sendMessage() {
     if (isSending || isProcessingCommand) return;
     isSending = true;
@@ -8198,22 +8181,12 @@ async function sendMessage() {
         
         // ===== NEW: Auto‑detect if content is a standalone image URL =====
         const imageUrlRegex = /^(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp|bmp|svg))(?:\?[^\s]*)?$/i;
-        
-        // ===== MODIFIED: Build reply payload as JSON string =====
-        let replyToPayload = null;
-        if (replyToData) {
-            replyToPayload = JSON.stringify({
-                text: replyToData.text,
-                image_url: replyToData.image_url
-            });
-        }
-        
         let payload;
         if (imageUrlRegex.test(content)) {
             // It's an image URL → send as image message (empty content)
-            payload = { content: '', username, image_url: content, reply_to: replyToPayload };
+            payload = { content: '', username, image_url: content, reply_to: replyToMessageId || null };
         } else {
-            payload = { content, username, image_url: '', reply_to: replyToPayload };
+            payload = { content, username, image_url: '', reply_to: replyToMessageId || null };
         }
         
         // Use OperaMiniMessenger for Opera Mini, otherwise use regular fetch
@@ -8227,7 +8200,7 @@ async function sendMessage() {
             savedMessage = {
                 content: payload.content,
                 username: username,
-                reply_to: replyToPayload,
+                reply_to: replyToMessageId || null,
                 id: result.id || Date.now().toString(),
                 image_url: payload.image_url
             };
@@ -8252,8 +8225,17 @@ async function sendMessage() {
             savedMessage = await response.json();
         }
         
-        // Display message with the actual ID from server
-        displayMessage(savedMessage.content, 'sent', savedMessage.reply_to, savedMessage.username, savedMessage.id, true, null, null, savedMessage.image_url);
+        // If this is a reply, store the reply image URL for later use when we receive the message back
+        if (replyToImageUrl) {
+            pendingReplyImages[savedMessage.id] = replyToImageUrl;
+            // Auto-clean after 1 minute
+            setTimeout(() => {
+                delete pendingReplyImages[savedMessage.id];
+            }, 60000);
+        }
+        
+        // Display message with the actual ID from server, including reply image if any
+        displayMessage(savedMessage.content, 'sent', savedMessage.reply_to, savedMessage.username, savedMessage.id, true, null, null, savedMessage.image_url, replyToImageUrl);
         
         // Clear input immediately for better UX
         elements.messageInput.value = '';
@@ -8375,6 +8357,12 @@ function initSocket() {
                 const isAIResponse = message.username === 'AI' || message.username === 'Bot';
                 
                 if (!isOwnMessage || isAIResponse) {
+                    // Check if this message is a reply and we have a pending image for it
+                    let replyImageUrl = null;
+                    if (message.id && pendingReplyImages[message.id]) {
+                        replyImageUrl = pendingReplyImages[message.id];
+                        // Optional: clear after use? Keep for later renders maybe
+                    }
                     displayMessage(
                         message.content, 
                         isOwnMessage ? 'sent' : 'received', 
@@ -8384,7 +8372,8 @@ function initSocket() {
                         true,
                         null,
                         null,
-                        message.image_url // Pass image_url
+                        message.image_url,
+                        replyImageUrl
                     );
                     
                     if (document.visibilityState !== 'visible' && !isOwnMessage) {
@@ -8402,7 +8391,7 @@ function initSocket() {
                 }
                 
                 // === NEW: Check if this message was the one being replied to ===
-                if (replyToData && replyToData.id === messageId) {
+                if (replyToMessageId && replyToMessageId === messageId) {
                     updateReplyPreviewDeleted();
                 }
             }
@@ -8462,6 +8451,12 @@ function initSocket() {
         // Only display if we don't already have it
         const existingMessage = document.querySelector(`[data-id="${message.id}"]`);
         if (!existingMessage && (!isOwnMessage || isAIResponse)) {
+            // Check if this message is a reply and we have a pending image for it
+            let replyImageUrl = null;
+            if (message.id && pendingReplyImages[message.id]) {
+                replyImageUrl = pendingReplyImages[message.id];
+                // Optional: clear after use? Keep for later renders maybe
+            }
             displayMessage(
                 message.content, 
                 isOwnMessage ? 'sent' : 'received', 
@@ -8471,7 +8466,8 @@ function initSocket() {
                 true,
                 null,
                 null,
-                message.image_url // Pass image_url
+                message.image_url,
+                replyImageUrl
             );
             
             if (document.visibilityState !== 'visible' && !isOwnMessage) {
@@ -8496,7 +8492,7 @@ function initSocket() {
         }
         
         // === NEW: Check if this message was the one being replied to ===
-        if (replyToData && replyToData.id === messageId) {
+        if (replyToMessageId && replyToMessageId === messageId) {
             updateReplyPreviewDeleted();
         }
     });
@@ -8602,9 +8598,11 @@ function initSocket() {
 function updateReplyPreviewDeleted() {
     if (elements.replyPreview) {
         elements.replyPreview.innerHTML = `
-            <div class="reply-preview" style="background-color: #ffebee; border-left-color: #f44336; display:flex; justify-content:space-between; align-items:center;">
-                <span style="color:#d32f2f;">The message you replied to was deleted.</span>
-                <button onclick="clearReply()" style="margin-left:5px; font-size:12px; padding:2px 5px;">Cancel</button>
+            <div class="reply-preview" style="background-color: #ffebee; border-left-color: #f44336;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="color:#d32f2f;">The message you replied to was deleted.</span>
+                    <button onclick="clearReply()" style="margin-left:5px; font-size:12px; padding:2px 5px;">Cancel</button>
+                </div>
             </div>
         `;
         // Optionally disable send button
@@ -8615,907 +8613,2149 @@ function updateReplyPreviewDeleted() {
 
 // MODIFIED: Update the delete button handler in showMessageContextMenu
 // In the delete button creation section, replace the onclick handler:
-// (We'll modify the showMessageContextMenu function below)
-
-// ===== MODIFIED: showMessageContextMenu with image capture and reply data =====
-function showMessageContextMenu(e, message) {
-    // If message is null, try to find the message element from the event target
-    if (!message || !message.classList || !message.classList.contains('message')) {
-        message = e.target.closest('.message');
-    }
-    
-    // FIX: Check if message exists before accessing properties
-    if (!message || !message.dataset) {
-        console.error('Message or message.dataset is null', message);
-        return;
-    }
-    
-    const messageText = message.dataset.content || '';
-    const messageId = message.dataset.id;
-    const messageUsername = message.dataset.username || '';
-    
-    // Extract image URL if present
-    const originalImage = message.querySelector('.content img');
-    const image_url = originalImage ? originalImage.src : null;
-    
-    // Check if message has a valid ID
-    if (!messageId || messageId === 'undefined' || messageId === 'null') {
-        console.error('Message has no ID, cannot delete:', message);
-        showError('Cannot delete message: No message ID found. Please refresh and try again.');
-        return;
-    }
-    
-    console.log('Deleting message:', messageId, 'Username:', messageUsername);
-
-    // Remove any existing context menus
-    document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());
-
-    const contextMenu = document.createElement('div');
-    contextMenu.className = 'message-context-menu active';
-    
-    // Get position for the menu - check for touch or mouse events
-    let clientX, clientY;
-    if (e.touches && e.touches.length > 0) {
-        clientX = e.touches[0].clientX;
-        clientY = e.touches[0].clientY;
-    } else {
-        clientX = e.clientX;
-        clientY = e.clientY;
-    }
-    
-    // Ensure menu stays within viewport
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    const menuWidth = 150; // Approximate width of the menu
-    
-    if (clientX + menuWidth > viewportWidth) {
-        clientX = viewportWidth - menuWidth - 10;
-    }
-    
-    contextMenu.style.left = `${Math.max(10, clientX)}px`;
-    contextMenu.style.top = `${Math.max(10, clientY)}px`;
-
-    // Copy button
-    const copyButton = document.createElement('button');
-    copyButton.textContent = 'Copy';
-    copyButton.onclick = () => {
-        copyToClipboard(messageText, copyButton);
-        contextMenu.remove();
-    };
-
-    // Reply button - MODIFIED: capture image_url and store full data
-    const replyButton = document.createElement('button');
-    replyButton.textContent = 'Reply';
-    replyButton.onclick = () => {
-        replyToData = {
-            text: messageText,
-            image_url: image_url,
-            id: messageId
-        };
-        elements.messageInput.focus();
-        showReplyPreview();
-        contextMenu.remove();
-    };
-
-    contextMenu.appendChild(copyButton);
-    contextMenu.appendChild(replyButton);
-
-    // Check if this is the user's own message
-    const currentUsername = currentUserSession?.username;
-    const isOwnMessage = messageUsername === currentUsername || message.classList.contains('sent');
-
-    // === ADMIN MODIFICATION: Admin0 can delete any message ===
-    const isAdmin = currentUsername === 'Admin0';  // case‑sensitive – adjust if needed
-    if (isOwnMessage || isAdmin) {
-        const deleteButton = document.createElement('button');
-        deleteButton.textContent = 'Delete';
-        deleteButton.className = 'delete-btn';
-        deleteButton.onclick = async () => {
-            try {
-                console.log('Deleting message:', messageId, 'Username:', currentUsername);
-                
-                // Delete from server using unified function
-                const success = await deleteMessageContext(messageId, currentUsername);
-                
-                if (success) {
-                    console.log('✅ Message deleted from server');
-                    
-                    // Remove from UI
-                    message.remove();
-                    showSuccess('Message deleted successfully');
-                    
-                    // Check if this was the replied-to message
-                    if (replyToData && replyToData.id === messageId) {
-                        updateReplyPreviewDeleted();
-                    }
-                } else {
-                    throw new Error('Delete failed');
-                }
-                
-            } catch (err) {
-                console.error('Delete error:', err);
-                // Even if server delete fails, remove from UI for better UX
-                message.remove();
-                showSuccess('Message removed locally');
-                
-                if (replyToData && replyToData.id === messageId) {
-                    updateReplyPreviewDeleted();
-                }
-            }
-            contextMenu.remove();
-        };
-        contextMenu.appendChild(deleteButton);
-    }
-
-    // === NEW: Block user option for Admin0 ===
-    if (isAdmin && !isOwnMessage) {
-        const blockButton = document.createElement('button');
-        blockButton.textContent = 'Block User';
-        blockButton.className = 'block-btn';
-        blockButton.onclick = () => {
-            blockUser(messageUsername);
-            contextMenu.remove();
-        };
-        contextMenu.appendChild(blockButton);
-    }
-
-    document.body.appendChild(contextMenu);
-    
-    // Close menu when clicking elsewhere
-    const closeMenu = (event) => {
-        if (!contextMenu.contains(event.target)) {
-            contextMenu.remove();
-            document.removeEventListener('click', closeMenu);
-            document.removeEventListener('touchstart', closeMenu);
-        }
-    };
-    
-    setTimeout(() => {
-        document.addEventListener('click', closeMenu);
-        document.addEventListener('touchstart', closeMenu);
-    }, 100);
-}
-
-// ===== FIXED: showPrivateMessageContextMenu with improved element finding =====
-function showPrivateMessageContextMenu(e, message) {
-    // If message is null, try to find the message element from the event target
-    if (!message || !message.classList || !message.classList.contains('message')) {
-        message = e.target.closest('.message');
-    }
-    
-    // FIX: Check if message exists before accessing properties
-    if (!message || !message.dataset) {
-        console.error('Message or message.dataset is null', message);
-        return;
-    }
-    
-    const messageText = message.dataset.content || '';
-    const messageId = message.dataset.id;
-    const messageUsername = message.dataset.username || '';
-    
-    // Extract image URL if present
-    const originalImage = message.querySelector('.content img');
-    const image_url = originalImage ? originalImage.src : null;
-    
-    document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());
-
-    const contextMenu = document.createElement('div');
-    contextMenu.className = 'message-context-menu active';
-    
-    // Get position for the menu
-    let clientX, clientY;
-    if (e.touches && e.touches.length > 0) {
-        clientX = e.touches[0].clientX;
-        clientY = e.touches[0].clientY;
-    } else {
-        clientX = e.clientX;
-        clientY = e.clientY;
-    }
-    
-    // Ensure menu stays within viewport
-    const viewportWidth = window.innerWidth;
-    const menuWidth = 150;
-    
-    if (clientX + menuWidth > viewportWidth) {
-        clientX = viewportWidth - menuWidth - 10;
-    }
-    
-    contextMenu.style.left = `${Math.max(10, clientX)}px`;
-    contextMenu.style.top = `${Math.max(10, clientY)}px`;
-
-    const copyButton = document.createElement('button');
-    copyButton.textContent = 'Copy';
-    copyButton.onclick = () => {
-        copyToClipboard(messageText, copyButton);
-        contextMenu.remove();
-    };
-
-    // For private messages, we might want to support reply as well, but we'll keep it simple for now
-    const replyButton = document.createElement('button');
-    replyButton.textContent = 'Reply';
-    replyButton.onclick = () => {
-        // For private, we'd need separate variables; we'll reuse replyToData for now (main chat only)
-        // To keep it clean, we'll just not support reply in private for now.
-        showError('Reply not yet supported in private messages');
-        contextMenu.remove();
-    };
-
-    contextMenu.appendChild(copyButton);
-    contextMenu.appendChild(replyButton);
-
-    document.body.appendChild(contextMenu);
-    
-    // Close menu when clicking elsewhere
-    const closeMenu = (event) => {
-        if (!contextMenu.contains(event.target)) {
-            contextMenu.remove();
-            document.removeEventListener('click', closeMenu);
-            document.removeEventListener('touchstart', closeMenu);
-        }
-    };
-    
-    setTimeout(() => {
-        document.addEventListener('click', closeMenu);
-        document.addEventListener('touchstart', closeMenu);
-    }, 100);
-}
-
-function copyToClipboard(text, button) {  
-    const textarea = document.createElement('textarea');  
-    textarea.value = text;  
-    document.body.appendChild(textarea);  
-    textarea.select();  
-    document.execCommand('copy');  
-    document.body.removeChild(textarea);  
-
-    button.innerHTML = '<span style="font-size: 15px;">Copied!</span>';  
-    setTimeout(() => {  
-        button.innerHTML = 'Copy';  
-    }, 2000);  
-}
-
-// ===== MODIFIED: showReplyPreview with image thumbnail =====
-function showReplyPreview() {
-    if (!elements.replyPreview) return;
-    
-    // Make container visible
-    elements.replyPreview.style.display = 'block';
-    
-    // Check if the replied-to message still exists in the DOM
-    let messageExists = replyToData && replyToData.id && document.querySelector(`[data-id="${replyToData.id}"]`);
-    
-    if (!messageExists && replyToData && replyToData.id) {
-        // Message was deleted, show warning
-        elements.replyPreview.innerHTML = `
-            <div class="reply-preview" style="background-color: #ffebee; border-left-color: #f44336; display:flex; justify-content:space-between; align-items:center;">
-                <span style="color:#d32f2f;">The message you replied to was deleted.</span>
-                <button onclick="clearReply()" title="Cancel reply"><i class="fas fa-times"></i></button>
-            </div>
-        `;
-    } else if (replyToData) {
-        // Normal reply preview with optional image
-        let previewHtml = `<div class="reply-preview" data-reply-id="${replyToData.id || ''}" style="display:flex; align-items:center; gap:8px;">`;
-        if (replyToData.image_url) {
-            previewHtml += `<img src="${replyToData.image_url}" style="width:40px; height:40px; object-fit:cover; border-radius:4px;">`;
-        }
-        previewHtml += `<span style="flex:1;">Replying to: ${replyToData.text ? replyToData.text.substring(0, 80) : (replyToData.image_url ? 'Image' : 'a message')}</span>`;
-        previewHtml += `<button onclick="clearReply()" title="Cancel reply"><i class="fas fa-times"></i></button></div>`;
-        elements.replyPreview.innerHTML = previewHtml;
-    }
-}
-
-// ===== MODIFIED: showPrivateReplyPreview (unchanged, for completeness) =====
-function showPrivateReplyPreview() {
-    // Not modified, left as is
-    const privatePreview = document.getElementById('private-reply-preview-container');
-    if (!privatePreview) return;
-    
-    privatePreview.style.display = 'block';
-    
-    let messageExists = privateReplyToMessageId && document.querySelector(`[data-id="${privateReplyToMessageId}"]`);
-    
-    if (!messageExists && privateReplyToMessageId) {
-        privatePreview.innerHTML = `
-            <div class="reply-preview" style="background-color: #ffebee; border-left-color: #f44336; display:flex; justify-content:space-between; align-items:center;">
-                <span style="color:#d32f2f;">The message you replied to was deleted.</span>
-                <button onclick="clearPrivateReply()" title="Cancel reply"><i class="fas fa-times"></i></button>
-            </div>
-        `;
-    } else {
-        privatePreview.innerHTML = `
-            <div class="reply-preview" data-reply-id="${privateReplyToMessageId || ''}" style="display:flex; align-items:center; gap:8px;">
-                <span>Replying to: ${privateReplyToText ? privateReplyToText.substring(0, 80) : 'a message'}</span>
-                <button onclick="clearPrivateReply()" title="Cancel reply"><i class="fas fa-times"></i></button>
-            </div>
-        `;
-    }
-}
-
-// ===== MODIFIED: clearReply to reset replyToData =====
-function clearReply() {
-    replyToData = null;
-    if (elements.replyPreview) {
-        elements.replyPreview.style.display = 'none';
-        elements.replyPreview.innerHTML = '';
-    }
-}
-
-// ===== MENU AND NAVIGATION FUNCTIONS =====
-function toggleDropdown() {
-    const dropdown = document.getElementById('dropdown');
-    if (!dropdown) return;
-    
-    const isVisible = dropdown.style.display === 'block';
-    
-    // Close all other menus first
-    const kebabDropdown = document.querySelector('.kebab-dropdown');
-    if (kebabDropdown) kebabDropdown.classList.remove('active');
-    
-    // Toggle dropdown
-    dropdown.style.display = isVisible ? 'none' : 'block';
-    
-    // Close if clicking the same button while open
-    if (isVisible) {
-        dropdown.style.display = 'none';
-    }
-}
-
-function toggleKebabMenu(event) {
-    event.stopPropagation();
-    const dropdown = document.querySelector('.kebab-dropdown');
-    if (dropdown) {
-        dropdown.classList.toggle('active');
-    }
-}
-
-function toggleTheme() {
-    document.body.classList.toggle('dark-theme');
-    const dropdown = document.querySelector('.kebab-dropdown');
-    if (dropdown) {
-        dropdown.classList.remove('active');
-    }
-}
-
-function clearChat() {
-    const chatContainer = document.getElementById('chat-container');
-    if (chatContainer) {
-        chatContainer.innerHTML = '';
-    }
-    const dropdown = document.querySelector('.kebab-dropdown');
-    if (dropdown) {
-        dropdown.classList.remove('active');
-    }
-}
-
-function exportChat() {
-    const chatContainer = document.getElementById('chat-container');
-    if (!chatContainer) return;
-    
-    const messages = chatContainer.innerText;
-    const blob = new Blob([messages], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'chat-export.txt';
-    a.click();
-    window.URL.revokeObjectURL(url);
-    const dropdown = document.querySelector('.kebab-dropdown');
-    if (dropdown) {
-        dropdown.classList.remove('active');
-    }
-}
-
-function exportChatPDF() {
-    const chatContainer = document.getElementById('chat-container');
-    if (!chatContainer) return;
-    
-    const dropdown = document.querySelector('.kebab-dropdown');
-    if (!dropdown) return;
-
-    const clone = chatContainer.cloneNode(true);
-
-    // Show downloading alert
-    const downloadingAlert = document.createElement('div');
-    downloadingAlert.id = 'downloading-alert';
-    downloadingAlert.textContent = 'Preparing download, please wait...';
-    downloadingAlert.style.position = 'fixed';
-    downloadingAlert.style.top = '20px';
-    downloadingAlert.style.left = '50%';
-    downloadingAlert.style.transform = 'translateX(-50%)';
-    downloadingAlert.style.padding = '10px 20px';
-    downloadingAlert.style.backgroundColor = '#333';
-    downloadingAlert.style.color = '#fff';
-    downloadingAlert.style.fontSize = '16px';
-    downloadingAlert.style.borderRadius = '8px';
-    downloadingAlert.style.zIndex = '9999';
-    document.body.appendChild(downloadingAlert);
-
-    // Find all images and replace src with base64
-    const images = clone.querySelectorAll('img');
-    const promises = [];
-
-    images.forEach(img => {
-        const promise = new Promise((resolve, reject) => {
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            const originalImage = new Image();
-            originalImage.crossOrigin = 'anonymous';
-            originalImage.src = img.src;
-
-            originalImage.onload = () => {
-                try {
-                    // Store original display style to restore later
-                    const originalDisplay = img.style.display;
-                    const originalWidth = img.style.width;
-                    const originalHeight = img.style.height;
-
-                    // Temporarily make image visible and full size for capture
-                    img.style.display = 'block';
-                    img.style.width = 'auto';
-                    img.style.height = 'auto';
-                    img.style.maxWidth = 'none';
-                    img.style.maxHeight = 'none';
-
-                    canvas.width = originalImage.naturalWidth;
-                    canvas.height = originalImage.naturalHeight;
-                    context.drawImage(originalImage, 0, 0);
-
-                    const dataURL = canvas.toDataURL('image/png');
-                    img.src = dataURL;
-
-                    // Restore original styles
-                    img.style.display = originalDisplay;
-                    img.style.width = originalWidth;
-                    img.style.height = originalHeight;
-
-                    resolve();
-                } catch (error) {
-                    console.error('Error converting image:', error);
-                    resolve();
-                }
-            };
-
-            originalImage.onerror = () => {
-                console.error('Error loading image:', img.src);
-                resolve();
-            };
-        });
-        promises.push(promise);
-    });
-
-    Promise.all(promises).then(() => {
-        const opt = {
-            margin: 10,
-            filename: 'chat-export.pdf',
-            image: { type: 'jpeg', quality: 1 },
-            html2canvas: { 
-                scale: 2,
-                useCORS: true,
-                allowTaint: true,
-                scrollX: 0,
-                scrollY: 0,
-                windowWidth: document.documentElement.scrollWidth,
-                windowHeight: document.documentElement.scrollHeight
-            },
-            jsPDF: { 
-                unit: 'mm',
-                format: 'a4',
-                orientation: 'portrait',
-                hotfixes: ['px_scaling'] 
-            },
-            pagebreak: { 
-                mode: ['avoid-all', 'css', 'legacy'],
-                before: '.page-break' 
-            }
-        };
-
-        // Temporarily modify image styles for PDF generation
-        const allImages = clone.querySelectorAll('img');
-        allImages.forEach(img => {
-            img.style.maxWidth = '100%';
-            img.style.height = 'auto';
-            img.style.display = 'block';
-        });
-
-        html2pdf().set(opt).from(clone).save().then(() => {
-            downloadingAlert.remove();
-        }).catch((error) => {
-            console.error('Error generating PDF:', error);
-            downloadingAlert.remove();
-        });
-
-        dropdown.classList.remove('active');
-    });
-}
-
-function showSettings() {
-    alert('Settings panel coming soon!');
-    const dropdown = document.querySelector('.kebab-dropdown');
-    if (dropdown) {
-        dropdown.classList.remove('active');
-    }
-}
-
-// ===== ENHANCED LOGOUT FUNCTION =====
-function logout() {
-    // Reset initialization flag so next login re-initializes properly
-    isAppInitialized = false;
-    
-    const username = currentUserSession?.username;
-    
-    // Notify server that user is going offline
-    if (username && socket) {
-        // [FIXED] Leave private room before disconnecting
-        socket.emit('leave-user-room', username);
-        socket.emit('user-offline', username);
-        // Disconnect socket
-        socket.disconnect();
-    }
-    
-    // Stop Opera Mini polling if active
-    if (operaMessenger) {
-        operaMessenger.stopPolling();
-    }
-    
-    // Clear user session from both storage locations
-    clearUserSession();
-    
-    // Remove page event listeners
-    document.removeEventListener('visibilitychange', handleVisibilityChange);
-    window.removeEventListener('beforeunload', handleBeforeUnload);
-    window.removeEventListener('pagehide', handlePageHide);
-    
-    // Hide all containers and menus
-    document.querySelectorAll('.main-chat-interface').forEach(container => {
-        container.style.display = 'none';
-    });
-    
-    const menu = document.querySelector('.menu');
-    if (menu) menu.style.display = 'none';
-    
-    const dropdown = document.getElementById('dropdown');
-    if (dropdown) dropdown.style.display = 'none';
-    
-    const kebabDropdown = document.querySelector('.kebab-dropdown');
-    if (kebabDropdown) kebabDropdown.classList.remove('active');
-    
-    // Hide all chat inputs
-    document.querySelectorAll('.chat-input').forEach(input => {
-        input.style.display = 'none';
-    });
-    
-    // Hide news container and toggle
-    const newsContainer = document.querySelector('.news-container');
-    if (newsContainer) newsContainer.style.display = 'none';
-    const newsToggle = document.querySelector('.news-toggle');
-    if (newsToggle) newsToggle.style.display = 'none';
-    
-    // Show auth container
-    document.getElementById('auth-container').style.display = 'flex';
-    
-    // Hide both buttons on logout
-    if (scrollToBottomBtn) {
-        scrollToBottomBtn.style.display = 'none';
-        scrollToBottomBtn.classList.remove('visible');
-    }
-    if (privateGoTopBtn) {
-        privateGoTopBtn.style.display = 'none';
-        privateGoTopBtn.classList.remove('visible');
-    }
-    
-    // Reset auth form
-    isLogin = true;
-    const authTitle = document.getElementById('auth-title');
-    if (authTitle) authTitle.textContent = 'Login';
-    
-    const authButton = document.querySelector('.auth-box button');
-    if (authButton) authButton.textContent = 'Login';
-    
-    const toggleText = document.getElementById('toggle-text');
-    if (toggleText) toggleText.textContent = "Don't have an account? ";
-    
-    const toggleLink = document.getElementById('toggle-link');
-    if (toggleLink) toggleLink.textContent = 'Sign Up';
-    
-    // Clear profile section
-    const profileSection = document.querySelector('.profile-display-section');
-    const divider = document.querySelector('.menu-divider');
-    if (profileSection) profileSection.remove();
-    if (divider) divider.remove();
-    
-    // Clear any validation states
-    const usernameInput = document.getElementById('auth-username');
-    if (usernameInput) {
-        usernameInput.classList.remove('username-valid', 'username-invalid');
-        usernameInput.value = '';
-    }
-    document.getElementById('auth-password').value = '';
-    
-    // Hide SQL Editor menu item
-    const sqlEditorMenuItem = document.getElementById('sql-editor-menu-item');
-    if (sqlEditorMenuItem) {
-        sqlEditorMenuItem.style.display = 'none';
-    }
-    
-    console.log('✅ User logged out successfully');
-}
-
-// ===== NOTIFICATION FUNCTIONS =====
-function showNotification(username, message) {
-    if (!notificationPermissionGranted || !('Notification' in window)) return;
-    const notification = new Notification(`${username} says:`, {
-        body: message.length > 50 ? message.substring(0, 50) + '...' : message,
-        icon: 'https://i.pravatar.cc/50?u=' + encodeURIComponent(username)
-    });
-    notification.onclick = () => {
-        window.focus();
-    };
-}
-
-// ✅ OPTIMIZED: AI Response function
-async function fetchChatResponse(userInput) {
-    if (isProcessingCommand) {
-        console.log('🛑 Command already being processed, skipping...');
-        return;
-    }
-
-    isProcessingCommand = true;
-    
+const deleteButton = document.createElement('button');
+deleteButton.textContent = 'Delete';
+deleteButton.className = 'delete-btn';
+deleteButton.onclick = async () => {
     try {
-        const PREFIX = '!';
+        console.log('Deleting message:', messageId, 'Username:', currentUsername);
         
-        // Don't process commands that start with prefix - let the server handle them
-        if (userInput.startsWith(PREFIX)) {
-            console.log('🤖 Command detected, letting server handle response...');
+        // Use the unified deleteMessageContext function
+        const success = await deleteMessageContext(messageId, currentUsername);
+        
+        if (success) {
+            console.log('✅ Message deleted successfully');
+            
+            // Remove from UI
+            message.remove();
+            showSuccess('Message deleted successfully');
+            
+            // === NEW: Check if this was the replied-to message ===
+            if (replyToMessageId && replyToMessageId === messageId) {
+                updateReplyPreviewDeleted();
+            }
+        } else {
+            throw new Error('Delete failed');
+        }
+        
+    } catch (err) {
+        console.error('Delete error:', err);
+        // Even if server delete fails, remove from UI for better UX
+        message.remove();
+        showSuccess('Message removed locally');
+        
+        if (replyToMessageId && replyToMessageId === messageId) {
+            updateReplyPreviewDeleted();
+        }
+    }
+    contextMenu.remove();
+};
+
+// Initialize the first visit check when the page loads
+window.addEventListener('load', function() {
+    // Check for first visit after a short delay
+    setTimeout(() => {
+        const isLoggedIn = localStorage.getItem('auth_token') && localStorage.getItem('username');
+        if (isLoggedIn && !localStorage.getItem('hasVisitedBefore')) {
+            showAllUsersOnFirstVisit();
+        }
+    }, 1500);
+});
+
+// ===== MODIFIED: Welcome screen animation function (FIXED) =====
+function animateWelcomeText() {
+    // Skip animation if already logged in or if OAuth callback parameters are present
+    const urlParams = new URLSearchParams(window.location.search);
+    if (currentUserSession !== null || urlParams.has('token')) {
+        console.log('⏭️ Skipping welcome animation, user already authenticated');
+        document.getElementById('welcome-screen').style.display = 'none';
+        initializeMainApp();
+        return;
+    }
+    
+    const text = "MessageMate";
+    const animatedText = document.getElementById('animated-text');
+    
+    // Clear any existing content
+    animatedText.innerHTML = '';
+    
+    // Create individual letter elements
+    for (let i = 0; i < text.length; i++) {
+        const letter = document.createElement('span');
+        letter.className = 'letter';
+        letter.textContent = text[i];
+        letter.style.animationDelay = `${i * 0.1}s`;
+        animatedText.appendChild(letter);
+    }
+    
+    // Check if user is already logged in
+    const isLoggedIn = currentUserSession !== null;
+    
+    console.log('User login status:', isLoggedIn ? 'Logged in' : 'Not logged in');
+    
+    // Hide welcome screen after animation completes
+    setTimeout(() => {
+        const welcomeScreen = document.getElementById('welcome-screen');
+        welcomeScreen.style.opacity = '0';
+        setTimeout(() => {
+            welcomeScreen.style.display = 'none';
+            
+            if (isLoggedIn) {
+                // User is already logged in - go directly to main app
+                console.log('✅ User already logged in, skipping auth screen');
+                initializeMainApp();
+            } else {
+                // User not logged in - show auth container
+                console.log('❌ User not logged in, showing auth screen');
+                document.getElementById('auth-container').style.display = 'flex';
+            }
+        }, 500);
+    }, 2500); // Total animation time: 2.5 seconds
+}
+
+// ===== MODIFIED: Function to initialize main app when user is already logged in (FIXED) =====
+let isAppInitialized = false;
+
+function initializeMainApp() {
+    if (isAppInitialized) {
+        console.log('⏭️ App already initialized, skipping');
+        return;
+    }
+    isAppInitialized = true;
+    
+    console.log('🚀 Initializing main application for logged-in user...');
+    
+    // Show main interface elements
+    document.querySelector('.menu').style.display = 'flex';
+    document.querySelector('.news-toggle').style.display = 'block';
+    
+    // Ensure auth container is hidden
+    const authContainer = document.getElementById('auth-container');
+    if (authContainer) authContainer.style.display = 'none';
+    
+    initializeButtons();
+    // IMPORTANT: Create profile section and load profile data
+    updateProfileSection(); // Create the profile section first
+    loadProfile(); // Then load the actual profile data from server
+
+    initializeChat();
+
+    initSocket();
+    setupTypingHandlers();
+    setupTypingDetection();
+    setupTypingSocketEvents();
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
+    
+    if (hasVerifiedCode()) {
+        enableSQLEditorAccess();
+    }
+    
+    // Show the appropriate container based on pendingPostId
+    if (pendingPostId) {
+        showContainer('posts');
+    } else {
+        showContainer('chat');
+    }
+    
+    // Show welcome message instead of login prompt
+    showSuccess(`Welcome back, ${currentUserSession?.username || 'User'}!`);
+
+    // ===== NEW: Show admin menu item if current user is Admin0 =====
+    const adminClearAll = document.getElementById('admin-clear-all');
+    if (adminClearAll && currentUserSession?.username === 'Admin0') {
+        adminClearAll.style.display = 'block';
+    }
+    
+    console.log('✅ Main application initialized successfully');
+}
+
+// ===== NEW: Clear all messages (Admin0 only) =====
+async function clearAllMessages() {
+    if (!confirm('⚠️ Are you sure you want to delete ALL public messages? This action cannot be undone.')) {
+        return;
+    }
+
+    const username = currentUserSession?.username;
+    if (username !== 'Admin0') {
+        showError('Only Admin0 can clear all messages.');
+        return;
+    }
+
+    const token = localStorage.getItem('auth_token');
+    try {
+        const response = await fetch('/api/admin/clear-all-messages', {
+            method: 'POST',
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || 'Failed to clear messages');
+        }
+
+        const data = await response.json();
+        showSuccess(data.message || 'All public messages cleared successfully.');
+
+        // Immediately clear local chat container
+        const chatContainer = document.getElementById('chat-container');
+        if (chatContainer) {
+            chatContainer.innerHTML = '';
+        }
+
+    } catch (error) {
+        console.error('Clear all messages error:', error);
+        showError(error.message);
+    }
+}
+
+// ===== DOMContentLoaded listener (FIXED) =====
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize current year
+    if (document.getElementById("year")) {
+        document.getElementById("year").textContent = new Date().getFullYear();
+    }
+    
+    // FIRST: Check for OAuth callback parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('token') && urlParams.has('username')) {
+        // Handle OAuth callback immediately – this will initialize the app
+        handleOAuthCallback().catch(error => {
+            console.error('OAuth callback error:', error);
+            // If OAuth fails, fall back to normal flow
+            attemptAutoLogin().then(success => {
+                if (success) {
+                    console.log('✅ User auto-logged in successfully (fallback)');
+                    animateWelcomeText();
+                } else {
+                    console.log('❌ No valid session found, showing welcome then login');
+                    animateWelcomeText();
+                }
+            }).catch(console.error);
+        });
+        return; // Stop further initialization; OAuth will handle it
+    }
+    
+    // If no OAuth callback, try auto-login
+    attemptAutoLogin().then(success => {
+        if (success) {
+            console.log('✅ User auto-logged in successfully');
+            // Check for pending post link from sessionStorage
+            const storedPostId = sessionStorage.getItem('pendingPostId');
+            if (storedPostId) {
+                pendingPostId = storedPostId;
+                console.log('🔗 Restored pending post ID from session:', pendingPostId);
+                sessionStorage.removeItem('pendingPostId');
+            }
+            animateWelcomeText(); // This will skip animation because user is already logged in
+        } else {
+            console.log('❌ No valid session found, showing welcome then login');
+            animateWelcomeText();
+        }
+    }).catch(error => {
+        console.error('Auto-login error:', error);
+        animateWelcomeText();
+    });
+    
+    // Initialize buttons and other common components
+    initializeButtons();
+    
+    // FIXED: Initialize online panel toggle
+    initializeOnlinePanelToggle();
+    
+    // Load user panel preference
+    loadUserPanelPreference();
+    
+    // Initialize password toggle
+    setupPasswordToggle();
+    
+    // NEW: Initialize OAuth buttons
+    initializeOAuth();
+    
+    if ('Notification' in window) {
+        Notification.requestPermission().then(permission => {
+            notificationPermissionGranted = permission === 'granted';
+            console.log('📢 Notification permission:', permission);
+        });
+    }
+
+    initializeChat();
+    
+    // ADDED: Setup typing detection
+    setupTypingDetection();
+    setupTypingSocketEvents();
+
+    // Add optimized scroll event listener for main chat
+    if (elements.chatContainer) {
+        elements.chatContainer.addEventListener('scroll', throttle(updateScrollState, 100));
+    }
+
+    // Initialize Private AI input handler
+    if (elements.privateInput) {
+        elements.privateInput.addEventListener('input', () => {
+            autoResize(elements.privateInput);
+            const hasText = elements.privateInput.value.trim().length > 0;
+            elements.privateSendButton.disabled = !hasText;
+            elements.privateSendButton.classList.toggle('enabled', hasText);
+        });
+        elements.privateInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendPrivateMessage();
+            }
+        });
+    }
+
+    // ===== POST SHARING: Check for shared post link =====
+    if (urlParams.has('post')) {
+        const postId = urlParams.get('post');
+        pendingPostId = postId;
+        console.log('🔗 Shared post link detected, post ID:', pendingPostId);
+        // Store in sessionStorage to persist across redirects
+        sessionStorage.setItem('pendingPostId', postId);
+    }
+
+    console.log('🎯 Application initialization complete');
+});
+
+// ===== PERFORMANCE OPTIMIZATIONS =====
+
+// Throttle function to limit how often a function can be called
+function throttle(func, limit) {
+    let inThrottle;
+    return function() {
+        const args = arguments;
+        const context = this;
+        if (!inThrottle) {
+            func.apply(context, args);
+            inThrottle = true;
+            setTimeout(() => inThrottle = false, limit);
+        }
+    }
+}
+
+// Debounce function to delay function execution
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// Batch DOM updates for better performance
+let renderQueue = [];
+let isRendering = false;
+
+function batchMessageRender(messages, renderFunction) {
+    if (!messages.length) return;
+    
+    renderQueue = renderQueue.concat(messages);
+    
+    if (!isRendering) {
+        isRendering = true;
+        requestAnimationFrame(() => {
+            const fragment = document.createDocumentFragment();
+            const batch = renderQueue.splice(0, 50); // Render 50 messages at once
+            
+            batch.forEach(message => {
+                const messageDiv = renderFunction(message);
+                if (messageDiv) fragment.appendChild(messageDiv);
+            });
+            
+            elements.chatContainer.appendChild(fragment);
+            
+            if (renderQueue.length > 0) {
+                isRendering = false;
+                batchMessageRender([], renderFunction);
+            } else {
+                isRendering = false;
+                // Scroll to bottom after rendering
+                setTimeout(() => forceScrollToBottom('chat-container'), 50);
+            }
+        });
+    }
+}
+    // ===== YOUR EXISTING VARIABLES AND FUNCTIONS =====
+    let isLogin = true;
+    let longPressTimer;
+    let isLongPress = false;
+    const badWords = ['fuck', 'nigga', 'shit', 'bitch', 'asshole'];
+    const spamTracker = {};
+    const SPAM_LIMIT = 5;
+    const SPAM_WINDOW = 10000;
+    const BAN_DURATION = 60000;
+    const bannedUsers = {};
+    const warnedUsers = {};
+
+    // SECRET CODE VERIFICATION VARIABLES
+    const SECRET_CODE = "456i";
+    let failedAttempts = 0;
+    const MAX_ATTEMPTS = 3;
+    let isLockedOut = false;
+    let lockoutTimeout = null;
+
+    // SQL Editor Variables
+    let sqlEditor = null;
+    let sqlResults = [];
+    let savedQueries = JSON.parse(localStorage.getItem('savedQueries')) || [];
+
+    // Notification variables
+    let lastMessageId = null;
+    let notificationPermissionGranted = false;
+
+    // Flag to prevent duplicate sends
+    let isSending = false;
+
+    // Scroll state variables
+    let isAtBottom = true;
+    let newMessagesCount = 0;
+    let scrollToBottomBtn;
+    let newMessagesCountEl = document.getElementById('newMessagesCount');
+
+    // Real-time active status variables
+    let socket;
+    let isTyping = false;
+    let typingTimer;
+
+    // ✅ ADDED: Typing indicator variables
+    let typingUsers = {};
+    let typingTimeout;
+
+    // ✅ ADDED: Flag to track if we're processing a command to prevent duplicates
+    let isProcessingCommand = false;
+
+    // ✅ ADDED: Track online users for profile popup
+    let onlineUsers = [];
+
+    // ✅ ADDED: Private Messaging Variables
+    let currentPrivateChatUser = null;
+    let privateMessageTypingTimer;
+
+    // ✅ ADDED: Track last sent messages to prevent duplicates
+    let lastSentMessages = {
+        private: {},
+        main: {}
+    };
+
+    // ✅ ADDED: User Panel Visibility State
+    let userPanelVisible = true;
+
+    // ✅ ADDED: Current user session
+    let currentUserSession = null;
+
+    // ✅ ADDED: Message pagination
+    let messagePage = 0;
+    const MESSAGES_PER_PAGE = 50;
+    let isLoadingMessages = false;
+    let hasMoreMessages = true;
+
+    // ✅ ADDED: Profile cache to reduce server calls
+    let profileCache = {};
+
+    const elements = {
+        usernameInput: document.getElementById('auth-username'),
+        messageInput: document.getElementById('user-input'),
+        sendButton: document.getElementById('send-button'),
+        chatContainer: document.getElementById('chat-container'),
+        replyPreview: document.getElementById('reply-preview-container'),
+        errorDisplay: document.getElementById('error-message'),
+        successDisplay: document.getElementById('success-message'),
+        privateInput: document.getElementById('private-user-input'),
+        privateSendButton: document.getElementById('private-send-button')
+    };
+
+    let replyToText = null;
+    let replyToMessageId = null; // store ID of the message being replied to
+    // ===== NEW: store image URL of the message being replied to =====
+    let replyToImageUrl = null;
+    // ===== NEW: map to store reply image URLs for pending messages =====
+    const pendingReplyImages = {};
+
+    // ===== MODIFIED: AVATAR URL HELPER FUNCTION =====
+    function getAvatarUrl(username) {
+        if (!username) return `https://i.pravatar.cc/50?u=default`;
+        
+        // First check if we have the profile in cache
+        if (profileCache[username]) {
+            // Use cached avatar
+            return profileCache[username].avatar || `https://i.pravatar.cc/50?u=${encodeURIComponent(username)}`;
+        }
+        
+        // Check if this is the current user
+        if (currentUserSession && username === currentUserSession.username) {
+            // For current user, we should have loaded the profile already
+            // Return default while we fetch or if not available
+            return `https://i.pravatar.cc/50?u=${encodeURIComponent(username)}`;
+        }
+        
+        // For other users, return default for now
+        // The actual profile will be fetched when needed
+        return `https://i.pravatar.cc/50?u=${encodeURIComponent(username)}`;
+    }
+
+    // ===== NEW: FUNCTION TO FETCH PROFILE FROM SERVER =====
+    async function fetchUserProfileFromServer(username) {
+        if (!username) return null;
+        
+        // Check cache first
+        if (profileCache[username]) {
+            return profileCache[username];
+        }
+        
+        try {
+            console.log(`📋 Fetching profile from server for: ${username}`);
+            
+            const response = await fetch(`/api/user/profile/${username}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.profile) {
+                    // Cache the profile
+                    profileCache[username] = {
+                        username: data.profile.username,
+                        firstname: data.profile.firstname || '',
+                        lastname: data.profile.lastname || '',
+                        bio: data.profile.bio || '',
+                        age: data.profile.age || '',
+                        gender: data.profile.gender || '',
+                        location: data.profile.location || '',
+                        interests: data.profile.interests || '',
+                        avatar: data.profile.avatar || `https://i.pravatar.cc/150?u=${username}`,
+                        display_name: data.profile.display_name || username,
+                        status: data.profile.status || 'offline',
+                        last_seen: data.profile.last_seen || null
+                    };
+                    
+                    console.log(`✅ Profile fetched from server for: ${username}`);
+                    return profileCache[username];
+                }
+            }
+            
+            // If not found or error, return default profile
+            const defaultProfile = {
+                username: username,
+                firstname: '',
+                lastname: '',
+                bio: '',
+                age: '',
+                gender: '',
+                location: '',
+                interests: '',
+                avatar: `https://i.pravatar.cc/150?u=${username}`,
+                display_name: username,
+                status: 'offline',
+                last_seen: null
+            };
+            
+            profileCache[username] = defaultProfile;
+            return defaultProfile;
+            
+        } catch (error) {
+            console.error(`❌ Error fetching profile for ${username}:`, error);
+            
+            // Return default profile on error
+            const defaultProfile = {
+                username: username,
+                firstname: '',
+                lastname: '',
+                bio: '',
+                age: '',
+                gender: '',
+                location: '',
+                interests: '',
+                avatar: `https://i.pravatar.cc/150?u=${username}`,
+                display_name: username,
+                status: 'offline',
+                last_seen: null
+            };
+            
+            profileCache[username] = defaultProfile;
+            return defaultProfile;
+        }
+    }
+
+    // ===== NEW: FUNCTION TO FETCH AND UPDATE AVATAR =====
+    async function updateAvatarFromServer(username, element) {
+        try {
+            const profile = await fetchUserProfileFromServer(username);
+            if (profile && profile.avatar && element) {
+                element.src = profile.avatar;
+            }
+        } catch (error) {
+            console.error(`❌ Error updating avatar for ${username}:`, error);
+        }
+    }
+
+    // ===== OPTIMIZED TYPING INDICATOR FUNCTIONS =====
+    function showTypingIndicator(username) {
+        if (!username || username === currentUserSession?.username) return;
+        
+        typingUsers[username] = Date.now();
+        updateTypingIndicator();
+    }
+
+    function hideTypingIndicator(username) {
+        if (typingUsers[username]) {
+            delete typingUsers[username];
+            updateTypingIndicator();
+        }
+    }
+
+    function updateTypingIndicator() {
+        const typingIndicator = document.getElementById('typing-indicator');
+        if (!typingIndicator) return;
+        
+        const currentUsers = Object.keys(typingUsers);
+        
+        // Clean up old entries (more than 5 seconds)
+        const now = Date.now();
+        Object.keys(typingUsers).forEach(username => {
+            if (now - typingUsers[username] > 5000) {
+                delete typingUsers[username];
+            }
+        });
+        
+        if (currentUsers.length === 0) {
+            typingIndicator.style.display = 'none';
+            typingIndicator.innerHTML = '';
             return;
         }
         
-        const response = await fetch('/api/command', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: userInput,
-                source: 'main-chat'
-            }),
+        let message = '';
+        if (currentUsers.length === 1) {
+            message = `${currentUsers[0]} is typing...`;
+        } else if (currentUsers.length === 2) {
+            message = `${currentUsers[0]} and ${currentUsers[1]} are typing...`;
+        } else {
+            message = `${currentUsers[0]} and ${currentUsers.length - 1} others are typing...`;
+        }
+        
+        typingIndicator.innerHTML = `
+            <div class="typing-indicator-message">
+                <div class="typing-dots">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+                <span class="typing-text">${message}</span>
+            </div>
+        `;
+        typingIndicator.style.display = 'block';
+    }
+
+    function sendTypingStart() {
+        const username = currentUserSession?.username;
+        if (username && socket) {
+            socket.emit('typing-start', { username });
+        }
+    }
+
+    function sendTypingStop() {
+        const username = currentUserSession?.username;
+        if (username && socket) {
+            socket.emit('typing-stop', { username });
+        }
+    }
+
+    function setupTypingDetection() {
+        const messageInput = document.getElementById('user-input');
+        if (!messageInput) return;
+        
+        let isTyping = false;
+        let typingTimer;
+        
+        messageInput.addEventListener('input', () => {
+            if (!isTyping) {
+                isTyping = true;
+                sendTypingStart();
+            }
+            
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(() => {
+                isTyping = false;
+                sendTypingStop();
+            }, 1000);
         });
         
-        console.log('🤖 Command sent to server, waiting for Socket.io response...');
+        messageInput.addEventListener('blur', () => {
+            if (isTyping) {
+                isTyping = false;
+                sendTypingStop();
+            }
+        });
         
-    } catch (error) {
-        console.error("Error fetching AI response:", error);
-    } finally {
+        // Also stop typing when message is sent
+        const originalSendMessage = sendMessage;
+        window.sendMessage = function() {
+            if (isTyping) {
+                isTyping = false;
+                sendTypingStop();
+            }
+            originalSendMessage();
+        };
+    }
+
+    function setupTypingSocketEvents() {
+        if (!socket) return;
+        
+        // Listen for typing start events
+        socket.on('user-typing-start', (data) => {
+            showTypingIndicator(data.username);
+        });
+        
+        // Listen for typing stop events
+        socket.on('user-typing-stop', (data) => {
+            hideTypingIndicator(data.username);
+        });
+        
+        // Clean up typing indicators when user goes offline
+        socket.on('user-offline', (username) => {
+            hideTypingIndicator(username);
+        });
+    }
+
+    // ===== AUTHENTICATION FUNCTIONS =====
+    async function handleAuth() {
+        const username = document.getElementById('auth-username').value.trim();
+        const password = document.getElementById('auth-password').value;
+        const loader = document.getElementById('loader');
+        
+        elements.errorDisplay.style.display = 'none';
+        elements.successDisplay.style.display = 'none';
+        
+        if (!username || !password) {
+            showError('Please enter both username and password');
+            return;
+        }
+        
+        if (username.length < 3 || username.length > 20) {
+            showError('Username must be between 3-20 characters');
+            return;
+        }
+        
+        if (password.length < 4 || password.length > 20) {
+            showError('Password must be between 4-20 characters');
+            return;
+        }
+        
+        // Validate username format
+        if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+            showError('Username can only contain letters, numbers, and underscores');
+            return;
+        }
+        
+        loader.style.display = 'flex';
+        
+        try {
+            if (isLogin) {
+                // Login - USING UPDATED ENDPOINT
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showSuccess('Login successful!');
+                    
+                    // Save user session with token for persistent login
+                    saveUserSession({
+                        username: data.username,
+                        user_id: data.user_id,
+                        token: data.token
+                    });
+                    
+                    setTimeout(() => {
+                        loader.style.display = 'none';
+                        document.getElementById('auth-container').style.display = 'none';
+                        
+                        // Use the new initializeMainApp function
+                        initializeMainApp();
+                    }, 500);
+                } else {
+                    throw new Error(data.error || 'Login failed');
+                }
+            } else {
+                // Signup - USING UPDATED ENDPOINT
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showSuccess('Account created successfully! Please login.');
+                    setTimeout(() => {
+                        loader.style.display = 'none';
+                        toggleAuth();
+                    }, 1000);
+                } else {
+                    throw new Error(data.error || 'Registration failed');
+                }
+            }
+        } catch (error) {
+            loader.style.display = 'none';
+            showError(error.message);
+        }
+    }
+
+    function toggleAuth() {
+        isLogin = !isLogin;
+        const authTitle = document.getElementById('auth-title');
+        const authButton = document.querySelector('.auth-box button');
+        const toggleText = document.getElementById('toggle-text');
+        const toggleLink = document.getElementById('toggle-link');
+        elements.errorDisplay.style.display = 'none';
+        elements.successDisplay.style.display = 'none';
+        
+        if (isLogin) {
+            authTitle.textContent = 'Login';
+            authButton.textContent = 'Login';
+            toggleText.textContent = "Don't have an account? ";
+            toggleLink.textContent = 'Sign Up';
+        } else {
+            authTitle.textContent = 'Sign Up';
+            authButton.textContent = 'Sign Up';
+            toggleText.textContent = 'Already have an account? ';
+            toggleLink.textContent = 'Login';
+        }
+        
+        // Reset username validation
+        const usernameInput = document.getElementById('auth-username');
+        if (usernameInput) {
+            usernameInput.classList.remove('username-valid', 'username-invalid');
+        }
+    }
+
+    // ===== ENHANCED USER SESSION MANAGEMENT =====
+    function checkUserSession() {
+        // Check localStorage first for persistent login
+        const savedSession = localStorage.getItem('userSession');
+        const savedToken = localStorage.getItem('auth_token');
+        
+        if (savedSession && savedToken) {
+            try {
+                currentUserSession = JSON.parse(savedSession);
+                return true;
+            } catch (e) {
+                console.error('Error parsing saved session:', e);
+                clearUserSession();
+            }
+        }
+        
+        // Fallback to sessionStorage
+        const sessionData = sessionStorage.getItem('currentUserSession');
+        if (sessionData) {
+            currentUserSession = JSON.parse(sessionData);
+            return true;
+        }
+        return false;
+    }
+
+    function saveUserSession(userData) {
+        currentUserSession = userData;
+        
+        // Save to both sessionStorage (for current session) and localStorage (for persistence)
+        sessionStorage.setItem('currentUserSession', JSON.stringify(userData));
+        localStorage.setItem('userSession', JSON.stringify(userData));
+        
+        // Also store token for API calls
+        if (userData.token) {
+            localStorage.setItem('auth_token', userData.token);
+            // Also store username for quick access
+            localStorage.setItem('username', userData.username);
+        }
+        
+        console.log('✅ User session saved for persistent login');
+    }
+
+    function clearUserSession() {
+        currentUserSession = null;
+        sessionStorage.removeItem('currentUserSession');
+        localStorage.removeItem('userSession');
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('username');
+        // Clear profile cache on logout
+        profileCache = {};
+        console.log('✅ User session cleared');
+    }
+
+    // ===== AUTO-LOGIN FUNCTIONALITY =====
+    async function attemptAutoLogin() {
+        const savedSession = localStorage.getItem('userSession');
+        const savedToken = localStorage.getItem('auth_token');
+        
+        if (!savedSession || !savedToken) {
+            return false;
+        }
+        
+        try {
+            const userData = JSON.parse(savedSession);
+            const response = await fetch('/api/auth/auto-login', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${savedToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                console.log('✅ Auto-login successful for:', data.username);
+                
+                // Update session with fresh data
+                saveUserSession({
+                    ...userData,
+                    username: data.username,
+                    user_id: data.user_id
+                });
+                
+                return true;
+            } else {
+                // Auto-login failed, clear invalid session
+                clearUserSession();
+                return false;
+            }
+        } catch (error) {
+            console.error('Auto-login error:', error);
+            clearUserSession();
+            return false;
+        }
+    }
+
+    // ===== UTILITY FUNCTIONS =====
+    function showSuccess(message) {
+        elements.successDisplay.textContent = message;
+        elements.successDisplay.style.display = 'block';
         setTimeout(() => {
-            isProcessingCommand = false;
+            elements.successDisplay.style.display = 'none';
+        }, 3000);
+    }
+
+    function showError(message) {
+        elements.errorDisplay.textContent = message;
+        elements.errorDisplay.style.display = 'block';
+        setTimeout(() => {
+            elements.errorDisplay.style.display = 'none';
+        }, 3000);
+    }
+
+    // ===== NEW: Show info message =====
+    function showInfo(message) {
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'info-message';
+        infoDiv.textContent = message;
+        infoDiv.style.cssText = 'background:#e7f3ff;color:#0066cc;padding:5px;border-radius:4px;margin:5px;text-align:center;';
+        document.body.appendChild(infoDiv);
+        setTimeout(() => infoDiv.remove(), 2000);
+    }
+
+    function autoResize(textarea) {
+        if (textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = (textarea.scrollHeight > 100 ? 100 : textarea.scrollHeight) + 'px';
+        }
+    }
+
+    // Helper function to escape HTML
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function hideContainer(containerId) {
+        console.log('🔄 Hiding container:', containerId);
+        const container = document.getElementById(containerId);
+        if (container) container.style.display = 'none';
+        
+        const overlay = document.getElementById('overlay');
+        if (overlay) overlay.style.display = 'none';
+        
+        // Close all menus when hiding any container
+        const dropdown = document.getElementById('dropdown');
+        if (dropdown) dropdown.style.display = 'none';
+        
+        const kebabDropdown = document.querySelector('.kebab-dropdown');
+        if (kebabDropdown) kebabDropdown.classList.remove('active');
+        
+        // Show chat container and input after closing any section
+        showContainer('chat');
+    }
+
+    async function sendPrivateMessage() {
+        const input = document.getElementById('private-user-input');
+        if (!input) return;
+        
+        const content = input.value.trim();
+        if (!content) return;
+
+        // Display user message immediately
+        displayPrivateMessage(content, 'sent');
+        input.value = '';
+        autoResize(input);
+
+        // Disable send button after sending
+        elements.privateSendButton.disabled = true;
+        elements.privateSendButton.classList.remove('enabled');
+
+        try {
+            // Get AI response directly
+            await fetchPrivateAIResponse(content);
+        } catch (error) {
+            console.error('Error sending private message:', error);
+            showError('Could not process your private message. Please try again.');
+        }
+
+        // Re-enable send button after processing
+        setTimeout(() => {
+            const hasText = input.value.trim().length > 0;
+            elements.privateSendButton.disabled = !hasText;
+            elements.privateSendButton.classList.toggle('enabled', hasText);
         }, 1000);
     }
-}
 
-async function fetchPrivateAIResponse(userInput) {
-    try {
-        let processedInput = userInput;
-        
-        if (!userInput.startsWith('-') && userInput.trim() !== '') {
-            processedInput = `-ai ${userInput}`;
+    // ===== NEW FUNCTION: Add touch event listeners to message element =====
+    function addMessageTouchListeners(messageDiv) {
+        // Check if listeners already added to prevent duplicates
+        if (messageDiv.dataset.hasTouchListeners === 'true') {
+            return;
         }
         
-        if (userInput.trim().toLowerCase() === 'ai') {
-            processedInput = '-ai';
-        }
-
-        console.log('🤫 Private AI processing:', { original: userInput, processed: processedInput });
-
-        const response = await fetch('/api/command', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: processedInput,
-                source: 'private-ai'
-            }),
+        messageDiv.addEventListener('touchstart', handleTouchStart);
+        messageDiv.addEventListener('touchend', handleTouchEnd);
+        messageDiv.addEventListener('touchmove', handleTouchMove);
+        messageDiv.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            showMessageContextMenu(e, messageDiv);
         });
         
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        // Mark that listeners have been added
+        messageDiv.dataset.hasTouchListeners = 'true';
+    }
+
+    // ===== NEW FUNCTION: Add private message touch event listeners =====
+    function addPrivateMessageTouchListeners(messageDiv) {
+        // Check if listeners already added to prevent duplicates
+        if (messageDiv.dataset.hasTouchListeners === 'true') {
+            return;
         }
         
-        const data = await response.json();
-        if (data.reply) {
-            if (Array.isArray(data.reply)) {
-                data.reply.forEach(reply => displayPrivateMessage(reply, 'received'));
-            } else {
-                displayPrivateMessage(data.reply, 'received');
+        messageDiv.addEventListener('touchstart', handlePrivateMessageTouchStart);
+        messageDiv.addEventListener('touchend', handlePrivateMessageTouchEnd);
+        messageDiv.addEventListener('touchmove', handlePrivateMessageTouchMove);
+        messageDiv.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            showPrivateMessageContextMenu(e, messageDiv);
+        });
+        
+        // Mark that listeners have been added
+        messageDiv.dataset.hasTouchListeners = 'true';
+    }
+
+    function displayPrivateMessage(text, sender, repliedTo = null, username = 'Private AI', messageId = null) {
+        const container = document.getElementById('private-ai-container');
+        if (!container) return;
+        
+        const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId);
+        
+        // Add event listeners for private messages
+        addPrivateMessageTouchListeners(messageDiv);
+
+        // Append to container
+        container.appendChild(messageDiv);
+
+        // Scroll to bottom
+        requestAnimationFrame(() => {
+            container.scrollTop = container.scrollHeight;
+        });
+    }
+
+    // ===== MODIFIED: Add touch listeners to existing messages when page loads =====
+    function addTouchListenersToExistingMessages() {
+        // Add listeners to main chat messages
+        const mainMessages = document.querySelectorAll('#chat-container .message');
+        mainMessages.forEach(message => {
+            addMessageTouchListeners(message);
+        });
+        
+        // Add listeners to private AI messages
+        const privateAIMessages = document.querySelectorAll('#private-ai-container .message');
+        privateAIMessages.forEach(message => {
+            addPrivateMessageTouchListeners(message);
+        });
+        
+        console.log(`✅ Added touch listeners to ${mainMessages.length} main messages and ${privateAIMessages.length} private AI messages`);
+    }
+
+    // ===== OPTIMIZED SCROLL FUNCTIONS =====
+    function forceScrollToBottom(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        requestAnimationFrame(() => {
+            container.scrollTop = container.scrollHeight;
+        });
+    }
+
+    function scrollToBottomMain() {
+        forceScrollToBottom('chat-container');
+        isAtBottom = true;
+        newMessagesCount = 0;
+        if (newMessagesCountEl) newMessagesCountEl.textContent = '0';
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.classList.remove('visible');
+            setTimeout(() => {
+                scrollToBottomBtn.style.display = 'none';
+            }, 300);
+        }
+    }
+
+    function updateScrollState() {
+        if (!elements.chatContainer || !scrollToBottomBtn) return;
+        
+        const scrollTop = elements.chatContainer.scrollTop;
+        const scrollHeight = elements.chatContainer.scrollHeight;
+        const clientHeight = elements.chatContainer.clientHeight;
+        
+        // Calculate if we're at the bottom (within 50px threshold)
+        const isAtBottomNow = Math.abs(scrollHeight - scrollTop - clientHeight) <= 50;
+        
+        if (!isAtBottomNow) {
+            // User has scrolled up - show the button
+            if (!scrollToBottomBtn.classList.contains('visible')) {
+                scrollToBottomBtn.style.display = 'flex';
+                requestAnimationFrame(() => {
+                    scrollToBottomBtn.classList.add('visible');
+                });
+            }
+            
+            // Update new messages count if we're receiving messages while scrolled up
+            if (isAtBottom && !isAtBottomNow) {
+                newMessagesCount++;
+                if (newMessagesCountEl) {
+                    newMessagesCountEl.textContent = newMessagesCount;
+                }
             }
         } else {
-            throw new Error('No reply from AI');
+            // User is at bottom - hide the button
+            if (scrollToBottomBtn.classList.contains('visible')) {
+                scrollToBottomBtn.classList.remove('visible');
+                setTimeout(() => {
+                    scrollToBottomBtn.style.display = 'none';
+                }, 300);
+            }
+            newMessagesCount = 0;
+            if (newMessagesCountEl) newMessagesCountEl.textContent = '0';
         }
-    } catch (error) {
-        console.error("Error fetching Private AI response:", error);
-        displayPrivateMessage("Sorry, I encountered an error processing your message. Please try again.", 'received');
-    }
-}
-
-// ===== OPTIMIZED IMAGE HANDLING FUNCTIONS =====
-function displayImageImmediately(imgUrl, container) {
-    return new Promise((resolve) => {
-        const img = new Image();
-        img.src = imgUrl;
-        img.alt = "Image";
-        img.loading = "lazy";
-        img.style.opacity = "1";
-        img.style.transition = "opacity 0.3s";
-        img.style.width = "100%";
-        img.style.borderRadius = "10px";
-        img.style.objectFit = "cover";
         
-        img.onload = function() {
-            container.appendChild(img);
-            resolve(img);
+        isAtBottom = isAtBottomNow;
+    }
+
+    // ===== FIXED: TOUCH AND CONTEXT MENU FUNCTIONS WITH NULL CHECKS =====
+    function handleTouchStart(e) {
+        isLongPress = false;
+        if (!e.currentTarget) return;
+        
+        // Check if we're touching a child element inside the message
+        let messageElement = e.currentTarget;
+        if (!messageElement.classList.contains('message')) {
+            messageElement = messageElement.closest('.message');
+        }
+        
+        if (!messageElement) return;
+        
+        messageElement.classList.add('no-select');
+        longPressTimer = setTimeout(() => {
+            isLongPress = true;
+            showMessageContextMenu(e, messageElement);
+        }, 500);
+    }
+
+    function handleTouchMove(e) {
+        clearTimeout(longPressTimer);
+        let messageElement = e.currentTarget;
+        if (messageElement) {
+            if (!messageElement.classList.contains('message')) {
+                messageElement = messageElement.closest('.message');
+            }
+            if (messageElement) {
+                messageElement.classList.remove('no-select');
+            }
+        }
+    }
+
+    function handleTouchEnd(e) {
+        clearTimeout(longPressTimer);
+        let messageElement = e.currentTarget;
+        if (messageElement) {
+            if (!messageElement.classList.contains('message')) {
+                messageElement = messageElement.closest('.message');
+            }
+            if (messageElement) {
+                messageElement.classList.remove('no-select');
+            }
+        }
+    }
+
+    function handlePrivateMessageTouchStart(e) {
+        isLongPress = false;
+        if (!e.currentTarget) return;
+        
+        // Check if we're touching a child element inside the message
+        let messageElement = e.currentTarget;
+        if (!messageElement.classList.contains('message')) {
+            messageElement = messageElement.closest('.message');
+        }
+        
+        if (!messageElement) return;
+        
+        messageElement.classList.add('no-select');
+        longPressTimer = setTimeout(() => {
+            isLongPress = true;
+            showPrivateMessageContextMenu(e, messageElement);
+        }, 500);
+    }
+
+    function handlePrivateMessageTouchMove(e) {
+        clearTimeout(longPressTimer);
+        let messageElement = e.currentTarget;
+        if (messageElement) {
+            if (!messageElement.classList.contains('message')) {
+                messageElement = messageElement.closest('.message');
+            }
+            if (messageElement) {
+                messageElement.classList.remove('no-select');
+            }
+        }
+    }
+
+    function handlePrivateMessageTouchEnd(e) {
+        clearTimeout(longPressTimer);
+        let messageElement = e.currentTarget;
+        if (messageElement) {
+            if (!messageElement.classList.contains('message')) {
+                messageElement = messageElement.closest('.message');
+            }
+            if (messageElement) {
+                messageElement.classList.remove('no-select');
+            }
+        }
+    }
+
+    // ===== MODIFIED: showMessageContextMenu with admin delete and block, also capture image URL =====
+    function showMessageContextMenu(e, message) {
+        // If message is null, try to find the message element from the event target
+        if (!message || !message.classList || !message.classList.contains('message')) {
+            message = e.target.closest('.message');
+        }
+        
+        // FIX: Check if message exists before accessing properties
+        if (!message || !message.dataset) {
+            console.error('Message or message.dataset is null', message);
+            return;
+        }
+        
+        const messageText = message.dataset.content || '';
+        const messageId = message.dataset.id;
+        const messageUsername = message.dataset.username || '';
+        
+        // Check if message has a valid ID
+        if (!messageId || messageId === 'undefined' || messageId === 'null') {
+            console.error('Message has no ID, cannot delete:', message);
+            showError('Cannot delete message: No message ID found. Please refresh and try again.');
+            return;
+        }
+        
+        console.log('Deleting message:', messageId, 'Username:', messageUsername);
+
+        // ===== NEW: Capture image URL if present =====
+        const messageImage = message.querySelector('img:not(.avatar img)');
+        let imageUrl = null;
+        if (messageImage) {
+            imageUrl = messageImage.src;
+        }
+
+        // Remove any existing context menus
+        document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());
+
+        const contextMenu = document.createElement('div');
+        contextMenu.className = 'message-context-menu active';
+        
+        // Get position for the menu - check for touch or mouse events
+        let clientX, clientY;
+        if (e.touches && e.touches.length > 0) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+        
+        // Ensure menu stays within viewport
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const menuWidth = 150; // Approximate width of the menu
+        
+        if (clientX + menuWidth > viewportWidth) {
+            clientX = viewportWidth - menuWidth - 10;
+        }
+        
+        contextMenu.style.left = `${Math.max(10, clientX)}px`;
+        contextMenu.style.top = `${Math.max(10, clientY)}px`;
+
+        // Copy button
+        const copyButton = document.createElement('button');
+        copyButton.textContent = 'Copy';
+        copyButton.onclick = () => {
+            copyToClipboard(messageText, copyButton);
+            contextMenu.remove();
+        };
+
+        // Reply button - now captures image URL
+        const replyButton = document.createElement('button');
+        replyButton.textContent = 'Reply';
+        replyButton.onclick = () => {
+            replyToText = messageText;
+            replyToMessageId = messageId; // store the ID of the message we're replying to
+            replyToImageUrl = imageUrl; // store the image URL if any
+            elements.messageInput.focus();
+            showReplyPreview();
+            contextMenu.remove();
+        };
+
+        contextMenu.appendChild(copyButton);
+        contextMenu.appendChild(replyButton);
+
+        // Check if this is the user's own message
+        const currentUsername = currentUserSession?.username;
+        const isOwnMessage = messageUsername === currentUsername || message.classList.contains('sent');
+
+        // === ADMIN MODIFICATION: Admin0 can delete any message ===
+        const isAdmin = currentUsername === 'Admin0';  // case‑sensitive – adjust if needed
+        if (isOwnMessage || isAdmin) {
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Delete';
+            deleteButton.className = 'delete-btn';
+            deleteButton.onclick = async () => {
+                try {
+                    console.log('Deleting message:', messageId, 'Username:', currentUsername);
+                    
+                    // Delete from server using unified function
+                    const success = await deleteMessageContext(messageId, currentUsername);
+                    
+                    if (success) {
+                        console.log('✅ Message deleted from server');
+                        
+                        // Remove from UI
+                        message.remove();
+                        showSuccess('Message deleted successfully');
+                        
+                        // Check if this was the replied-to message
+                        if (replyToMessageId && replyToMessageId === messageId) {
+                            updateReplyPreviewDeleted();
+                        }
+                    } else {
+                        throw new Error('Delete failed');
+                    }
+                    
+                } catch (err) {
+                    console.error('Delete error:', err);
+                    // Even if server delete fails, remove from UI for better UX
+                    message.remove();
+                    showSuccess('Message removed locally');
+                    
+                    if (replyToMessageId && replyToMessageId === messageId) {
+                        updateReplyPreviewDeleted();
+                    }
+                }
+                contextMenu.remove();
+            };
+            contextMenu.appendChild(deleteButton);
+        }
+
+        // === NEW: Block user option for Admin0 ===
+        if (isAdmin && !isOwnMessage) {
+            const blockButton = document.createElement('button');
+            blockButton.textContent = 'Block User';
+            blockButton.className = 'block-btn';
+            blockButton.onclick = () => {
+                blockUser(messageUsername);
+                contextMenu.remove();
+            };
+            contextMenu.appendChild(blockButton);
+        }
+
+        document.body.appendChild(contextMenu);
+        
+        // Close menu when clicking elsewhere
+        const closeMenu = (event) => {
+            if (!contextMenu.contains(event.target)) {
+                contextMenu.remove();
+                document.removeEventListener('click', closeMenu);
+                document.removeEventListener('touchstart', closeMenu);
+            }
         };
         
         setTimeout(() => {
-            if (!img.parentNode) {
-                container.appendChild(img);
-            }
-            resolve(img);
+            document.addEventListener('click', closeMenu);
+            document.addEventListener('touchstart', closeMenu);
         }, 100);
-    });
-}
+    }
 
-function forceImageRendering() {
-    document.querySelectorAll('.message img').forEach(img => {
-        if (img.complete) {
-            img.style.opacity = '1';
+    // ===== FIXED: showPrivateMessageContextMenu with improved element finding =====
+    function showPrivateMessageContextMenu(e, message) {
+        // If message is null, try to find the message element from the event target
+        if (!message || !message.classList || !message.classList.contains('message')) {
+            message = e.target.closest('.message');
         }
-    });
-}
-
-// ===== ZOOM FUNCTIONS =====
-function openZoom(src) {
-    document.body.style.overflow = 'hidden';
-    const overlay = document.getElementById('zoom-overlay');
-    const zoomImage = document.getElementById('zoom-image');
-    const downloadBtn = document.getElementById('download-btn');
-
-    if (!overlay || !zoomImage || !downloadBtn) return;
-    
-    zoomImage.src = src;
-
-    // Force download filename
-    downloadBtn.href = src;
-    downloadBtn.setAttribute('download', 'image.jpg');
-
-    overlay.style.display = 'flex';
-}
-
-function closeZoom() {
-    document.body.style.overflow = '';
-    const overlay = document.getElementById('zoom-overlay');
-    if (overlay) overlay.style.display = 'none';
-}
-
-// ===== OPTIMIZED INITIALIZATION FUNCTIONS =====
-function initializeButtons() {
-    console.log('Initializing buttons...');
-    
-    // Initialize main chat scroll button
-    scrollToBottomBtn = document.getElementById('scrollToBottomBtn');
-    if (scrollToBottomBtn) {
-        console.log('Found main chat scroll button');
-        scrollToBottomBtn.style.position = 'fixed';
-        scrollToBottomBtn.style.bottom = '80px';
-        scrollToBottomBtn.style.right = '20px';
-        scrollToBottomBtn.style.zIndex = '1000';
-        scrollToBottomBtn.style.display = 'none';
-        scrollToBottomBtn.addEventListener('click', scrollToBottomMain);
         
-        // Add proper scroll event listener to main chat
+        // FIX: Check if message exists before accessing properties
+        if (!message || !message.dataset) {
+            console.error('Message or message.dataset is null', message);
+            return;
+        }
+        
+        const messageText = message.dataset.content || '';
+        document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());
+
+        const contextMenu = document.createElement('div');
+        contextMenu.className = 'message-context-menu active';
+        
+        // Get position for the menu
+        let clientX, clientY;
+        if (e.touches && e.touches.length > 0) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+        
+        // Ensure menu stays within viewport
+        const viewportWidth = window.innerWidth;
+        const menuWidth = 150;
+        
+        if (clientX + menuWidth > viewportWidth) {
+            clientX = viewportWidth - menuWidth - 10;
+        }
+        
+        contextMenu.style.left = `${Math.max(10, clientX)}px`;
+        contextMenu.style.top = `${Math.max(10, clientY)}px`;
+
+        const copyButton = document.createElement('button');
+        copyButton.textContent = 'Copy';
+        copyButton.onclick = () => {
+            copyToClipboard(messageText, copyButton);
+            contextMenu.remove();
+        };
+
+        const replyButton = document.createElement('button');
+        replyButton.textContent = 'Reply';
+        replyButton.onclick = () => {
+            replyToText = messageText;
+            replyToMessageId = message.dataset.id || null; // store ID
+            elements.messageInput.focus();
+            showReplyPreview();
+            contextMenu.remove();
+        };
+
+        contextMenu.appendChild(copyButton);
+        contextMenu.appendChild(replyButton);
+
+        document.body.appendChild(contextMenu);
+        
+        // Close menu when clicking elsewhere
+        const closeMenu = (event) => {
+            if (!contextMenu.contains(event.target)) {
+                contextMenu.remove();
+                document.removeEventListener('click', closeMenu);
+                document.removeEventListener('touchstart', closeMenu);
+            }
+        };
+        
+        setTimeout(() => {
+            document.addEventListener('click', closeMenu);
+            document.addEventListener('touchstart', closeMenu);
+        }, 100);
+    }
+
+    function copyToClipboard(text, button) {  
+        const textarea = document.createElement('textarea');  
+        textarea.value = text;  
+        document.body.appendChild(textarea);  
+        textarea.select();  
+        document.execCommand('copy');  
+        document.body.removeChild(textarea);  
+
+        button.innerHTML = '<span style="font-size: 15px;">Copied!</span>';  
+        setTimeout(() => {  
+            button.innerHTML = 'Copy';  
+        }, 2000);  
+    }
+
+    // ===== MODIFIED: showReplyPreview with ID and icon cancel button, plus image thumbnail =====
+    function showReplyPreview() {
+        if (!elements.replyPreview) return;
+        
+        // Make container visible
+        elements.replyPreview.style.display = 'block';
+        
+        // Check if the replied-to message still exists in the DOM
+        let messageExists = replyToMessageId && document.querySelector(`[data-id="${replyToMessageId}"]`);
+        
+        if (!messageExists && replyToMessageId) {
+            // Message was deleted, show warning
+            elements.replyPreview.innerHTML = `
+                <div class="reply-preview" style="background-color: #ffebee; border-left-color: #f44336;">
+                    <span style="color:#d32f2f;">The message you replied to was deleted.</span>
+                    <button onclick="clearReply()" title="Cancel reply"><i class="fas fa-times"></i></button>
+                </div>
+            `;
+        } else {
+            // Normal reply preview with optional image thumbnail
+            let previewHtml = `<div class="reply-preview" data-reply-id="${replyToMessageId || ''}">`;
+            if (replyToImageUrl) {
+                previewHtml += `<div style="display:flex; align-items:center; gap:5px; margin-bottom:3px;">
+                    <img src="${replyToImageUrl}" style="width:40px; height:40px; object-fit:cover; border-radius:4px;">
+                    <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Replying to: ${replyToText ? replyToText.substring(0, 80) : 'a message'}</span>
+                </div>`;
+            } else {
+                previewHtml += `<span>Replying to: ${replyToText ? replyToText.substring(0, 80) : 'a message'}</span>`;
+            }
+            previewHtml += `<button onclick="clearReply()" title="Cancel reply"><i class="fas fa-times"></i></button></div>`;
+            elements.replyPreview.innerHTML = previewHtml;
+        }
+    }
+
+    // ===== MODIFIED: showPrivateReplyPreview with icon cancel button =====
+    function showPrivateReplyPreview() {
+        const privatePreview = document.getElementById('private-reply-preview-container');
+        if (!privatePreview) return;
+        
+        privatePreview.style.display = 'block';
+        
+        let messageExists = privateReplyToMessageId && document.querySelector(`[data-id="${privateReplyToMessageId}"]`);
+        
+        if (!messageExists && privateReplyToMessageId) {
+            privatePreview.innerHTML = `
+                <div class="reply-preview" style="background-color: #ffebee; border-left-color: #f44336;">
+                    <span style="color:#d32f2f;">The message you replied to was deleted.</span>
+                    <button onclick="clearPrivateReply()" title="Cancel reply"><i class="fas fa-times"></i></button>
+                </div>
+            `;
+        } else {
+            privatePreview.innerHTML = `
+                <div class="reply-preview" data-reply-id="${privateReplyToMessageId || ''}">
+                    <span>Replying to: ${privateReplyToText ? privateReplyToText.substring(0, 80) : 'a message'}</span>
+                    <button onclick="clearPrivateReply()" title="Cancel reply"><i class="fas fa-times"></i></button>
+                </div>
+            `;
+        }
+    }
+
+    // ===== MODIFIED: clearReply to reset both text, ID, and image URL =====
+    function clearReply() {
+        replyToText = null;
+        replyToMessageId = null;
+        replyToImageUrl = null;
+        if (elements.replyPreview) {
+            elements.replyPreview.style.display = 'none';
+            elements.replyPreview.innerHTML = '';
+        }
+    }
+
+    // ===== MENU AND NAVIGATION FUNCTIONS =====
+    function toggleDropdown() {
+        const dropdown = document.getElementById('dropdown');
+        if (!dropdown) return;
+        
+        const isVisible = dropdown.style.display === 'block';
+        
+        // Close all other menus first
+        const kebabDropdown = document.querySelector('.kebab-dropdown');
+        if (kebabDropdown) kebabDropdown.classList.remove('active');
+        
+        // Toggle dropdown
+        dropdown.style.display = isVisible ? 'none' : 'block';
+        
+        // Close if clicking the same button while open
+        if (isVisible) {
+            dropdown.style.display = 'none';
+        }
+    }
+
+    function toggleKebabMenu(event) {
+        event.stopPropagation();
+        const dropdown = document.querySelector('.kebab-dropdown');
+        if (dropdown) {
+            dropdown.classList.toggle('active');
+        }
+    }
+
+    function toggleTheme() {
+        document.body.classList.toggle('dark-theme');
+        const dropdown = document.querySelector('.kebab-dropdown');
+        if (dropdown) {
+            dropdown.classList.remove('active');
+        }
+    }
+
+    function clearChat() {
         const chatContainer = document.getElementById('chat-container');
         if (chatContainer) {
-            chatContainer.addEventListener('scroll', throttle(updateScrollState, 100));
-            console.log('Added scroll listener to main chat');
+            chatContainer.innerHTML = '';
         }
-    } else {
-        console.log('Main chat scroll button NOT found');
+        const dropdown = document.querySelector('.kebab-dropdown');
+        if (dropdown) {
+            dropdown.classList.remove('active');
+        }
     }
 
-    // Initialize private AI go-top button
-    privateGoTopBtn = document.getElementById('private-go-top');
-    privateContainer = document.getElementById('private-ai-container');
-    if (privateGoTopBtn) {
-        console.log('Found private AI go-top button');
-        privateGoTopBtn.style.position = 'fixed';
-        privateGoTopBtn.style.bottom = '80px';
-        privateGoTopBtn.style.right = '20px';
-        privateGoTopBtn.style.zIndex = '1000';
-        privateGoTopBtn.style.display = 'none';
-        privateGoTopBtn.addEventListener('click', scrollPrivateToTop);
+    function exportChat() {
+        const chatContainer = document.getElementById('chat-container');
+        if (!chatContainer) return;
+        
+        const messages = chatContainer.innerText;
+        const blob = new Blob([messages], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'chat-export.txt';
+        a.click();
+        window.URL.revokeObjectURL(url);
+        const dropdown = document.querySelector('.kebab-dropdown');
+        if (dropdown) {
+            dropdown.classList.remove('active');
+        }
     }
 
-    // Force initial state update
-    setTimeout(updateScrollState, 100);
-}
+    function exportChatPDF() {
+        const chatContainer = document.getElementById('chat-container');
+        if (!chatContainer) return;
+        
+        const dropdown = document.querySelector('.kebab-dropdown');
+        if (!dropdown) return;
 
-function initializeChat() {
-    if (elements.messageInput) {
-        elements.messageInput.addEventListener('input', () => {
-            autoResize(elements.messageInput);
-            const hasText = elements.messageInput.value.trim().length > 0;
-            elements.sendButton.disabled = !hasText;
-            elements.sendButton.classList.toggle('enabled', hasText);
+        const clone = chatContainer.cloneNode(true);
+
+        // Show downloading alert
+        const downloadingAlert = document.createElement('div');
+        downloadingAlert.id = 'downloading-alert';
+        downloadingAlert.textContent = 'Preparing download, please wait...';
+        downloadingAlert.style.position = 'fixed';
+        downloadingAlert.style.top = '20px';
+        downloadingAlert.style.left = '50%';
+        downloadingAlert.style.transform = 'translateX(-50%)';
+        downloadingAlert.style.padding = '10px 20px';
+        downloadingAlert.style.backgroundColor = '#333';
+        downloadingAlert.style.color = '#fff';
+        downloadingAlert.style.fontSize = '16px';
+        downloadingAlert.style.borderRadius = '8px';
+        downloadingAlert.style.zIndex = '9999';
+        document.body.appendChild(downloadingAlert);
+
+        // Find all images and replace src with base64
+        const images = clone.querySelectorAll('img');
+        const promises = [];
+
+        images.forEach(img => {
+            const promise = new Promise((resolve, reject) => {
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                const originalImage = new Image();
+                originalImage.crossOrigin = 'anonymous';
+                originalImage.src = img.src;
+
+                originalImage.onload = () => {
+                    try {
+                        // Store original display style to restore later
+                        const originalDisplay = img.style.display;
+                        const originalWidth = img.style.width;
+                        const originalHeight = img.style.height;
+
+                        // Temporarily make image visible and full size for capture
+                        img.style.display = 'block';
+                        img.style.width = 'auto';
+                        img.style.height = 'auto';
+                        img.style.maxWidth = 'none';
+                        img.style.maxHeight = 'none';
+
+                        canvas.width = originalImage.naturalWidth;
+                        canvas.height = originalImage.naturalHeight;
+                        context.drawImage(originalImage, 0, 0);
+
+                        const dataURL = canvas.toDataURL('image/png');
+                        img.src = dataURL;
+
+                        // Restore original styles
+                        img.style.display = originalDisplay;
+                        img.style.width = originalWidth;
+                        img.style.height = originalHeight;
+
+                        resolve();
+                    } catch (error) {
+                        console.error('Error converting image:', error);
+                        resolve();
+                    }
+                };
+
+                originalImage.onerror = () => {
+                    console.error('Error loading image:', img.src);
+                    resolve();
+                };
+            });
+            promises.push(promise);
         });
-        elements.messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey && !isSending) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-    }
-    loadMessages();
-}
 
-// ===== MODIFIED: IMAGE UPLOAD HANDLER =====
-async function attachFile() {
-    const fileInput = document.getElementById('image-upload-main');
-    fileInput.click();
-    fileInput.onchange = async function() {
-        const file = fileInput.files[0];
-        if (!file) return;
+        Promise.all(promises).then(() => {
+            const opt = {
+                margin: 10,
+                filename: 'chat-export.pdf',
+                image: { type: 'jpeg', quality: 1 },
+                html2canvas: { 
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                    scrollX: 0,
+                    scrollY: 0,
+                    windowWidth: document.documentElement.scrollWidth,
+                    windowHeight: document.documentElement.scrollHeight
+                },
+                jsPDF: { 
+                    unit: 'mm',
+                    format: 'a4',
+                    orientation: 'portrait',
+                    hotfixes: ['px_scaling'] 
+                },
+                pagebreak: { 
+                    mode: ['avoid-all', 'css', 'legacy'],
+                    before: '.page-break' 
+                }
+            };
 
-        const formData = new FormData();
-        formData.append('image', file);
-
-        try {
-            showInfo('Uploading image...');
-            const response = await fetch('/upload', {
-                method: 'POST',
-                body: formData
+            // Temporarily modify image styles for PDF generation
+            const allImages = clone.querySelectorAll('img');
+            allImages.forEach(img => {
+                img.style.maxWidth = '100%';
+                img.style.height = 'auto';
+                img.style.display = 'block';
             });
 
-            if (!response.ok) throw new Error('Upload failed');
-            const data = await response.json();
-            const imageUrl = data.imageUrl;
+            html2pdf().set(opt).from(clone).save().then(() => {
+                downloadingAlert.remove();
+            }).catch((error) => {
+                console.error('Error generating PDF:', error);
+                downloadingAlert.remove();
+            });
 
-            // Send a message with empty content and image_url
-            const username = currentUserSession?.username;
-            if (!username) return showError('You must be logged in');
+            dropdown.classList.remove('active');
+        });
+    }
 
-            // Build reply payload if any
-            let replyToPayload = null;
-            if (replyToData) {
-                replyToPayload = JSON.stringify({
-                    text: replyToData.text,
-                    image_url: replyToData.image_url
-                });
+    function showSettings() {
+        alert('Settings panel coming soon!');
+        const dropdown = document.querySelector('.kebab-dropdown');
+        if (dropdown) {
+            dropdown.classList.remove('active');
+        }
+    }
+
+    // ===== ENHANCED LOGOUT FUNCTION =====
+    function logout() {
+        // Reset initialization flag so next login re-initializes properly
+        isAppInitialized = false;
+        
+        const username = currentUserSession?.username;
+        
+        // Notify server that user is going offline
+        if (username && socket) {
+            // [FIXED] Leave private room before disconnecting
+            socket.emit('leave-user-room', username);
+            socket.emit('user-offline', username);
+            // Disconnect socket
+            socket.disconnect();
+        }
+        
+        // Stop Opera Mini polling if active
+        if (operaMessenger) {
+            operaMessenger.stopPolling();
+        }
+        
+        // Clear user session from both storage locations
+        clearUserSession();
+        
+        // Remove page event listeners
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+        window.removeEventListener('pagehide', handlePageHide);
+        
+        // Hide all containers and menus
+        document.querySelectorAll('.main-chat-interface').forEach(container => {
+            container.style.display = 'none';
+        });
+        
+        const menu = document.querySelector('.menu');
+        if (menu) menu.style.display = 'none';
+        
+        const dropdown = document.getElementById('dropdown');
+        if (dropdown) dropdown.style.display = 'none';
+        
+        const kebabDropdown = document.querySelector('.kebab-dropdown');
+        if (kebabDropdown) kebabDropdown.classList.remove('active');
+        
+        // Hide all chat inputs
+        document.querySelectorAll('.chat-input').forEach(input => {
+            input.style.display = 'none';
+        });
+        
+        // Hide news container and toggle
+        const newsContainer = document.querySelector('.news-container');
+        if (newsContainer) newsContainer.style.display = 'none';
+        const newsToggle = document.querySelector('.news-toggle');
+        if (newsToggle) newsToggle.style.display = 'none';
+        
+        // Show auth container
+        document.getElementById('auth-container').style.display = 'flex';
+        
+        // Hide both buttons on logout
+        if (scrollToBottomBtn) {
+            scrollToBottomBtn.style.display = 'none';
+            scrollToBottomBtn.classList.remove('visible');
+        }
+        if (privateGoTopBtn) {
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.classList.remove('visible');
+        }
+        
+        // Reset auth form
+        isLogin = true;
+        const authTitle = document.getElementById('auth-title');
+        if (authTitle) authTitle.textContent = 'Login';
+        
+        const authButton = document.querySelector('.auth-box button');
+        if (authButton) authButton.textContent = 'Login';
+        
+        const toggleText = document.getElementById('toggle-text');
+        if (toggleText) toggleText.textContent = "Don't have an account? ";
+        
+        const toggleLink = document.getElementById('toggle-link');
+        if (toggleLink) toggleLink.textContent = 'Sign Up';
+        
+        // Clear profile section
+        const profileSection = document.querySelector('.profile-display-section');
+        const divider = document.querySelector('.menu-divider');
+        if (profileSection) profileSection.remove();
+        if (divider) divider.remove();
+        
+        // Clear any validation states
+        const usernameInput = document.getElementById('auth-username');
+        if (usernameInput) {
+            usernameInput.classList.remove('username-valid', 'username-invalid');
+            usernameInput.value = '';
+        }
+        document.getElementById('auth-password').value = '';
+        
+        // Hide SQL Editor menu item
+        const sqlEditorMenuItem = document.getElementById('sql-editor-menu-item');
+        if (sqlEditorMenuItem) {
+            sqlEditorMenuItem.style.display = 'none';
+        }
+        
+        console.log('✅ User logged out successfully');
+    }
+
+    // ===== NOTIFICATION FUNCTIONS =====
+    function showNotification(username, message) {
+        if (!notificationPermissionGranted || !('Notification' in window)) return;
+        const notification = new Notification(`${username} says:`, {
+            body: message.length > 50 ? message.substring(0, 50) + '...' : message,
+            icon: 'https://i.pravatar.cc/50?u=' + encodeURIComponent(username)
+        });
+        notification.onclick = () => {
+            window.focus();
+        };
+    }
+
+    // ✅ OPTIMIZED: AI Response function
+    async function fetchChatResponse(userInput) {
+        if (isProcessingCommand) {
+            console.log('🛑 Command already being processed, skipping...');
+            return;
+        }
+
+        isProcessingCommand = true;
+        
+        try {
+            const PREFIX = '!';
+            
+            // Don't process commands that start with prefix - let the server handle them
+            if (userInput.startsWith(PREFIX)) {
+                console.log('🤖 Command detected, letting server handle response...');
+                return;
             }
-
-            const payload = { content: '', username, image_url: imageUrl, reply_to: replyToPayload };
-            const token = localStorage.getItem('auth_token');
-            const msgRes = await fetch('/api/messages', {
+            
+            const response = await fetch('/api/command', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': token ? `Bearer ${token}` : ''
+                    'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({
+                    message: userInput,
+                    source: 'main-chat'
+                }),
             });
-            if (!msgRes.ok) throw new Error('Failed to send image message');
-            const savedMsg = await msgRes.json();
-
-            // Display immediately (will also come via socket)
-            displayMessage(savedMsg.content, 'sent', savedMsg.reply_to, savedMsg.username, savedMsg.id, true, null, null, savedMsg.image_url);
-
-            fileInput.value = ''; // reset
-            clearReply(); // Clear reply after sending
-        } catch (err) {
-            console.error('Upload error:', err);
-            showError('Image upload failed: ' + err.message);
+            
+            console.log('🤖 Command sent to server, waiting for Socket.io response...');
+            
+        } catch (error) {
+            console.error("Error fetching AI response:", error);
+        } finally {
+            setTimeout(() => {
+                isProcessingCommand = false;
+            }, 1000);
         }
-    };
-}
-// --- CUT HERE ---
+    }
+
+    async function fetchPrivateAIResponse(userInput) {
+        try {
+            let processedInput = userInput;
+            
+            if (!userInput.startsWith('-') && userInput.trim() !== '') {
+                processedInput = `-ai ${userInput}`;
+            }
+            
+            if (userInput.trim().toLowerCase() === 'ai') {
+                processedInput = '-ai';
+            }
+
+            console.log('🤫 Private AI processing:', { original: userInput, processed: processedInput });
+
+            const response = await fetch('/api/command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: processedInput,
+                    source: 'private-ai'
+                }),
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            if (data.reply) {
+                if (Array.isArray(data.reply)) {
+                    data.reply.forEach(reply => displayPrivateMessage(reply, 'received'));
+                } else {
+                    displayPrivateMessage(data.reply, 'received');
+                }
+            } else {
+                throw new Error('No reply from AI');
+            }
+        } catch (error) {
+            console.error("Error fetching Private AI response:", error);
+            displayPrivateMessage("Sorry, I encountered an error processing your message. Please try again.", 'received');
+        }
+    }
+
+    // ===== OPTIMIZED IMAGE HANDLING FUNCTIONS =====
+    function displayImageImmediately(imgUrl, container) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.src = imgUrl;
+            img.alt = "Image";
+            img.loading = "lazy";
+            img.style.opacity = "1";
+            img.style.transition = "opacity 0.3s";
+            img.style.width = "100%";
+            img.style.borderRadius = "10px";
+            img.style.objectFit = "cover";
+            
+            img.onload = function() {
+                container.appendChild(img);
+                resolve(img);
+            };
+            
+            setTimeout(() => {
+                if (!img.parentNode) {
+                    container.appendChild(img);
+                }
+                resolve(img);
+            }, 100);
+        });
+    }
+
+    function forceImageRendering() {
+        document.querySelectorAll('.message img').forEach(img => {
+            if (img.complete) {
+                img.style.opacity = '1';
+            }
+        });
+    }
+
+    // ===== ZOOM FUNCTIONS =====
+    function openZoom(src) {
+        document.body.style.overflow = 'hidden';
+        const overlay = document.getElementById('zoom-overlay');
+        const zoomImage = document.getElementById('zoom-image');
+        const downloadBtn = document.getElementById('download-btn');
+
+        if (!overlay || !zoomImage || !downloadBtn) return;
+        
+        zoomImage.src = src;
+
+        // Force download filename
+        downloadBtn.href = src;
+        downloadBtn.setAttribute('download', 'image.jpg');
+
+        overlay.style.display = 'flex';
+    }
+
+    function closeZoom() {
+        document.body.style.overflow = '';
+        const overlay = document.getElementById('zoom-overlay');
+        if (overlay) overlay.style.display = 'none';
+    }
+
+    // ===== OPTIMIZED INITIALIZATION FUNCTIONS =====
+    function initializeButtons() {
+        console.log('Initializing buttons...');
+        
+        // Initialize main chat scroll button
+        scrollToBottomBtn = document.getElementById('scrollToBottomBtn');
+        if (scrollToBottomBtn) {
+            console.log('Found main chat scroll button');
+            scrollToBottomBtn.style.position = 'fixed';
+            scrollToBottomBtn.style.bottom = '80px';
+            scrollToBottomBtn.style.right = '20px';
+            scrollToBottomBtn.style.zIndex = '1000';
+            scrollToBottomBtn.style.display = 'none';
+            scrollToBottomBtn.addEventListener('click', scrollToBottomMain);
+            
+            // Add proper scroll event listener to main chat
+            const chatContainer = document.getElementById('chat-container');
+            if (chatContainer) {
+                chatContainer.addEventListener('scroll', throttle(updateScrollState, 100));
+                console.log('Added scroll listener to main chat');
+            }
+        } else {
+            console.log('Main chat scroll button NOT found');
+        }
+
+        // Initialize private AI go-top button
+        privateGoTopBtn = document.getElementById('private-go-top');
+        privateContainer = document.getElementById('private-ai-container');
+        if (privateGoTopBtn) {
+            console.log('Found private AI go-top button');
+            privateGoTopBtn.style.position = 'fixed';
+            privateGoTopBtn.style.bottom = '80px';
+            privateGoTopBtn.style.right = '20px';
+            privateGoTopBtn.style.zIndex = '1000';
+            privateGoTopBtn.style.display = 'none';
+            privateGoTopBtn.addEventListener('click', scrollPrivateToTop);
+        }
+
+        // Force initial state update
+        setTimeout(updateScrollState, 100);
+    }
+
+    function initializeChat() {
+        if (elements.messageInput) {
+            elements.messageInput.addEventListener('input', () => {
+                autoResize(elements.messageInput);
+                const hasText = elements.messageInput.value.trim().length > 0;
+                elements.sendButton.disabled = !hasText;
+                elements.sendButton.classList.toggle('enabled', hasText);
+            });
+            elements.messageInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !isSending) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+        }
+        loadMessages();
+    }
+
+    // ===== MODIFIED: IMAGE UPLOAD HANDLER =====
+    async function attachFile() {
+        const fileInput = document.getElementById('image-upload-main');
+        fileInput.click();
+        fileInput.onchange = async function() {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('image', file);
+
+            try {
+                showInfo('Uploading image...');
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error('Upload failed');
+                const data = await response.json();
+                const imageUrl = data.imageUrl;
+
+                // Send a message with empty content and image_url
+                const username = currentUserSession?.username;
+                if (!username) return showError('You must be logged in');
+
+                const payload = { content: '', username, image_url: imageUrl, reply_to: null };
+                const token = localStorage.getItem('auth_token');
+                const msgRes = await fetch('/api/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': token ? `Bearer ${token}` : ''
+                    },
+                    body: JSON.stringify(payload)
+                });
+                if (!msgRes.ok) throw new Error('Failed to send image message');
+                const savedMsg = await msgRes.json();
+
+                // Display immediately (will also come via socket)
+                displayMessage(savedMsg.content, 'sent', null, savedMsg.username, savedMsg.id, true, null, null, savedMsg.image_url);
+
+                fileInput.value = ''; // reset
+            } catch (err) {
+                console.error('Upload error:', err);
+                showError('Image upload failed: ' + err.message);
+            }
+        };
+    }
+
+    // --- CUT HERE ---
 // ===== PRIVATE MESSAGING FUNCTIONS =====
 function initializePrivateMessaging() {
     loadPrivateUsers();
