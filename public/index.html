@@ -5736,7 +5736,7 @@ async function updateAllMessagesFromUser(username, status, lastSeen) {
     });
 }
 
-// ===== MODIFIED: createMessageElement to accept image_url and replyImageUrl =====
+// ===== MODIFIED: createMessageElement to accept image_url and reply image preview =====
 function createMessageElement(text, sender, repliedTo = null, username = '', messageId = null, status = 'offline', lastSeen = null, image_url = null, replyImageUrl = null) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${sender}`;
@@ -5744,6 +5744,7 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
     messageDiv.dataset.content = text;
     messageDiv.dataset.username = username;
     messageDiv.dataset.timestamp = Date.now();
+    if (image_url) messageDiv.dataset.imageUrl = image_url; // store original image URL
 
     // Only create avatar for received messages
     if (sender === 'received') {
@@ -5814,35 +5815,43 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
 
         const contentDiv = document.createElement('div');
         contentDiv.className = 'content';
-        // ===== MODIFIED: Reply preview with image thumbnail =====
-        if (repliedTo) {
+        
+        // If it's a reply message and has a reply image URL, show thumbnail
+        if (replyImageUrl) {
+            const replyPreviewDiv = document.createElement('div');
+            replyPreviewDiv.className = 'reply-preview';
+            replyPreviewDiv.style.display = 'flex';
+            replyPreviewDiv.style.flexDirection = 'column';
+            replyPreviewDiv.style.alignItems = 'flex-start';
+            replyPreviewDiv.style.gap = '4px';
+            
+            const img = new Image();
+            img.src = replyImageUrl;
+            img.alt = "reply image";
+            img.style.width = '60px';
+            img.style.height = '60px';
+            img.style.objectFit = 'cover';
+            img.style.borderRadius = '4px';
+            img.style.cursor = 'pointer';
+            img.onclick = () => openZoom(replyImageUrl);
+            replyPreviewDiv.appendChild(img);
+            
+            if (text) {
+                const replyText = document.createElement('span');
+                replyText.textContent = text;
+                replyText.style.fontSize = '0.9em';
+                replyText.style.color = '#555';
+                replyText.style.maxWidth = '100%';
+                replyText.style.wordBreak = 'break-word';
+                replyPreviewDiv.appendChild(replyText);
+            }
+            
+            contentDiv.appendChild(replyPreviewDiv);
+        } else if (repliedTo) {
+            // Fallback to text-only reply preview
             const replyBubble = document.createElement('div');
             replyBubble.className = 'reply-preview';
-            if (replyImageUrl) {
-                // Create container with image and text
-                const replyContainer = document.createElement('div');
-                replyContainer.style.display = 'flex';
-                replyContainer.style.alignItems = 'center';
-                replyContainer.style.gap = '5px';
-                replyContainer.style.marginBottom = '3px';
-                const img = document.createElement('img');
-                img.src = replyImageUrl;
-                img.style.width = '40px';
-                img.style.height = '40px';
-                img.style.objectFit = 'cover';
-                img.style.borderRadius = '4px';
-                const textSpan = document.createElement('span');
-                textSpan.style.flex = '1';
-                textSpan.style.overflow = 'hidden';
-                textSpan.style.textOverflow = 'ellipsis';
-                textSpan.style.whiteSpace = 'nowrap';
-                textSpan.textContent = repliedTo;
-                replyContainer.appendChild(img);
-                replyContainer.appendChild(textSpan);
-                replyBubble.appendChild(replyContainer);
-            } else {
-                replyBubble.textContent = repliedTo;
-            }
+            replyBubble.textContent = repliedTo;
             contentDiv.appendChild(replyBubble);
         }
 
@@ -5998,34 +6007,42 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
         // For sent messages - simpler structure without avatar/username
         const contentDiv = document.createElement('div');
         contentDiv.className = 'content';
-        // ===== MODIFIED: Reply preview with image thumbnail =====
-        if (repliedTo) {
+        // If it's a reply message and has a reply image URL, show thumbnail
+        if (replyImageUrl) {
+            const replyPreviewDiv = document.createElement('div');
+            replyPreviewDiv.className = 'reply-preview';
+            replyPreviewDiv.style.display = 'flex';
+            replyPreviewDiv.style.flexDirection = 'column';
+            replyPreviewDiv.style.alignItems = 'flex-start';
+            replyPreviewDiv.style.gap = '4px';
+            
+            const img = new Image();
+            img.src = replyImageUrl;
+            img.alt = "reply image";
+            img.style.width = '60px';
+            img.style.height = '60px';
+            img.style.objectFit = 'cover';
+            img.style.borderRadius = '4px';
+            img.style.cursor = 'pointer';
+            img.onclick = () => openZoom(replyImageUrl);
+            replyPreviewDiv.appendChild(img);
+            
+            if (text) {
+                const replyText = document.createElement('span');
+                replyText.textContent = text;
+                replyText.style.fontSize = '0.9em';
+                replyText.style.color = '#555';
+                replyText.style.maxWidth = '100%';
+                replyText.style.wordBreak = 'break-word';
+                replyPreviewDiv.appendChild(replyText);
+            }
+            
+            contentDiv.appendChild(replyPreviewDiv);
+        } else if (repliedTo) {
+            // Fallback to text-only reply preview
             const replyBubble = document.createElement('div');
             replyBubble.className = 'reply-preview';
-            if (replyImageUrl) {
-                const replyContainer = document.createElement('div');
-                replyContainer.style.display = 'flex';
-                replyContainer.style.alignItems = 'center';
-                replyContainer.style.gap = '5px';
-                replyContainer.style.marginBottom = '3px';
-                const img = document.createElement('img');
-                img.src = replyImageUrl;
-                img.style.width = '40px';
-                img.style.height = '40px';
-                img.style.objectFit = 'cover';
-                img.style.borderRadius = '4px';
-                const textSpan = document.createElement('span');
-                textSpan.style.flex = '1';
-                textSpan.style.overflow = 'hidden';
-                textSpan.style.textOverflow = 'ellipsis';
-                textSpan.style.whiteSpace = 'nowrap';
-                textSpan.textContent = repliedTo;
-                replyContainer.appendChild(img);
-                replyContainer.appendChild(textSpan);
-                replyBubble.appendChild(replyContainer);
-            } else {
-                replyBubble.textContent = repliedTo;
-            }
+            replyBubble.textContent = repliedTo;
             contentDiv.appendChild(replyBubble);
         }
         // ===== MODIFIED: Handle image_url if provided =====
@@ -6066,6 +6083,11 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
     
     const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId, status, lastSeen, image_url, replyImageUrl);
     
+    // Store image URL in map if present
+    if (messageId && image_url) {
+        messageImageMap[messageId] = image_url;
+    }
+    
     // Add event listeners to ALL messages
     addMessageTouchListeners(messageDiv);
 
@@ -6088,7 +6110,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
     }
 }
 
-// ===== MODIFIED: renderMessages to include image_url and replyImageUrl =====
+// ===== MODIFIED: renderMessages to include image_url and build image map =====
 function renderMessages(messages, isFirstLoad = false) {
     if (!elements.chatContainer) return;
     
@@ -6097,6 +6119,7 @@ function renderMessages(messages, isFirstLoad = false) {
     if (isFirstLoad) {
         // Clear container for first load
         elements.chatContainer.innerHTML = '';
+        messageImageMap = {}; // reset map
     }
     
     // Sort messages by timestamp or ID in ascending order
@@ -6124,13 +6147,9 @@ function renderMessages(messages, isFirstLoad = false) {
             usersToUpdate.add(msg.username);
         }
         
-        // Attempt to retrieve reply image URL from pending map if this message is a reply
-        let replyImageUrl = null;
-        if (msg.reply_to && pendingReplyImages[msg.id]) {
-            replyImageUrl = pendingReplyImages[msg.id];
-        } else if (msg.reply_to && msg.reply_image_url) {
-            // If server provides it
-            replyImageUrl = msg.reply_image_url;
+        // Store image URL in map if present
+        if (msg.id && msg.image_url) {
+            messageImageMap[msg.id] = msg.image_url;
         }
         
         const messageDiv = createMessageElement(
@@ -6141,8 +6160,7 @@ function renderMessages(messages, isFirstLoad = false) {
             msg.id, 
             status, 
             lastSeen,
-            msg.image_url, // Pass image_url
-            replyImageUrl   // Pass replyImageUrl
+            msg.image_url // Pass image_url
         );
         
         // ADD TOUCH LISTENERS TO ALL MESSAGES (including loaded ones)
@@ -8113,12 +8131,12 @@ function getUserProfile(username) {
     };
 }
 
-// ===== MODIFIED: sendMessage function to use OperaMiniMessenger when on Opera Mini and handle reply image =====
+// ===== MODIFIED: sendMessage function to use OperaMiniMessenger when on Opera Mini =====
 async function sendMessage() {
     if (isSending || isProcessingCommand) return;
     isSending = true;
     
-    const content = elements.messageInput.value.trim();
+    let content = elements.messageInput.value.trim();
     const username = currentUserSession?.username;
     
     if (!content || !username) {
@@ -8179,6 +8197,18 @@ async function sendMessage() {
         elements.sendButton.disabled = true;
         elements.sendButton.classList.remove('enabled');
         
+        // ===== MODIFIED: Construct message content with reply image preview if needed =====
+        let finalContent = content;
+        let replyImageUrl = null;
+        
+        // If replying to an image message, we embed a marker and store the image URL separately
+        if (replyToImageUrl) {
+            // We'll send the image URL as part of the message content for simplicity
+            // This will be parsed on the receiving end to show the thumbnail
+            finalContent = `[reply_img]${replyToImageUrl}[/reply_img] ${content}`;
+            replyImageUrl = replyToImageUrl; // keep for local display
+        }
+        
         // ===== NEW: Auto‑detect if content is a standalone image URL =====
         const imageUrlRegex = /^(https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp|bmp|svg))(?:\?[^\s]*)?$/i;
         let payload;
@@ -8186,7 +8216,7 @@ async function sendMessage() {
             // It's an image URL → send as image message (empty content)
             payload = { content: '', username, image_url: content, reply_to: replyToMessageId || null };
         } else {
-            payload = { content, username, image_url: '', reply_to: replyToMessageId || null };
+            payload = { content: finalContent, username, image_url: '', reply_to: replyToMessageId || null };
         }
         
         // Use OperaMiniMessenger for Opera Mini, otherwise use regular fetch
@@ -8225,17 +8255,8 @@ async function sendMessage() {
             savedMessage = await response.json();
         }
         
-        // If this is a reply, store the reply image URL for later use when we receive the message back
-        if (replyToImageUrl) {
-            pendingReplyImages[savedMessage.id] = replyToImageUrl;
-            // Auto-clean after 1 minute
-            setTimeout(() => {
-                delete pendingReplyImages[savedMessage.id];
-            }, 60000);
-        }
-        
-        // Display message with the actual ID from server, including reply image if any
-        displayMessage(savedMessage.content, 'sent', savedMessage.reply_to, savedMessage.username, savedMessage.id, true, null, null, savedMessage.image_url, replyToImageUrl);
+        // Display message with the actual ID from server
+        displayMessage(finalContent, 'sent', replyToText, savedMessage.username, savedMessage.id, true, null, null, payload.image_url, replyImageUrl);
         
         // Clear input immediately for better UX
         elements.messageInput.value = '';
@@ -8357,14 +8378,16 @@ function initSocket() {
                 const isAIResponse = message.username === 'AI' || message.username === 'Bot';
                 
                 if (!isOwnMessage || isAIResponse) {
-                    // Check if this message is a reply and we have a pending image for it
+                    // Parse reply image if present
                     let replyImageUrl = null;
-                    if (message.id && pendingReplyImages[message.id]) {
-                        replyImageUrl = pendingReplyImages[message.id];
-                        // Optional: clear after use? Keep for later renders maybe
+                    let content = message.content;
+                    const replyImgMatch = content.match(/\[reply_img\]([^\[]+)\[\/reply_img\]\s*(.*)/);
+                    if (replyImgMatch) {
+                        replyImageUrl = replyImgMatch[1];
+                        content = replyImgMatch[2];
                     }
                     displayMessage(
-                        message.content, 
+                        content, 
                         isOwnMessage ? 'sent' : 'received', 
                         message.reply_to, 
                         message.username, 
@@ -8434,6 +8457,15 @@ function initSocket() {
         const isOwnMessage = message.username === currentUserSession?.username;
         const isAIResponse = message.username === 'AI' || message.username === 'Bot';
         
+        // Parse reply image if present
+        let replyImageUrl = null;
+        let content = message.content;
+        const replyImgMatch = content.match(/\[reply_img\]([^\[]+)\[\/reply_img\]\s*(.*)/);
+        if (replyImgMatch) {
+            replyImageUrl = replyImgMatch[1];
+            content = replyImgMatch[2];
+        }
+        
         // Check if we already have this message displayed (without ID)
         if (isOwnMessage) {
             // Find messages from this user without an ID and update them
@@ -8451,14 +8483,8 @@ function initSocket() {
         // Only display if we don't already have it
         const existingMessage = document.querySelector(`[data-id="${message.id}"]`);
         if (!existingMessage && (!isOwnMessage || isAIResponse)) {
-            // Check if this message is a reply and we have a pending image for it
-            let replyImageUrl = null;
-            if (message.id && pendingReplyImages[message.id]) {
-                replyImageUrl = pendingReplyImages[message.id];
-                // Optional: clear after use? Keep for later renders maybe
-            }
             displayMessage(
-                message.content, 
+                content, 
                 isOwnMessage ? 'sent' : 'received', 
                 message.reply_to, 
                 message.username, 
@@ -9062,6 +9088,14 @@ function batchMessageRender(messages, renderFunction) {
     // ✅ ADDED: Profile cache to reduce server calls
     let profileCache = {};
 
+    // ✅ ADDED: Map to store image URLs by message ID
+    let messageImageMap = {};
+
+    // ✅ ADDED: Variables for replying to image messages
+    let replyToText = null;
+    let replyToMessageId = null;
+    let replyToImageUrl = null;
+
     const elements = {
         usernameInput: document.getElementById('auth-username'),
         messageInput: document.getElementById('user-input'),
@@ -9073,13 +9107,6 @@ function batchMessageRender(messages, renderFunction) {
         privateInput: document.getElementById('private-user-input'),
         privateSendButton: document.getElementById('private-send-button')
     };
-
-    let replyToText = null;
-    let replyToMessageId = null; // store ID of the message being replied to
-    // ===== NEW: store image URL of the message being replied to =====
-    let replyToImageUrl = null;
-    // ===== NEW: map to store reply image URLs for pending messages =====
-    const pendingReplyImages = {};
 
     // ===== MODIFIED: AVATAR URL HELPER FUNCTION =====
     function getAvatarUrl(username) {
@@ -9867,7 +9894,7 @@ function batchMessageRender(messages, renderFunction) {
         }
     }
 
-    // ===== MODIFIED: showMessageContextMenu with admin delete and block, also capture image URL =====
+    // ===== MODIFIED: showMessageContextMenu with admin delete and block, and reply image capture =====
     function showMessageContextMenu(e, message) {
         // If message is null, try to find the message element from the event target
         if (!message || !message.classList || !message.classList.contains('message')) {
@@ -9880,25 +9907,10 @@ function batchMessageRender(messages, renderFunction) {
             return;
         }
         
-        // === ENHANCED: Get message text with fallback ===
-        let messageText = message.dataset.content;
-        if (!messageText) {
-            // Try to extract from content div
-            const contentDiv = message.querySelector('.content');
-            if (contentDiv) {
-                // Clone to avoid modifying original
-                const clone = contentDiv.cloneNode(true);
-                // Remove any child elements like reply preview, images
-                const replyPreviews = clone.querySelectorAll('.reply-preview');
-                replyPreviews.forEach(pr => pr.remove());
-                const images = clone.querySelectorAll('img');
-                images.forEach(img => img.remove());
-                messageText = clone.textContent.trim();
-            }
-        }
-        
+        const messageText = message.dataset.content || '';
         const messageId = message.dataset.id;
         const messageUsername = message.dataset.username || '';
+        const messageImageUrl = message.dataset.imageUrl || messageImageMap[messageId];
         
         // Check if message has a valid ID
         if (!messageId || messageId === 'undefined' || messageId === 'null') {
@@ -9908,13 +9920,6 @@ function batchMessageRender(messages, renderFunction) {
         }
         
         console.log('Deleting message:', messageId, 'Username:', messageUsername);
-
-        // ===== NEW: Capture image URL if present =====
-        const messageImage = message.querySelector('img:not(.avatar img)');
-        let imageUrl = null;
-        if (messageImage) {
-            imageUrl = messageImage.src;
-        }
 
         // Remove any existing context menus
         document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());
@@ -9952,13 +9957,13 @@ function batchMessageRender(messages, renderFunction) {
             contextMenu.remove();
         };
 
-        // Reply button - now captures image URL
+        // Reply button
         const replyButton = document.createElement('button');
         replyButton.textContent = 'Reply';
         replyButton.onclick = () => {
             replyToText = messageText;
-            replyToMessageId = messageId; // store the ID of the message we're replying to
-            replyToImageUrl = imageUrl; // store the image URL if any
+            replyToMessageId = messageId;
+            replyToImageUrl = messageImageUrl || null; // store image URL if present
             elements.messageInput.focus();
             showReplyPreview();
             contextMenu.remove();
@@ -10056,20 +10061,7 @@ function batchMessageRender(messages, renderFunction) {
             return;
         }
         
-        // === ENHANCED: Get message text with fallback ===
-        let messageText = message.dataset.content;
-        if (!messageText) {
-            const contentDiv = message.querySelector('.content');
-            if (contentDiv) {
-                const clone = contentDiv.cloneNode(true);
-                const replyPreviews = clone.querySelectorAll('.reply-preview');
-                replyPreviews.forEach(pr => pr.remove());
-                const images = clone.querySelectorAll('img');
-                images.forEach(img => img.remove());
-                messageText = clone.textContent.trim();
-            }
-        }
-        
+        const messageText = message.dataset.content || '';
         document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());
 
         const contextMenu = document.createElement('div');
@@ -10147,7 +10139,7 @@ function batchMessageRender(messages, renderFunction) {
         }, 2000);  
     }
 
-    // ===== MODIFIED: showReplyPreview with ID and icon cancel button, plus image thumbnail =====
+    // ===== MODIFIED: showReplyPreview with image thumbnail if replying to an image =====
     function showReplyPreview() {
         if (!elements.replyPreview) return;
         
@@ -10166,18 +10158,24 @@ function batchMessageRender(messages, renderFunction) {
                 </div>
             `;
         } else {
-            // Normal reply preview with optional image thumbnail
-            let previewHtml = `<div class="reply-preview" data-reply-id="${replyToMessageId || ''}">`;
+            // If replying to an image, show thumbnail
             if (replyToImageUrl) {
-                previewHtml += `<div style="display:flex; align-items:center; gap:5px; margin-bottom:3px;">
-                    <img src="${replyToImageUrl}" style="width:40px; height:40px; object-fit:cover; border-radius:4px;">
-                    <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Replying to: ${replyToText ? replyToText.substring(0, 80) : 'a message'}</span>
-                </div>`;
+                elements.replyPreview.innerHTML = `
+                    <div class="reply-preview" data-reply-id="${replyToMessageId || ''}" style="display: flex; align-items: center; gap: 8px;">
+                        <img src="${replyToImageUrl}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;">
+                        <span style="flex:1;">Replying to image</span>
+                        <button onclick="clearReply()" title="Cancel reply"><i class="fas fa-times"></i></button>
+                    </div>
+                `;
             } else {
-                previewHtml += `<span>Replying to: ${replyToText ? replyToText.substring(0, 80) : 'a message'}</span>`;
+                // Normal text reply preview
+                elements.replyPreview.innerHTML = `
+                    <div class="reply-preview" data-reply-id="${replyToMessageId || ''}">
+                        <span>Replying to: ${replyToText ? replyToText.substring(0, 80) : 'a message'}</span>
+                        <button onclick="clearReply()" title="Cancel reply"><i class="fas fa-times"></i></button>
+                    </div>
+                `;
             }
-            previewHtml += `<button onclick="clearReply()" title="Cancel reply"><i class="fas fa-times"></i></button></div>`;
-            elements.replyPreview.innerHTML = previewHtml;
         }
     }
 
@@ -10207,7 +10205,7 @@ function batchMessageRender(messages, renderFunction) {
         }
     }
 
-    // ===== MODIFIED: clearReply to reset both text, ID, and image URL =====
+    // ===== MODIFIED: clearReply to reset both text and ID and image =====
     function clearReply() {
         replyToText = null;
         replyToMessageId = null;
