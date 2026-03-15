@@ -5815,15 +5815,22 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
         contentDiv.className = 'content';
         // ===== MODIFIED: Reply preview with image thumbnail and cache lookup =====
         if (repliedTo) {
-            // Determine if repliedTo is an ID (likely numeric string) and we have cached content
+            // Determine if repliedTo is an ID (likely numeric string) and we have cached data
             let displayReply = repliedTo;
+            let replyImage = replyImageUrl; // start with passed replyImageUrl (from pending or server)
+            
             if (repliedTo && !repliedTo.includes(' ') && messageContentCache[repliedTo]) {
-                displayReply = messageContentCache[repliedTo];
+                // Use cached content and image
+                const cached = messageContentCache[repliedTo];
+                displayReply = cached.content;
+                if (!replyImage && cached.image_url) {
+                    replyImage = cached.image_url; // use cached image if none provided
+                }
             }
             
             const replyBubble = document.createElement('div');
             replyBubble.className = 'reply-preview';
-            if (replyImageUrl) {
+            if (replyImage) {
                 // Create container with image and text
                 const replyContainer = document.createElement('div');
                 replyContainer.style.display = 'flex';
@@ -5831,7 +5838,7 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
                 replyContainer.style.gap = '5px';
                 replyContainer.style.marginBottom = '3px';
                 const img = document.createElement('img');
-                img.src = replyImageUrl;
+                img.src = replyImage;
                 img.style.width = '40px';
                 img.style.height = '40px';
                 img.style.objectFit = 'cover';
@@ -5851,7 +5858,7 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
             contentDiv.appendChild(replyBubble);
         }
 
-        // ===== MODIFIED: Handle image_url if provided =====
+        // ===== Handle image_url if provided =====
         if (image_url) {
             const img = new Image();
             img.src = image_url;
@@ -6005,22 +6012,27 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
         contentDiv.className = 'content';
         // ===== MODIFIED: Reply preview with image thumbnail and cache lookup =====
         if (repliedTo) {
-            // Determine if repliedTo is an ID (likely numeric string) and we have cached content
             let displayReply = repliedTo;
+            let replyImage = replyImageUrl;
+            
             if (repliedTo && !repliedTo.includes(' ') && messageContentCache[repliedTo]) {
-                displayReply = messageContentCache[repliedTo];
+                const cached = messageContentCache[repliedTo];
+                displayReply = cached.content;
+                if (!replyImage && cached.image_url) {
+                    replyImage = cached.image_url;
+                }
             }
             
             const replyBubble = document.createElement('div');
             replyBubble.className = 'reply-preview';
-            if (replyImageUrl) {
+            if (replyImage) {
                 const replyContainer = document.createElement('div');
                 replyContainer.style.display = 'flex';
                 replyContainer.style.alignItems = 'center';
                 replyContainer.style.gap = '5px';
                 replyContainer.style.marginBottom = '3px';
                 const img = document.createElement('img');
-                img.src = replyImageUrl;
+                img.src = replyImage;
                 img.style.width = '40px';
                 img.style.height = '40px';
                 img.style.objectFit = 'cover';
@@ -6039,7 +6051,7 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
             }
             contentDiv.appendChild(replyBubble);
         }
-        // ===== MODIFIED: Handle image_url if provided =====
+        // ===== Handle image_url if provided =====
         if (image_url) {
             const img = new Image();
             img.src = image_url;
@@ -6099,7 +6111,7 @@ function displayMessage(text, sender, repliedTo = null, username = '', messageId
     }
 }
 
-// ===== MODIFIED: renderMessages to include image_url and replyImageUrl and cache updates =====
+// ===== MODIFIED: renderMessages to store content+image in cache =====
 function renderMessages(messages, isFirstLoad = false) {
     if (!elements.chatContainer) return;
     
@@ -6135,9 +6147,12 @@ function renderMessages(messages, isFirstLoad = false) {
             usersToUpdate.add(msg.username);
         }
         
-        // ===== ADDED: Store message content in cache for reply resolution =====
+        // ===== ADDED: Store message content and image in cache for reply resolution =====
         if (msg.id) {
-            messageContentCache[msg.id] = msg.content;
+            messageContentCache[msg.id] = {
+                content: msg.content,
+                image_url: msg.image_url || null
+            };
         }
         
         // Attempt to retrieve reply image URL from pending map if this message is a reply
@@ -8383,7 +8398,10 @@ function initSocket() {
                     }
                     // ===== ADDED: Update cache =====
                     if (message.id) {
-                        messageContentCache[message.id] = message.content;
+                        messageContentCache[message.id] = {
+                            content: message.content,
+                            image_url: message.image_url || null
+                        };
                         saveMessageCache();
                     }
                     displayMessage(
@@ -8476,7 +8494,10 @@ function initSocket() {
         
         // ===== ADDED: Update cache =====
         if (message.id) {
-            messageContentCache[message.id] = message.content;
+            messageContentCache[message.id] = {
+                content: message.content,
+                image_url: message.image_url || null
+            };
             saveMessageCache();
         }
         
