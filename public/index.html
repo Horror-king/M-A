@@ -9880,7 +9880,23 @@ function batchMessageRender(messages, renderFunction) {
             return;
         }
         
-        const messageText = message.dataset.content || '';
+        // === ENHANCED: Get message text with fallback ===
+        let messageText = message.dataset.content;
+        if (!messageText) {
+            // Try to extract from content div
+            const contentDiv = message.querySelector('.content');
+            if (contentDiv) {
+                // Clone to avoid modifying original
+                const clone = contentDiv.cloneNode(true);
+                // Remove any child elements like reply preview, images
+                const replyPreviews = clone.querySelectorAll('.reply-preview');
+                replyPreviews.forEach(pr => pr.remove());
+                const images = clone.querySelectorAll('img');
+                images.forEach(img => img.remove());
+                messageText = clone.textContent.trim();
+            }
+        }
+        
         const messageId = message.dataset.id;
         const messageUsername = message.dataset.username || '';
         
@@ -10040,7 +10056,20 @@ function batchMessageRender(messages, renderFunction) {
             return;
         }
         
-        const messageText = message.dataset.content || '';
+        // === ENHANCED: Get message text with fallback ===
+        let messageText = message.dataset.content;
+        if (!messageText) {
+            const contentDiv = message.querySelector('.content');
+            if (contentDiv) {
+                const clone = contentDiv.cloneNode(true);
+                const replyPreviews = clone.querySelectorAll('.reply-preview');
+                replyPreviews.forEach(pr => pr.remove());
+                const images = clone.querySelectorAll('img');
+                images.forEach(img => img.remove());
+                messageText = clone.textContent.trim();
+            }
+        }
+        
         document.querySelectorAll('.message-context-menu').forEach(menu => menu.remove());
 
         const contextMenu = document.createElement('div');
