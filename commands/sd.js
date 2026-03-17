@@ -72,7 +72,6 @@ Combine images:
     }
   },
 
-  // 👇 ADDED event PARAMETER
   onStart: async function ({ message, args, event }) {
     try {
       const input = args.join(" ").trim();
@@ -81,34 +80,55 @@ Combine images:
         return message.reply("❌ | Please provide a prompt.");
       }
 
+      // ---------- COLLECT IMAGE URLS ----------
       let imageUrls = [];
-      let promptInput = input;
 
-      // ===== NEW: CHECK FOR REPLIED IMAGE =====
-      if (event && event.messageReply && event.messageReply.attachments && event.messageReply.attachments.length > 0) {
-        // Extract image URLs from the replied message
-        event.messageReply.attachments.forEach(att => {
-          if (att.type === "photo" || att.url) {
-            imageUrls.push(att.url);
+      // 1️⃣  Check if the user replied to a message
+      if (event && event.messageReply) {
+        console.log("📨 Replied message data:", event.messageReply);
+
+        // a) Look for attachments (set by our index.js)
+        if (event.messageReply.attachments && event.messageReply.attachments.length > 0) {
+          event.messageReply.attachments.forEach(att => {
+            if (att.url) {
+              imageUrls.push(att.url);
+            }
+          });
+        }
+
+        // b) If the replied message had a direct image_url field (maybe we add it later)
+        if (event.messageReply.image_url) {
+          imageUrls.push(event.messageReply.image_url);
+        }
+
+        // c) Try to extract an image URL from the message body (e.g. a plain link)
+        if (event.messageReply.body) {
+          const match = event.messageReply.body.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|webp|gif)/i);
+          if (match) {
+            imageUrls.push(match[0]);
           }
-        });
-        console.log("📸 Using replied image(s):", imageUrls);
+        }
+
+        console.log("📸 Extracted from reply:", imageUrls);
       }
 
-      // ===== EXISTING LOGIC: detect image link format (user typed URL|prompt) =====
+      // 2️⃣  Handle the pipe syntax (img1.jpg,img2.jpg | prompt)
+      //     Append these URLs to imageUrls instead of overwriting
+      let promptInput = input;
       if (input.includes("|")) {
         const parts = input.split("|");
         const linkPart = parts[0].trim();
         const promptPart = parts.slice(1).join("|").trim();
 
         if (linkPart.startsWith("http")) {
-          // support multiple images
-          imageUrls = linkPart.split(",").map(x => x.trim());
+          const pipeUrls = linkPart.split(",").map(x => x.trim());
+          imageUrls.push(...pipeUrls);
+          console.log("🔗 URLs from pipe syntax:", pipeUrls);
         }
         promptInput = promptPart;
       }
 
-      // Parse flags from the prompt part
+      // ---------- PARSE FLAGS ----------
       const parsed = parseFlags(promptInput);
 
       if (!parsed.prompt) {
@@ -138,7 +158,7 @@ Combine images:
         qualityText = `📐 Quality: ${quality}\n`;
       }
 
-      // Validate nano_banana requires at least 2 images
+      // ---------- VALIDATE IMAGE COUNT ----------
       if (realModel === "kie_nano_banana") {
         if (imageUrls.length < 2) {
           return message.reply(
@@ -152,16 +172,18 @@ Combine images:
         }
       }
 
+      // ---------- BUILD API URL ----------
       let apiUrl =
         `${API_URL}?prompt=${encodeURIComponent(prompt)}&model=${realModel}`;
 
       if (ratio) apiUrl += `&ratio=${ratio}`;
-
       apiUrl += qualityParam;
 
       if (imageUrls.length > 0) {
         apiUrl += `&url=${encodeURIComponent(imageUrls.join(","))}`;
       }
+
+      console.log("🚀 Final API URL (sanitized):", apiUrl.replace(API_COOKIE, "HIDDEN"));
 
       const processing = await message.reply(
         "🎨 Generating image... please wait (up to 4 minutes)"
