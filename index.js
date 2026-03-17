@@ -4775,190 +4775,187 @@ app.post('/test-message', async (req, res) => {
 });
 
 // ===== MODIFIED: Command API handler with prefix-free support for private AI =====
+// This is the updated /api/command endpoint with robust image extraction from replied messages
 app.post("/api/command", async (req, res) => {
   try {
     let { message, source = 'main-chat', reply_to } = req.body;
     console.log('📨 Received command:', { message, source, reply_to });
-    
-    if (!message) return res.status(400).json({ reply: "❌ Message is required" });
 
-    // ===== NEW: AUTO-PREFIX FOR PRIVATE AI =====
+    if (!message) {
+      return res.status(400).json({ reply: "❌ Message is required" });
+    }
+
+    // ===== AUTO-PREFIX FOR PRIVATE AI =====
     if (source === 'private-ai' && !message.startsWith(PREFIX)) {
-      console.log('🤫 Private AI detected - checking for prefix-free commands...');
-      
-      const trimmedMessage = message.trim().toLowerCase();
-      const firstWord = trimmedMessage.split(' ')[0];
-      
-      // Check if it's a direct command word without prefix
+      const trimmed = message.trim().toLowerCase();
+      const firstWord = trimmed.split(' ')[0];
+
       const commandWords = ['ai', 'help', 'ping', 'prefix', 'ask', 'chat'];
-      
+
       if (commandWords.includes(firstWord)) {
-        // It's a command - add the prefix
         message = PREFIX + message;
-        console.log('🔍 Auto-added prefix to command:', message);
       } else {
-        // It's regular text - treat as AI command
         message = PREFIX + 'ai ' + message;
-        console.log('🤖 Auto-treated as AI command:', message);
       }
     }
     // ===== END AUTO-PREFIX =====
 
-    // Handle prefix command separately
+    // PREFIX COMMAND
     if (message.trim().toLowerCase() === "prefix") {
-      const reply = `🔹 My command prefix is: \`${PREFIX}\``;
-      
-      // Save to main chat only
-      if (source === 'main-chat') {
-        console.log('💾 Saving prefix command response to Supabase...');
-        try {
-          await saveBotResponseToSupabase(reply, 'prefix', 'Bot');
-        } catch (saveError) {
-          console.error('❌ Failed to save prefix response:', saveError);
-        }
-      }
-      
-      return res.json({ reply });
+      return res.json({ reply: `🔹 My prefix is: ${PREFIX}` });
     }
 
     const cmd = handleCommand(message);
-    if (!cmd) {
-      console.log('❌ Not a command or wrong prefix');
-      return res.end();
-    }
+    if (!cmd) return res.end();
 
-    console.log('🔍 Command detected:', cmd.commandName);
-    console.log('📍 Source:', source);
-
-    // ✅ COMPLETELY FIXED: EXCLUSIVE SINGLE RESPONSE SYSTEM
     let finalReply = null;
     let responder = null;
 
-    // AI COMMANDS - ONLY AI RESPONDS
+    // =========================
+    // 🤖 AI COMMAND
+    // =========================
     if (cmd.commandName === "ai") {
-      console.log('🤖 Processing EXCLUSIVELY as AI command');
       responder = 'AI';
-      
+
       try {
         const response = await axios.get(
           `https://yau-cener-gpt4-api.vercel.app/ai?prompt=${encodeURIComponent(cmd.text)}&cb=${Date.now()}`,
-          { 
-            headers: { 
-              Accept: "application/json",
-              "User-Agent": "GoatBot/1.0"
-            },
-            timeout: 15000,
-            validateStatus: () => true
-          }
+          { timeout: 15000 }
         );
 
-        let responseData;
-        let aiResponse;
+        const data = response.data;
+        finalReply =
+          data.response ||
+          data.message ||
+          data.data ||
+          (typeof data === "string" ? data : "⚠️ Unknown AI response");
 
-        if (typeof response.data === 'string') {
-          try {
-            responseData = JSON.parse(response.data);
-          } catch (e) {
-            if (response.data.includes('error') || response.status !== 200) {
-              throw new Error(response.data || `API returned status ${response.status}`);
-            }
-            aiResponse = response.data;
-          }
-        } else {
-          responseData = response.data;
-        }
-
-        if (!aiResponse) {
-          if (responseData.response) {
-            aiResponse = responseData.response;
-          } else if (responseData.message) {
-            aiResponse = responseData.message;
-          } else if (responseData.data) {
-            aiResponse = responseData.data;
-          } else {
-            aiResponse = JSON.stringify(responseData) || "⚠️ No recognizable response format";
-          }
-        }
-
-        finalReply = aiResponse;
-        console.log('🤖 AI Response received');
-
-      } catch (aiError) {
-        console.error("❌ AI Processing Error:", aiError);
-        finalReply = `❌ AI Error: ${aiError.message.replace(/[\n\r]/g, ' ').substring(0, 200)}`;
+      } catch (err) {
+        finalReply = `❌ AI Error: ${err.message}`;
       }
-    } 
-    // BOT COMMANDS - ONLY BOT RESPONDS
+    }
+
+    // =========================
+    // 🤖 BOT COMMANDS
+    // =========================
     else {
-      console.log('🤖 Processing EXCLUSIVELY as Bot command');
       responder = 'Bot';
 
       const command = commands[cmd.commandName];
       if (!command) {
         finalReply = "❌ Command not found";
-      } else if (typeof command.onStart !== "function") {
-        finalReply = "❌ This command does not support execution";
       } else {
+
         const replies = [];
-        // Prepare event object with messageReply if reply_to was provided
+
         const event = { body: cmd.text };
+
+        // =========================
+        // 🔥 FIX: HANDLE REPLY IMAGE
+        // =========================
         if (reply_to) {
-          event.messageReply = { id: reply_to };
+          console.log("🔍 Fetching replied message:", reply_to);
+
+          try {
+            const { data, error } = await supabase
+              .from("chatter") // Using your existing table 'chatter'
+              .select("*")
+              .eq("id", reply_to)
+              .single();
+
+            if (error) {
+              console.error("❌ DB error:", error);
+            }
+
+            if (data) {
+              console.log("✅ Found replied message:", data);
+
+              let imageUrl = null;
+
+              // ✅ Case 1: direct column
+              if (data.image_url) {
+                imageUrl = data.image_url;
+              }
+
+              // ✅ Case 2: attachments JSON (if you ever store it)
+              if (!imageUrl && data.attachments) {
+                try {
+                  const atts = typeof data.attachments === "string"
+                    ? JSON.parse(data.attachments)
+                    : data.attachments;
+
+                  if (Array.isArray(atts)) {
+                    const img = atts.find(a =>
+                      a.type === "photo" || a.type === "image"
+                    );
+                    if (img) imageUrl = img.url;
+                  }
+                } catch (e) {
+                  console.log("❌ Attachment parse error");
+                }
+              }
+
+              // ✅ Case 3: extract from message text (content)
+              if (!imageUrl && data.content) {
+                const match = data.content.match(/https?:\/\/\S+\.(jpg|jpeg|png|webp|gif)/i);
+                if (match) imageUrl = match[0];
+              }
+
+              console.log("📸 Extracted image:", imageUrl);
+
+              // ✅ PASS TO COMMAND (THIS IS THE MAIN FIX)
+              event.messageReply = {
+                messageID: data.id,
+                body: data.content,
+                attachments: imageUrl
+                  ? [{ type: "photo", url: imageUrl }]
+                  : []
+              };
+            }
+
+          } catch (err) {
+            console.error("❌ Fetch error:", err);
+          }
         }
 
+        // =========================
+        // RUN COMMAND
+        // =========================
         await command.onStart({
           api: {
-            sendMessage: (msg) => replies.push(typeof msg === "string" ? msg : JSON.stringify(msg)),
-            supabase: supabase,
-            io: io
+            sendMessage: (msg) => replies.push(
+              typeof msg === "string" ? msg : JSON.stringify(msg)
+            ),
+            supabase,
+            io
           },
-          event: event,
+          event,
           args: cmd.args,
           message: {
             reply: (content) => replies.push(content)
           }
         });
 
-        if (replies.length > 0) {
-          finalReply = replies.length === 1 ? replies[0] : replies.join('\n');
-        } else {
-          finalReply = "❌ Command executed but no response generated";
-        }
+        finalReply = replies.join("\n") || "❌ No response";
       }
     }
 
-    // ✅ SINGLE RESPONSE SAVING - Only save ONE response
+    // =========================
+    // 💾 SAVE RESPONSE
+    // =========================
     if (finalReply && source === 'main-chat') {
-      console.log(`💾 Saving ${responder} response to Supabase...`);
       try {
         await saveBotResponseToSupabase(finalReply, cmd.commandName, responder);
-      } catch (saveError) {
-        console.error(`❌ Failed to save ${responder} response:`, saveError);
+      } catch (e) {
+        console.log("❌ Save error");
       }
     }
 
-    // ✅ SINGLE RESPONSE RETURN - Only return ONE response
-    if (finalReply) {
-      return res.json({ reply: finalReply });
-    } else {
-      return res.json({ reply: "❌ No response generated" });
-    }
+    return res.json({ reply: finalReply });
 
   } catch (error) {
     console.error("❌ Server Error:", error);
-    const errorReply = `❌ Server Error: ${error.message}`;
-    
-    // Save error response
-    if (source === 'main-chat') {
-      console.log('💾 Saving server error response to Supabase...');
-      try {
-        await saveBotResponseToSupabase(errorReply, 'unknown', 'Bot');
-      } catch (saveError) {
-        console.error('❌ Failed to save server error response:', saveError);
-      }
-    }
-    
-    res.status(500).json({ reply: errorReply });
+    return res.status(500).json({ reply: "❌ Server error" });
   }
 });
 
