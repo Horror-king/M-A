@@ -64,17 +64,17 @@ module.exports = {
 `Generate image:
 {pn} a cute cat --model sd_4.5 --quality 4k
 
-Edit image:
-{pn} https://image.jpg | make it anime style --model sd_4.5
+Edit image (via reply):
+Reply to an image with {pn} make it anime style --model sd_4.5
 
 Combine images:
 {pn} img1.jpg,img2.jpg | combine them --model nano_banana --ratio 3:2`
     }
   },
 
-  onStart: async function ({ message, args }) {
+  // 👇 ADDED event PARAMETER
+  onStart: async function ({ message, args, event }) {
     try {
-
       const input = args.join(" ").trim();
 
       if (!input) {
@@ -84,23 +84,31 @@ Combine images:
       let imageUrls = [];
       let promptInput = input;
 
-      // detect image link format
+      // ===== NEW: CHECK FOR REPLIED IMAGE =====
+      if (event && event.messageReply && event.messageReply.attachments && event.messageReply.attachments.length > 0) {
+        // Extract image URLs from the replied message
+        event.messageReply.attachments.forEach(att => {
+          if (att.type === "photo" || att.url) {
+            imageUrls.push(att.url);
+          }
+        });
+        console.log("📸 Using replied image(s):", imageUrls);
+      }
+
+      // ===== EXISTING LOGIC: detect image link format (user typed URL|prompt) =====
       if (input.includes("|")) {
-
         const parts = input.split("|");
-
         const linkPart = parts[0].trim();
         const promptPart = parts.slice(1).join("|").trim();
 
         if (linkPart.startsWith("http")) {
-
           // support multiple images
           imageUrls = linkPart.split(",").map(x => x.trim());
         }
-
         promptInput = promptPart;
       }
 
+      // Parse flags from the prompt part
       const parsed = parseFlags(promptInput);
 
       if (!parsed.prompt) {
@@ -121,7 +129,6 @@ Combine images:
       let qualityText = "";
 
       if (realModel !== "kie_nano_banana") {
-
         const quality =
           ALLOWED_QUALITY.includes(parsed.quality)
             ? parsed.quality
@@ -131,20 +138,16 @@ Combine images:
         qualityText = `📐 Quality: ${quality}\n`;
       }
 
+      // Validate nano_banana requires at least 2 images
       if (realModel === "kie_nano_banana") {
-
         if (imageUrls.length < 2) {
           return message.reply(
             "⚠️ nano_banana requires at least **2 images**.\nExample:\n-sd img1.jpg,img2.jpg | combine them --model nano_banana"
           );
         }
-
       } else {
-
         if (imageUrls.length > 1) {
-
           message.reply(`⚠️ Multiple images detected. Only the first image will be used.`);
-
           imageUrls = [imageUrls[0]];
         }
       }
@@ -187,7 +190,6 @@ Combine images:
       const imageBuffer = Buffer.from(imageRes.data, "binary");
 
       const form = new FormData();
-
       form.append("image", imageBuffer.toString("base64"));
       form.append("type", "base64");
 
@@ -217,13 +219,11 @@ ${imgUrl}`;
       await message.reply(replyText);
 
     } catch (error) {
-
       if (error.code === "ECONNABORTED") {
         return message.reply(
           "❌ Image generation timeout. Try a simpler prompt."
         );
       }
-
       return message.reply(`❌ Error: ${error.message}`);
     }
   }
