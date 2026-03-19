@@ -8279,8 +8279,13 @@ async function sendMessage() {
         // Only get AI response if it's NOT a command
         const PREFIX = '!';
         if (!content.startsWith(PREFIX) && !imageUrlRegex.test(content)) {
-            // ===== MODIFIED: Pass replyToMessageId to fetchChatResponse =====
-            fetchChatResponse(content, replyToMessageId);
+            // ===== MODIFIED: Pass replyToMessageId to fetchChatResponse and handle errors =====
+            try {
+                await fetchChatResponse(content, replyToMessageId);
+            } catch (err) {
+                console.error('Error in fetchChatResponse:', err);
+                // Error already handled inside fetchChatResponse, but we catch here to prevent unhandled rejection
+            }
         }
         
     } catch (error) {
@@ -8408,10 +8413,19 @@ async function fetchChatResponse(userInput, replyToId) {
             }),
         });
 
-        console.log('🤖 Command sent to server, waiting for Socket.io response...');
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `Server returned ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('🤖 Command response received:', data);
+        // The actual bot response will come via socket.io
+        // We don't need to do anything here
 
     } catch (error) {
-        console.error("Error fetching AI response:", error);
+        console.error("❌ Error fetching AI response:", error);
+        showError(`Command failed: ${error.message}`);
     } finally {
         setTimeout(() => {
             isProcessingCommand = false;
