@@ -4775,7 +4775,7 @@ app.post('/test-message', async (req, res) => {
 });
 
 // ===== MODIFIED: Command API handler with prefix-free support for private AI =====
-// ===== MODIFIED: Command API handler with STRONG image extraction =====
+// This is the updated /api/command endpoint with robust image extraction from replied messages
 app.post("/api/command", async (req, res) => {
   try {
     let { message, source = 'main-chat', reply_to } = req.body;
@@ -4798,6 +4798,7 @@ app.post("/api/command", async (req, res) => {
         message = PREFIX + 'ai ' + message;
       }
     }
+    // ===== END AUTO-PREFIX =====
 
     // PREFIX COMMAND
     if (message.trim().toLowerCase() === "prefix") {
@@ -4846,32 +4847,37 @@ app.post("/api/command", async (req, res) => {
       } else {
 
         const replies = [];
+
         const event = { body: cmd.text };
 
         // =========================
-        // 🔥 ULTRA FIX: ALWAYS GET IMAGE
+        // 🔥 FIX: HANDLE REPLY IMAGE
         // =========================
         if (reply_to) {
           console.log("🔍 Fetching replied message:", reply_to);
 
           try {
-            const { data } = await supabase
-              .from("chatter")
+            const { data, error } = await supabase
+              .from("chatter") // Using your existing table 'chatter'
               .select("*")
               .eq("id", reply_to)
               .single();
+
+            if (error) {
+              console.error("❌ DB error:", error);
+            }
 
             if (data) {
               console.log("✅ Found replied message:", data);
 
               let imageUrl = null;
 
-              // 🔥 PRIORITY 1: direct column
+              // ✅ Case 1: direct column
               if (data.image_url) {
                 imageUrl = data.image_url;
               }
 
-              // 🔥 PRIORITY 2: attachments JSON
+              // ✅ Case 2: attachments JSON (if you ever store it)
               if (!imageUrl && data.attachments) {
                 try {
                   const atts = typeof data.attachments === "string"
@@ -4880,26 +4886,27 @@ app.post("/api/command", async (req, res) => {
 
                   if (Array.isArray(atts)) {
                     const img = atts.find(a =>
-                      a.url && (a.type === "photo" || a.type === "image")
+                      a.type === "photo" || a.type === "image"
                     );
                     if (img) imageUrl = img.url;
                   }
-                } catch {}
+                } catch (e) {
+                  console.log("❌ Attachment parse error");
+                }
               }
 
-              // 🔥 PRIORITY 3: extract ANY URL (not only .jpg)
+              // ✅ Case 3: extract from message text (content)
               if (!imageUrl && data.content) {
-                const match = data.content.match(/https?:\/\/[^\s]+/i);
+                const match = data.content.match(/https?:\/\/\S+\.(jpg|jpeg|png|webp|gif)/i);
                 if (match) imageUrl = match[0];
               }
 
-              console.log("🚀 FINAL IMAGE URL:", imageUrl);
+              console.log("📸 Extracted image:", imageUrl);
 
-              // 🔥 FORCE INTO COMMAND
+              // ✅ PASS TO COMMAND (THIS IS THE MAIN FIX)
               event.messageReply = {
                 messageID: data.id,
-                body: data.content || "",
-                image_url: imageUrl,
+                body: data.content,
                 attachments: imageUrl
                   ? [{ type: "photo", url: imageUrl }]
                   : []
@@ -4952,54 +4959,53 @@ app.post("/api/command", async (req, res) => {
   }
 });
 
-
-// =========================
-// ONLINE USERS
-// =========================
+// Add endpoint to get online users
 app.get('/online-users', (req, res) => {
   const onlineUsersArray = Array.from(onlineUsers.keys());
   console.log('Current online users:', onlineUsersArray);
   res.json(onlineUsersArray);
 });
 
-
-// =========================
-// BLOCK USER (ADMIN)
-// =========================
+// ===== NEW: BLOCK USER ENDPOINT (Admin only) =====
 app.post('/api/admin/block/:username', verifyToken, async (req, res) => {
   try {
     const adminUsername = req.user.username;
     const targetUsername = req.params.username;
 
+    // Only Admin0 can block
     if (adminUsername !== 'Admin0') {
       return res.status(403).json({ success: false, error: 'Only Admin0 can block users.' });
     }
 
-    const { data: user } = await supabase
+    // Check if target exists
+    const { data: user, error: findError } = await supabase
       .from('users')
       .select('id')
       .ilike('username', targetUsername)
       .limit(1)
       .single();
 
-    if (!user) {
+    if (findError || !user) {
       return res.status(404).json({ success: false, error: 'User not found.' });
     }
 
-    await supabase
+    // Block the user (set banned = true)
+    const { error: updateError } = await supabase
       .from('users')
       .update({ banned: true })
       .eq('id', user.id);
 
+    if (updateError) {
+      console.error('❌ Error blocking user:', updateError);
+      return res.status(500).json({ success: false, error: 'Database error.' });
+    }
+
+    // Optionally kick the user from online list
     onlineUsers.delete(targetUsername);
-    io.emit('user-status-change', {
-      username: targetUsername,
-      status: 'offline',
-      lastSeen: new Date().toISOString()
-    });
+    io.emit('user-status-change', { username: targetUsername, status: 'offline', lastSeen: new Date().toISOString() });
 
+    console.log(`🚫 User ${targetUsername} blocked by Admin0.`);
     res.json({ success: true, message: `User @${targetUsername} has been blocked.` });
-
   } catch (error) {
     console.error('❌ Block endpoint error:', error);
     res.status(500).json({ success: false, error: 'Internal server error.' });
