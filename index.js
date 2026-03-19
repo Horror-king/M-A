@@ -4775,11 +4775,12 @@ app.post('/test-message', async (req, res) => {
 });
 
 // ===== MODIFIED: Command API handler with prefix-free support for private AI =====
-// This is the updated /api/command endpoint with robust image extraction from replied messages
+
+// ===== **** MODIFIED: COMMAND API HANDLER WITH REPLY IMAGE EXTRACTION **** =====
 app.post("/api/command", async (req, res) => {
   try {
-    let { message, source = 'main-chat', reply_to } = req.body;
-    console.log('📨 Received command:', { message, source, reply_to });
+    let { message, source = 'main-chat', reply_to, reply_image_url } = req.body; // <-- added reply_image_url
+    console.log('📨 Received command:', { message, source, reply_to, reply_image_url });
 
     if (!message) {
       return res.status(400).json({ reply: "❌ Message is required" });
@@ -4789,16 +4790,13 @@ app.post("/api/command", async (req, res) => {
     if (source === 'private-ai' && !message.startsWith(PREFIX)) {
       const trimmed = message.trim().toLowerCase();
       const firstWord = trimmed.split(' ')[0];
-
       const commandWords = ['ai', 'help', 'ping', 'prefix', 'ask', 'chat'];
-
       if (commandWords.includes(firstWord)) {
         message = PREFIX + message;
       } else {
         message = PREFIX + 'ai ' + message;
       }
     }
-    // ===== END AUTO-PREFIX =====
 
     // PREFIX COMMAND
     if (message.trim().toLowerCase() === "prefix") {
@@ -4816,49 +4814,45 @@ app.post("/api/command", async (req, res) => {
     // =========================
     if (cmd.commandName === "ai") {
       responder = 'AI';
-
       try {
         const response = await axios.get(
           `https://yau-cener-gpt4-api.vercel.app/ai?prompt=${encodeURIComponent(cmd.text)}&cb=${Date.now()}`,
           { timeout: 15000 }
         );
-
         const data = response.data;
-        finalReply =
-          data.response ||
-          data.message ||
-          data.data ||
-          (typeof data === "string" ? data : "⚠️ Unknown AI response");
-
+        finalReply = data.response || data.message || data.data || (typeof data === "string" ? data : "⚠️ Unknown AI response");
       } catch (err) {
         finalReply = `❌ AI Error: ${err.message}`;
       }
     }
-
     // =========================
     // 🤖 BOT COMMANDS
     // =========================
     else {
       responder = 'Bot';
-
       const command = commands[cmd.commandName];
       if (!command) {
         finalReply = "❌ Command not found";
       } else {
-
         const replies = [];
-
         const event = { body: cmd.text };
 
         // =========================
         // 🔥 FIX: HANDLE REPLY IMAGE
         // =========================
-        if (reply_to) {
-          console.log("🔍 Fetching replied message:", reply_to);
+        let imageUrl = null;
 
+        // NEW: If the frontend provided a direct image URL, use it
+        if (reply_image_url) {
+          console.log("📸 Using direct reply image URL from frontend:", reply_image_url);
+          imageUrl = reply_image_url;
+        }
+        // Otherwise, try to fetch the replied message from the database
+        else if (reply_to) {
+          console.log("🔍 Fetching replied message:", reply_to);
           try {
             const { data, error } = await supabase
-              .from("chatter") // Using your existing table 'chatter'
+              .from("chatter")
               .select("*")
               .eq("id", reply_to)
               .single();
@@ -4869,53 +4863,45 @@ app.post("/api/command", async (req, res) => {
 
             if (data) {
               console.log("✅ Found replied message:", data);
-
-              let imageUrl = null;
-
-              // ✅ Case 1: direct column
+              // Case 1: direct column
               if (data.image_url) {
                 imageUrl = data.image_url;
               }
-
-              // ✅ Case 2: attachments JSON (if you ever store it)
+              // Case 2: attachments JSON (if any)
               if (!imageUrl && data.attachments) {
                 try {
                   const atts = typeof data.attachments === "string"
                     ? JSON.parse(data.attachments)
                     : data.attachments;
-
                   if (Array.isArray(atts)) {
-                    const img = atts.find(a =>
-                      a.type === "photo" || a.type === "image"
-                    );
+                    const img = atts.find(a => a.type === "photo" || a.type === "image");
                     if (img) imageUrl = img.url;
                   }
                 } catch (e) {
                   console.log("❌ Attachment parse error");
                 }
               }
-
-              // ✅ Case 3: extract from message text (content)
+              // Case 3: extract from message content
               if (!imageUrl && data.content) {
                 const match = data.content.match(/https?:\/\/\S+\.(jpg|jpeg|png|webp|gif)/i);
                 if (match) imageUrl = match[0];
               }
-
-              console.log("📸 Extracted image:", imageUrl);
-
-              // ✅ PASS TO COMMAND (THIS IS THE MAIN FIX)
-              event.messageReply = {
-                messageID: data.id,
-                body: data.content,
-                attachments: imageUrl
-                  ? [{ type: "photo", url: imageUrl }]
-                  : []
-              };
             }
-
           } catch (err) {
             console.error("❌ Fetch error:", err);
           }
+        }
+
+        // If we found an image URL, attach it to the event for the command
+        if (imageUrl) {
+          console.log("📸 Extracted image:", imageUrl);
+          event.messageReply = {
+            messageID: reply_to || null,
+            body: '', // not needed for editing
+            attachments: [{ type: "photo", url: imageUrl }]
+          };
+        } else if (reply_to) {
+          console.log("⚠️ No image found in replied message.");
         }
 
         // =========================
@@ -4923,9 +4909,7 @@ app.post("/api/command", async (req, res) => {
         // =========================
         await command.onStart({
           api: {
-            sendMessage: (msg) => replies.push(
-              typeof msg === "string" ? msg : JSON.stringify(msg)
-            ),
+            sendMessage: (msg) => replies.push(typeof msg === "string" ? msg : JSON.stringify(msg)),
             supabase,
             io
           },
