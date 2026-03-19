@@ -10667,16 +10667,27 @@ function batchMessageRender(messages, renderFunction) {
         console.log('✅ User logged out successfully');
     }
 
-    // ===== NOTIFICATION FUNCTIONS =====
+    // ===== NOTIFICATION FUNCTIONS (FIXED) =====
     function showNotification(username, message) {
-        if (!notificationPermissionGranted || !('Notification' in window)) return;
-        const notification = new Notification(`${username} says:`, {
-            body: message.length > 50 ? message.substring(0, 50) + '...' : message,
-            icon: 'https://i.pravatar.cc/50?u=' + encodeURIComponent(username)
-        });
-        notification.onclick = () => {
-            window.focus();
-        };
+        if (!('Notification' in window)) {
+            console.log('Notifications not supported');
+            return;
+        }
+        if (Notification.permission !== 'granted') {
+            console.log('Notification permission not granted');
+            return;
+        }
+        try {
+            const notification = new Notification(`${username} says:`, {
+                body: message.length > 50 ? message.substring(0, 50) + '...' : message,
+                icon: 'https://i.pravatar.cc/50?u=' + encodeURIComponent(username)
+            });
+            notification.onclick = () => {
+                window.focus();
+            };
+        } catch (error) {
+            console.error('Failed to show notification:', error);
+        }
     }
 
     // ✅ OPTIMIZED: AI Response function
