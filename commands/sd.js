@@ -51,7 +51,7 @@ module.exports = {
   config: {
     name: "sd",
     aliases: ["seedream"],
-    version: "4.0",
+    version: "5.0",
     role: 0,
     author: "Hassan + Modified",
     countDown: 5,
