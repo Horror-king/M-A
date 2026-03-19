@@ -8384,7 +8384,8 @@ async function blockUser(usernameToBlock) {
 }
 
 // ===== MODIFIED: fetchChatResponse function to accept replyToId and send it =====
-async function fetchChatResponse(userInput, replyToId) {
+// ===== MODIFIED: fetchChatResponse function to accept replyToId and replyImageUrl =====
+async function fetchChatResponse(userInput, replyToId, replyImageUrl) {
     if (isProcessingCommand) {
         console.log('🛑 Command already being processed, skipping...');
         return;
@@ -8409,7 +8410,8 @@ async function fetchChatResponse(userInput, replyToId) {
             body: JSON.stringify({
                 message: userInput,
                 source: 'main-chat',
-                reply_to: replyToId || null   // <-- MODIFIED: Include reply ID
+                reply_to: replyToId || null,
+                reply_image_url: replyImageUrl || null   // <-- NEW: send image URL directly
             }),
         });
 
@@ -8431,7 +8433,7 @@ async function fetchChatResponse(userInput, replyToId) {
             isProcessingCommand = false;
         }, 1000);
     }
-}
+  }
 
 // ===== MODIFIED: initSocket function with room join, post events, and cache updates =====
 function initSocket() {
