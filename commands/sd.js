@@ -28,15 +28,12 @@ function parseFlags(input) {
       case "--ratio":
         ratio = tokens[++i];
         break;
-
       case "--model":
         model = tokens[++i];
         break;
-
       case "--quality":
         quality = tokens[++i];
         break;
-
       default:
         promptParts.push(tokens[i]);
     }
@@ -54,9 +51,9 @@ module.exports = {
   config: {
     name: "sd",
     aliases: ["seedream"],
-    version: "4.1-FIXED",
+    version: "4.0",
     role: 0,
-    author: "Hassan + FIXED",
+    author: "Hassan + Modified",
     countDown: 5,
     category: "image",
     guide: {
@@ -74,7 +71,7 @@ Combine images:
 
   onStart: async function ({ message, args, event }) {
     try {
-      let input = args.join(" ").trim();
+      const input = args.join(" ").trim();
 
       if (!input) {
         return message.reply("❌ | Please provide a prompt.");
@@ -83,38 +80,39 @@ Combine images:
       // ---------- COLLECT IMAGE URLS ----------
       let imageUrls = [];
 
-      // 🔥 1️⃣ PRIORITY: reply image (FORCE USE)
+      // 1️⃣  Check if the user replied to a message
       if (event && event.messageReply) {
         console.log("📨 Replied message data:", event.messageReply);
 
-        // ✅ FIRST: direct image_url (MOST IMPORTANT FIX)
+        // a) Look for attachments (set by our index.js)
+        if (event.messageReply.attachments && event.messageReply.attachments.length > 0) {
+          event.messageReply.attachments.forEach(att => {
+            if (att.url) {
+              imageUrls.push(att.url);
+            }
+          });
+        }
+
+        // b) If the replied message had a direct image_url field (maybe we add it later)
         if (event.messageReply.image_url) {
           imageUrls.push(event.messageReply.image_url);
-          console.log("🚀 Using image_url:", event.messageReply.image_url);
         }
 
-        // ✅ SECOND: attachments
-        if (imageUrls.length === 0 && event.messageReply.attachments?.length > 0) {
-          const att = event.messageReply.attachments.find(a => a.url);
-          if (att) {
-            imageUrls.push(att.url);
-            console.log("🚀 Using attachment:", att.url);
-          }
-        }
-
-        // ✅ THIRD: extract ANY URL (not only .jpg)
-        if (imageUrls.length === 0 && event.messageReply.body) {
-          const match = event.messageReply.body.match(/https?:\/\/[^\s]+/i);
+        // c) Try to extract an image URL from the message body (e.g. a plain link)
+        if (event.messageReply.body) {
+          const match = event.messageReply.body.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|webp|gif)/i);
           if (match) {
             imageUrls.push(match[0]);
-            console.log("🚀 Using body URL:", match[0]);
           }
         }
+
+        console.log("📸 Extracted from reply:", imageUrls);
       }
 
-      // 🔥 2️⃣ PIPE SYNTAX (only if no reply image)
+      // 2️⃣  Handle the pipe syntax (img1.jpg,img2.jpg | prompt)
+      //     Append these URLs to imageUrls instead of overwriting
       let promptInput = input;
-      if (input.includes("|") && imageUrls.length === 0) {
+      if (input.includes("|")) {
         const parts = input.split("|");
         const linkPart = parts[0].trim();
         const promptPart = parts.slice(1).join("|").trim();
@@ -122,13 +120,10 @@ Combine images:
         if (linkPart.startsWith("http")) {
           const pipeUrls = linkPart.split(",").map(x => x.trim());
           imageUrls.push(...pipeUrls);
-          console.log("🔗 Using pipe URLs:", pipeUrls);
+          console.log("🔗 URLs from pipe syntax:", pipeUrls);
         }
-
         promptInput = promptPart;
       }
-
-      console.log("🧩 FINAL IMAGE URLS:", imageUrls);
 
       // ---------- PARSE FLAGS ----------
       const parsed = parseFlags(promptInput);
@@ -160,38 +155,34 @@ Combine images:
         qualityText = `📐 Quality: ${quality}\n`;
       }
 
-      // ---------- VALIDATION ----------
+      // ---------- VALIDATE IMAGE COUNT ----------
       if (realModel === "kie_nano_banana") {
         if (imageUrls.length < 2) {
           return message.reply(
-            "⚠️ nano_banana requires at least 2 images."
+            "⚠️ nano_banana requires at least **2 images**.\nExample:\n-sd img1.jpg,img2.jpg | combine them --model nano_banana"
           );
         }
       } else {
         if (imageUrls.length > 1) {
-          message.reply("⚠️ Multiple images detected. Using first only.");
+          message.reply(`⚠️ Multiple images detected. Only the first image will be used.`);
           imageUrls = [imageUrls[0]];
         }
       }
 
-      // ---------- BUILD API ----------
+      // ---------- BUILD API URL ----------
       let apiUrl =
         `${API_URL}?prompt=${encodeURIComponent(prompt)}&model=${realModel}`;
 
       if (ratio) apiUrl += `&ratio=${ratio}`;
       apiUrl += qualityParam;
 
-      // 🔥 CRITICAL: ALWAYS FORCE IMAGE INTO API
       if (imageUrls.length > 0) {
         apiUrl += `&url=${encodeURIComponent(imageUrls.join(","))}`;
-        console.log("🚀 FORCED IMAGE:", imageUrls);
-      } else {
-        console.log("⚠️ NO IMAGE USED (text-to-image)");
       }
 
-      console.log("🌐 API URL READY");
+      console.log("🚀 Final API URL (sanitized):", apiUrl.replace(API_COOKIE, "HIDDEN"));
 
-      await message.reply(
+      const processing = await message.reply(
         "🎨 Generating image... please wait (up to 4 minutes)"
       );
 
@@ -200,17 +191,13 @@ Combine images:
           Cookie: API_COOKIE,
           "User-Agent": "Mozilla/5.0"
         },
-        timeout: 240000,
-        validateStatus: () => true
+        timeout: 240000
       });
-
-      console.log("📡 STATUS:", res.status);
 
       const data = res.data;
 
-      if (!data || !data.success || !data.images?.length) {
-        console.log("❌ API FAIL:", data);
-        return message.reply(`❌ API error: ${data?.message || "Unknown error"}`);
+      if (!data.success || !data.images || data.images.length === 0) {
+        return message.reply(`❌ API error: ${data.message || "Unknown error"}`);
       }
 
       const externalImageUrl = data.images[0];
@@ -244,7 +231,7 @@ Combine images:
 🧠 Prompt: ${prompt}
 ⚙ Model: ${realModel}
 🖼 Ratio: ${ratio || "Auto"}
-${qualityText}🧩 Image used: ${imageUrls.length ? "YES" : "NO"}
+${qualityText}${imageUrls.length ? `🧩 Images used: ${imageUrls.length}\n` : ""}
 
 ${imgUrl}`;
 
@@ -252,7 +239,9 @@ ${imgUrl}`;
 
     } catch (error) {
       if (error.code === "ECONNABORTED") {
-        return message.reply("❌ Timeout. Try simpler prompt.");
+        return message.reply(
+          "❌ Image generation timeout. Try a simpler prompt."
+        );
       }
       return message.reply(`❌ Error: ${error.message}`);
     }
