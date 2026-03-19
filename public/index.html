@@ -8279,7 +8279,8 @@ async function sendMessage() {
         // Only get AI response if it's NOT a command
         const PREFIX = '!';
         if (!content.startsWith(PREFIX) && !imageUrlRegex.test(content)) {
-            fetchChatResponse(content);
+            // ===== MODIFIED: Pass replyToMessageId to fetchChatResponse =====
+            fetchChatResponse(content, replyToMessageId);
         }
         
     } catch (error) {
@@ -8374,6 +8375,47 @@ async function blockUser(usernameToBlock) {
     } catch (error) {
         console.error('Block error:', error);
         showError(error.message);
+    }
+}
+
+// ===== MODIFIED: fetchChatResponse function to accept replyToId and send it =====
+async function fetchChatResponse(userInput, replyToId) {
+    if (isProcessingCommand) {
+        console.log('🛑 Command already being processed, skipping...');
+        return;
+    }
+
+    isProcessingCommand = true;
+
+    try {
+        const PREFIX = '!';
+        
+        // Don't process commands that start with prefix - let the server handle them
+        if (userInput.startsWith(PREFIX)) {
+            console.log('🤖 Command detected, letting server handle response...');
+            return;
+        }
+
+        const response = await fetch('/api/command', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: userInput,
+                source: 'main-chat',
+                reply_to: replyToId || null   // <-- MODIFIED: Include reply ID
+            }),
+        });
+
+        console.log('🤖 Command sent to server, waiting for Socket.io response...');
+
+    } catch (error) {
+        console.error("Error fetching AI response:", error);
+    } finally {
+        setTimeout(() => {
+            isProcessingCommand = false;
+        }, 1000);
     }
 }
 
