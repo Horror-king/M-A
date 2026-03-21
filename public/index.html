@@ -6153,6 +6153,7 @@ function renderMessages(messages, isFirstLoad = false) {
                 content: msg.content,
                 image_url: msg.image_url || null
             };
+            saveMessageCache();
         }
         
         // Attempt to retrieve reply image URL from pending map if this message is a reply
@@ -8279,9 +8280,9 @@ async function sendMessage() {
         // Only get AI response if it's NOT a command
         const PREFIX = '!';
         if (!content.startsWith(PREFIX) && !imageUrlRegex.test(content)) {
-            // ===== MODIFIED: Pass replyToMessageId to fetchChatResponse and handle errors =====
+            // ===== MODIFIED: Pass replyToMessageId and replyToImageUrl to fetchChatResponse =====
             try {
-                await fetchChatResponse(content, replyToMessageId);
+                await fetchChatResponse(content, replyToMessageId, replyToImageUrl);
             } catch (err) {
                 console.error('Error in fetchChatResponse:', err);
                 // Error already handled inside fetchChatResponse, but we catch here to prevent unhandled rejection
@@ -8383,7 +8384,6 @@ async function blockUser(usernameToBlock) {
     }
 }
 
-// ===== MODIFIED: fetchChatResponse function to accept replyToId and send it =====
 // ===== MODIFIED: fetchChatResponse function to accept replyToId and replyImageUrl =====
 async function fetchChatResponse(userInput, replyToId, replyImageUrl) {
     if (isProcessingCommand) {
@@ -8411,7 +8411,7 @@ async function fetchChatResponse(userInput, replyToId, replyImageUrl) {
                 message: userInput,
                 source: 'main-chat',
                 reply_to: replyToId || null,
-                reply_image_url: replyImageUrl || null   // <-- NEW: send image URL directly
+                reply_image_url: replyImageUrl || null   // <-- send the image URL
             }),
         });
 
