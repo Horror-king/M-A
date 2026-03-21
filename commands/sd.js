@@ -62,14 +62,15 @@ module.exports = {
 {pn} a cute cat --model sd_4.5 --quality 4k
 
 Edit image (via reply):
-Reply to an image with {pn} make it anime style --model sd_4.5
+Reply to a message containing an image (uploaded or generated) with:
+{pn} make it anime style --model sd_4.5
 
-Combine images:
+Combine images (nano_banana only):
 {pn} img1.jpg,img2.jpg | combine them --model nano_banana --ratio 3:2`
     }
   },
 
-  onStart: async function ({ message, args, event }) {
+  onStart: async function ({ message, args, event, api }) {
     try {
       const input = args.join(" ").trim();
 
@@ -93,14 +94,22 @@ Combine images:
           });
         }
 
-        // b) If the replied message had a direct image_url field (maybe we add it later)
+        // b) If the replied message had a direct image_url field
         if (event.messageReply.image_url) {
           imageUrls.push(event.messageReply.image_url);
         }
 
-        // c) Try to extract an image URL from the message body (e.g. a plain link)
+        // c) Try to extract an image URL from the message body (from our enhanced index.js)
         if (event.messageReply.body) {
           const match = event.messageReply.body.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|webp|gif)/i);
+          if (match) {
+            imageUrls.push(match[0]);
+          }
+        }
+
+        // d) Also check content field (fallback if body is empty)
+        if (event.messageReply.content) {
+          const match = event.messageReply.content.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|webp|gif)/i);
           if (match) {
             imageUrls.push(match[0]);
           }
@@ -110,7 +119,6 @@ Combine images:
       }
 
       // 2️⃣  Handle the pipe syntax (img1.jpg,img2.jpg | prompt)
-      //     Append these URLs to imageUrls instead of overwriting
       let promptInput = input;
       if (input.includes("|")) {
         const parts = input.split("|");
