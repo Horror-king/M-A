@@ -83,36 +83,30 @@ Combine images (nano_banana only):
 
       // 1️⃣  Check if the user replied to a message
       if (event && event.messageReply) {
-        console.log("📨 Replied message data:", event.messageReply);
+        console.log("📨 Replied message data:", JSON.stringify(event.messageReply, null, 2));
 
-        // a) Look for attachments (set by our index.js)
+        // a) Look for attachments (set by index.js)
         if (event.messageReply.attachments && event.messageReply.attachments.length > 0) {
           event.messageReply.attachments.forEach(att => {
-            if (att.url) {
-              imageUrls.push(att.url);
-            }
+            if (att.url) imageUrls.push(att.url);
           });
         }
 
-        // b) If the replied message had a direct image_url field
+        // b) Direct image_url field (set by index.js)
         if (event.messageReply.image_url) {
           imageUrls.push(event.messageReply.image_url);
         }
 
-        // c) Try to extract an image URL from the message body (from our enhanced index.js)
-        if (event.messageReply.body) {
-          const match = event.messageReply.body.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|webp|gif)/i);
-          if (match) {
-            imageUrls.push(match[0]);
-          }
+        // c) Try to extract from message body / content
+        const textToSearch = event.messageReply.body || event.messageReply.content || "";
+        const urlMatch = textToSearch.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|webp|gif)(?:\?[^\s]*)?/i);
+        if (urlMatch) {
+          imageUrls.push(urlMatch[0]);
         }
 
-        // d) Also check content field (fallback if body is empty)
-        if (event.messageReply.content) {
-          const match = event.messageReply.content.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|webp|gif)/i);
-          if (match) {
-            imageUrls.push(match[0]);
-          }
+        // d) Also look inside a possible 'url' property
+        if (event.messageReply.url) {
+          imageUrls.push(event.messageReply.url);
         }
 
         console.log("📸 Extracted from reply:", imageUrls);
