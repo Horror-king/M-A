@@ -4774,12 +4774,37 @@ app.post('/test-message', async (req, res) => {
   }
 });
 
-// ===== MODIFIED: Command API handler with prefix-free support for private AI =====
+// ===== HELPER: Extract image URL from any message content =====
+function extractImageUrlFromMessage(message) {
+  if (!message) return null;
+  
+  // Check direct image_url field
+  if (message.image_url) return message.image_url;
+  
+  // Check attachments
+  if (message.attachments) {
+    try {
+      const atts = typeof message.attachments === 'string' ? JSON.parse(message.attachments) : message.attachments;
+      if (Array.isArray(atts)) {
+        const img = atts.find(a => a.type === 'photo' || a.type === 'image' || (a.url && /\.(jpg|jpeg|png|gif|webp)/i.test(a.url)));
+        if (img && img.url) return img.url;
+      }
+    } catch (e) {}
+  }
+  
+  // Look for URL in content (any http/https URL)
+  if (message.content) {
+    const urlMatch = message.content.match(/https?:\/\/[^\s]+/i);
+    if (urlMatch) return urlMatch[0];
+  }
+  
+  return null;
+}
 
-// ===== **** MODIFIED: COMMAND API HANDLER WITH REPLY IMAGE EXTRACTION **** =====
+// ===== MODIFIED: COMMAND API HANDLER WITH IMPROVED REPLY IMAGE EXTRACTION =====
 app.post("/api/command", async (req, res) => {
   try {
-    let { message, source = 'main-chat', reply_to, reply_image_url } = req.body; // <-- added reply_image_url
+    let { message, source = 'main-chat', reply_to, reply_image_url } = req.body;
     console.log('📨 Received command:', { message, source, reply_to, reply_image_url });
 
     if (!message) {
@@ -4838,16 +4863,16 @@ app.post("/api/command", async (req, res) => {
         const event = { body: cmd.text };
 
         // =========================
-        // 🔥 FIX: HANDLE REPLY IMAGE
+        // 🔥 IMPROVED: HANDLE REPLY IMAGE
         // =========================
         let imageUrl = null;
 
-        // NEW: If the frontend provided a direct image URL, use it
+        // 1. If frontend provided direct image URL, use it
         if (reply_image_url) {
           console.log("📸 Using direct reply image URL from frontend:", reply_image_url);
           imageUrl = reply_image_url;
         }
-        // Otherwise, try to fetch the replied message from the database
+        // 2. Otherwise, try to fetch the replied message from the database
         else if (reply_to) {
           console.log("🔍 Fetching replied message:", reply_to);
           try {
@@ -4863,28 +4888,11 @@ app.post("/api/command", async (req, res) => {
 
             if (data) {
               console.log("✅ Found replied message:", data);
-              // Case 1: direct column
-              if (data.image_url) {
-                imageUrl = data.image_url;
-              }
-              // Case 2: attachments JSON (if any)
-              if (!imageUrl && data.attachments) {
-                try {
-                  const atts = typeof data.attachments === "string"
-                    ? JSON.parse(data.attachments)
-                    : data.attachments;
-                  if (Array.isArray(atts)) {
-                    const img = atts.find(a => a.type === "photo" || a.type === "image");
-                    if (img) imageUrl = img.url;
-                  }
-                } catch (e) {
-                  console.log("❌ Attachment parse error");
-                }
-              }
-              // Case 3: extract from message content
-              if (!imageUrl && data.content) {
-                const match = data.content.match(/https?:\/\/\S+\.(jpg|jpeg|png|webp|gif)/i);
-                if (match) imageUrl = match[0];
+              imageUrl = extractImageUrlFromMessage(data);
+              if (imageUrl) {
+                console.log("📸 Extracted image from replied message:", imageUrl);
+              } else {
+                console.log("⚠️ No image found in replied message.");
               }
             }
           } catch (err) {
@@ -4894,7 +4902,7 @@ app.post("/api/command", async (req, res) => {
 
         // If we found an image URL, attach it to the event for the command
         if (imageUrl) {
-          console.log("📸 Extracted image:", imageUrl);
+          console.log("📸 Attaching image to event:", imageUrl);
           event.messageReply = {
             messageID: reply_to || null,
             body: '', // not needed for editing
@@ -4902,7 +4910,7 @@ app.post("/api/command", async (req, res) => {
             image_url: imageUrl   // <-- CRITICAL: added for direct access
           };
         } else if (reply_to) {
-          console.log("⚠️ No image found in replied message.");
+          console.log("⚠️ No image found for replied message.");
         }
 
         // =========================
