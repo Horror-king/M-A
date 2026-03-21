@@ -4898,7 +4898,8 @@ app.post("/api/command", async (req, res) => {
           event.messageReply = {
             messageID: reply_to || null,
             body: '', // not needed for editing
-            attachments: [{ type: "photo", url: imageUrl }]
+            attachments: [{ type: "photo", url: imageUrl }],
+            image_url: imageUrl   // <-- CRITICAL: added for direct access
           };
         } else if (reply_to) {
           console.log("⚠️ No image found in replied message.");
