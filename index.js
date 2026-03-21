@@ -4779,9 +4779,11 @@ function extractImageUrlFromMessage(message) {
   if (!message) return null;
   
   // Check direct image_url field
-  if (message.image_url) return message.image_url;
+  if (message.image_url && typeof message.image_url === 'string' && message.image_url.trim() !== '') {
+    return message.image_url;
+  }
   
-  // Check attachments
+  // Check attachments (if any)
   if (message.attachments) {
     try {
       const atts = typeof message.attachments === 'string' ? JSON.parse(message.attachments) : message.attachments;
@@ -4874,7 +4876,7 @@ app.post("/api/command", async (req, res) => {
         }
         // 2. Otherwise, try to fetch the replied message from the database
         else if (reply_to) {
-          console.log("🔍 Fetching replied message:", reply_to);
+          console.log("🔍 Fetching replied message ID:", reply_to);
           try {
             const { data, error } = await supabase
               .from("chatter")
@@ -4883,7 +4885,7 @@ app.post("/api/command", async (req, res) => {
               .single();
 
             if (error) {
-              console.error("❌ DB error:", error);
+              console.error("❌ DB error fetching replied message:", error);
             }
 
             if (data) {
@@ -4894,6 +4896,8 @@ app.post("/api/command", async (req, res) => {
               } else {
                 console.log("⚠️ No image found in replied message.");
               }
+            } else {
+              console.log("⚠️ No replied message found with ID:", reply_to);
             }
           } catch (err) {
             console.error("❌ Fetch error:", err);
