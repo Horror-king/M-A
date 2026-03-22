@@ -4804,7 +4804,6 @@ function extractImageUrlFromMessage(message) {
 }
 
 // ===== MODIFIED: COMMAND API HANDLER WITH IMPROVED REPLY IMAGE EXTRACTION =====
-
 app.post("/api/command", async (req, res) => {
   try {
     let { message, source = 'main-chat', reply_to, reply_image_url } = req.body;
@@ -4863,12 +4862,15 @@ app.post("/api/command", async (req, res) => {
         finalReply = "❌ Command not found";
       } else {
         const replies = [];
+        
+        // Initialize the event object
         const event = { 
           body: cmd.text,
-          reply_to: reply_to  // 👈 ADDED: pass the replied message ID directly
+          reply_to: reply_to,
+          messageReply: null // Will be populated below
         };
 
-        // If frontend provided direct image URL, use it as fallback
+        // 1. Prioritize direct image URL from frontend
         if (reply_image_url) {
           console.log("📸 Using direct reply image URL from frontend:", reply_image_url);
           event.messageReply = {
@@ -4878,7 +4880,7 @@ app.post("/api/command", async (req, res) => {
             image_url: reply_image_url
           };
         }
-        // Otherwise, try to fetch the replied message from database
+        // 2. Fallback: Fetch from Supabase if reply_to exists but no direct URL
         else if (reply_to) {
           console.log("🔍 Fetching replied message ID from DB:", reply_to);
           try {
@@ -4889,21 +4891,18 @@ app.post("/api/command", async (req, res) => {
               .single();
 
             if (!error && dbMsg) {
-              console.log("✅ Found replied message:", dbMsg);
-              const imageUrl = extractImageUrlFromMessage(dbMsg);
-              if (imageUrl) {
-                console.log("📸 Extracted image from DB:", imageUrl);
+              // Ensure we check both image_url and metadata for the URL
+              const imageUrl = dbMsg.image_url || (dbMsg.metadata && dbMsg.metadata.image_url) || extractImageUrlFromMessage(dbMsg);
+              
+              if (imageUrl && imageUrl.trim() !== "") {
+                console.log("✅ Found image in DB:", imageUrl);
                 event.messageReply = {
                   messageID: reply_to,
                   body: dbMsg.content || '',
                   attachments: [{ type: "photo", url: imageUrl }],
                   image_url: imageUrl
                 };
-              } else {
-                console.log("⚠️ No image found in replied message.");
               }
-            } else {
-              console.log("⚠️ Could not fetch message from DB:", error?.message);
             }
           } catch (err) {
             console.error("❌ DB fetch error:", err);
@@ -4913,18 +4912,24 @@ app.post("/api/command", async (req, res) => {
         // =========================
         // RUN COMMAND
         // =========================
-        await command.onStart({
-          api: {
-            sendMessage: (msg) => replies.push(typeof msg === "string" ? msg : JSON.stringify(msg)),
-            supabase,
-            io
-          },
-          event,
-          args: cmd.args,
-          message: {
-            reply: (content) => replies.push(content)
-          }
-        });
+        try {
+          await command.onStart({
+            api: {
+              sendMessage: (msg) => replies.push(typeof msg === "string" ? msg : JSON.stringify(msg)),
+              supabase,
+              io
+            },
+            event,
+            args: cmd.args,
+            message: {
+              reply: (content) => replies.push(content)
+            },
+            supabase // Pass supabase explicitly for the command's internal DB checks
+          });
+        } catch (cmdError) {
+          console.error("❌ Command Execution Error:", cmdError);
+          replies.push(`❌ Command Error: ${cmdError.message}`);
+        }
 
         finalReply = replies.join("\n") || "❌ No response";
       }
@@ -4948,6 +4953,7 @@ app.post("/api/command", async (req, res) => {
     return res.status(500).json({ reply: "❌ Server error" });
   }
 });
+
 // Add endpoint to get online users
 app.get('/online-users', (req, res) => {
   const onlineUsersArray = Array.from(onlineUsers.keys());
