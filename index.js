@@ -4865,17 +4865,12 @@ app.post("/api/command", async (req, res) => {
         const event = { body: cmd.text };
 
         // =========================
-        // 🔥 IMPROVED: HANDLE REPLY IMAGE
+        // 🔥 IMPROVED: HANDLE REPLY IMAGE (prioritize database fetch by ID)
         // =========================
         let imageUrl = null;
 
-        // 1. If frontend provided direct image URL, use it
-        if (reply_image_url) {
-          console.log("📸 Using direct reply image URL from frontend:", reply_image_url);
-          imageUrl = reply_image_url;
-        }
-        // 2. Otherwise, try to fetch the replied message from the database
-        else if (reply_to) {
+        // 1. If reply_to provided, fetch the message from database to get its image URL
+        if (reply_to) {
           console.log("🔍 Fetching replied message ID:", reply_to);
           try {
             const { data, error } = await supabase
@@ -4892,7 +4887,7 @@ app.post("/api/command", async (req, res) => {
               console.log("✅ Found replied message:", data);
               imageUrl = extractImageUrlFromMessage(data);
               if (imageUrl) {
-                console.log("📸 Extracted image from replied message:", imageUrl);
+                console.log("📸 Extracted image from replied message (ID):", imageUrl);
               } else {
                 console.log("⚠️ No image found in replied message.");
               }
@@ -4902,6 +4897,12 @@ app.post("/api/command", async (req, res) => {
           } catch (err) {
             console.error("❌ Fetch error:", err);
           }
+        }
+
+        // 2. If no image found from database, fallback to direct reply_image_url (if provided)
+        if (!imageUrl && reply_image_url) {
+          console.log("📸 Using direct reply image URL from frontend as fallback:", reply_image_url);
+          imageUrl = reply_image_url;
         }
 
         // If we found an image URL, attach it to the event for the command
