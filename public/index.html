@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5178,12 +5179,7 @@
         </div>
     </div>
     <script>
-// --- CUT HERE ---
     // --- CUT HERE ---
-// ===== SET THE CORRECT COMMAND PREFIX =====
-// The server uses '-' as prefix (based on config.json)
-const PREFIX = '-';
-
 // Add eye icon functionality for password field
 function setupPasswordToggle() {
     const passwordInput = document.getElementById('auth-password');
@@ -8282,7 +8278,8 @@ async function sendMessage() {
         autoResize(elements.messageInput);
         clearReply();
 
-        // Only get AI response if it's NOT a command (prefix is now '-')
+        // Only get AI response if it's NOT a command
+        const PREFIX = '!';
         if (!content.startsWith(PREFIX) && !imageUrlRegex.test(content)) {
             // ===== MODIFIED: Pass replyToMessageId and replyToImageUrl to fetchChatResponse =====
             try {
@@ -8388,7 +8385,7 @@ async function blockUser(usernameToBlock) {
     }
 }
 
-// ===== MODIFIED: fetchChatResponse function to accept replyToId and replyImageUrl and send user =====
+// ===== MODIFIED: fetchChatResponse function to accept replyToId and replyImageUrl =====
 async function fetchChatResponse(userInput, replyToId, replyImageUrl) {
     if (isProcessingCommand) {
         console.log('🛑 Command already being processed, skipping...');
@@ -8398,6 +8395,8 @@ async function fetchChatResponse(userInput, replyToId, replyImageUrl) {
     isProcessingCommand = true;
 
     try {
+        const PREFIX = '!';
+        
         // Don't process commands that start with prefix - let the server handle them
         if (userInput.startsWith(PREFIX)) {
             console.log('🤖 Command detected, letting server handle response...');
@@ -8412,9 +8411,8 @@ async function fetchChatResponse(userInput, replyToId, replyImageUrl) {
             body: JSON.stringify({
                 message: userInput,
                 source: 'main-chat',
-                user: currentUserSession?.username, // <-- ADDED: send username for fallback
                 reply_to: replyToId || null,
-                reply_image_url: replyImageUrl || null
+                reply_image_url: replyImageUrl || null   // <-- send the image URL
             }),
         });
 
@@ -8436,7 +8434,7 @@ async function fetchChatResponse(userInput, replyToId, replyImageUrl) {
             isProcessingCommand = false;
         }, 1000);
     }
-}
+  }
 
 // ===== MODIFIED: initSocket function with room join, post events, and cache updates =====
 function initSocket() {
@@ -10705,6 +10703,8 @@ function batchMessageRender(messages, renderFunction) {
         isProcessingCommand = true;
         
         try {
+            const PREFIX = '!';
+            
             // Don't process commands that start with prefix - let the server handle them
             if (userInput.startsWith(PREFIX)) {
                 console.log('🤖 Command detected, letting server handle response...');
