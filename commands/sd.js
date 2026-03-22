@@ -28,12 +28,15 @@ function parseFlags(input) {
       case "--ratio":
         ratio = tokens[++i];
         break;
+
       case "--model":
         model = tokens[++i];
         break;
+
       case "--quality":
         quality = tokens[++i];
         break;
+
       default:
         promptParts.push(tokens[i]);
     }
@@ -51,7 +54,7 @@ module.exports = {
   config: {
     name: "sd",
     aliases: ["seedream"],
-    version: "5.0",
+    version: "4.0",
     role: 0,
     author: "Hassan + Modified",
     countDown: 5,
@@ -62,15 +65,14 @@ module.exports = {
 {pn} a cute cat --model sd_4.5 --quality 4k
 
 Edit image (via reply):
-Reply to a message containing an image (uploaded or generated) with:
-{pn} make it anime style --model sd_4.5
+Reply to an image with {pn} make it anime style --model sd_4.5
 
-Combine images (nano_banana only):
+Combine images:
 {pn} img1.jpg,img2.jpg | combine them --model nano_banana --ratio 3:2`
     }
   },
 
-  onStart: async function ({ message, args, event, api }) {
+  onStart: async function ({ message, args, event }) {
     try {
       const input = args.join(" ").trim();
 
@@ -83,36 +85,35 @@ Combine images (nano_banana only):
 
       // 1️⃣  Check if the user replied to a message
       if (event && event.messageReply) {
-        console.log("📨 Replied message data:", JSON.stringify(event.messageReply, null, 2));
+        console.log("📨 Replied message data:", event.messageReply);
 
-        // a) Look for attachments (set by index.js)
+        // a) Look for attachments (set by our index.js)
         if (event.messageReply.attachments && event.messageReply.attachments.length > 0) {
           event.messageReply.attachments.forEach(att => {
-            if (att.url) imageUrls.push(att.url);
+            if (att.url) {
+              imageUrls.push(att.url);
+            }
           });
         }
 
-        // b) Direct image_url field (set by index.js)
+        // b) If the replied message had a direct image_url field (maybe we add it later)
         if (event.messageReply.image_url) {
           imageUrls.push(event.messageReply.image_url);
         }
 
-        // c) Try to extract from message body / content
-        const textToSearch = event.messageReply.body || event.messageReply.content || "";
-        const urlMatch = textToSearch.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|webp|gif)(?:\?[^\s]*)?/i);
-        if (urlMatch) {
-          imageUrls.push(urlMatch[0]);
-        }
-
-        // d) Also look inside a possible 'url' property
-        if (event.messageReply.url) {
-          imageUrls.push(event.messageReply.url);
+        // c) Try to extract an image URL from the message body (e.g. a plain link)
+        if (event.messageReply.body) {
+          const match = event.messageReply.body.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|webp|gif)/i);
+          if (match) {
+            imageUrls.push(match[0]);
+          }
         }
 
         console.log("📸 Extracted from reply:", imageUrls);
       }
 
       // 2️⃣  Handle the pipe syntax (img1.jpg,img2.jpg | prompt)
+      //     Append these URLs to imageUrls instead of overwriting
       let promptInput = input;
       if (input.includes("|")) {
         const parts = input.split("|");
