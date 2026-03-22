@@ -50,6 +50,35 @@ function parseFlags(input) {
   };
 }
 
+// Helper to extract image URL from a message object
+function extractImageUrlFromMessage(msg) {
+  if (!msg) return null;
+
+  // 1. Direct image_url field
+  if (msg.image_url && typeof msg.image_url === 'string' && msg.image_url.trim() !== '') {
+    return msg.image_url;
+  }
+
+  // 2. Attachments array
+  if (msg.attachments) {
+    try {
+      const atts = typeof msg.attachments === 'string' ? JSON.parse(msg.attachments) : msg.attachments;
+      if (Array.isArray(atts)) {
+        const img = atts.find(a => a.type === 'photo' || a.type === 'image' || (a.url && /\.(jpg|jpeg|png|gif|webp)/i.test(a.url)));
+        if (img && img.url) return img.url;
+      }
+    } catch (e) {}
+  }
+
+  // 3. Look for URL in content
+  if (msg.content) {
+    const match = msg.content.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)/i);
+    if (match) return match[0];
+  }
+
+  return null;
+}
+
 module.exports = {
   config: {
     name: "sd",
@@ -72,7 +101,7 @@ Combine images:
     }
   },
 
-  onStart: async function ({ message, args, event, supabase }) { // supabase is now injected
+  onStart: async function ({ message, args, event, supabase }) {
     try {
       const input = args.join(" ").trim();
 
@@ -83,67 +112,56 @@ Combine images:
       // ---------- COLLECT IMAGE URLS ----------
       let imageUrls = [];
 
-      // 1️⃣  Check if the user replied to a message
-      if (event && event.messageReply) {
-        console.log("📨 Replied message data (from event):", event.messageReply);
+      // ========== PRIMARY METHOD: Use event.reply_to to fetch from database ==========
+      if (event.reply_to && supabase) {
+        console.log("🔍 Using event.reply_to to fetch image from DB:", event.reply_to);
+        try {
+          const { data: dbMsg, error } = await supabase
+            .from("chatter")
+            .select("*")
+            .eq("id", event.reply_to)
+            .single();
 
-        // a) Look for attachments (set by our index.js)
+          if (!error && dbMsg) {
+            const imgUrl = extractImageUrlFromMessage(dbMsg);
+            if (imgUrl) {
+              imageUrls.push(imgUrl);
+              console.log("📸 Found image from DB via reply_to:", imgUrl);
+            } else {
+              console.log("⚠️ No image in replied message (DB)");
+            }
+          } else {
+            console.log("⚠️ Could not fetch replied message from DB:", error?.message);
+          }
+        } catch (err) {
+          console.error("❌ DB fetch error:", err);
+        }
+      }
+
+      // ========== FALLBACK: Use event.messageReply if provided ==========
+      if (imageUrls.length === 0 && event.messageReply) {
+        console.log("📨 Trying event.messageReply as fallback:", event.messageReply);
         if (event.messageReply.attachments && event.messageReply.attachments.length > 0) {
           event.messageReply.attachments.forEach(att => {
-            if (att.url) {
-              imageUrls.push(att.url);
-            }
+            if (att.url) imageUrls.push(att.url);
           });
         }
-
-        // b) If the replied message had a direct image_url field (set by index.js)
         if (event.messageReply.image_url) {
           imageUrls.push(event.messageReply.image_url);
         }
-
-        // c) Try to extract an image URL from the message body (e.g. a plain link)
         if (event.messageReply.body) {
           const match = event.messageReply.body.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|webp|gif)/i);
-          if (match) {
-            imageUrls.push(match[0]);
-          }
+          if (match) imageUrls.push(match[0]);
         }
+      }
 
-        // ========== NEW: FALLBACK – fetch the replied message directly from Supabase ==========
-        // This is extra safety in case the image URL wasn't included in event.messageReply.
-        if (event.messageReply.messageID && supabase && imageUrls.length === 0) {
-          console.log("🔍 No image found in event, trying to fetch from database using ID:", event.messageReply.messageID);
-          try {
-            const { data: dbMsg, error } = await supabase
-              .from("chatter")
-              .select("*")
-              .eq("id", event.messageReply.messageID)
-              .single();
-
-            if (!error && dbMsg) {
-              // Check for image_url field directly
-              if (dbMsg.image_url && dbMsg.image_url.trim()) {
-                imageUrls.push(dbMsg.image_url);
-                console.log("📸 Image found via database fetch (image_url):", dbMsg.image_url);
-              }
-              // If the message itself is an image link inside content
-              else if (dbMsg.content) {
-                const match = dbMsg.content.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|webp|gif)/i);
-                if (match) {
-                  imageUrls.push(match[0]);
-                  console.log("📸 Image found via database fetch (content link):", match[0]);
-                }
-              }
-            } else {
-              console.log("⚠️ Could not fetch message from database:", error?.message);
-            }
-          } catch (fetchErr) {
-            console.error("❌ Error fetching replied message from DB:", fetchErr);
-          }
+      // ========== FALLBACK: Check if the message body contains a direct image link ==========
+      if (imageUrls.length === 0) {
+        const urlMatch = input.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)/i);
+        if (urlMatch) {
+          imageUrls.push(urlMatch[0]);
+          console.log("📸 Found image URL in prompt:", urlMatch[0]);
         }
-        // ========== END NEW FALLBACK ==========
-
-        console.log("📸 Final extracted image URLs:", imageUrls);
       }
 
       // 2️⃣  Handle the pipe syntax (img1.jpg,img2.jpg | prompt)
