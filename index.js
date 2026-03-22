@@ -4804,10 +4804,11 @@ function extractImageUrlFromMessage(message) {
 }
 
 // ===== MODIFIED: COMMAND API HANDLER WITH IMPROVED REPLY IMAGE EXTRACTION =====
+
 app.post("/api/command", async (req, res) => {
   try {
-    let { message, source = 'main-chat', reply_to, reply_image_url } = req.body;
-    console.log('📨 Received command:', { message, source, reply_to, reply_image_url });
+    let { message, source = 'main-chat', reply_to, reply_image_url, user } = req.body;
+    console.log('📨 Received command:', { message, source, reply_to, reply_image_url, user });
 
     if (!message) {
       return res.status(400).json({ reply: "❌ Message is required" });
@@ -4828,6 +4829,29 @@ app.post("/api/command", async (req, res) => {
     // PREFIX COMMAND
     if (message.trim().toLowerCase() === "prefix") {
       return res.json({ reply: `🔹 My prefix is: ${PREFIX}` });
+    }
+
+    // If we don't have reply_to but we have a username, try to fetch the most recent message from this user that has a reply_to
+    if (!reply_to && user) {
+      console.log("🔍 No reply_to in command, fetching most recent message from user:", user);
+      try {
+        const { data: recentMsg, error } = await supabase
+          .from("chatter")
+          .select("reply_to")
+          .eq("username", user)
+          .not("reply_to", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        if (!error && recentMsg && recentMsg.length > 0 && recentMsg[0].reply_to) {
+          reply_to = recentMsg[0].reply_to;
+          console.log("✅ Found recent reply_to from DB:", reply_to);
+        } else {
+          console.log("⚠️ No recent message with reply_to found.");
+        }
+      } catch (err) {
+        console.error("❌ Error fetching recent message:", err);
+      }
     }
 
     const cmd = handleCommand(message);
@@ -4862,15 +4886,12 @@ app.post("/api/command", async (req, res) => {
         finalReply = "❌ Command not found";
       } else {
         const replies = [];
-        
-        // Initialize the event object
         const event = { 
           body: cmd.text,
-          reply_to: reply_to,
-          messageReply: null // Will be populated below
+          reply_to: reply_to  // Now contains the ID from DB if found
         };
 
-        // 1. Prioritize direct image URL from frontend
+        // If frontend provided direct image URL, use it as fallback
         if (reply_image_url) {
           console.log("📸 Using direct reply image URL from frontend:", reply_image_url);
           event.messageReply = {
@@ -4880,7 +4901,7 @@ app.post("/api/command", async (req, res) => {
             image_url: reply_image_url
           };
         }
-        // 2. Fallback: Fetch from Supabase if reply_to exists but no direct URL
+        // Otherwise, try to fetch the replied message from database
         else if (reply_to) {
           console.log("🔍 Fetching replied message ID from DB:", reply_to);
           try {
@@ -4891,18 +4912,21 @@ app.post("/api/command", async (req, res) => {
               .single();
 
             if (!error && dbMsg) {
-              // Ensure we check both image_url and metadata for the URL
-              const imageUrl = dbMsg.image_url || (dbMsg.metadata && dbMsg.metadata.image_url) || extractImageUrlFromMessage(dbMsg);
-              
-              if (imageUrl && imageUrl.trim() !== "") {
-                console.log("✅ Found image in DB:", imageUrl);
+              console.log("✅ Found replied message:", dbMsg);
+              const imageUrl = extractImageUrlFromMessage(dbMsg);
+              if (imageUrl) {
+                console.log("📸 Extracted image from DB:", imageUrl);
                 event.messageReply = {
                   messageID: reply_to,
                   body: dbMsg.content || '',
                   attachments: [{ type: "photo", url: imageUrl }],
                   image_url: imageUrl
                 };
+              } else {
+                console.log("⚠️ No image found in replied message.");
               }
+            } else {
+              console.log("⚠️ Could not fetch message from DB:", error?.message);
             }
           } catch (err) {
             console.error("❌ DB fetch error:", err);
@@ -4912,24 +4936,18 @@ app.post("/api/command", async (req, res) => {
         // =========================
         // RUN COMMAND
         // =========================
-        try {
-          await command.onStart({
-            api: {
-              sendMessage: (msg) => replies.push(typeof msg === "string" ? msg : JSON.stringify(msg)),
-              supabase,
-              io
-            },
-            event,
-            args: cmd.args,
-            message: {
-              reply: (content) => replies.push(content)
-            },
-            supabase // Pass supabase explicitly for the command's internal DB checks
-          });
-        } catch (cmdError) {
-          console.error("❌ Command Execution Error:", cmdError);
-          replies.push(`❌ Command Error: ${cmdError.message}`);
-        }
+        await command.onStart({
+          api: {
+            sendMessage: (msg) => replies.push(typeof msg === "string" ? msg : JSON.stringify(msg)),
+            supabase,
+            io
+          },
+          event,
+          args: cmd.args,
+          message: {
+            reply: (content) => replies.push(content)
+          }
+        });
 
         finalReply = replies.join("\n") || "❌ No response";
       }
@@ -4953,7 +4971,6 @@ app.post("/api/command", async (req, res) => {
     return res.status(500).json({ reply: "❌ Server error" });
   }
 });
-
 // Add endpoint to get online users
 app.get('/online-users', (req, res) => {
   const onlineUsersArray = Array.from(onlineUsers.keys());
