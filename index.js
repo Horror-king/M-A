@@ -4804,6 +4804,7 @@ function extractImageUrlFromMessage(message) {
 }
 
 // ===== MODIFIED: COMMAND API HANDLER WITH IMPROVED REPLY IMAGE EXTRACTION =====
+
 app.post("/api/command", async (req, res) => {
   try {
     let { message, source = 'main-chat', reply_to, reply_image_url } = req.body;
@@ -4862,60 +4863,51 @@ app.post("/api/command", async (req, res) => {
         finalReply = "❌ Command not found";
       } else {
         const replies = [];
-        const event = { body: cmd.text };
+        const event = { 
+          body: cmd.text,
+          reply_to: reply_to  // 👈 ADDED: pass the replied message ID directly
+        };
 
-        // =========================
-        // 🔥 IMPROVED: HANDLE REPLY IMAGE (prioritize database fetch by ID)
-        // =========================
-        let imageUrl = null;
-
-        // 1. If reply_to provided, fetch the message from database to get its image URL
-        if (reply_to) {
-          console.log("🔍 Fetching replied message ID:", reply_to);
+        // If frontend provided direct image URL, use it as fallback
+        if (reply_image_url) {
+          console.log("📸 Using direct reply image URL from frontend:", reply_image_url);
+          event.messageReply = {
+            messageID: reply_to,
+            body: '',
+            attachments: [{ type: "photo", url: reply_image_url }],
+            image_url: reply_image_url
+          };
+        }
+        // Otherwise, try to fetch the replied message from database
+        else if (reply_to) {
+          console.log("🔍 Fetching replied message ID from DB:", reply_to);
           try {
-            const { data, error } = await supabase
+            const { data: dbMsg, error } = await supabase
               .from("chatter")
               .select("*")
               .eq("id", reply_to)
               .single();
 
-            if (error) {
-              console.error("❌ DB error fetching replied message:", error);
-            }
-
-            if (data) {
-              console.log("✅ Found replied message:", data);
-              imageUrl = extractImageUrlFromMessage(data);
+            if (!error && dbMsg) {
+              console.log("✅ Found replied message:", dbMsg);
+              const imageUrl = extractImageUrlFromMessage(dbMsg);
               if (imageUrl) {
-                console.log("📸 Extracted image from replied message (ID):", imageUrl);
+                console.log("📸 Extracted image from DB:", imageUrl);
+                event.messageReply = {
+                  messageID: reply_to,
+                  body: dbMsg.content || '',
+                  attachments: [{ type: "photo", url: imageUrl }],
+                  image_url: imageUrl
+                };
               } else {
                 console.log("⚠️ No image found in replied message.");
               }
             } else {
-              console.log("⚠️ No replied message found with ID:", reply_to);
+              console.log("⚠️ Could not fetch message from DB:", error?.message);
             }
           } catch (err) {
-            console.error("❌ Fetch error:", err);
+            console.error("❌ DB fetch error:", err);
           }
-        }
-
-        // 2. If no image found from database, fallback to direct reply_image_url (if provided)
-        if (!imageUrl && reply_image_url) {
-          console.log("📸 Using direct reply image URL from frontend as fallback:", reply_image_url);
-          imageUrl = reply_image_url;
-        }
-
-        // If we found an image URL, attach it to the event for the command
-        if (imageUrl) {
-          console.log("📸 Attaching image to event:", imageUrl);
-          event.messageReply = {
-            messageID: reply_to || null,
-            body: '', // not needed for editing
-            attachments: [{ type: "photo", url: imageUrl }],
-            image_url: imageUrl   // <-- CRITICAL: added for direct access
-          };
-        } else if (reply_to) {
-          console.log("⚠️ No image found for replied message.");
         }
 
         // =========================
@@ -4956,7 +4948,6 @@ app.post("/api/command", async (req, res) => {
     return res.status(500).json({ reply: "❌ Server error" });
   }
 });
-
 // Add endpoint to get online users
 app.get('/online-users', (req, res) => {
   const onlineUsersArray = Array.from(onlineUsers.keys());
