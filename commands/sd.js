@@ -2,7 +2,7 @@ const axios = require("axios");
 const FormData = require("form-data");
 
 const API_URL = "https://fahim-api-demo.onrender.com/ai/aiease/v1";
-const API_COOKIE = "connect.sid=s%3A7sKKv8NJgIs6k3gb4DVeDiPAQNr1cyUE.m%2BNmkn%2BHDCqttRUhpW5sm9vjshuCccz3nNSoC3FBQK8";
+const API_COOKIE = "connect.sid=s%3A7sKKv8NJgIs6k3gb4DVeDiPAQNr1cyUE.m%2BNmkn%2BHDCqttRUhpW5sm9vjshuCcz3nNSoC3FBQK8";
 
 const ALLOWED_RATIOS = [
   "1:1","5:4","4:5","4:3","3:4",
@@ -17,6 +17,7 @@ const MODEL_MAP = {
 
 const ALLOWED_QUALITY = ["2k","4k"];
 
+// Helper: parse flags from input
 function parseFlags(input) {
   const tokens = input.split(/\s+/);
   const promptParts = [];
@@ -50,11 +51,33 @@ function parseFlags(input) {
   };
 }
 
+// Retry wrapper for the API call
+async function callApiWithRetry(apiUrl, options, maxRetries = 3, baseDelay = 2000) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 API attempt ${attempt}/${maxRetries}`);
+      const res = await axios.get(apiUrl, options);
+      return res;
+    } catch (error) {
+      lastError = error;
+      // Only retry on timeout or network errors (ECONNABORTED, ECONNRESET, etc.)
+      const isRetryable = error.code === 'ECONNABORTED' || error.code === 'ECONNRESET' || !error.response;
+      if (!isRetryable || attempt === maxRetries) break;
+
+      const delay = baseDelay * Math.pow(2, attempt - 1);
+      console.warn(`⚠️ Attempt ${attempt} failed: ${error.message}. Retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  throw lastError;
+}
+
 module.exports = {
   config: {
     name: "sd",
     aliases: ["seedream"],
-    version: "4.0",
+    version: "4.2",
     role: 0,
     author: "Hassan + Modified",
     countDown: 5,
@@ -68,7 +91,10 @@ Edit image (via reply):
 Reply to an image with {pn} make it anime style --model sd_4.5
 
 Combine images:
-{pn} img1.jpg,img2.jpg | combine them --model nano_banana --ratio 3:2`
+{pn} img1.jpg,img2.jpg | combine them --model nano_banana --ratio 3:2
+
+Edit a single image with nano_banana:
+Reply to an image with {pn} make it cyberpunk --model nano_banana`
     }
   },
 
@@ -152,7 +178,7 @@ Combine images:
         const quality =
           ALLOWED_QUALITY.includes(parsed.quality)
             ? parsed.quality
-            : "2k";
+            : "2k";   // Default to 2k for faster generation
 
         qualityParam = `&quality=${quality}`;
         qualityText = `📐 Quality: ${quality}\n`;
@@ -160,12 +186,17 @@ Combine images:
 
       // ---------- VALIDATE IMAGE COUNT ----------
       if (realModel === "kie_nano_banana") {
-        if (imageUrls.length < 2) {
+        // nano_banana can work with 1 image (edit) or 2+ images (combine)
+        if (imageUrls.length === 0) {
           return message.reply(
-            "⚠️ nano_banana requires at least **2 images**.\nExample:\n-sd img1.jpg,img2.jpg | combine them --model nano_banana"
+            "⚠️ nano_banana requires at least **1 image** for editing or **2+ images** for combining.\n" +
+            "Examples:\n" +
+            "• Reply to an image: `{pn} make it cyberpunk --model nano_banana`\n" +
+            "• Combine two images: `{pn} img1.jpg,img2.jpg | combine them --model nano_banana`"
           );
         }
       } else {
+        // For other models, only use the first image if multiple are provided
         if (imageUrls.length > 1) {
           message.reply(`⚠️ Multiple images detected. Only the first image will be used.`);
           imageUrls = [imageUrls[0]];
@@ -186,15 +217,16 @@ Combine images:
       console.log("🚀 Final API URL (sanitized):", apiUrl.replace(API_COOKIE, "HIDDEN"));
 
       const processing = await message.reply(
-        "🎨 Generating image... please wait (up to 4 minutes)"
+        "🎨 Generating image... please wait (up to 10 minutes, retrying if needed)"
       );
 
-      const res = await axios.get(apiUrl, {
+      // ---------- CALL API WITH RETRY ----------
+      const res = await callApiWithRetry(apiUrl, {
         headers: {
           Cookie: API_COOKIE,
           "User-Agent": "Mozilla/5.0"
         },
-        timeout: 240000
+        timeout: 600000  // 10 minutes per attempt
       });
 
       const data = res.data;
@@ -205,12 +237,15 @@ Combine images:
 
       const externalImageUrl = data.images[0];
 
+      // Download image
       const imageRes = await axios.get(externalImageUrl, {
-        responseType: "arraybuffer"
+        responseType: "arraybuffer",
+        timeout: 60000
       });
 
       const imageBuffer = Buffer.from(imageRes.data, "binary");
 
+      // Upload to Imgur (optional, but useful for persistent link)
       const form = new FormData();
       form.append("image", imageBuffer.toString("base64"));
       form.append("type", "base64");
@@ -222,7 +257,8 @@ Combine images:
           headers: {
             ...form.getHeaders(),
             Authorization: "Client-ID 225899c9a3312bd"
-          }
+          },
+          timeout: 30000
         }
       );
 
@@ -241,9 +277,11 @@ ${imgUrl}`;
       await message.reply(replyText);
 
     } catch (error) {
+      // Detailed error handling
       if (error.code === "ECONNABORTED") {
         return message.reply(
-          "❌ Image generation timeout. Try a simpler prompt."
+          "❌ Image generation timed out after multiple attempts. The server might be overloaded.\n" +
+          "Please try again later with a simpler prompt or lower quality."
         );
       }
       return message.reply(`❌ Error: ${error.message}`);
