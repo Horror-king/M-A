@@ -4524,7 +4524,7 @@
         color: #4267B2;
     }
     </style>
-    <!-- ===== ADDED: Checkers Game CSS ===== -->
+    <!-- ===== ADDED: Checkers Game CSS - Fixed board (no scaling) ===== -->
     <style>
         /* Checkers Game Styles - FIXED: no scaling transforms, stable piece sizes */
         .game-container {
@@ -4556,6 +4556,7 @@
             margin: 10px 0;
         }
 
+        /* FIXED: Board uses CSS Grid with fixed aspect ratio */
         .checkers-board {
             display: grid;
             grid-template-columns: repeat(8, 1fr);
@@ -4564,6 +4565,7 @@
             background: #e5e7eb;
             border: 2px solid #333;
             cursor: pointer;
+            /* No transform, no scaling */
         }
 
         .square {
@@ -13343,7 +13345,7 @@ function setupPrivateMessageInputHandlers() {
     }
 }
 
-// ===== CHECKERS GAME IMPLEMENTATION (UPDATED) =====
+// ===== CHECKERS GAME IMPLEMENTATION (UPDATED WITH ADVANCED RULES) =====
 
 // Game state variables
 let gameRoomCode = null;
@@ -13376,36 +13378,39 @@ function getPieceColorLocal(piece) {
     return null;
 }
 
-// Compute valid moves for a piece (local, for highlighting) - includes multi‑capture
+// ===== ADVANCED RULES: Compute valid moves for a piece =====
+// Directions for normal moves (forward only for pawns, all for kings)
+function getNormalDirs(piece) {
+    if (piece === 1) return [[-1, -1], [-1, 1]]; // white moves up
+    if (piece === 2) return [[1, -1], [1, 1]];   // black moves down
+    if (piece === 3 || piece === 4) return [[-1, -1], [-1, 1], [1, -1], [1, 1]]; // kings all directions
+    return [];
+}
+
+// Directions for capture moves (all four diagonals for any piece)
+function getCaptureDirsLocal(piece) {
+    return [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+}
+
 function computeValidMovesForPiece(board, row, col, turn) {
     const piece = board[row][col];
     if (piece === 0) return [];
     const color = getPieceColorLocal(piece);
     if (color !== turn) return [];
     
-    // Directions for normal moves and captures
-    let dirs;
-    if (piece === 1) {
-        dirs = [[-1, -1], [-1, 1]]; // white moves up
-    } else if (piece === 2) {
-        dirs = [[1, -1], [1, 1]];   // black moves down
-    } else if (piece === 3 || piece === 4) {
-        dirs = [[-1, -1], [-1, 1], [1, -1], [1, 1]]; // kings move in all four diagonal directions
-    } else {
-        return [];
-    }
-    
     const moves = [];
-    // Check normal moves
-    for (const [dr, dc] of dirs) {
+    // Normal moves (forward only)
+    const normalDirs = getNormalDirs(piece);
+    for (const [dr, dc] of normalDirs) {
         const nr = row + dr;
         const nc = col + dc;
         if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && board[nr][nc] === 0) {
-            moves.push({ from: [row, col], to: [nr, nc] });
+            moves.push({ from: [row, col], to: [nr, nc], capture: false });
         }
     }
-    // Check captures
-    for (const [dr, dc] of dirs) {
+    // Capture moves (all four directions)
+    const captureDirs = getCaptureDirsLocal(piece);
+    for (const [dr, dc] of captureDirs) {
         const midR = row + dr;
         const midC = col + dc;
         const jumpR = row + dr*2;
@@ -13413,7 +13418,7 @@ function computeValidMovesForPiece(board, row, col, turn) {
         if (jumpR >= 0 && jumpR < 8 && jumpC >= 0 && jumpC < 8 &&
             board[midR][midC] !== 0 && getPieceColorLocal(board[midR][midC]) !== turn &&
             board[jumpR][jumpC] === 0) {
-            moves.push({ from: [row, col], to: [jumpR, jumpC] });
+            moves.push({ from: [row, col], to: [jumpR, jumpC], capture: true, captured: [midR, midC] });
         }
     }
     return moves;
@@ -13422,10 +13427,10 @@ function computeValidMovesForPiece(board, row, col, turn) {
 // Check if there are any capture moves for the turn
 function hasCaptureLocal(board, turn) {
     const moves = getAllMovesLocal(board, turn);
-    return moves.some(m => Math.abs(m.to[0] - m.from[0]) === 2);
+    return moves.some(m => m.capture === true);
 }
 
-// Helper: get all moves for a turn (local)
+// Helper: get all moves for a turn (including capture status)
 function getAllMovesLocal(board, turn) {
     const moves = [];
     for (let r = 0; r < 8; r++) {
@@ -13595,7 +13600,7 @@ async function handleSquareClick(row, col) {
         const moves = computeValidMovesForPiece(currentBoard, row, col, yourRole);
         // If there are capture moves anywhere, only allow capture moves
         const hasAnyCapture = hasCaptureLocal(currentBoard, yourRole);
-        const allowedMoves = hasAnyCapture ? moves.filter(m => Math.abs(m.to[0] - m.from[0]) === 2) : moves;
+        const allowedMoves = hasAnyCapture ? moves.filter(m => m.capture === true) : moves;
         if (allowedMoves.length > 0) {
             selectedPiece = { row, col };
             validMovesList = allowedMoves;
@@ -13679,7 +13684,7 @@ function handleGameUpdate(data) {
             if (isCapture && gameCurrentTurn === yourRole) {
                 // Compute capture moves for the piece at the destination
                 const captureMoves = computeValidMovesForPiece(currentBoard, movedTo[0], movedTo[1], yourRole)
-                    .filter(m => Math.abs(m.to[0] - m.from[0]) === 2);
+                    .filter(m => m.capture === true);
                 if (captureMoves.length > 0) {
                     // Automatically select that piece
                     selectedPiece = { row: movedTo[0], col: movedTo[1] };
