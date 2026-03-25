@@ -5866,7 +5866,7 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 // ===== MODIFICATION END =====
 
-// ===== CHECKERS GAME ROUTES =====
+// ===== ADVANCED CHECKERS GAME LOGIC =====
 
 // Board representation constants
 const BOARD_SIZE = 8;
@@ -5903,6 +5903,7 @@ function isKing(piece) {
   return piece === 3 || piece === 4;
 }
 
+// Returns directions for normal moves (forward only for pawns, all for kings)
 function getMoveDirs(piece) {
   if (piece === 1) return [[-1, -1], [-1, 1]]; // white pawn moves up
   if (piece === 2) return [[1, -1], [1, 1]];   // black pawn moves down
@@ -5911,31 +5912,39 @@ function getMoveDirs(piece) {
   return [];
 }
 
+// Returns directions for capture moves (all four diagonal directions for any piece)
+function getCaptureDirs(piece) {
+  // All pieces can capture in any diagonal direction (forward and backward)
+  return [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+}
+
 function isValidCoord(row, col) {
   return row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE;
 }
 
+// Generate all moves (normal and capture) for a given turn
 function getAllMoves(board, turn) {
   const moves = [];
   for (let row = 0; row < BOARD_SIZE; row++) {
     for (let col = 0; col < BOARD_SIZE; col++) {
       const piece = board[row][col];
       if (piece !== 0 && getPieceColor(piece) === turn) {
-        // Check normal moves
-        const dirs = getMoveDirs(piece);
-        for (const [dr, dc] of dirs) {
+        // Check normal moves using getMoveDirs
+        const normalDirs = getMoveDirs(piece);
+        for (const [dr, dc] of normalDirs) {
           const newRow = row + dr;
           const newCol = col + dc;
           if (isValidCoord(newRow, newCol) && board[newRow][newCol] === 0) {
             moves.push({ from: [row, col], to: [newRow, newCol], capture: false });
           }
         }
-        // Check capture moves
-        for (const [dr, dc] of dirs) {
-          const jumpRow = row + dr * 2;
-          const jumpCol = col + dc * 2;
+        // Check capture moves using getCaptureDirs (all four directions)
+        const captureDirs = getCaptureDirs(piece);
+        for (const [dr, dc] of captureDirs) {
           const midRow = row + dr;
           const midCol = col + dc;
+          const jumpRow = row + dr * 2;
+          const jumpCol = col + dc * 2;
           if (isValidCoord(jumpRow, jumpCol) && board[jumpRow][jumpCol] === 0 &&
               board[midRow][midCol] !== 0 && getPieceColor(board[midRow][midCol]) !== turn) {
             moves.push({ from: [row, col], to: [jumpRow, jumpCol], capture: true, captured: [midRow, midCol] });
@@ -5951,21 +5960,23 @@ function isValidMove(board, fromRow, fromCol, toRow, toCol, turn) {
   const piece = board[fromRow][fromCol];
   if (piece === 0 || getPieceColor(piece) !== turn) return false;
 
-  const dirs = getMoveDirs(piece);
-  for (const [dr, dc] of dirs) {
+  // Check normal moves (using forward directions only)
+  const normalDirs = getMoveDirs(piece);
+  for (const [dr, dc] of normalDirs) {
     if (fromRow + dr === toRow && fromCol + dc === toCol && board[toRow][toCol] === 0) {
-      return true; // normal move
+      return true;
     }
   }
-  // Capture moves
-  for (const [dr, dc] of dirs) {
+  // Check capture moves (using all four diagonal directions)
+  const captureDirs = getCaptureDirs(piece);
+  for (const [dr, dc] of captureDirs) {
     const midRow = fromRow + dr;
     const midCol = fromCol + dc;
     const jumpRow = fromRow + dr * 2;
     const jumpCol = fromCol + dc * 2;
     if (jumpRow === toRow && jumpCol === toCol && isValidCoord(jumpRow, jumpCol) && board[jumpRow][jumpCol] === 0 &&
         board[midRow][midCol] !== 0 && getPieceColor(board[midRow][midCol]) !== turn) {
-      return true; // capture move
+      return true;
     }
   }
   return false;
@@ -6150,12 +6161,23 @@ app.post('/move', verifyToken, async (req, res) => {
     // Switch turn
     let nextTurn = player.role === 'white' ? 'black' : 'white';
 
-    // Check if the player has additional captures (multiple jump)
+    // Check if the player has additional captures (multi‑capture)
     if (captured !== null) {
-      // Check if the same piece can capture again
-      const movesAfter = getAllMoves(newBoard, player.role);
-      const pieceAtNewPos = newBoard[toRow][toCol];
-      const canCaptureAgain = movesAfter.some(m => m.from[0] === toRow && m.from[1] === toCol && m.capture);
+      // Check if the same piece can capture again (using all four directions)
+      const pieceAfter = newBoard[toRow][toCol];
+      const captureDirs = getCaptureDirs(pieceAfter);
+      let canCaptureAgain = false;
+      for (const [dr, dc] of captureDirs) {
+        const midRow = toRow + dr;
+        const midCol = toCol + dc;
+        const jumpRow = toRow + dr * 2;
+        const jumpCol = toCol + dc * 2;
+        if (isValidCoord(jumpRow, jumpCol) && newBoard[jumpRow][jumpCol] === 0 &&
+            newBoard[midRow][midCol] !== 0 && getPieceColor(newBoard[midRow][midCol]) !== player.role) {
+          canCaptureAgain = true;
+          break;
+        }
+      }
       if (canCaptureAgain) {
         nextTurn = player.role; // same player continues
       }
