@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4527,7 +4526,7 @@
     </style>
     <!-- ===== ADDED: Checkers Game CSS ===== -->
     <style>
-        /* Checkers Game Styles */
+        /* Checkers Game Styles - FIXED: no scaling transforms, stable piece sizes */
         .game-container {
             display: flex;
             flex-direction: column;
@@ -4572,7 +4571,7 @@
             align-items: center;
             justify-content: center;
             font-size: 2rem;
-            transition: all 0.1s;
+            transition: background-color 0.2s ease; /* only background transitions */
             box-sizing: border-box;
         }
 
@@ -4612,8 +4611,9 @@
             justify-content: center;
             font-size: 2rem;
             cursor: pointer;
-            transition: transform 0.1s;
+            /* No transform or scaling transitions */
             background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3), transparent);
+            transition: none;
         }
 
         .piece.white {
@@ -13343,7 +13343,7 @@ function setupPrivateMessageInputHandlers() {
     }
 }
 
-// ===== CHECKERS GAME IMPLEMENTATION =====
+// ===== CHECKERS GAME IMPLEMENTATION (UPDATED) =====
 
 // Game state variables
 let gameRoomCode = null;
@@ -13353,6 +13353,7 @@ let gameWinner = null;
 let yourRole = null;
 let selectedPiece = null;
 let validMovesList = [];
+let lastMove = null; // to know which piece moved for multi‑capture
 
 // Helper: get piece symbol
 function getPieceSymbol(piece) {
@@ -13375,7 +13376,7 @@ function getPieceColorLocal(piece) {
     return null;
 }
 
-// Compute valid moves for a piece (local, for highlighting)
+// Compute valid moves for a piece (local, for highlighting) - includes multi‑capture
 function computeValidMovesForPiece(board, row, col, turn) {
     const piece = board[row][col];
     if (piece === 0) return [];
@@ -13439,7 +13440,49 @@ function getAllMovesLocal(board, turn) {
     return moves;
 }
 
-// Render the checkers board
+// Update a single square on the board without full re-render
+function updateSquare(row, col, board) {
+    const boardElem = document.getElementById('checkersBoard');
+    if (!boardElem) return;
+    const square = boardElem.children[row * 8 + col];
+    if (!square) return;
+    
+    const piece = board[row][col];
+    const isDark = (row + col) % 2 === 1;
+    // Update classes (keep light/dark, selected, valid‑move are handled separately)
+    square.className = `square ${isDark ? 'dark' : 'light'}`;
+    // Remove existing piece content
+    const existingPiece = square.querySelector('.piece');
+    if (existingPiece) existingPiece.remove();
+    
+    if (piece !== 0) {
+        const pieceDiv = document.createElement('div');
+        pieceDiv.className = `piece ${piece === 1 || piece === 3 ? 'white' : 'black'}`;
+        if (piece === 3 || piece === 4) pieceDiv.classList.add('king');
+        pieceDiv.textContent = getPieceSymbol(piece);
+        square.appendChild(pieceDiv);
+    }
+}
+
+// Update board efficiently: compare old board with new board, update only changed cells
+function updateBoardUI(oldBoard, newBoard) {
+    if (!oldBoard || !newBoard) {
+        // Fallback to full render
+        renderBoard(newBoard, gameCurrentTurn, yourRole, selectedPiece, validMovesList);
+        return;
+    }
+    for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+            if (oldBoard[row][col] !== newBoard[row][col]) {
+                updateSquare(row, col, newBoard);
+            }
+        }
+    }
+    // Also update selection and valid moves (they are not part of the board state)
+    // We'll keep the highlight logic separate
+}
+
+// Render the checkers board (full, used for initial load and as fallback)
 function renderBoard(board, currentTurn, yourRole, selected, validMoves) {
     const boardElem = document.getElementById('checkersBoard');
     if (!boardElem) return;
@@ -13494,7 +13537,7 @@ async function handleSquareClick(row, col) {
         return;
     }
     if (gameWinner) {
-        showInfo(`Game over! Winner: ${gameWinner}`);
+        showInfo(`Game over! Winner: ${gameWinner === 'white' ? 'White' : 'Black'}`);
         return;
     }
     if (!yourRole) {
@@ -13538,7 +13581,10 @@ async function handleSquareClick(row, col) {
         // Clear selection regardless
         selectedPiece = null;
         validMovesList = [];
-        renderBoard(currentBoard, gameCurrentTurn, yourRole, selectedPiece, validMovesList);
+        // Re-render to remove highlight (we'll update via socket soon)
+        if (currentBoard) {
+            renderBoard(currentBoard, gameCurrentTurn, yourRole, selectedPiece, validMovesList);
+        }
     } else {
         // Select piece
         const piece = currentBoard[row][col];
@@ -13619,10 +13665,33 @@ function updateGameInfo() {
 function handleGameUpdate(data) {
     console.log('Game update received:', data);
     if (data.board) {
+        const oldBoard = currentBoard;
         currentBoard = data.board;
         gameCurrentTurn = data.currentTurn;
         gameWinner = data.winner;
-        // Clear selection
+        // Efficient board update
+        updateBoardUI(oldBoard, currentBoard);
+        // If the turn is still the player's turn, and the last move was a capture, automatically select the moved piece for potential further captures
+        if (data.lastMove && data.lastMove.player === yourRole && !gameWinner) {
+            const movedTo = data.lastMove.to;
+            // Check if the move was a capture (distance of 2)
+            const isCapture = Math.abs(movedTo[0] - data.lastMove.from[0]) === 2;
+            if (isCapture && gameCurrentTurn === yourRole) {
+                // Compute capture moves for the piece at the destination
+                const captureMoves = computeValidMovesForPiece(currentBoard, movedTo[0], movedTo[1], yourRole)
+                    .filter(m => Math.abs(m.to[0] - m.from[0]) === 2);
+                if (captureMoves.length > 0) {
+                    // Automatically select that piece
+                    selectedPiece = { row: movedTo[0], col: movedTo[1] };
+                    validMovesList = captureMoves;
+                    // Re-render with selection
+                    renderBoard(currentBoard, gameCurrentTurn, yourRole, selectedPiece, validMovesList);
+                    showInfo('You can capture again with the same piece!');
+                    return; // don't clear selection below
+                }
+            }
+        }
+        // Clear selection after each update
         selectedPiece = null;
         validMovesList = [];
         renderBoard(currentBoard, gameCurrentTurn, yourRole, selectedPiece, validMovesList);
