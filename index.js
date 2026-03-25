@@ -4804,11 +4804,10 @@ function extractImageUrlFromMessage(message) {
 }
 
 // ===== MODIFIED: COMMAND API HANDLER WITH IMPROVED REPLY IMAGE EXTRACTION =====
-
 app.post("/api/command", async (req, res) => {
   try {
-    let { message, source = 'main-chat', reply_to, reply_image_url, user } = req.body;
-    console.log('📨 Received command:', { message, source, reply_to, reply_image_url, user });
+    let { message, source = 'main-chat', reply_to, reply_image_url } = req.body;
+    console.log('📨 Received command:', { message, source, reply_to, reply_image_url });
 
     if (!message) {
       return res.status(400).json({ reply: "❌ Message is required" });
@@ -4829,29 +4828,6 @@ app.post("/api/command", async (req, res) => {
     // PREFIX COMMAND
     if (message.trim().toLowerCase() === "prefix") {
       return res.json({ reply: `🔹 My prefix is: ${PREFIX}` });
-    }
-
-    // If we don't have reply_to but we have a username, try to fetch the most recent message from this user that has a reply_to
-    if (!reply_to && user) {
-      console.log("🔍 No reply_to in command, fetching most recent message from user:", user);
-      try {
-        const { data: recentMsg, error } = await supabase
-          .from("chatter")
-          .select("reply_to")
-          .eq("username", user)
-          .not("reply_to", "is", null)
-          .order("created_at", { ascending: false })
-          .limit(1);
-
-        if (!error && recentMsg && recentMsg.length > 0 && recentMsg[0].reply_to) {
-          reply_to = recentMsg[0].reply_to;
-          console.log("✅ Found recent reply_to from DB:", reply_to);
-        } else {
-          console.log("⚠️ No recent message with reply_to found.");
-        }
-      } catch (err) {
-        console.error("❌ Error fetching recent message:", err);
-      }
     }
 
     const cmd = handleCommand(message);
@@ -4886,51 +4862,59 @@ app.post("/api/command", async (req, res) => {
         finalReply = "❌ Command not found";
       } else {
         const replies = [];
-        const event = { 
-          body: cmd.text,
-          reply_to: reply_to  // Now contains the ID from DB if found
-        };
+        const event = { body: cmd.text };
 
-        // If frontend provided direct image URL, use it as fallback
+        // =========================
+        // 🔥 IMPROVED: HANDLE REPLY IMAGE
+        // =========================
+        let imageUrl = null;
+
+        // 1. If frontend provided direct image URL, use it
         if (reply_image_url) {
           console.log("📸 Using direct reply image URL from frontend:", reply_image_url);
-          event.messageReply = {
-            messageID: reply_to,
-            body: '',
-            attachments: [{ type: "photo", url: reply_image_url }],
-            image_url: reply_image_url
-          };
+          imageUrl = reply_image_url;
         }
-        // Otherwise, try to fetch the replied message from database
+        // 2. Otherwise, try to fetch the replied message from the database
         else if (reply_to) {
-          console.log("🔍 Fetching replied message ID from DB:", reply_to);
+          console.log("🔍 Fetching replied message ID:", reply_to);
           try {
-            const { data: dbMsg, error } = await supabase
+            const { data, error } = await supabase
               .from("chatter")
               .select("*")
               .eq("id", reply_to)
               .single();
 
-            if (!error && dbMsg) {
-              console.log("✅ Found replied message:", dbMsg);
-              const imageUrl = extractImageUrlFromMessage(dbMsg);
+            if (error) {
+              console.error("❌ DB error fetching replied message:", error);
+            }
+
+            if (data) {
+              console.log("✅ Found replied message:", data);
+              imageUrl = extractImageUrlFromMessage(data);
               if (imageUrl) {
-                console.log("📸 Extracted image from DB:", imageUrl);
-                event.messageReply = {
-                  messageID: reply_to,
-                  body: dbMsg.content || '',
-                  attachments: [{ type: "photo", url: imageUrl }],
-                  image_url: imageUrl
-                };
+                console.log("📸 Extracted image from replied message:", imageUrl);
               } else {
                 console.log("⚠️ No image found in replied message.");
               }
             } else {
-              console.log("⚠️ Could not fetch message from DB:", error?.message);
+              console.log("⚠️ No replied message found with ID:", reply_to);
             }
           } catch (err) {
-            console.error("❌ DB fetch error:", err);
+            console.error("❌ Fetch error:", err);
           }
+        }
+
+        // If we found an image URL, attach it to the event for the command
+        if (imageUrl) {
+          console.log("📸 Attaching image to event:", imageUrl);
+          event.messageReply = {
+            messageID: reply_to || null,
+            body: '', // not needed for editing
+            attachments: [{ type: "photo", url: imageUrl }],
+            image_url: imageUrl   // <-- CRITICAL: added for direct access
+          };
+        } else if (reply_to) {
+          console.log("⚠️ No image found for replied message.");
         }
 
         // =========================
@@ -4971,6 +4955,7 @@ app.post("/api/command", async (req, res) => {
     return res.status(500).json({ reply: "❌ Server error" });
   }
 });
+
 // Add endpoint to get online users
 app.get('/online-users', (req, res) => {
   const onlineUsersArray = Array.from(onlineUsers.keys());
@@ -5314,6 +5299,21 @@ io.on('connection', (socket) => {
     console.log('✅ Private message confirmed on server:', data.message_id);
   });
 
+  // ===== CHECKERS GAME SOCKET EVENTS =====
+  socket.on('join-game-room', (roomCode) => {
+    if (roomCode) {
+      socket.join(`game_${roomCode}`);
+      console.log(`User joined game room: ${roomCode}`);
+    }
+  });
+
+  socket.on('leave-game-room', (roomCode) => {
+    if (roomCode) {
+      socket.leave(`game_${roomCode}`);
+      console.log(`User left game room: ${roomCode}`);
+    }
+  });
+
   // Handle disconnect properly - UPDATED WITH LAST SEEN
   socket.on('disconnect', (reason) => {
     console.log('🔌 User disconnected:', socket.id, 'Reason:', reason);
@@ -5521,33 +5521,6 @@ app.put('/api/messages/:id', async (req, res) => {
     console.error('❌ Error in update message:', error);
     res.status(500).json({ error: 'Server error' });
   }
-});
-
-// ===== NEW SOCKET.IO EVENT: Message updates =====
-io.on('connection', (socket) => {
-  // Listen for message updates
-  socket.on('update-message', async (data) => {
-    try {
-      const { id, content } = data;
-      
-      const { data: updatedMessage, error } = await supabase
-        .from('chatter')
-        .update({ 
-          content: content,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
-        .select();
-
-      if (error) throw error;
-
-      // Broadcast update to all clients
-      io.emit('message-updated', updatedMessage[0]);
-    } catch (error) {
-      console.error('❌ Error updating message via socket:', error);
-      socket.emit('message-update-error', { error: 'Failed to update message' });
-    }
-  });
 });
 
 // NEW: Get user's last seen time (with bot override)
@@ -5892,6 +5865,383 @@ setInterval(() => {
   ensureBotUsersExist();
 }, 5 * 60 * 1000);
 // ===== MODIFICATION END =====
+
+// ===== CHECKERS GAME ROUTES =====
+
+// Board representation constants
+const BOARD_SIZE = 8;
+
+// Initialize a fresh board
+function initBoard() {
+  const board = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(0));
+  // Place black pieces (rows 0-2)
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < BOARD_SIZE; col++) {
+      if ((row + col) % 2 === 1) {
+        board[row][col] = 2; // black pawn
+      }
+    }
+  }
+  // Place white pieces (rows 5-7)
+  for (let row = 5; row < 8; row++) {
+    for (let col = 0; col < BOARD_SIZE; col++) {
+      if ((row + col) % 2 === 1) {
+        board[row][col] = 1; // white pawn
+      }
+    }
+  }
+  return board;
+}
+
+function getPieceColor(piece) {
+  if (piece === 1 || piece === 3) return 'white';
+  if (piece === 2 || piece === 4) return 'black';
+  return null;
+}
+
+function isKing(piece) {
+  return piece === 3 || piece === 4;
+}
+
+function getMoveDirs(piece) {
+  if (piece === 1) return [[-1, -1], [-1, 1]]; // white pawn moves up
+  if (piece === 2) return [[1, -1], [1, 1]];   // black pawn moves down
+  if (piece === 3) return [[-1, -1], [-1, 1], [1, -1], [1, 1]]; // white king moves any diagonal
+  if (piece === 4) return [[-1, -1], [-1, 1], [1, -1], [1, 1]]; // black king moves any diagonal
+  return [];
+}
+
+function isValidCoord(row, col) {
+  return row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE;
+}
+
+function getAllMoves(board, turn) {
+  const moves = [];
+  for (let row = 0; row < BOARD_SIZE; row++) {
+    for (let col = 0; col < BOARD_SIZE; col++) {
+      const piece = board[row][col];
+      if (piece !== 0 && getPieceColor(piece) === turn) {
+        // Check normal moves
+        const dirs = getMoveDirs(piece);
+        for (const [dr, dc] of dirs) {
+          const newRow = row + dr;
+          const newCol = col + dc;
+          if (isValidCoord(newRow, newCol) && board[newRow][newCol] === 0) {
+            moves.push({ from: [row, col], to: [newRow, newCol], capture: false });
+          }
+        }
+        // Check capture moves
+        for (const [dr, dc] of dirs) {
+          const jumpRow = row + dr * 2;
+          const jumpCol = col + dc * 2;
+          const midRow = row + dr;
+          const midCol = col + dc;
+          if (isValidCoord(jumpRow, jumpCol) && board[jumpRow][jumpCol] === 0 &&
+              board[midRow][midCol] !== 0 && getPieceColor(board[midRow][midCol]) !== turn) {
+            moves.push({ from: [row, col], to: [jumpRow, jumpCol], capture: true, captured: [midRow, midCol] });
+          }
+        }
+      }
+    }
+  }
+  return moves;
+}
+
+function isValidMove(board, fromRow, fromCol, toRow, toCol, turn) {
+  const piece = board[fromRow][fromCol];
+  if (piece === 0 || getPieceColor(piece) !== turn) return false;
+
+  const dirs = getMoveDirs(piece);
+  for (const [dr, dc] of dirs) {
+    if (fromRow + dr === toRow && fromCol + dc === toCol && board[toRow][toCol] === 0) {
+      return true; // normal move
+    }
+  }
+  // Capture moves
+  for (const [dr, dc] of dirs) {
+    const midRow = fromRow + dr;
+    const midCol = fromCol + dc;
+    const jumpRow = fromRow + dr * 2;
+    const jumpCol = fromCol + dc * 2;
+    if (jumpRow === toRow && jumpCol === toCol && isValidCoord(jumpRow, jumpCol) && board[jumpRow][jumpCol] === 0 &&
+        board[midRow][midCol] !== 0 && getPieceColor(board[midRow][midCol]) !== turn) {
+      return true; // capture move
+    }
+  }
+  return false;
+}
+
+function applyMove(board, fromRow, fromCol, toRow, toCol) {
+  const newBoard = board.map(row => [...row]);
+  const piece = newBoard[fromRow][fromCol];
+  newBoard[toRow][toCol] = piece;
+  newBoard[fromRow][fromCol] = 0;
+
+  let captured = null;
+  // Check if it was a capture
+  if (Math.abs(toRow - fromRow) === 2) {
+    const midRow = (fromRow + toRow) / 2;
+    const midCol = (fromCol + toCol) / 2;
+    captured = newBoard[midRow][midCol];
+    newBoard[midRow][midCol] = 0;
+  }
+
+  // King promotion
+  let promoted = false;
+  if ((piece === 1 && toRow === 0) || (piece === 2 && toRow === BOARD_SIZE - 1)) {
+    newBoard[toRow][toCol] = piece === 1 ? 3 : 4; // become king
+    promoted = true;
+  }
+  return { newBoard, captured, promoted };
+}
+
+function hasCapture(board, turn) {
+  const moves = getAllMoves(board, turn);
+  return moves.some(m => m.capture);
+}
+
+function checkWinner(board) {
+  let whiteExists = false, blackExists = false;
+  for (let row = 0; row < BOARD_SIZE; row++) {
+    for (let col = 0; col < BOARD_SIZE; col++) {
+      const piece = board[row][col];
+      if (piece === 1 || piece === 3) whiteExists = true;
+      if (piece === 2 || piece === 4) blackExists = true;
+    }
+  }
+  if (!whiteExists) return 'black';
+  if (!blackExists) return 'white';
+  // Also check if any player has moves
+  if (getAllMoves(board, 'white').length === 0) return 'black';
+  if (getAllMoves(board, 'black').length === 0) return 'white';
+  return null;
+}
+
+// Create a new game room
+app.post('/create-room', verifyToken, async (req, res) => {
+  try {
+    const username = req.user.username;
+    // Generate a 6-character invite code
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    // Insert room
+    const { data: room, error: roomError } = await supabase
+      .from('rooms')
+      .insert([{ code, status: 'waiting' }])
+      .select();
+    if (roomError) throw roomError;
+
+    // Insert player as white
+    const { error: playerError } = await supabase
+      .from('players')
+      .insert([{ room_id: room[0].id, username, role: 'white' }]);
+    if (playerError) throw playerError;
+
+    // Insert initial game state
+    const initialBoard = initBoard();
+    const { error: gameError } = await supabase
+      .from('games')
+      .insert([{ room_id: room[0].id, board_state: initialBoard, current_turn: 'white' }]);
+    if (gameError) throw gameError;
+
+    res.json({ success: true, roomCode: code });
+  } catch (err) {
+    console.error('Create room error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Join an existing room
+app.post('/join-room', verifyToken, async (req, res) => {
+  try {
+    const { roomCode } = req.body;
+    const username = req.user.username;
+
+    // Find room
+    const { data: room, error: roomError } = await supabase
+      .from('rooms')
+      .select('id, status')
+      .eq('code', roomCode)
+      .single();
+    if (roomError || !room) return res.status(404).json({ success: false, error: 'Room not found' });
+    if (room.status !== 'waiting') return res.status(400).json({ success: false, error: 'Room is not available' });
+
+    // Check if player already in room
+    const { data: existingPlayer, error: checkError } = await supabase
+      .from('players')
+      .select('id')
+      .eq('room_id', room.id)
+      .eq('username', username)
+      .single();
+    if (checkError && checkError.code !== 'PGRST116') throw checkError;
+    if (existingPlayer) return res.status(400).json({ success: false, error: 'Already in this room' });
+
+    // Add player as black
+    const { error: playerError } = await supabase
+      .from('players')
+      .insert([{ room_id: room.id, username, role: 'black' }]);
+    if (playerError) throw playerError;
+
+    // Update room status to playing
+    await supabase.from('rooms').update({ status: 'playing' }).eq('id', room.id);
+
+    res.json({ success: true, roomCode });
+  } catch (err) {
+    console.error('Join room error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Make a move
+app.post('/move', verifyToken, async (req, res) => {
+  try {
+    const { roomCode, from, to } = req.body;
+    const username = req.user.username;
+    const [fromRow, fromCol] = from;
+    const [toRow, toCol] = to;
+
+    // Get room and game
+    const { data: room, error: roomError } = await supabase
+      .from('rooms')
+      .select('id, status')
+      .eq('code', roomCode)
+      .single();
+    if (roomError || !room) return res.status(404).json({ success: false, error: 'Room not found' });
+    if (room.status !== 'playing') return res.status(400).json({ success: false, error: 'Game not started' });
+
+    // Get players
+    const { data: players, error: playersError } = await supabase
+      .from('players')
+      .select('username, role')
+      .eq('room_id', room.id);
+    if (playersError) throw playersError;
+
+    const player = players.find(p => p.username === username);
+    if (!player) return res.status(403).json({ success: false, error: 'You are not in this game' });
+
+    // Get current game state
+    const { data: game, error: gameError } = await supabase
+      .from('games')
+      .select('board_state, current_turn, winner')
+      .eq('room_id', room.id)
+      .single();
+    if (gameError) throw gameError;
+    if (game.winner) return res.status(400).json({ success: false, error: 'Game already finished' });
+    if (game.current_turn !== player.role) return res.status(403).json({ success: false, error: 'Not your turn' });
+
+    const board = game.board_state;
+
+    // Validate move
+    if (!isValidMove(board, fromRow, fromCol, toRow, toCol, player.role)) {
+      return res.status(400).json({ success: false, error: 'Invalid move' });
+    }
+
+    // Check if player has capture moves and this move captures (forced capture rule)
+    if (hasCapture(board, player.role)) {
+      // Player must make a capture move
+      if (Math.abs(toRow - fromRow) !== 2) {
+        return res.status(400).json({ success: false, error: 'You must capture an opponent piece' });
+      }
+    }
+
+    // Apply move
+    const { newBoard, captured, promoted } = applyMove(board, fromRow, fromCol, toRow, toCol);
+
+    // Switch turn
+    let nextTurn = player.role === 'white' ? 'black' : 'white';
+
+    // Check if the player has additional captures (multiple jump)
+    if (captured !== null) {
+      // Check if the same piece can capture again
+      const movesAfter = getAllMoves(newBoard, player.role);
+      const pieceAtNewPos = newBoard[toRow][toCol];
+      const canCaptureAgain = movesAfter.some(m => m.from[0] === toRow && m.from[1] === toCol && m.capture);
+      if (canCaptureAgain) {
+        nextTurn = player.role; // same player continues
+      }
+    }
+
+    // Check winner
+    const winner = checkWinner(newBoard);
+
+    // Update game in database
+    const { error: updateError } = await supabase
+      .from('games')
+      .update({
+        board_state: newBoard,
+        current_turn: nextTurn,
+        winner: winner,
+        updated_at: new Date().toISOString()
+      })
+      .eq('room_id', room.id);
+    if (updateError) throw updateError;
+
+    // Broadcast update to the room via Socket.io
+    const roomName = `game_${roomCode}`;
+    io.to(roomName).emit('game-update', {
+      board: newBoard,
+      currentTurn: nextTurn,
+      winner: winner,
+      lastMove: { from, to, player: player.role }
+    });
+
+    res.json({ success: true, board: newBoard, currentTurn: nextTurn, winner });
+  } catch (err) {
+    console.error('Move error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get game state
+app.get('/game/:roomCode', verifyToken, async (req, res) => {
+  try {
+    const { roomCode } = req.params;
+    const username = req.user.username;
+
+    // Get room
+    const { data: room, error: roomError } = await supabase
+      .from('rooms')
+      .select('id, status')
+      .eq('code', roomCode)
+      .single();
+    if (roomError || !room) return res.status(404).json({ success: false, error: 'Room not found' });
+
+    // Get players
+    const { data: players, error: playersError } = await supabase
+      .from('players')
+      .select('username, role')
+      .eq('room_id', room.id);
+    if (playersError) throw playersError;
+
+    // Get game
+    const { data: game, error: gameError } = await supabase
+      .from('games')
+      .select('board_state, current_turn, winner')
+      .eq('room_id', room.id)
+      .single();
+    if (gameError) throw gameError;
+
+    // Determine player's role
+    const player = players.find(p => p.username === username);
+    const role = player ? player.role : null;
+
+    res.json({
+      success: true,
+      roomCode,
+      status: room.status,
+      board: game.board_state,
+      currentTurn: game.current_turn,
+      winner: game.winner,
+      players: players,
+      yourRole: role
+    });
+  } catch (err) {
+    console.error('Get game error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ===== END CHECKERS GAME ROUTES =====
 
 // Start server
 server.listen(port, () => {
