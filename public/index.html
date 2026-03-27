@@ -15,7 +15,7 @@
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style> 
-    /* NEW: OAuth Button Styles */
+    /* OAuth Button Styles */
     .oauth-buttons {
         margin-top: 20px;
         padding-top: 20px;
@@ -176,11 +176,11 @@
         vertical-align: top;
     }
 
-    /* NEW: Password field with eye icon */
+    /* Password field with eye icon */
     .password-container {
         position: relative;
-        width: 100%; /* Changed from 90% to 100% */
-        margin: 0 0 20px 0; /* Removed auto margins */
+        width: 100%;
+        margin: 0 0 20px 0;
     }
 
     .password-container input {
@@ -227,7 +227,7 @@
         transition: color 0.3s ease;
     }
 
-    /* NEW: Welcome screen styles */
+    /* Welcome screen styles */
     .welcome-screen {
         position: fixed;
         top: 0;
@@ -337,7 +337,7 @@
         }
     }
 
-    /* FIXED: Dynamic padding for online users panel states */
+    /* Dynamic padding for online users panel states */
     .main-chat-interface {
         flex: 1;
         display: flex;
@@ -353,7 +353,6 @@
         box-shadow: none;
     }
 
-    /* FIXED: Chat container with proper spacing */
     .chat-container {
         flex: 1;
         display: flex;
@@ -364,10 +363,9 @@
         position: relative;
     }
 
-    /* FIXED: Dynamic padding for online users panel states */
     .chat-messages, #private-ai-container {
         flex: 1;
-        padding: 5px 10px 80px 10px; /* Default padding when panel is collapsed */
+        padding: 5px 10px 80px 10px;
         overflow-y: auto;
         height: 100%;
         display: flex;
@@ -383,27 +381,20 @@
         gap: 2px;
         box-sizing: border-box;
         transition: padding-bottom 0.3s ease;
-        overflow-x: hidden; /* Prevent horizontal scroll */
-        max-width: 100%; /* Ensure doesn't exceed container */
+        overflow-x: hidden;
+        max-width: 100%;
     }
 
-    /* When online panel is expanded - increase bottom padding */
     .online-users-panel:not(.collapsed) ~ .chat-container .chat-messages,
     .online-users-panel:not(.collapsed) ~ .chat-container #private-ai-container {
-        padding-bottom: 183px !important; /* Increased padding when panel is expanded */
+        padding-bottom: 183px !important;
     }
 
-    /* When online panel is collapsed - use default padding */
     .online-users-panel.collapsed ~ .chat-container .chat-messages,
     .online-users-panel.collapsed ~ .chat-container #private-ai-container {
-        padding-bottom: 117px !important; /* Normal padding when panel is collapsed */
+        padding-bottom: 117px !important;
     }
 
-    .online-users-panel:not(.collapsed) {
-        /* This will make the chat container adjust automatically */
-        height: auto !important;
-    }
-    /* User status indicator styles */
     .user-status-indicator {
         display: inline-block;
         width: 8px;
@@ -453,7 +444,7 @@
             box-shadow: 0 0 0 0 rgba(49, 162, 76, 0);
         }
     }
-    /* FIXED: Chat input positioning */
+
     .chat-input {
         display: none;
         align-items: center;
@@ -469,12 +460,10 @@
         z-index: 1000;
         height: auto;
         min-height: 55px;
-        /* ADDED: flex column for reply preview */
         flex-direction: column;
         align-items: stretch;
     }
 
-    /* NEW: Row inside chat input for icon, textarea, send button */
     .chat-input-row {
         display: flex;
         align-items: center;
@@ -482,7 +471,6 @@
         gap: 5px;
     }
 
-    /* NEW: Attach button style */
     .attach-btn {
         background: none;
         border: none;
@@ -498,7 +486,6 @@
         color: #4267B2;
     }
 
-    /* FIXED: Private messages container adjustments */
     .private-chat-messages {
         flex: 1;
         padding: 15px;
@@ -506,17 +493,15 @@
         background: #f5f5f5;
         display: flex;
         flex-direction: column;
-        padding-bottom: 80px; /* Base padding */
-        overflow-x: hidden; /* Prevent horizontal scroll */
-        max-width: 100%; /* Ensure doesn't exceed container */
+        padding-bottom: 80px;
+        overflow-x: hidden;
+        max-width: 100%;
     }
 
-    /* FIXED: Ensure proper spacing for private chat when active */
     .private-chat-container.active .private-chat-messages {
-        padding-bottom: 90px; /* More space when chat is active */
+        padding-bottom: 90px;
     }
 
-    /* FIXED: Online users panel transitions */
     .online-users-panel {
         background: white;
         border-radius: 0;
@@ -524,17 +509,17 @@
         margin: 0;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         overflow-x: auto;
-        overflow-y: hidden; /* Prevent vertical scroll */
+        overflow-y: hidden;
         border-bottom: 1px solid #e4e6eb;
         flex-shrink: 0;
         height: auto;
         transition: all 0.3s ease;
-        max-height: 200px; /* Expanded height */
-        max-width: 100%; /* Prevent horizontal overflow */
+        max-height: 200px;
+        max-width: 100%;
     }
 
     .online-users-panel.collapsed {
-        max-height: 50px; /* Collapsed height - header only */
+        max-height: 50px;
         overflow: hidden;
     }
 
@@ -542,7 +527,6 @@
         display: none;
     }
 
-    /* FIXED: Toggle button animation */
     .toggle-online-panel i {
         font-size: 16px;
         transition: transform 0.3s ease;
@@ -552,11 +536,11 @@
         transform: rotate(180deg);
     }
 
-    /* NEW: All Users Container Styles */
+    /* All Users Container Styles */
     #all-users {
         background: #f0f2f5;
         padding: 0;
-        overflow-x: hidden; /* Prevent horizontal scroll */
+        overflow-x: hidden;
     }
 
     .all-users-header {
@@ -607,7 +591,7 @@
         padding: 15px;
         max-height: calc(100vh - 200px);
         overflow-y: auto;
-        overflow-x: hidden; /* Prevent horizontal scroll */
+        overflow-x: hidden;
     }
 
     .user-directory-card {
@@ -622,7 +606,7 @@
         gap: 15px;
         transition: all 0.3s ease;
         max-width: 100%;
-        overflow: hidden; /* Prevent content overflow */
+        overflow: hidden;
         box-sizing: border-box;
     }
 
@@ -898,7 +882,7 @@
         }
     }
 
-    /* COMPLETELY FIXED: Secret Code Container */
+    /* Secret Code Container */
     .secret-code-container {
         padding: 20px;
         width: 100vw;
@@ -1028,7 +1012,7 @@
         font-style: italic;
     }
 
-    /* COMPLETELY FIXED: SQL Editor Container */
+    /* SQL Editor Container */
     .sql-editor-container {
         padding: 20px;
         width: 100vw;
@@ -1363,7 +1347,7 @@
         box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }
 
-    /* FIXED: Image loading styles - Remove transitions and ensure immediate display */
+    /* Image loading styles */
     .message img {
         width: 100%;
         margin: 4px 0 0 0;
@@ -1645,7 +1629,6 @@
         word-break: break-word;
     }
 
-    /* Improved avatar styling */
     .message .avatar {
         width: 26px;
         height: 26px;
@@ -1672,7 +1655,6 @@
         display: block;
     }
 
-    /* Improved username with status indicator */
     .message .username {
         font-size: 0.68rem;
         font-weight: bold;
@@ -1685,7 +1667,6 @@
         cursor: pointer;
     }
 
-    /* MODIFIED: Status indicator in messages - shows online dot or time ago when offline */
     .user-status-indicator.online {
         background-color: #4CAF50;
         box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
@@ -1696,7 +1677,6 @@
         box-shadow: none;
     }
 
-    /* Last seen text for offline users */
     .last-seen-text {
         font-size: 0.65rem;
         color: #999;
@@ -1704,8 +1684,6 @@
         font-style: italic;
     }
 
-
-    /* In the directory-user-status section */
     .directory-user-status .status-dot {
         width: 8px;
         height: 8px;
@@ -1722,7 +1700,6 @@
         background: #bcc0c4;
     }
 
-    /* In user profile popup */
     .user-status-indicator.online-dot {
         width: 8px;
         height: 8px;
@@ -1736,7 +1713,6 @@
         background-color: #FFC107;
     }
 
-    /* Message body improvements */
     .message-body {
         display: flex;
         flex-direction: column;
@@ -1744,14 +1720,12 @@
         min-width: 0;
     }
 
-    /* Received messages (left aligned) */
     .message.received {
         align-self: flex-start;
         margin-left: -10px;
         flex-direction: row;
     }
 
-    /* Sent messages (right aligned) - HIDE AVATAR FOR SENT MESSAGES */
     .message.sent {
         align-self: flex-end;
         margin-right: -10px;
@@ -1763,7 +1737,6 @@
         order: 1;
     }
 
-    /* Hide avatar and username for sent messages */
     .message.sent .avatar {
         display: none !important;
     }
@@ -1953,7 +1926,7 @@
         text-decoration: underline;
     }
 
-    /* FIXED: Specific positioning for Private AI go-top button */
+    /* Private AI go-top button */
     #private-ai .go-top-btn {
         position: fixed;
         width: 40px;
@@ -1985,7 +1958,7 @@
         background: #075E54;
     }
 
-    /* FIXED: Specific positioning for main chat scroll-to-bottom button */
+    /* Main chat scroll-to-bottom button */
     #chat .scroll-to-bottom-btn {
         position: fixed;
         width: 40px;
@@ -2017,7 +1990,7 @@
         background: #075E54;
     }
 
-    /* FIXED: Help container with proper scrolling */
+    /* Help container with proper scrolling */
     .about-container, .features-container, .help-container {
         padding: 20px;
         width: 90%;
@@ -2079,7 +2052,6 @@
         left: 0;
     }
 
-    /* FIXED: Help section with proper scrolling */
     .help-section {
         margin-bottom: 20px;
         padding: 15px;
@@ -2270,7 +2242,7 @@
         }
     }
 
-    /* MODIFIED: INTEGRATED ONLINE USERS PANEL - NOW PART OF CHAT CONTAINER WITH TOGGLE */
+    /* Integrated online users panel with toggle */
     .online-users-header {
         display: flex;
         justify-content: space-between;
@@ -2467,7 +2439,6 @@
             height: 36px;
         }
         
-        /* FIXED: Help container mobile responsiveness */
         .help-container {
             padding: 10px;
         }
@@ -2482,7 +2453,7 @@
         }
     }
 
-    /* ADDED: CSS for long-press functionality */
+    /* CSS for long-press functionality */
     .no-select {
         -webkit-user-select: none;
         -moz-user-select: none;
@@ -2501,7 +2472,7 @@
         touch-action: manipulation;
     }
 
-    /* ===== PROFILE EDITING STYLES ===== */
+    /* Profile editing styles */
     .profile-container {
         padding: 20px;
         width: 100vw;
@@ -2793,7 +2764,7 @@
         }
     }
 
-    /* ===== ADDED: USER PROFILE POPUP STYLES ===== */
+    /* User profile popup styles */
     .user-profile-popup {
         position: fixed;
         top: 0;
@@ -2976,7 +2947,7 @@
         background: rgba(255, 255, 255, 0.3);
     }
 
-    /* MODIFIED: Private Messages Layout */
+    /* Private Messages Layout */
     .private-messages-layout {
         display: flex;
         height: calc(100vh - 150px);
@@ -3011,7 +2982,7 @@
         display: none;
     }
 
-    /* FIXED: Hide private messages header when chat container is active */
+    /* Hide private messages header when chat container is active */
     #private-messages.private-chat-active .private-messages-header {
         display: none !important;
     }
@@ -3027,7 +2998,6 @@
         color: #4267B2;
     }
 
-    /* FIXED: Private Messages Search Container Positioning */
     .private-messages-header {
         background: white;
         padding: 15px;
@@ -3486,7 +3456,7 @@
         z-index: 1;
     }
 
-    /* ===== FIXED POSTS FEED STYLES - NO HORIZONTAL SCROLLING ===== */
+    /* Fixed posts feed styles - no horizontal scrolling */
     #posts {
         background: #f0f2f5;
         padding: 0;
@@ -3645,7 +3615,7 @@
         box-sizing: border-box;
     }
 
-    /* Post cards - FIXED FOR NO HORIZONTAL SCROLL */
+    /* Post cards - fixed for no horizontal scroll */
     .post-card {
         background: white;
         border-radius: 10px;
@@ -3787,7 +3757,7 @@
         background: #f0f2f5;
     }
 
-    /* ===== FACEBOOK-STYLE HIDDEN COMMENTS ===== */
+    /* Facebook-style hidden comments */
     .post-comments {
         margin-top: 15px;
         padding-top: 15px;
@@ -4393,7 +4363,7 @@
         }
     }
 
-    /* === ADDED: Reply preview container styles (inside chat-input) === */
+    /* Reply preview container styles (inside chat-input) */
     #reply-preview-container,
     #private-reply-preview-container {
         background: #e3f2fd;
@@ -4445,7 +4415,7 @@
     .reply-preview button i {
         font-size: 16px;
     }
-    /* ADDED: Styles for post three‑dot menu */
+    /* Styles for post three‑dot menu */
     .post-header-actions {
         position: relative;
         margin-left: auto;
@@ -4504,7 +4474,7 @@
         color: #4267B2;
     }
     </style>
-    <!-- ===== ADDED: Checkers Game CSS - Fixed board (no scaling) ===== -->
+    <!-- Checkers Game CSS - Fixed board (no scaling) -->
     <style>
         /* Checkers Game Styles - FIXED: no scaling transforms, stable piece sizes */
         .game-container {
@@ -4636,7 +4606,7 @@
     </style>
 </head>
 <body>
-    <!-- NEW: Welcome screen with animated text -->
+    <!-- Welcome screen with animated text -->
     <div class="welcome-screen" id="welcome-screen">
         <div class="animated-logo">
             <div class="animated-text" id="animated-text">
@@ -4671,18 +4641,12 @@
                 <a href="#" id="toggle-link" onclick="toggleAuth()">Sign Up</a>
             </div>
             
-            <!-- ADDED: Google OAuth Button -->
+            <!-- Google OAuth Button -->
             <div class="oauth-buttons">
                 <div class="oauth-providers">
                     <button onclick="loginWithGoogle()" class="oauth-btn google-btn">
                         <i class="fab fa-google"></i> Continue with Google
                     </button>
-                    <!-- You can add Facebook later if needed -->
-                    <!--
-                    <button onclick="loginWithFacebook()" class="oauth-btn facebook-btn">
-                        <i class="fab fa-facebook"></i> Continue with Facebook
-                    </button>
-                    -->
                 </div>
                 <div class="oauth-divider">
                     <span>or</span>
@@ -4708,7 +4672,6 @@
                 <a href="#" onclick="exportChat()">Export Chat</a>
                 <a href="#" onclick="exportChatPDF()">Download PDF</a>
                 <a href="#" onclick="showSettings()">Settings</a>
-                <!-- NEW: Admin only menu item (hidden by default) -->
                 <a href="#" id="admin-clear-all" style="display: none;" onclick="clearAllMessages()"><i class="fas fa-trash-alt" style="color:#ff4444;"></i> Clear All Messages (Admin)</a>
             </div>
         </div>
@@ -4732,13 +4695,9 @@
         <div class="menu-divider"></div>
         <a href="#" onclick="showContainer('chat')">MessageMate</a>
         <a href="#" onclick="showContainer('private-ai')">Private AI</a>
-        <!-- ADDED: Private Messages Link -->
         <a href="#" onclick="showContainer('private-messages')">Private Messages</a>
-        <!-- ADDED: Posts Feed Link -->
         <a href="#" onclick="showContainer('posts')"><i class="fas fa-newspaper"></i> Posts Feed</a>
-        <!-- NEW: All Users Link -->
         <a href="#" onclick="showContainer('all-users')"><i class="fas fa-users"></i> All Users</a>
-        <!-- NEW: Checkers Game Link -->
         <a href="#" onclick="showContainer('checkers')"><i class="fas fa-chess-board"></i> Checkers</a>
         <a href="#" onclick="showContainer('profile')">Edit Profile</a>
         <a href="#" onclick="showContainer('about')">About</a>
@@ -4749,7 +4708,7 @@
         <a href="#" onclick="logout()" style="color: #ff4444;">Logout</a>
     </div>
 
-    <!-- UPDATED: Posts Container with FACEBOOK-STYLE SCROLLING -->
+    <!-- Posts Container with FACEBOOK-STYLE SCROLLING -->
     <div id="posts" class="main-chat-interface container" style="display: none;">
         <div class="posts-header">
             <h2>Community Posts</h2>
@@ -4805,7 +4764,7 @@
         </div>
     </div>
 
-    <!-- NEW: All Users Container -->
+    <!-- All Users Container -->
     <div id="all-users" class="main-chat-interface container" style="display: none;">
         <div class="all-users-header">
             <h2>All Users</h2>
@@ -4830,7 +4789,7 @@
         </div>
     </div>
 
-    <!-- ===== NEW: Checkers Game Tab Content ===== -->
+    <!-- Checkers Game Tab Content -->
     <div id="checkers" class="main-chat-interface container" style="display: none;">
         <div class="game-container">
             <div class="game-controls">
@@ -4849,7 +4808,7 @@
         </div>
     </div>
 
-    <!-- MODIFIED: Chat container with collapsible online users panel -->
+    <!-- Chat container with collapsible online users panel -->
     <div id="chat" class="main-chat-interface container" style="display: none;">
         <div class="online-users-panel" id="online-users-panel">
             <div class="online-users-header">
@@ -4867,13 +4826,11 @@
         <div class="chat-container">
             <div class="chat-messages" id="chat-container"></div>
             
-            <!-- ADDED: Typing Indicator -->
+            <!-- Typing Indicator -->
             <div id="typing-indicator"></div>
-            
-            <!-- removed old preview container from here -->
         </div>
         
-        <!-- MODIFIED: Chat input with paper icon -->
+        <!-- Chat input with paper icon -->
         <div class="chat-input" style="display: none;">
             <!-- REPLY PREVIEW CONTAINER MOVED INSIDE CHAT-INPUT -->
             <div id="reply-preview-container"></div>
@@ -4891,14 +4848,14 @@
         <!-- hidden file input for image uploads (main chat) -->
         <input type="file" id="image-upload-main" accept="image/*" style="display: none;">
         
-        <!-- FIXED: Scroll to bottom button specifically for main chat -->
+        <!-- Scroll to bottom button specifically for main chat -->
         <div class="scroll-to-bottom-btn" id="scrollToBottomBtn">
             <i class="fas fa-chevron-down"></i>
             <div class="new-messages-notification" id="newMessagesCount">0</div>
         </div>
     </div>
     
-    <!-- MODIFIED: Private AI container with collapsible online users panel -->
+    <!-- Private AI container with collapsible online users panel -->
     <div id="private-ai" class="main-chat-interface container" style="display: none;">
         <div class="online-users-panel" id="private-online-users-panel">
             <div class="online-users-header">
@@ -4915,15 +4872,14 @@
         
         <div class="chat-container">
             <div class="chat-messages" id="private-ai-container"></div>
-            <!-- removed old private preview container -->
         </div>
         
-        <!-- MODIFIED: Private AI chat input with paper icon -->
+        <!-- Private AI chat input with paper icon -->
         <div class="chat-input" style="display: none;">
             <!-- PRIVATE REPLY PREVIEW CONTAINER INSIDE CHAT-INPUT -->
             <div id="private-reply-preview-container"></div>
-            <!-- NEW: Attachment preview area for private AI (only shown when image is attached) -->
-            <div id="private-ai-attachment-preview" style="display: none; margin-top: 8px; background: #e9ecef; border-radius: 8px; padding: 6px 10px; font-size: 13px; align-items: center; gap: 10px;">
+            <!-- Attachment preview area for private AI (only shown when image is attached) -->
+            <div id="private-ai-attachment-preview" style="display: none; margin-top: 8px; background: #e9ecef; border-radius: 8px; padding: 6px 10px; align-items: center; gap: 10px;">
                 <img id="private-ai-attach-img" style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px;">
                 <span id="private-ai-attach-text" style="flex:1; overflow: hidden; text-overflow: ellipsis;">Image attached (will be edited)</span>
                 <button onclick="clearPrivateAIAttachment()" style="background: none; border: none; cursor: pointer; color: #666;"><i class="fas fa-times"></i></button>
@@ -4942,13 +4898,13 @@
         <!-- hidden file input for private AI image upload -->
         <input type="file" id="image-upload-private" accept="image/*" style="display: none;">
         
-        <!-- FIXED: Go to top button specifically for private AI -->
+        <!-- Go to top button specifically for private AI -->
         <div class="go-top-btn" id="private-go-top">
             <i class="fas fa-arrow-up"></i>
         </div>
     </div>
 
-    <!-- MODIFIED: Private Messages Container with updated structure -->
+    <!-- Private Messages Container with updated structure -->
     <div id="private-messages" class="main-chat-interface container" style="display: none;">
         <div class="private-messages-header" id="private-messages-header">
             <h3 id="private-messages-title">Private Messages</h3>
@@ -4987,9 +4943,8 @@
                     </div>
                 </div>
                 
-                <!-- MODIFIED: Private messages chat input with paper icon -->
+                <!-- Private messages chat input with paper icon -->
                 <div class="private-chat-input chat-input" style="display: none;" id="private-chat-input">
-                    <!-- If you need a reply preview container here, add it similarly -->
                     <div class="chat-input-row">
                         <button class="attach-btn" id="attach-btn-private-msg" onclick="attachFilePrivateMsg()" type="button">
                             <i class="fas fa-paperclip"></i>
@@ -5013,7 +4968,7 @@
         <div class="news-items" id="news-items"></div>
     </div>
 
-    <!-- ADDED: Profile Container -->
+    <!-- Profile Container -->
     <div id="profile" class="profile-container" style="display: none;">
         <span class="close-btn" onclick="hideContainer('profile')">&times;</span>
         <div class="profile-box">
@@ -5087,7 +5042,7 @@
         </div>
     </div>
 
-    <!-- ADDED: User Profile Popup -->
+    <!-- User Profile Popup -->
     <div id="user-profile-popup" class="user-profile-popup" style="display: none;">
         <div class="user-profile-card">
             <div class="user-profile-header">
@@ -5135,7 +5090,7 @@
         </div>
     </div>
 
-    <!-- ADDED: Secret Code Container -->
+    <!-- Secret Code Container -->
     <div id="secret-code" class="secret-code-container" style="display: none;">
         <span class="close-btn" onclick="hideContainer('secret-code')">&times;</span>
         <div class="secret-code-box">
@@ -5151,7 +5106,7 @@
         </div>
     </div>
  
-     <!-- FIXED: SQL Editor Container -->
+     <!-- SQL Editor Container -->
     <div id="sql-editor-container" class="sql-editor-container" style="display: none;">
         <span class="close-btn" onclick="hideContainer('sql-editor-container')">&times;</span>
         <div class="sql-editor-box">
@@ -5243,13 +5198,9 @@
             <li>Customizable interface</li>
             <li>Dark mode support</li>
             <li>Responsive design for all devices</li>
-            <!-- ADDED: Posts Feed Feature -->
             <li>Facebook-style posts feed with media sharing</li>
             <li>Like and comment functionality on posts</li>
-            <!-- NEW: All Users Feature -->
             <li>User directory to find and connect with all registered users</li>
-            <li>Search and filter users by status, interests, and more</li>
-            <!-- NEW: Checkers Game -->
             <li>Multiplayer checkers game with real-time moves</li>
         </ul>
     </div>
@@ -5277,7 +5228,6 @@
                 💡 <i>Tip:</i> Make sure your image link is public and ends with .jpg, .png, or .jpeg.
             </div>
         </div>
-        <!-- ADDED: Posts Help Section -->
         <div class="help-section">
             <div class="help-question">How do I create a post?</div>
             <div class="help-answer">
@@ -5290,7 +5240,6 @@
                 You can also like and comment on other users' posts!
             </div>
         </div>
-        <!-- NEW: All Users Help Section -->
         <div class="help-section">
             <div class="help-question">How do I find and connect with other users?</div>
             <div class="help-answer">
@@ -5306,7 +5255,6 @@
                 This feature helps you discover and connect with people who share similar interests!
             </div>
         </div>
-        <!-- NEW: Checkers Help Section -->
         <div class="help-section">
             <div class="help-question">How do I play Checkers?</div>
             <div class="help-answer">
@@ -9904,7 +9852,7 @@ function batchMessageRender(messages, renderFunction) {
     // ===== PRIVATE AI IMAGE ATTACHMENT VARIABLES =====
     let privateAIAttachedImageUrl = null;
 
-    // ===== MODIFIED: sendPrivateMessage to support image attachment and seedream command =====
+    // ===== MODIFIED: sendPrivateMessage to support image attachment and seedream command using -sd =====
     async function sendPrivateMessage() {
         const input = document.getElementById('private-user-input');
         if (!input) return;
@@ -9923,17 +9871,17 @@ function batchMessageRender(messages, renderFunction) {
         }
         
         try {
-            // If there's an attached image, construct seedream command
+            // If there's an attached image, construct -sd command
             if (privateAIAttachedImageUrl) {
-                // Build command: seedream <image_url> | <prompt>
+                // Build command: -sd <image_url> | <prompt>
                 const prompt = content || "edit this image creatively";
-                const command = `seedream ${privateAIAttachedImageUrl} | ${prompt}`;
-                console.log('🎨 Sending seedream command:', command);
+                const command = `-sd ${privateAIAttachedImageUrl} | ${prompt}`;
+                console.log('🎨 Sending -sd (seedream) command:', command);
                 // Display user's "message" (the command) immediately
                 displayPrivateMessage(command, 'sent');
                 // Send to AI
                 await fetchPrivateAIResponse(command);
-                // Clear attachment
+                // Clear attachment preview after sending
                 clearPrivateAIAttachment();
                 input.value = '';
                 autoResize(input);
