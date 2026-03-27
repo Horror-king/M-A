@@ -204,8 +204,7 @@
     .toggle-password {
         position: absolute;
         right: 16px;
-        /* Change from 50% to a smaller percentage to move it higher */
-        top: 40%; /* Adjust this value (try 45%, 40%, etc.) to position it as desired */
+        top: 40%;
         transform: translateY(-50%);
         cursor: pointer;
         color: #65676b;
@@ -568,7 +567,7 @@
         background: white;
         border-bottom: 1px solid #e4e6eb;
         position: sticky;
-        top: 0; /* FIXED: Changed from 50px to 0 */
+        top: 0;
         z-index: 10;
     }
 
@@ -638,13 +637,13 @@
         border-radius: 50%;
         object-fit: cover;
         border: 3px solid #f0f2f5;
-        flex-shrink: 0; /* Prevent shrinking */
+        flex-shrink: 0;
     }
 
     .directory-user-info {
         flex: 1;
-        min-width: 0; /* Allow text truncation */
-        overflow: hidden; /* Prevent overflow */
+        min-width: 0;
+        overflow: hidden;
     }
 
     .directory-user-name {
@@ -672,7 +671,7 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        flex-wrap: wrap; /* Allow wrapping on small screens */
+        flex-wrap: wrap;
     }
 
     .status-dot {
@@ -697,7 +696,7 @@
     .directory-user-actions {
         display: flex;
         gap: 10px;
-        flex-shrink: 0; /* Prevent buttons from shrinking */
+        flex-shrink: 0;
     }
 
     .directory-action-btn {
@@ -708,7 +707,7 @@
         font-size: 14px;
         font-weight: 500;
         transition: all 0.3s ease;
-        white-space: nowrap; /* Prevent button text from wrapping */
+        white-space: nowrap;
     }
 
     .directory-action-btn.message {
@@ -741,7 +740,7 @@
         display: flex;
         gap: 15px;
         margin-top: 10px;
-        flex-wrap: wrap; /* Allow wrapping on small screens */
+        flex-wrap: wrap;
     }
 
     .user-stat {
@@ -864,28 +863,27 @@
     /* Mobile responsive adjustments */
     @media (max-width: 480px) {
         .chat-messages, #private-ai-container {
-            padding-bottom: 79px; /* Slightly less on mobile when collapsed */
+            padding-bottom: 79px;
         }
         
         .online-users-panel:not(.collapsed) ~ .chat-container .chat-messages,
         .online-users-panel:not(.collapsed) ~ .chat-container #private-ai-container {
-            padding-bottom: 160px; /* Slightly less on mobile when expanded */
+            padding-bottom: 160px;
         }
         
         .online-users-panel.collapsed ~ .chat-container .chat-messages,
         .online-users-panel.collapsed ~ .chat-container #private-ai-container {
-            padding-bottom: 75px; /* Slightly less on mobile when collapsed */
+            padding-bottom: 75px;
         }
         
         .online-users-panel {
-            max-height: 180px; /* Slightly smaller on mobile */
+            max-height: 180px;
         }
         
         .online-users-panel.collapsed {
-            max-height: 40px; /* Smaller collapsed height on mobile */
+            max-height: 40px;
         }
 
-        /* NEW: Mobile adjustments for welcome screen */
         .animated-logo {
             font-size: 2.5rem;
         }
@@ -894,7 +892,6 @@
             font-size: 1rem;
         }
 
-        /* OAuth button adjustments for mobile */
         .oauth-btn {
             padding: 10px 15px;
             font-size: 14px;
@@ -915,7 +912,7 @@
         border-radius: 0;
         box-shadow: none;
         overflow-y: auto;
-        overflow-x: hidden; /* Prevent horizontal scroll */
+        overflow-x: hidden;
         display: none;
         z-index: 1002;
         box-sizing: border-box;
@@ -1045,7 +1042,7 @@
         border-radius: 0;
         box-shadow: none;
         overflow-y: auto;
-        overflow-x: hidden; /* Prevent horizontal scroll */
+        overflow-x: hidden;
         display: none;
         z-index: 1002;
         box-sizing: border-box;
@@ -1062,7 +1059,6 @@
         box-sizing: border-box;
     }
 
-    /* FIXED: Ensure all elements inside don't cause overflow */
     .sql-editor-box * {
         max-width: 100%;
     }
@@ -1071,7 +1067,7 @@
         display: flex;
         gap: 10px;
         margin-bottom: 15px;
-        flex-wrap: wrap; /* Allow wrapping on small screens */
+        flex-wrap: wrap;
     }
 
     .sql-btn {
@@ -1125,7 +1121,7 @@
         min-height: 100px;
         max-height: 400px;
         overflow-y: auto;
-        overflow-x: hidden; /* Prevent horizontal scroll */
+        overflow-x: hidden;
         background: #f8f9fa;
     }
 
@@ -1143,7 +1139,7 @@
         border: 1px solid #ddd;
         padding: 8px;
         text-align: left;
-        word-break: break-word; /* Prevent long text overflow */
+        word-break: break-word;
     }
 
     .sql-result-table th {
@@ -1186,7 +1182,7 @@
         border-radius: 4px;
         max-height: 200px;
         overflow-y: auto;
-        overflow-x: hidden; /* Prevent horizontal scroll */
+        overflow-x: hidden;
     }
 
     .saved-query-item {
@@ -1325,7 +1321,6 @@
             margin-bottom: 5px;
         }
         
-        /* Ensure tables don't cause horizontal scroll */
         .sql-result-table {
             font-size: 12px;
             display: block;
@@ -1376,22 +1371,18 @@
         border-radius: 10px;
         object-fit: cover;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        /* REMOVE transitions that cause slow reveal */
         transition: none !important;
         opacity: 1 !important;
         animation: none !important;
-        /* Force immediate rendering */
         visibility: visible !important;
-        max-width: 100%; /* Prevent image overflow */
+        max-width: 100%;
     }
 
-    /* Ensure images are always fully visible */
     .message img[src] {
         opacity: 1 !important;
         visibility: visible !important;
     }
 
-    /* Preload helper for images */
     .img-preload {
         position: absolute;
         opacity: 0;
@@ -1400,7 +1391,6 @@
         height: 0;
     }
 
-    /* Rest of your existing styles remain the same */
     body {
         font-family: Arial, sans-serif;
         background-color: #f0f2f5;
@@ -1408,7 +1398,7 @@
         height: 100vh;
         display: flex;
         flex-direction: column;
-        overflow-x: hidden; /* Prevent horizontal scroll */
+        overflow-x: hidden;
     }
 
     .loader {
@@ -1598,7 +1588,7 @@
     html, body {
         overflow: auto;
         height: 100%;
-        overflow-x: hidden; /* Prevent horizontal scroll */
+        overflow-x: hidden;
     }
 
     /* Improved message styling with better avatar alignment */
@@ -1657,22 +1647,22 @@
 
     /* Improved avatar styling */
     .message .avatar {
-        width: 26px; /* Changed from 28px */
-        height: 26px; /* Changed from 28px */
+        width: 26px;
+        height: 26px;
         border-radius: 50%;
         flex-shrink: 0;
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
         align-self: flex-start;
-        margin-top: 6px; /* Changed from 10px */
-        cursor: pointer; /* ADDED: Make avatar clickable */
+        margin-top: 6px;
+        cursor: pointer;
     }
 
     .message.sent .avatar {
         display: block;
         order: 2;
-        margin-top: 6px; /* Changed from 10px */
+        margin-top: 6px;
     }
 
     .message .avatar img {
@@ -1692,11 +1682,10 @@
         display: flex;
         align-items: center;
         gap: 5px;
-        cursor: pointer; /* ADDED: Make username clickable */
+        cursor: pointer;
     }
 
     /* MODIFIED: Status indicator in messages - shows online dot or time ago when offline */
-    /* Updated status indicator styles */
     .user-status-indicator.online {
         background-color: #4CAF50;
         box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
@@ -1752,20 +1741,20 @@
         display: flex;
         flex-direction: column;
         flex-grow: 1;
-        min-width: 0; /* Prevent flex overflow */
+        min-width: 0;
     }
 
     /* Received messages (left aligned) */
     .message.received {
         align-self: flex-start;
-        margin-left: -10px; /* Changed from -15px */
+        margin-left: -10px;
         flex-direction: row;
     }
 
     /* Sent messages (right aligned) - HIDE AVATAR FOR SENT MESSAGES */
     .message.sent {
         align-self: flex-end;
-        margin-right: -10px; /* Changed from -15px */
+        margin-right: -10px;
         flex-direction: row;
         justify-content: flex-end;
     }
@@ -1905,7 +1894,7 @@
     }
     /* Also update the username input to match */
     .auth-box input {
-        width: 100%; /* Changed from 90% to 100% */
+        width: 100%;
         height: 57px;
         padding: 0 20px;
         margin-bottom: 20px;
@@ -1915,7 +1904,7 @@
         outline: none;
         font-size: 16px;
         transition: 0.2s ease;
-        box-sizing: border-box; /* Added for consistency */
+        box-sizing: border-box;
     }
 
     .auth-box input:focus {
@@ -2042,7 +2031,7 @@
         border-radius: 0;
         box-shadow: none;
         overflow-y: auto;
-        overflow-x: hidden; /* Prevent horizontal scroll */
+        overflow-x: hidden;
         display: none;
         z-index: 1002;
         box-sizing: border-box;
@@ -2325,7 +2314,7 @@
         gap: 4px;
         padding: 5px 0;
         overflow-x: auto;
-        overflow-y: hidden; /* Prevent vertical scroll */
+        overflow-y: hidden;
         max-width: 100%;
         flex-wrap: nowrap;
         align-items: center;
@@ -2344,7 +2333,7 @@
         border: 1px solid transparent;
         position: relative;
         flex-shrink: 0;
-        cursor: pointer; /* ADDED: Make online user clickable */
+        cursor: pointer;
     }
 
     .online-user:hover {
@@ -2526,7 +2515,7 @@
         border-radius: 0;
         box-shadow: none;
         overflow-y: auto;
-        overflow-x: hidden; /* Prevent horizontal scroll */
+        overflow-x: hidden;
         display: none;
         z-index: 1002;
         box-sizing: border-box;
@@ -2765,7 +2754,6 @@
             gap: 15px;
         }
         
-        /* FIXED: Help container mobile responsiveness */
         .help-container {
             padding: 15px;
             width: 100vw;
@@ -3001,13 +2989,13 @@
         border-right: none;
         background: white;
         overflow-y: auto;
-        display: block; /* Show by default */
-        overflow-x: hidden; /* Prevent horizontal scroll */
+        display: block;
+        overflow-x: hidden;
     }
 
     /* Private Chat Container - Hide initially */
     .private-chat-container {
-        display: none; /* Hide by default */
+        display: none;
         flex: 1;
         flex-direction: column;
         background: white;
@@ -3241,7 +3229,7 @@
         background: #f5f5f5;
         display: flex;
         flex-direction: column;
-        overflow-x: hidden; /* Prevent horizontal scroll */
+        overflow-x: hidden;
     }
 
     .no-chat-selected {
@@ -3369,7 +3357,6 @@
             height: 45px;
         }
         
-        /* FIXED: Hide private messages header when chat container is active */
         #private-messages.private-chat-active .private-messages-header {
             display: none !important;
         }
@@ -3405,7 +3392,6 @@
             font-size: 12px;
         }
         
-        /* FIXED: Hide private messages header when chat container is active */
         #private-messages.private-chat-active .private-messages-header {
             display: none !important;
         }
@@ -3544,9 +3530,9 @@
     .posts-main-container {
         display: flex;
         flex-direction: column;
-        height: calc(100vh - 60px); /* Header height */
-        overflow-y: auto; /* Changed to auto for scrolling */
-        overflow-x: hidden; /* Prevent horizontal scroll */
+        height: calc(100vh - 60px);
+        overflow-y: auto;
+        overflow-x: hidden;
         width: 100%;
         max-width: 100%;
         box-sizing: border-box;
@@ -3558,7 +3544,7 @@
         padding: 15px;
         border-bottom: 1px solid #e4e6eb;
         flex-shrink: 0;
-        z-index: 1; /* Lower z-index to scroll */
+        z-index: 1;
         width: 100%;
         box-sizing: border-box;
     }
@@ -3618,7 +3604,7 @@
         padding-top: 10px;
         border-top: 1px solid #e4e6eb;
         margin-top: 10px;
-        flex-wrap: wrap; /* Allow buttons to wrap on small screens */
+        flex-wrap: wrap;
     }
 
     .create-post-action {
@@ -3647,8 +3633,6 @@
         font-size: 16px;
     }
 
-    /* REMOVED: .posts-container-wrapper and .posts-container absolute positioning */
-    /* Now everything scrolls together */
     .posts-container {
         padding: 0;
         width: 100%;
@@ -3669,10 +3653,10 @@
         margin: 15px;
         box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         border: 1px solid #e4e6eb;
-        width: calc(100% - 30px); /* Account for margins */
+        width: calc(100% - 30px);
         max-width: 100%;
         box-sizing: border-box;
-        overflow: hidden; /* Prevent content overflow */
+        overflow: hidden;
         word-wrap: break-word;
         word-break: break-word;
     }
@@ -3695,7 +3679,7 @@
 
     .post-author-info {
         flex: 1;
-        min-width: 0; /* Allow text truncation */
+        min-width: 0;
     }
 
     .post-author-name {
@@ -3714,7 +3698,7 @@
         display: flex;
         align-items: center;
         gap: 5px;
-        flex-wrap: wrap; /* Allow meta info to wrap */
+        flex-wrap: wrap;
     }
 
     .post-content {
@@ -3739,7 +3723,7 @@
     .post-media img {
         width: 100%;
         max-height: 400px;
-        object-fit: contain; /* Changed from cover to contain to prevent overflow */
+        object-fit: contain;
         border-radius: 8px;
         cursor: pointer;
         display: block;
@@ -3759,7 +3743,7 @@
         border-bottom: 1px solid #e4e6eb;
         color: #65676b;
         font-size: 14px;
-        flex-wrap: wrap; /* Allow stats to wrap */
+        flex-wrap: wrap;
     }
 
     .post-likes, .post-comments-count {
@@ -3777,7 +3761,7 @@
         display: flex;
         gap: 5px;
         padding: 5px 0;
-        flex-wrap: wrap; /* Allow actions to wrap on small screens */
+        flex-wrap: wrap;
     }
 
     .post-action {
@@ -3813,9 +3797,9 @@
         margin: 15px -15px -15px -15px;
         padding: 15px;
         display: none;
-        width: calc(100% + 30px); /* Account for negative margins */
+        width: calc(100% + 30px);
         box-sizing: border-box;
-        overflow: hidden; /* Prevent overflow */
+        overflow: hidden;
     }
 
     .post-comments.show-comments {
@@ -3861,7 +3845,7 @@
         max-height: 300px;
         overflow-y: auto;
         margin-bottom: 12px;
-        overflow-x: hidden; /* Prevent horizontal scroll */
+        overflow-x: hidden;
     }
 
     .comment {
@@ -3892,7 +3876,7 @@
         padding: 10px;
         border-radius: 15px;
         box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-        min-width: 0; /* Allow text truncation */
+        min-width: 0;
         word-break: break-word;
     }
 
@@ -4078,7 +4062,7 @@
         padding: 10px;
         border: 1px solid #e4e6eb;
         border-radius: 8px;
-        flex-wrap: wrap; /* Allow buttons to wrap */
+        flex-wrap: wrap;
     }
 
     .post-action-btn {
@@ -4122,7 +4106,7 @@
     .media-preview-item video {
         width: 100%;
         max-height: 200px;
-        object-fit: contain; /* Changed from cover to contain */
+        object-fit: contain;
         display: block;
     }
 
@@ -4209,7 +4193,7 @@
         .post-card {
             padding: 12px;
             margin: 12px;
-            width: calc(100% - 24px); /* Adjust for smaller margins */
+            width: calc(100% - 24px);
         }
         
         .post-modal-content {
@@ -4220,7 +4204,7 @@
         .post-comments {
             margin: 12px -12px -12px -12px;
             padding: 12px;
-            width: calc(100% + 24px); /* Adjust for smaller margins */
+            width: calc(100% + 24px);
         }
         
         .comments-list {
@@ -4290,13 +4274,13 @@
         .post-card {
             padding: 10px;
             margin: 10px;
-            width: calc(100% - 20px); /* Adjust for smaller margins */
+            width: calc(100% - 20px);
         }
         
         .post-comments {
             margin: 10px -10px -10px -10px;
             padding: 10px;
-            width: calc(100% + 20px); /* Adjust for smaller margins */
+            width: calc(100% + 20px);
         }
         
         .comments-header {
@@ -4357,7 +4341,6 @@
             transform: translateZ(0);
         }
 
-        /* Reduce repaints for scrollable containers */
         #chat-container, #private-ai-container, #private-chat-messages {
             transform: translateZ(0);
         }
@@ -4374,7 +4357,7 @@
         }
         
         .post-media img {
-            max-height: 300px; /* Reduce max height on mobile */
+            max-height: 300px;
         }
     }
 
@@ -4939,6 +4922,12 @@
         <div class="chat-input" style="display: none;">
             <!-- PRIVATE REPLY PREVIEW CONTAINER INSIDE CHAT-INPUT -->
             <div id="private-reply-preview-container"></div>
+            <!-- NEW: Attachment preview area for private AI (only shown when image is attached) -->
+            <div id="private-ai-attachment-preview" style="display: none; margin-top: 8px; background: #e9ecef; border-radius: 8px; padding: 6px 10px; font-size: 13px; align-items: center; gap: 10px;">
+                <img id="private-ai-attach-img" style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px;">
+                <span id="private-ai-attach-text" style="flex:1; overflow: hidden; text-overflow: ellipsis;">Image attached (will be edited)</span>
+                <button onclick="clearPrivateAIAttachment()" style="background: none; border: none; cursor: pointer; color: #666;"><i class="fas fa-times"></i></button>
+            </div>
             <div class="chat-input-row">
                 <button class="attach-btn" id="attach-btn-private" onclick="attachFilePrivate()" type="button">
                     <i class="fas fa-paperclip"></i>
@@ -4947,12 +4936,6 @@
                 <button id="private-send-button" onclick="sendPrivateMessage()" disabled>
                     <i class="fas fa-paper-plane"></i>
                 </button>
-            </div>
-            <!-- NEW: Attachment preview area for private AI -->
-            <div id="private-ai-attachment-preview" style="display: none; margin-top: 8px; background: #e9ecef; border-radius: 8px; padding: 6px 10px; font-size: 13px; display: flex; align-items: center; gap: 10px;">
-                <img id="private-ai-attach-img" style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px;">
-                <span id="private-ai-attach-text" style="flex:1; overflow: hidden; text-overflow: ellipsis;">Image attached</span>
-                <button onclick="clearPrivateAIAttachment()" style="background: none; border: none; cursor: pointer; color: #666;"><i class="fas fa-times"></i></button>
             </div>
         </div>
         
@@ -10996,6 +10979,10 @@ function batchMessageRender(messages, renderFunction) {
 
             console.log('🤫 Private AI processing:', { original: userInput, processed: processedInput });
 
+            // Use AbortController with 60 second timeout to avoid 15s timeout error
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 60000);
+            
             const response = await fetch('/api/command', {
                 method: 'POST',
                 headers: {
@@ -11005,7 +10992,10 @@ function batchMessageRender(messages, renderFunction) {
                     message: processedInput,
                     source: 'private-ai'
                 }),
+                signal: controller.signal
             });
+            
+            clearTimeout(timeoutId);
             
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -11023,7 +11013,11 @@ function batchMessageRender(messages, renderFunction) {
             }
         } catch (error) {
             console.error("Error fetching Private AI response:", error);
-            displayPrivateMessage("Sorry, I encountered an error processing your message. Please try again.", 'received');
+            if (error.name === 'AbortError') {
+                displayPrivateMessage("The AI took too long to respond. Please try again later.", 'received');
+            } else {
+                displayPrivateMessage("Sorry, I encountered an error processing your message. Please try again.", 'received');
+            }
         }
     }
 
