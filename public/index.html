@@ -9862,7 +9862,6 @@ function batchMessageRender(messages, renderFunction) {
         if (!input) return;
         
         let content = input.value.trim();
-        const username = currentUserSession?.username;
         
         // If no content and no attached image, ignore
         if (!content && !privateAIAttachedImageUrl) return;
@@ -9919,7 +9918,6 @@ function batchMessageRender(messages, renderFunction) {
         } finally {
             // Re-enable send button after a short delay
             setTimeout(() => {
-                // Check if there's new text after send (e.g., user typed while processing)
                 const currentText = input.value.trim();
                 const hasText = currentText.length > 0;
                 if (sendBtn) {
@@ -9950,15 +9948,28 @@ function batchMessageRender(messages, renderFunction) {
             const file = fileInput.files[0];
             if (!file) return;
             
+            // Show loading indicator in attachment area
+            const previewDiv = document.getElementById('private-ai-attachment-preview');
+            if (previewDiv) {
+                previewDiv.style.display = 'flex';
+                const textSpan = document.getElementById('private-ai-attach-text');
+                if (textSpan) textSpan.textContent = 'Uploading image...';
+            }
+            
             const formData = new FormData();
             formData.append('image', file);
             
             try {
-                showInfo('Uploading image...');
+                // Increased timeout for upload
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 30000);
+                
                 const response = await fetch('/upload', {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    signal: controller.signal
                 });
+                clearTimeout(timeoutId);
                 
                 if (!response.ok) throw new Error('Upload failed');
                 const data = await response.json();
@@ -9980,7 +9991,10 @@ function batchMessageRender(messages, renderFunction) {
                 fileInput.value = ''; // reset
             } catch (err) {
                 console.error('Private AI upload error:', err);
-                showError('Image upload failed: ' + err.message);
+                showError('Image upload failed: ' + (err.name === 'AbortError' ? 'Timeout (30s)' : err.message));
+                // Hide preview on error
+                if (previewDiv) previewDiv.style.display = 'none';
+                privateAIAttachedImageUrl = null;
             }
         };
     }
@@ -10007,6 +10021,99 @@ function batchMessageRender(messages, renderFunction) {
             const hasText = input.value.trim().length > 0;
             sendBtn.disabled = !hasText;
             sendBtn.classList.toggle('enabled', hasText);
+        }
+    }
+
+    // ===== ADD TYPING INDICATOR FOR AI RESPONSES =====
+    function showTypingIndicator(who) {
+        const container = document.getElementById('private-ai-container');
+        if (!container) return;
+        let indicator = document.getElementById('ai-typing-indicator');
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.id = 'ai-typing-indicator';
+            indicator.className = 'typing-indicator';
+            indicator.style.padding = '8px 15px';
+            indicator.style.color = '#666';
+            indicator.style.fontStyle = 'italic';
+            indicator.innerHTML = `${who} is thinking <span class="typing-dots"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></span>`;
+            container.appendChild(indicator);
+        }
+        indicator.style.display = 'block';
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function hideTypingIndicator(who) {
+        const indicator = document.getElementById('ai-typing-indicator');
+        if (indicator) indicator.style.display = 'none';
+    }
+
+    // ===== MODIFIED: fetchPrivateAIResponse with longer timeout, retry, and progress =====
+    async function fetchPrivateAIResponse(userInput, retryCount = 0) {
+        try {
+            let processedInput = userInput;
+            
+            if (!userInput.startsWith('-') && userInput.trim() !== '') {
+                processedInput = `-ai ${userInput}`;
+            }
+            
+            if (userInput.trim().toLowerCase() === 'ai') {
+                processedInput = '-ai';
+            }
+
+            console.log('🤫 Private AI processing:', { original: userInput, processed: processedInput });
+
+            // Show a "processing" indicator in the chat
+            showTypingIndicator('AI');
+
+            // Use AbortController with 120 second timeout (increased for Opera/slow connections)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes
+            
+            const response = await fetch('/api/command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: processedInput,
+                    source: 'private-ai'
+                }),
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            hideTypingIndicator('AI');
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            if (data.reply) {
+                if (Array.isArray(data.reply)) {
+                    data.reply.forEach(reply => displayPrivateMessage(reply, 'received'));
+                } else {
+                    displayPrivateMessage(data.reply, 'received');
+                }
+            } else {
+                throw new Error('No reply from AI');
+            }
+        } catch (error) {
+            console.error("Error fetching Private AI response:", error);
+            hideTypingIndicator('AI');
+            
+            // Retry once if timeout (AbortError) and not already retried
+            if (error.name === 'AbortError' && retryCount === 0) {
+                displayPrivateMessage("⏳ The AI is taking longer than expected. Retrying once more...", 'received');
+                // Wait 2 seconds before retry
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                return fetchPrivateAIResponse(userInput, 1);
+            } else if (error.name === 'AbortError') {
+                displayPrivateMessage("The AI took too long to respond after multiple attempts. Please try again later or use a simpler prompt.", 'received');
+            } else {
+                displayPrivateMessage("Sorry, I encountered an error processing your message. Please try again.", 'received');
+            }
         }
     }
     
@@ -10941,62 +11048,9 @@ function batchMessageRender(messages, renderFunction) {
         }
     }
 
-    async function fetchPrivateAIResponse(userInput) {
-        try {
-            let processedInput = userInput;
-            
-            if (!userInput.startsWith('-') && userInput.trim() !== '') {
-                processedInput = `-ai ${userInput}`;
-            }
-            
-            if (userInput.trim().toLowerCase() === 'ai') {
-                processedInput = '-ai';
-            }
-
-            console.log('🤫 Private AI processing:', { original: userInput, processed: processedInput });
-
-            // Use AbortController with 60 second timeout to avoid 15s timeout error
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 60000);
-            
-            const response = await fetch('/api/command', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    message: processedInput,
-                    source: 'private-ai'
-                }),
-                signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            if (data.reply) {
-                if (Array.isArray(data.reply)) {
-                    data.reply.forEach(reply => displayPrivateMessage(reply, 'received'));
-                } else {
-                    displayPrivateMessage(data.reply, 'received');
-                }
-            } else {
-                throw new Error('No reply from AI');
-            }
-        } catch (error) {
-            console.error("Error fetching Private AI response:", error);
-            if (error.name === 'AbortError') {
-                displayPrivateMessage("The AI took too long to respond. Please try again later.", 'received');
-            } else {
-                displayPrivateMessage("Sorry, I encountered an error processing your message. Please try again.", 'received');
-            }
-        }
-    }
-
+    // ===== MODIFIED: fetchPrivateAIResponse with longer timeout, retry, and progress =====
+    // (Already defined above, keep as is)
+    
     // ===== OPTIMIZED IMAGE HANDLING FUNCTIONS =====
     function displayImageImmediately(imgUrl, container) {
         return new Promise((resolve) => {
