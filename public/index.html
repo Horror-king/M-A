@@ -8418,14 +8418,20 @@ async function sendMessage() {
                 },
                 body: JSON.stringify({ message: command, source: 'main-chat' })
             });
-            if (!response.ok) throw new Error('Command failed');
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || 'Command failed');
+            }
             const data = await response.json();
             if (data.reply) {
                 displayMessage(data.reply, 'received', null, 'AI', null, true);
+            } else {
+                throw new Error('No reply from server');
             }
         } catch (error) {
             console.error('Error sending -prompt:', error);
             showError('Failed to extract prompt. Please try again.');
+            displayMessage(`❌ ${error.message}`, 'received', null, 'AI', null, true);
         } finally {
             isSending = false;
             return;
@@ -8554,6 +8560,194 @@ async function sendMessage() {
     }
 }
 
+// ===== MODIFIED: Private AI sendPrivateMessage to handle -prompt =====
+// Private AI attachment variables
+let privateAIAttachedImageUrl = null;
+let isSendingPrivate = false;
+
+// Private AI attach function (no lock)
+async function attachFilePrivate() {
+    const fileInput = document.getElementById('image-upload-private');
+    fileInput.click();
+    fileInput.onchange = async function() {
+        const file = fileInput.files[0];
+        if (!file) return;
+        
+        const formData = new FormData();
+        formData.append('image', file);
+        
+        try {
+            showInfo('Uploading image...');
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) throw new Error('Upload failed');
+            const data = await response.json();
+            const imageUrl = data.imageUrl;
+            
+            privateAIAttachedImageUrl = imageUrl;
+            showPrivateAIAttachmentPreview(imageUrl);
+            showInfo('Image attached! Type -prompt to extract prompt, or send empty to edit.');
+            
+            const sendBtn = document.getElementById('private-send-button');
+            if (sendBtn) {
+                sendBtn.disabled = false;
+                sendBtn.classList.add('enabled');
+            }
+            
+            fileInput.value = ''; // reset
+        } catch (err) {
+            console.error('Private AI upload error:', err);
+            showError('Image upload failed: ' + err.message);
+        }
+    };
+}
+
+function showPrivateAIAttachmentPreview(imageUrl) {
+    const previewDiv = document.getElementById('private-ai-attachment-preview');
+    if (!previewDiv) return;
+    
+    const imgElem = document.getElementById('private-ai-attach-img');
+    const textSpan = document.getElementById('private-ai-attach-text');
+    if (imgElem) imgElem.src = imageUrl;
+    if (textSpan) textSpan.textContent = 'Image attached (will be used with -prompt or edited)';
+    previewDiv.style.display = 'flex';
+}
+
+function clearPrivateAIAttachment() {
+    privateAIAttachedImageUrl = null;
+    const previewDiv = document.getElementById('private-ai-attachment-preview');
+    if (previewDiv) previewDiv.style.display = 'none';
+    const input = document.getElementById('private-user-input');
+    const sendBtn = document.getElementById('private-send-button');
+    if (sendBtn && input) {
+        const hasText = input.value.trim().length > 0;
+        sendBtn.disabled = !hasText;
+        sendBtn.classList.toggle('enabled', hasText);
+    }
+}
+
+// Modified sendPrivateMessage to handle -prompt
+async function sendPrivateMessage() {
+    if (isSendingPrivate) return;
+    
+    const input = document.getElementById('private-user-input');
+    if (!input) return;
+    
+    let content = input.value.trim();
+    const username = currentUserSession?.username;
+    
+    if (!content && !privateAIAttachedImageUrl) return;
+    
+    isSendingPrivate = true;
+    
+    const sendBtn = document.getElementById('private-send-button');
+    if (sendBtn) {
+        sendBtn.disabled = true;
+        sendBtn.classList.remove('enabled');
+    }
+    
+    // Clear input and preview immediately
+    input.value = '';
+    autoResize(input);
+    
+    const attachedImageUrl = privateAIAttachedImageUrl;
+    privateAIAttachedImageUrl = null;
+    const previewDiv = document.getElementById('private-ai-attachment-preview');
+    if (previewDiv) previewDiv.style.display = 'none';
+    clearPrivateReply();
+    
+    // Check for -prompt command
+    const isPromptCommand = content.toLowerCase() === '-prompt' || content.toLowerCase().startsWith('-prompt ');
+    if (isPromptCommand && attachedImageUrl) {
+        const parts = content.split(/\s+/);
+        let extraText = '';
+        if (parts.length > 1) extraText = parts.slice(1).join(' ');
+        const command = `!prompt ${attachedImageUrl} ${extraText}`.trim();
+        console.log('🔍 Private AI: Sending -prompt command:', command);
+        
+        displayPrivateMessage(command, 'sent');
+        
+        try {
+            const token = localStorage.getItem('auth_token');
+            const response = await fetch('/api/command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': token ? `Bearer ${token}` : ''
+                },
+                body: JSON.stringify({ message: command, source: 'private-ai' })
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || 'Command failed');
+            }
+            const data = await response.json();
+            if (data.reply) {
+                displayPrivateMessage(data.reply, 'received');
+            } else {
+                throw new Error('No reply from server');
+            }
+        } catch (error) {
+            console.error('Error sending -prompt in private AI:', error);
+            displayPrivateMessage(`❌ Failed to extract prompt: ${error.message}`, 'received');
+        } finally {
+            setTimeout(() => {
+                const currentText = input.value.trim();
+                const hasText = currentText.length > 0;
+                if (sendBtn) {
+                    sendBtn.disabled = !hasText;
+                    sendBtn.classList.toggle('enabled', hasText);
+                }
+                isSendingPrivate = false;
+            }, 500);
+        }
+        return;
+    }
+    
+    if (isPromptCommand && !attachedImageUrl) {
+        displayPrivateMessage('Please attach an image first to use -prompt.', 'received');
+        setTimeout(() => {
+            if (sendBtn) {
+                sendBtn.disabled = false;
+                sendBtn.classList.remove('enabled');
+            }
+            isSendingPrivate = false;
+        }, 500);
+        return;
+    }
+    
+    // Normal -sd edit or text
+    try {
+        if (attachedImageUrl) {
+            const prompt = content || "edit this image creatively";
+            const command = `-sd ${attachedImageUrl} | ${prompt}`;
+            console.log('🎨 Sending -sd command:', command);
+            displayPrivateMessage(command, 'sent');
+            await fetchPrivateAIResponse(command);
+        } else if (content) {
+            displayPrivateMessage(content, 'sent');
+            await fetchPrivateAIResponse(content);
+        }
+    } catch (error) {
+        console.error('Error sending private message:', error);
+        showError('Could not process your private message. Please try again.');
+    } finally {
+        setTimeout(() => {
+            const currentText = input.value.trim();
+            const hasText = currentText.length > 0;
+            if (sendBtn) {
+                sendBtn.disabled = !hasText;
+                sendBtn.classList.toggle('enabled', hasText);
+            }
+            isSendingPrivate = false;
+        }, 500);
+    }
+}
+
+// ===== END OF MODIFICATIONS =====
 // ===== MODIFIED: deleteMessageContext function in context menu to use OperaMiniMessenger =====
 async function deleteMessageContext(messageId, username) {
     try {
