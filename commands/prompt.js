@@ -1,80 +1,52 @@
-const axios = require('axios');
+const axios = require("axios");
 
 module.exports = {
   config: {
-    name: 'prompt',
-    aliases: ['imgprompt', 'describe'],
-    version: '1.0.0',
-    author: 'Hassan',
+    name: "prompt",
+    version: "1.1",
+    author: "Hassan",
+    countDown: 3,
     role: 0,
-    category: 'ai',
-    shortDescription: {
-      en: 'Generate an AI image prompt from an image link or description.'
-    },
-    longDescription: {
-      en: 'Uses img2prompt API to generate a detailed AI prompt from an image URL or text description.'
-    },
-    guide: {
-      en:
-        '{pn} prompt <image link>\n' +
-        '{pn} prompt <image description>'
-    }
+    shortDescription: "Extract prompt from image",
+    longDescription: "Reply to an image to get a single clean prompt",
+    category: "image",
+    guide: `{pn} (reply to an image)`
   },
 
-  onStart: async function ({ message, args }) {
+  onStart: async function ({ event, message, api }) {
     try {
-      const input = args.join(' ').trim();
-
-      if (!input) {
-        return message.reply(
-          '❌ Usage:\n' +
-          'prompt <image link>\n' +
-          'prompt <image description>\n\n' +
-          'Example:\n' +
-          'prompt https://i.postimg.cc/pLr7qvQ8/image.png\n' +
-          'prompt a cat wearing sunglasses'
-        );
+      if (
+        !event.messageReply ||
+        !event.messageReply.attachments ||
+        event.messageReply.attachments[0]?.type !== "photo"
+      ) {
+        return message.reply("Reply to an image.");
       }
 
-      let apiUrl = '';
+      api.setMessageReaction("⏳", event.messageID, () => {}, true);
 
-      // If input looks like an image URL
-      if (input.startsWith('http://') || input.startsWith('https://')) {
-        apiUrl =
-          `https://fahim-api-demo.onrender.com/img2prompt/v2` +
-          `?imageUrl=${encodeURIComponent(input)}` +
-          `&language=en&imageModelId=0`;
-      } else {
-        // Treat input as description
-        apiUrl =
-          `https://fahim-api-demo.onrender.com/img2prompt/v2` +
-          `?description=${encodeURIComponent(input)}` +
-          `&language=en&imageModelId=0`;
-      }
+      const imageUrl = event.messageReply.attachments[0].url;
 
-      const response = await axios.get(apiUrl, {
-        timeout: 20000
-      });
-
-      if (!response.data || !response.data.prompt) {
-        return message.reply('❌ Failed to generate prompt.');
-      }
-
-      let promptText = response.data.prompt.trim();
-
-      // Prevent very long messages
-      if (promptText.length > 3500) {
-        promptText = promptText.slice(0, 3500) + '\n\n...prompt truncated';
-      }
-
-      return message.reply(
-        `🖼️ **Generated Image Prompt:**\n\n${promptText}`
+      const res = await axios.get(
+        "https://theone-fast-image-gen.vercel.app/prompt",
+        {
+          params: { imageUrl }
+        }
       );
 
-    } catch (error) {
-      return message.reply(
-        `⚠️ Prompt Error: ${error.response?.status || ''} ${error.message}`
-      );
+      const prompt = res.data?.prompt;
+
+      if (!prompt) {
+        return message.reply("Failed to extract prompt.");
+      }
+
+      // SEND RAW PROMPT ONLY
+      await message.reply(prompt);
+
+      api.setMessageReaction("✅", event.messageID, () => {}, true);
+    } catch (err) {
+      console.error("PROMPT ERROR:", err);
+      return message.reply("Error.");
     }
   }
 };
