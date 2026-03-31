@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8292,14 +8291,12 @@ function getUserProfile(username) {
 
 // ===== MODIFIED: sendMessage function to use OperaMiniMessenger when on Opera Mini and handle reply image =====
 async function sendMessage() {
-    if (isSending || isProcessingCommand) return;
-    isSending = true;
+    // Removed global isSending and isProcessingCommand flags to allow concurrent sends.
     
     const content = elements.messageInput.value.trim();
     const username = currentUserSession?.username;
     
     if (!content || !username) {
-        isSending = false;
         return showError('Please enter both username and message');
     }
 
@@ -8308,7 +8305,6 @@ async function sendMessage() {
     if (lastSentMessages.main[messageKey] && 
         Date.now() - lastSentMessages.main[messageKey] < 3000) {
         console.log('Duplicate message prevented in main chat');
-        isSending = false;
         return;
     }
     
@@ -8320,12 +8316,10 @@ async function sendMessage() {
     if (badWords.some(word => lowerContent.includes(word))) {
         if (!warnedUsers[username]) {
             warnedUsers[username] = true;
-            isSending = false;
             return showError('Warning: bad word detected! If you repeat, you will be banned.');
         } else {
             bannedUsers[username] = Date.now() + BAN_DURATION;
             showError('You used bad words again. Account deleted and banned.');
-            isSending = false;
             setTimeout(() => {
                 logout();
             }, 2000);
@@ -8336,7 +8330,6 @@ async function sendMessage() {
     // Spam protection
     const now = Date.now();
     if (bannedUsers[username] && bannedUsers[username] > now) {
-        isSending = false;
         return showError(`You're banned. Wait ${Math.ceil((bannedUsers[username] - now) / 1000)}s.`);
     }
     
@@ -8348,7 +8341,6 @@ async function sendMessage() {
     
     if (spamTracker[username].length > SPAM_LIMIT) {
         bannedUsers[username] = now + BAN_DURATION;
-        isSending = false;
         return showError("You're banned for spamming.");
     }
 
@@ -8431,8 +8423,8 @@ async function sendMessage() {
         // Remove from tracking on error
         delete lastSentMessages.main[messageKey];
     } finally {
+        // Re‑enable send button after a short delay (just to prevent rapid double‑clicks, but not block further sends)
         setTimeout(() => {
-            isSending = false;
             const hasText = elements.messageInput.value.trim().length > 0;
             elements.sendButton.disabled = !hasText;
             elements.sendButton.classList.toggle('enabled', hasText);
@@ -9850,7 +9842,7 @@ function batchMessageRender(messages, renderFunction) {
 
     // ===== PRIVATE AI IMAGE ATTACHMENT VARIABLES =====
     let privateAIAttachedImageUrl = null;
-    let isSendingPrivate = false; // Flag to prevent duplicate sends
+    // ===== REMOVED isSendingPrivate flag =====
 
     // ===== MODIFIED: Helper to update Private AI send button state =====
     function updatePrivateSendButtonState() {
@@ -9867,8 +9859,7 @@ function batchMessageRender(messages, renderFunction) {
 
     // ===== MODIFIED: sendPrivateMessage to support image attachment and seedream command using -sd =====
     async function sendPrivateMessage() {
-        // Prevent concurrent sends
-        if (isSendingPrivate) return;
+        // Removed isSendingPrivate flag to allow concurrent sends.
         
         const input = document.getElementById('private-user-input');
         if (!input) return;
@@ -9879,9 +9870,7 @@ function batchMessageRender(messages, renderFunction) {
         // If no content and no attached image, ignore
         if (!content && !privateAIAttachedImageUrl) return;
         
-        isSendingPrivate = true;
-        
-        // Disable send button while processing
+        // Disable send button while processing (short cooldown)
         const sendBtn = document.getElementById('private-send-button');
         if (sendBtn) {
             sendBtn.disabled = true;
@@ -9929,17 +9918,16 @@ function batchMessageRender(messages, renderFunction) {
             console.error('Error sending private message:', error);
             showError('Could not process your private message. Please try again.');
         } finally {
-            // Re-enable send button after a short delay, but only if no attachment remains
+            // Re-enable send button after a short delay (just to prevent rapid double‑clicks)
             setTimeout(() => {
                 // Check if there's new text after send (e.g., user typed while processing)
                 const currentText = input.value.trim();
                 const hasText = currentText.length > 0;
-                // Also consider if an attachment was added again (should be cleared)
+                const hasImage = privateAIAttachedImageUrl !== null;
                 if (sendBtn) {
-                    sendBtn.disabled = !(hasText || privateAIAttachedImageUrl);
-                    sendBtn.classList.toggle('enabled', hasText || privateAIAttachedImageUrl);
+                    sendBtn.disabled = !(hasText || hasImage);
+                    sendBtn.classList.toggle('enabled', hasText || hasImage);
                 }
-                isSendingPrivate = false;
             }, 500);
         }
     }
@@ -10904,15 +10892,9 @@ function batchMessageRender(messages, renderFunction) {
         };
     }
 
-    // ✅ OPTIMIZED: AI Response function
+    // ✅ OPTIMIZED: AI Response function (removed isProcessingCommand)
     async function fetchChatResponse(userInput) {
-        if (isProcessingCommand) {
-            console.log('🛑 Command already being processed, skipping...');
-            return;
-        }
-
-        isProcessingCommand = true;
-        
+        // Removed isProcessingCommand flag.
         try {
             const PREFIX = '!';
             
@@ -10937,10 +10919,6 @@ function batchMessageRender(messages, renderFunction) {
             
         } catch (error) {
             console.error("Error fetching AI response:", error);
-        } finally {
-            setTimeout(() => {
-                isProcessingCommand = false;
-            }, 1000);
         }
     }
 
