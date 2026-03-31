@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9109,9 +9110,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (elements.privateInput) {
         elements.privateInput.addEventListener('input', () => {
             autoResize(elements.privateInput);
-            const hasText = elements.privateInput.value.trim().length > 0;
-            elements.privateSendButton.disabled = !hasText;
-            elements.privateSendButton.classList.toggle('enabled', hasText);
+            updatePrivateSendButtonState(); // Enable/disable send button based on text/attachment
         });
         elements.privateInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -9853,6 +9852,19 @@ function batchMessageRender(messages, renderFunction) {
     let privateAIAttachedImageUrl = null;
     let isSendingPrivate = false; // Flag to prevent duplicate sends
 
+    // ===== MODIFIED: Helper to update Private AI send button state =====
+    function updatePrivateSendButtonState() {
+        const input = document.getElementById('private-user-input');
+        const sendBtn = document.getElementById('private-send-button');
+        if (sendBtn && input) {
+            const hasText = input.value.trim().length > 0;
+            const hasImage = privateAIAttachedImageUrl !== null;
+            const enabled = hasText || hasImage;
+            sendBtn.disabled = !enabled;
+            sendBtn.classList.toggle('enabled', enabled);
+        }
+    }
+
     // ===== MODIFIED: sendPrivateMessage to support image attachment and seedream command using -sd =====
     async function sendPrivateMessage() {
         // Prevent concurrent sends
@@ -9917,14 +9929,15 @@ function batchMessageRender(messages, renderFunction) {
             console.error('Error sending private message:', error);
             showError('Could not process your private message. Please try again.');
         } finally {
-            // Re-enable send button after a short delay
+            // Re-enable send button after a short delay, but only if no attachment remains
             setTimeout(() => {
                 // Check if there's new text after send (e.g., user typed while processing)
                 const currentText = input.value.trim();
                 const hasText = currentText.length > 0;
+                // Also consider if an attachment was added again (should be cleared)
                 if (sendBtn) {
-                    sendBtn.disabled = !hasText;
-                    sendBtn.classList.toggle('enabled', hasText);
+                    sendBtn.disabled = !(hasText || privateAIAttachedImageUrl);
+                    sendBtn.classList.toggle('enabled', hasText || privateAIAttachedImageUrl);
                 }
                 isSendingPrivate = false;
             }, 500);
@@ -9971,11 +9984,7 @@ function batchMessageRender(messages, renderFunction) {
                 showInfo('Image attached! Add a prompt or send with empty message to edit.');
                 
                 // Enable send button
-                const sendBtn = document.getElementById('private-send-button');
-                if (sendBtn) {
-                    sendBtn.disabled = false;
-                    sendBtn.classList.add('enabled');
-                }
+                updatePrivateSendButtonState();
                 
                 fileInput.value = ''; // reset
             } catch (err) {
@@ -10001,13 +10010,7 @@ function batchMessageRender(messages, renderFunction) {
         const previewDiv = document.getElementById('private-ai-attachment-preview');
         if (previewDiv) previewDiv.style.display = 'none';
         // Update send button state
-        const input = document.getElementById('private-user-input');
-        const sendBtn = document.getElementById('private-send-button');
-        if (sendBtn && input) {
-            const hasText = input.value.trim().length > 0;
-            sendBtn.disabled = !hasText;
-            sendBtn.classList.toggle('enabled', hasText);
-        }
+        updatePrivateSendButtonState();
     }
     
     // ===== NEW FUNCTION: Add touch event listeners to message element =====
