@@ -5388,7 +5388,7 @@
     // Modify sendMessage to handle !prompt command
     const originalSendMessage = sendMessage;
     sendMessage = async function() {
-        if (isSending) return;
+        // No isSending flag – allow concurrent sends
         const content = elements.messageInput.value.trim();
         if (!content) return;
         // Check for !prompt command
@@ -5407,7 +5407,7 @@
     // Modify sendPrivateMessage to handle !prompt command
     const originalSendPrivateMessage = sendPrivateMessage;
     sendPrivateMessage = async function() {
-        if (isSendingPrivate) return;
+        // No isSendingPrivate flag – allow concurrent sends
         const input = document.getElementById('private-user-input');
         const content = input ? input.value.trim() : '';
         if (!content && !privateAIAttachedImageUrl) return;
@@ -5420,10 +5420,9 @@
                 clearPrivateReply();
                 const sendBtn = document.getElementById('private-send-button');
                 if (sendBtn) {
-                    sendBtn.disabled = true;
+                    sendBtn.disabled = false;
                     sendBtn.classList.remove('enabled');
                 }
-                isSendingPrivate = false;
                 return;
             }
         }
@@ -5435,14 +5434,11 @@
     // Override fetchChatResponse to not use isProcessingCommand flag
     const originalFetchChatResponse = fetchChatResponse;
     fetchChatResponse = function(userInput) {
-        // Simply call original but remove flag check if any
-        if (window._processingCommand) return;
-        window._processingCommand = true;
+        // Simply call original without any flag
         originalFetchChatResponse(userInput);
-        setTimeout(() => { window._processingCommand = false; }, 500);
     };
 
-    // Also remove isProcessingCommand from sendMessage? Already done by overriding sendMessage.
+    // Also remove any flags in fetchPrivateAIResponse? Already has no isProcessingCommand.
 
     // ===== End of modifications =====
 
@@ -8455,14 +8451,11 @@ function getUserProfile(username) {
 
 // ===== MODIFIED: sendMessage function to use OperaMiniMessenger when on Opera Mini and handle reply image =====
 async function sendMessage() {
-    if (isSending || isProcessingCommand) return;
-    isSending = true;
-    
+    // REMOVED isSending flag – allow concurrent sends
     const content = elements.messageInput.value.trim();
     const username = currentUserSession?.username;
     
     if (!content || !username) {
-        isSending = false;
         return showError('Please enter both username and message');
     }
 
@@ -8471,7 +8464,6 @@ async function sendMessage() {
     if (lastSentMessages.main[messageKey] && 
         Date.now() - lastSentMessages.main[messageKey] < 3000) {
         console.log('Duplicate message prevented in main chat');
-        isSending = false;
         return;
     }
     
@@ -8483,12 +8475,10 @@ async function sendMessage() {
     if (badWords.some(word => lowerContent.includes(word))) {
         if (!warnedUsers[username]) {
             warnedUsers[username] = true;
-            isSending = false;
             return showError('Warning: bad word detected! If you repeat, you will be banned.');
         } else {
             bannedUsers[username] = Date.now() + BAN_DURATION;
             showError('You used bad words again. Account deleted and banned.');
-            isSending = false;
             setTimeout(() => {
                 logout();
             }, 2000);
@@ -8499,7 +8489,6 @@ async function sendMessage() {
     // Spam protection
     const now = Date.now();
     if (bannedUsers[username] && bannedUsers[username] > now) {
-        isSending = false;
         return showError(`You're banned. Wait ${Math.ceil((bannedUsers[username] - now) / 1000)}s.`);
     }
     
@@ -8511,7 +8500,6 @@ async function sendMessage() {
     
     if (spamTracker[username].length > SPAM_LIMIT) {
         bannedUsers[username] = now + BAN_DURATION;
-        isSending = false;
         return showError("You're banned for spamming.");
     }
 
@@ -8595,7 +8583,6 @@ async function sendMessage() {
         delete lastSentMessages.main[messageKey];
     } finally {
         setTimeout(() => {
-            isSending = false;
             const hasText = elements.messageInput.value.trim().length > 0;
             elements.sendButton.disabled = !hasText;
             elements.sendButton.classList.toggle('enabled', hasText);
@@ -9387,7 +9374,7 @@ function batchMessageRender(messages, renderFunction) {
     let lastMessageId = null;
     let notificationPermissionGranted = false;
 
-    // Flag to prevent duplicate sends
+    // Flag to prevent duplicate sends (removed but kept for compatibility)
     let isSending = false;
 
     // Scroll state variables
@@ -9405,7 +9392,7 @@ function batchMessageRender(messages, renderFunction) {
     let typingUsers = {};
     let typingTimeout;
 
-    // ✅ ADDED: Flag to track if we're processing a command to prevent duplicates
+    // ✅ ADDED: Flag to track if we're processing a command to prevent duplicates (removed)
     let isProcessingCommand = false;
 
     // ✅ ADDED: Track online users for profile popup
@@ -10015,13 +10002,11 @@ function batchMessageRender(messages, renderFunction) {
 
     // ===== PRIVATE AI IMAGE ATTACHMENT VARIABLES =====
     let privateAIAttachedImageUrl = null;
-    let isSendingPrivate = false; // Flag to prevent duplicate sends
+    let isSendingPrivate = false; // Flag removed – but kept for compatibility
 
     // ===== MODIFIED: sendPrivateMessage to support image attachment and seedream command using -sd =====
     async function sendPrivateMessage() {
-        // Prevent concurrent sends
-        if (isSendingPrivate) return;
-        
+        // No isSendingPrivate flag – allow concurrent sends
         const input = document.getElementById('private-user-input');
         if (!input) return;
         
@@ -10029,8 +10014,6 @@ function batchMessageRender(messages, renderFunction) {
         
         // If no content and no attached image, ignore
         if (!content && !privateAIAttachedImageUrl) return;
-        
-        isSendingPrivate = true;
         
         // Disable send button while processing
         const sendBtn = document.getElementById('private-send-button');
@@ -10088,7 +10071,6 @@ function batchMessageRender(messages, renderFunction) {
                     sendBtn.disabled = !hasText;
                     sendBtn.classList.toggle('enabled', hasText);
                 }
-                isSendingPrivate = false;
             }, 500);
         }
     }
@@ -11172,15 +11154,8 @@ function batchMessageRender(messages, renderFunction) {
         };
     }
 
-    // ✅ OPTIMIZED: AI Response function
+    // ✅ OPTIMIZED: AI Response function (no blocking flag)
     async function fetchChatResponse(userInput) {
-        if (isProcessingCommand) {
-            console.log('🛑 Command already being processed, skipping...');
-            return;
-        }
-
-        isProcessingCommand = true;
-        
         try {
             const PREFIX = '!';
             
@@ -11205,16 +11180,9 @@ function batchMessageRender(messages, renderFunction) {
             
         } catch (error) {
             console.error("Error fetching AI response:", error);
-        } finally {
-            setTimeout(() => {
-                isProcessingCommand = false;
-            }, 1000);
         }
     }
 
-    // ===== MODIFIED: fetchPrivateAIResponse with longer timeout, retry, and progress =====
-    // (Already defined above, keep as is)
-    
     // ===== OPTIMIZED IMAGE HANDLING FUNCTIONS =====
     function displayImageImmediately(imgUrl, container) {
         return new Promise((resolve) => {
