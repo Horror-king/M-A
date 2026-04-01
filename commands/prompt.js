@@ -3,7 +3,7 @@ const axios = require("axios");
 module.exports = {
   config: {
     name: "prompt",
-    version: "3.0",
+    version: "3.1",
     author: "Hassan",
     countDown: 3,
     role: 0,
@@ -14,71 +14,60 @@ module.exports = {
   },
 
   onStart: async function ({ args, message, event, api }) {
-    try {
-      let imageUrl = null;
-      let userPrompt = null;
+    let imageUrl = null;
+    let userPrompt = null;
 
-      // 🧠 1. If link provided
+    try {
+      // 1️⃣ Detect input
       if (args[0] && args[0].startsWith("http")) {
         imageUrl = args[0];
-      }
-
-      // 🖼️ 2. If replying to image
-      else if (
+      } else if (
         event.messageReply &&
         event.messageReply.attachments &&
         event.messageReply.attachments[0]?.type === "photo"
       ) {
         imageUrl = event.messageReply.attachments[0].url;
-      }
-
-      // ✍️ 3. If text provided
-      else if (args.length > 0) {
+      } else if (args.length > 0) {
         userPrompt = args.join(" ");
-      }
-
-      // ❌ Nothing provided
-      else {
+      } else {
         return message.reply(
-          "Send an image link, reply to an image, OR type text.\n\nExamples:\n-prompt https://image.jpg\n-prompt a futuristic city at night"
+          "Send an image link, reply to an image, OR type text."
         );
       }
 
       api.setMessageReaction("⏳", event.messageID, () => {}, true);
 
-      let res;
+      // 2️⃣ Call API safely
+      const res = await axios.get(
+        "https://theone-fast-image-gen.vercel.app/prompt",
+        {
+          params: imageUrl ? { imageUrl } : { userPrompt },
+          timeout: 15000 // ⏱️ prevent hanging
+        }
+      );
 
-      // 🎯 Decide API mode
-      if (imageUrl) {
-        res = await axios.get(
-          "https://theone-fast-image-gen.vercel.app/prompt",
-          {
-            params: { imageUrl }
-          }
-        );
-      } else {
-        res = await axios.get(
-          "https://theone-fast-image-gen.vercel.app/prompt",
-          {
-            params: { userPrompt }
-          }
-        );
-      }
+      console.log("API RESPONSE:", res.data); // 🔍 debug
 
-      const prompt = res.data?.prompt;
+      // 3️⃣ Safe extraction
+      const prompt =
+        res?.data?.prompt ||
+        res?.data?.data?.prompt ||
+        res?.data;
 
-      if (!prompt) {
+      if (!prompt || typeof prompt !== "string") {
         return message.reply("Failed to generate prompt.");
       }
 
-      // ✅ Send clean prompt
       await message.reply(prompt);
 
       api.setMessageReaction("✅", event.messageID, () => {}, true);
 
     } catch (err) {
-      console.error("PROMPT ERROR:", err);
-      return message.reply("Error processing request.");
+      console.error("PROMPT ERROR FULL:", err.response?.data || err.message);
+
+      return message.reply(
+        "Error processing request. API might be slow or temporarily down."
+      );
     }
   }
 };
