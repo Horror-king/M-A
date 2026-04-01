@@ -9857,10 +9857,23 @@ function batchMessageRender(messages, renderFunction) {
         }
     }
 
-    // ===== MODIFIED: sendPrivateMessage to support image attachment and seedream command using -sd =====
+    // ===== NEW: Function to extract prompt from image via external API =====
+    async function extractPromptFromImage(imageUrl) {
+        // TODO: Replace the URL with your actual API endpoint
+        const apiUrl = `https://your-api.com/extract?imageUrl=${encodeURIComponent(imageUrl)}`;
+        try {
+            const response = await fetch(apiUrl);
+            if (!response.ok) throw new Error('API error');
+            const data = await response.json();
+            return data.prompt || null;
+        } catch (error) {
+            console.error('Prompt extraction error:', error);
+            throw error;
+        }
+    }
+
+    // ===== MODIFIED: sendPrivateMessage to support -prompt command and -sd editing =====
     async function sendPrivateMessage() {
-        // Removed isSendingPrivate flag to allow concurrent sends.
-        
         const input = document.getElementById('private-user-input');
         if (!input) return;
         
@@ -9877,20 +9890,77 @@ function batchMessageRender(messages, renderFunction) {
             sendBtn.classList.remove('enabled');
         }
         
-        // --- IMMEDIATELY CLEAR INPUT AND PREVIEW ---
+        // --- NEW: Handle -prompt command ---
+        if (content.startsWith('-prompt')) {
+            // Extract image URL from command (format: -prompt <url>)
+            const parts = content.split(/\s+/);
+            let imageUrl = parts[1];
+            
+            // If no URL provided but there's an attached image, use that
+            if (!imageUrl && privateAIAttachedImageUrl) {
+                imageUrl = privateAIAttachedImageUrl;
+            }
+            
+            if (!imageUrl) {
+                showError('Please provide an image URL after -prompt or attach an image.');
+                // Re-enable send button
+                if (sendBtn) {
+                    setTimeout(() => {
+                        sendBtn.disabled = !(input.value.trim().length > 0 || privateAIAttachedImageUrl);
+                        sendBtn.classList.toggle('enabled', input.value.trim().length > 0 || privateAIAttachedImageUrl);
+                    }, 500);
+                }
+                return;
+            }
+            
+            // Clear input and attachment
+            input.value = '';
+            autoResize(input);
+            if (privateAIAttachedImageUrl) {
+                clearPrivateAIAttachment();
+            }
+            
+            // Show user's command message
+            displayPrivateMessage(content, 'sent');
+            
+            try {
+                // Extract prompt from image
+                const prompt = await extractPromptFromImage(imageUrl);
+                if (prompt) {
+                    displayPrivateMessage(prompt, 'received');
+                } else {
+                    displayPrivateMessage('❌ Failed to extract prompt from the image.', 'received');
+                }
+            } catch (error) {
+                console.error('Prompt extraction error:', error);
+                displayPrivateMessage('⚠️ Error extracting prompt. Please try again.', 'received');
+            } finally {
+                // Re-enable send button after a short delay
+                setTimeout(() => {
+                    const currentText = input.value.trim();
+                    const hasText = currentText.length > 0;
+                    const hasImage = privateAIAttachedImageUrl !== null;
+                    if (sendBtn) {
+                        sendBtn.disabled = !(hasText || hasImage);
+                        sendBtn.classList.toggle('enabled', hasText || hasImage);
+                    }
+                }, 500);
+            }
+            return; // Do not proceed to normal processing
+        }
+        // --- End of -prompt handling ---
+        
+        // --- Existing normal processing (text or -sd with attached image) ---
+        // Clear input and preview immediately
         input.value = '';
         autoResize(input);
-        
-        // Clear attachment preview
         const previewDiv = document.getElementById('private-ai-attachment-preview');
         if (previewDiv) previewDiv.style.display = 'none';
-        
-        // Clear any private reply preview
         clearPrivateReply();
         
-        // Store the image URL locally because we'll clear the global reference
+        // Store image URL and clear global reference
         const attachedImageUrl = privateAIAttachedImageUrl;
-        privateAIAttachedImageUrl = null; // Clear immediately to prevent reuse
+        privateAIAttachedImageUrl = null;
         
         try {
             // If there was an attached image, construct -sd command
@@ -9898,9 +9968,7 @@ function batchMessageRender(messages, renderFunction) {
                 const prompt = content || "edit this image creatively";
                 const command = `-sd ${attachedImageUrl} | ${prompt}`;
                 console.log('🎨 Sending -sd (seedream) command:', command);
-                // Display user's "message" (the command) immediately
                 displayPrivateMessage(command, 'sent');
-                // Send to AI
                 await fetchPrivateAIResponse(command);
                 return;
             }
@@ -9908,19 +9976,15 @@ function batchMessageRender(messages, renderFunction) {
             // Normal text message (no image)
             if (!content) return;
             
-            // Display user message immediately
             displayPrivateMessage(content, 'sent');
-            
-            // Send to AI
             await fetchPrivateAIResponse(content);
             
         } catch (error) {
             console.error('Error sending private message:', error);
             showError('Could not process your private message. Please try again.');
         } finally {
-            // Re-enable send button after a short delay (just to prevent rapid double‑clicks)
+            // Re-enable send button after a short delay
             setTimeout(() => {
-                // Check if there's new text after send (e.g., user typed while processing)
                 const currentText = input.value.trim();
                 const hasText = currentText.length > 0;
                 const hasImage = privateAIAttachedImageUrl !== null;
