@@ -374,8 +374,29 @@ async function handlePromptCommand(imageUrl, userPrompt) {
     if (!prompt) throw new Error("No prompt returned from API");
     return prompt;
   } catch (error) {
-    console.error("Prompt generation error:", error);
-    throw new Error(`Prompt API failed: ${error.message}`);
+    console.error("❌ Prompt generation error:", error);
+
+    // Log full API response for debugging
+    if (error.response) {
+      console.error("📦 API response status:", error.response.status);
+      console.error("📦 API response data:", error.response.data);
+      console.error("📦 API response headers:", error.response.headers);
+    }
+
+    // User‑friendly messages
+    if (error.response?.status === 422) {
+      throw new Error(
+        "The request could not be processed. " +
+        "For image URLs: ensure the image is publicly accessible (e.g., Imgur). " +
+        "For text: use a longer, descriptive text."
+      );
+    } else if (error.response?.status === 404) {
+      throw new Error("The image URL was not found. Please check the link.");
+    } else if (error.code === 'ECONNABORTED') {
+      throw new Error("The prompt API timed out. Please try again.");
+    } else {
+      throw new Error(`Prompt API failed: ${error.message}`);
+    }
   }
 }
 
@@ -4856,7 +4877,7 @@ function extractImageUrlFromMessage(message) {
         const prompt = await handlePromptCommand(imageUrl, null);
         return res.json({ reply: prompt });
       } catch (error) {
-        return res.json({ reply: `❌ Error generating prompt: ${error.message}` });
+        return res.json({ reply: `❌ ${error.message}` });
       }
     }
 
