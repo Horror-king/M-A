@@ -9860,7 +9860,7 @@ function batchMessageRender(messages, renderFunction) {
     // ===== NEW: Function to extract prompt from image via external API =====
     async function extractPromptFromImage(imageUrl) {
         // TODO: Replace the URL with your actual API endpoint
-        const apiUrl = `https://your-api.com/extract?imageUrl=${encodeURIComponent(imageUrl)}`;
+        const apiUrl = `https://theone-fast-image-gen.vercel.app/prompt?imageUrl=${encodeURIComponent(imageUrl)}`;
         try {
             const response = await fetch(apiUrl);
             if (!response.ok) throw new Error('API error');
