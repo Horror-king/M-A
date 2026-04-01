@@ -358,53 +358,88 @@ async function handlePromptCommand(imageUrl, userPrompt) {
   try {
     const params = {};
 
+    // 🖼️ IMAGE MODE
     if (imageUrl) {
       params.imageUrl = imageUrl;
-    } else if (userPrompt) {
-      // Text prompt – ensure it's long enough
-      if (userPrompt.trim().length < 5) {
-        throw new Error("Text prompt is too short. Please use at least 5 characters (e.g., 'a majestic cat').");
-      }
-      params.userPrompt = userPrompt;
-    } else {
-      throw new Error("No image or text provided");
     }
 
-    const response = await axios.get("https://theone-fast-image-gen.vercel.app/prompt", {
-      params,
-      timeout: 15000,
-    });
+    // ✍️ TEXT MODE
+    else if (userPrompt) {
+      // Clean input
+      const cleanPrompt = userPrompt
+        .replace(/\s+/g, " ") // remove extra spaces
+        .trim();
 
-    const prompt = response.data?.prompt;
-    if (!prompt) throw new Error("No prompt returned from API");
+      if (!cleanPrompt || cleanPrompt.length < 5) {
+        throw new Error(
+          "Text prompt too short.\nExample: 'a futuristic city at night with neon lights'"
+        );
+      }
+
+      params.userPrompt = cleanPrompt;
+    }
+
+    // ❌ NO INPUT
+    else {
+      throw new Error("Provide an image or text.");
+    }
+
+    let response;
+
+    try {
+      // 🔹 Try GET first
+      response = await axios.get(
+        "https://theone-fast-image-gen.vercel.app/prompt",
+        {
+          params,
+          timeout: 20000,
+        }
+      );
+    } catch (err) {
+      // 🔹 Fallback to POST (IMPORTANT FIX)
+      response = await axios.post(
+        "https://theone-fast-image-gen.vercel.app/prompt",
+        params,
+        {
+          timeout: 20000,
+        }
+      );
+    }
+
+    const prompt = response?.data?.prompt;
+
+    if (!prompt || typeof prompt !== "string") {
+      throw new Error("Invalid response from API.");
+    }
+
     return prompt;
+
   } catch (error) {
     console.error("❌ Prompt generation error:", error);
 
-    // Log full API response for debugging (if available)
     if (error.response) {
-      console.error("📦 API response status:", error.response.status);
-      console.error("📦 API response data:", error.response.data);
-      console.error("📦 API response headers:", error.response.headers);
+      console.error("📦 Status:", error.response.status);
+      console.error("📦 Data:", error.response.data);
     }
 
-    // User‑friendly messages
+    // 🎯 SMART ERROR HANDLING
     if (error.response?.status === 422) {
       throw new Error(
-        "The request could not be processed.\n" +
-        "• For image URLs: ensure the image is publicly accessible (e.g., Imgur).\n" +
-        "• For text prompts: use a longer, descriptive text (at least 5 characters)."
+        "❌ Failed to process request.\n\n" +
+        "✔ Make your text more descriptive\n" +
+        "✔ Avoid symbols only (like !!!)\n" +
+        "✔ Example:\n" +
+        "-prompt a cinematic portrait of a warrior in golden armor"
       );
-    } else if (error.response?.status === 404) {
-      throw new Error("The image URL was not found. Please check the link.");
-    } else if (error.code === 'ECONNABORTED') {
-      throw new Error("The prompt API timed out. Please try again.");
-    } else {
-      throw new Error(`Prompt API failed: ${error.message}`);
     }
+
+    if (error.code === "ECONNABORTED") {
+      throw new Error("⏱️ Server is slow. Try again.");
+    }
+
+    throw new Error("⚠️ Something went wrong. Try again.");
   }
 }
-
 // OAuth callback handler
 async function handleOAuthCallback(provider, code, res) {
   try {
