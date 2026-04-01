@@ -9857,22 +9857,7 @@ function batchMessageRender(messages, renderFunction) {
         }
     }
 
-    // ===== NEW: Function to extract prompt from image via external API =====
-    async function extractPromptFromImage(imageUrl) {
-        // TODO: Replace the URL with your actual API endpoint
-        const apiUrl = `https://theone-fast-image-gen.vercel.app/prompt?imageUrl=${encodeURIComponent(imageUrl)}`;
-        try {
-            const response = await fetch(apiUrl);
-            if (!response.ok) throw new Error('API error');
-            const data = await response.json();
-            return data.prompt || null;
-        } catch (error) {
-            console.error('Prompt extraction error:', error);
-            throw error;
-        }
-    }
-
-    // ===== MODIFIED: sendPrivateMessage to support -prompt command and -sd editing =====
+    // ===== MODIFIED: sendPrivateMessage to support -prompt command via backend =====
     async function sendPrivateMessage() {
         const input = document.getElementById('private-user-input');
         if (!input) return;
@@ -9890,7 +9875,7 @@ function batchMessageRender(messages, renderFunction) {
             sendBtn.classList.remove('enabled');
         }
         
-        // --- NEW: Handle -prompt command ---
+        // --- Handle -prompt command: send to backend command system ---
         if (content.startsWith('-prompt')) {
             // Extract image URL from command (format: -prompt <url>)
             const parts = content.split(/\s+/);
@@ -9913,6 +9898,13 @@ function batchMessageRender(messages, renderFunction) {
                 return;
             }
             
+            // Construct the command to send: if the user typed the URL already, keep the original command
+            let commandToSend = content;
+            if (!parts[1] && imageUrl) {
+                // User only typed "-prompt" (no URL) but attached an image
+                commandToSend = `-prompt ${imageUrl}`;
+            }
+            
             // Clear input and attachment
             input.value = '';
             autoResize(input);
@@ -9920,32 +9912,22 @@ function batchMessageRender(messages, renderFunction) {
                 clearPrivateAIAttachment();
             }
             
-            // Show user's command message
-            displayPrivateMessage(content, 'sent');
+            // Display the user's command
+            displayPrivateMessage(commandToSend, 'sent');
             
-            try {
-                // Extract prompt from image
-                const prompt = await extractPromptFromImage(imageUrl);
-                if (prompt) {
-                    displayPrivateMessage(prompt, 'received');
-                } else {
-                    displayPrivateMessage('❌ Failed to extract prompt from the image.', 'received');
+            // Send to backend command system
+            await fetchPrivateAIResponse(commandToSend);
+            
+            // Re-enable send button after a short delay
+            setTimeout(() => {
+                const currentText = input.value.trim();
+                const hasText = currentText.length > 0;
+                const hasImage = privateAIAttachedImageUrl !== null;
+                if (sendBtn) {
+                    sendBtn.disabled = !(hasText || hasImage);
+                    sendBtn.classList.toggle('enabled', hasText || hasImage);
                 }
-            } catch (error) {
-                console.error('Prompt extraction error:', error);
-                displayPrivateMessage('⚠️ Error extracting prompt. Please try again.', 'received');
-            } finally {
-                // Re-enable send button after a short delay
-                setTimeout(() => {
-                    const currentText = input.value.trim();
-                    const hasText = currentText.length > 0;
-                    const hasImage = privateAIAttachedImageUrl !== null;
-                    if (sendBtn) {
-                        sendBtn.disabled = !(hasText || hasImage);
-                        sendBtn.classList.toggle('enabled', hasText || hasImage);
-                    }
-                }, 500);
-            }
+            }, 500);
             return; // Do not proceed to normal processing
         }
         // --- End of -prompt handling ---
