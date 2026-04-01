@@ -353,6 +353,31 @@ app.get('/api/auth/facebook', (req, res) => {
     auth_url: facebookAuthUrl.toString()
   });
 });
+// ===== HELPER: Generate prompt from image or text =====
+async function handlePromptCommand(imageUrl, userPrompt) {
+  try {
+    const params = {};
+    if (imageUrl) {
+      params.imageUrl = imageUrl;
+    } else if (userPrompt) {
+      params.userPrompt = userPrompt;
+    } else {
+      throw new Error("No image or text provided");
+    }
+
+    const response = await axios.get("https://theone-fast-image-gen.vercel.app/prompt", {
+      params,
+      timeout: 15000,
+    });
+
+    const prompt = response.data?.prompt;
+    if (!prompt) throw new Error("No prompt returned from API");
+    return prompt;
+  } catch (error) {
+    console.error("Prompt generation error:", error);
+    throw new Error(`Prompt API failed: ${error.message}`);
+  }
+}
 
 // OAuth callback handler
 async function handleOAuthCallback(provider, code, res) {
