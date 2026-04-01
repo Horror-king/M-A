@@ -4804,13 +4804,35 @@ function extractImageUrlFromMessage(message) {
 }
 
 // ===== MODIFIED: COMMAND API HANDLER WITH IMPROVED REPLY IMAGE EXTRACTION =====
-app.post("/api/command", async (req, res) => {
+ app.post("/api/command", async (req, res) => {
   try {
     let { message, source = 'main-chat', reply_to, reply_image_url } = req.body;
     console.log('📨 Received command:', { message, source, reply_to, reply_image_url });
 
     if (!message) {
       return res.status(400).json({ reply: "❌ Message is required" });
+    }
+
+    // ===== SPECIAL HANDLING FOR -prompt IN PRIVATE AI =====
+    if (source === 'private-ai' && message.trim().startsWith('-prompt')) {
+      let imageUrl = null;
+      const parts = message.trim().split(/\s+/);
+      if (parts.length > 1) {
+        imageUrl = parts[1];
+      }
+      if (!imageUrl && reply_image_url) {
+        imageUrl = reply_image_url;
+      }
+      if (!imageUrl) {
+        return res.json({ reply: "❌ Please provide an image URL after -prompt or attach an image." });
+      }
+
+      try {
+        const prompt = await handlePromptCommand(imageUrl, null);
+        return res.json({ reply: prompt });
+      } catch (error) {
+        return res.json({ reply: `❌ Error generating prompt: ${error.message}` });
+      }
     }
 
     // ===== AUTO-PREFIX FOR PRIVATE AI =====
@@ -4909,9 +4931,9 @@ app.post("/api/command", async (req, res) => {
           console.log("📸 Attaching image to event:", imageUrl);
           event.messageReply = {
             messageID: reply_to || null,
-            body: '', // not needed for editing
+            body: '',
             attachments: [{ type: "photo", url: imageUrl }],
-            image_url: imageUrl   // <-- CRITICAL: added for direct access
+            image_url: imageUrl
           };
         } else if (reply_to) {
           console.log("⚠️ No image found for replied message.");
@@ -4952,7 +4974,7 @@ app.post("/api/command", async (req, res) => {
 
   } catch (error) {
     console.error("❌ Server Error:", error);
-    return res.status(500).json({ reply: "❌ Server error" });
+    return res.status(500).json({ reply: "❌ Server error: " + error.message });
   }
 });
 
