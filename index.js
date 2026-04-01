@@ -4860,8 +4860,25 @@ function extractImageUrlFromMessage(message) {
       }
     }
 
-    // ===== AUTO-PREFIX FOR PRIVATE AI =====
-    if (source === 'private-ai' && !message.startsWith(PREFIX)) {
+    // ===== HANDLE DASH COMMANDS IN PRIVATE AI (like -sd) =====
+    if (source === 'private-ai' && !message.startsWith(PREFIX) && message.trim().startsWith('-')) {
+      const trimmed = message.trim();
+      const parts = trimmed.split(/\s+/);
+      const dashCmd = parts[0].substring(1); // remove the leading '-'
+      // Check if a command with that name exists (e.g., 'sd')
+      if (commands[dashCmd]) {
+        // Convert to prefix command
+        const rest = parts.slice(1).join(' ');
+        message = `${PREFIX}${dashCmd}${rest ? ' ' + rest : ''}`;
+        console.log(`🔀 Converted dash command: ${trimmed} → ${message}`);
+      } else {
+        // Unknown dash command, fallback to !ai (original behavior)
+        message = `${PREFIX}ai ${trimmed}`;
+        console.log(`🤖 Unknown dash command, prefixing with !ai: ${message}`);
+      }
+    }
+    // ===== AUTO-PREFIX FOR PRIVATE AI (normal messages) =====
+    else if (source === 'private-ai' && !message.startsWith(PREFIX)) {
       const trimmed = message.trim().toLowerCase();
       const firstWord = trimmed.split(' ')[0];
       const commandWords = ['ai', 'help', 'ping', 'prefix', 'ask', 'chat'];
