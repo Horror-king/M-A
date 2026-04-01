@@ -353,13 +353,18 @@ app.get('/api/auth/facebook', (req, res) => {
     auth_url: facebookAuthUrl.toString()
   });
 });
-// ===== HELPER: Generate prompt from image or text =====
+// ===== HELPER: Generate prompt from image or text with better validation =====
 async function handlePromptCommand(imageUrl, userPrompt) {
   try {
     const params = {};
+
     if (imageUrl) {
       params.imageUrl = imageUrl;
     } else if (userPrompt) {
+      // Text prompt – ensure it's long enough
+      if (userPrompt.trim().length < 5) {
+        throw new Error("Text prompt is too short. Please use at least 5 characters (e.g., 'a majestic cat').");
+      }
       params.userPrompt = userPrompt;
     } else {
       throw new Error("No image or text provided");
@@ -376,7 +381,7 @@ async function handlePromptCommand(imageUrl, userPrompt) {
   } catch (error) {
     console.error("❌ Prompt generation error:", error);
 
-    // Log full API response for debugging
+    // Log full API response for debugging (if available)
     if (error.response) {
       console.error("📦 API response status:", error.response.status);
       console.error("📦 API response data:", error.response.data);
@@ -386,9 +391,9 @@ async function handlePromptCommand(imageUrl, userPrompt) {
     // User‑friendly messages
     if (error.response?.status === 422) {
       throw new Error(
-        "The request could not be processed. " +
-        "For image URLs: ensure the image is publicly accessible (e.g., Imgur). " +
-        "For text: use a longer, descriptive text."
+        "The request could not be processed.\n" +
+        "• For image URLs: ensure the image is publicly accessible (e.g., Imgur).\n" +
+        "• For text prompts: use a longer, descriptive text (at least 5 characters)."
       );
     } else if (error.response?.status === 404) {
       throw new Error("The image URL was not found. Please check the link.");
