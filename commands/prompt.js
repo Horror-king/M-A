@@ -3,71 +3,59 @@ const axios = require("axios");
 module.exports = {
   config: {
     name: "prompt",
-    version: "3.1",
+    version: "1.0",
     author: "Hassan",
-    countDown: 3,
+    countDown: 5,
     role: 0,
-    shortDescription: "Get AI image prompt",
-    longDescription: "Use image, link, or text to generate prompt",
+    shortDescription: "Generate an image prompt using AI",
+    longDescription: "Generate a detailed prompt from an image URL or text description.",
     category: "image",
-    guide: `{pn} <image link>\n{pn} <text>\nOR reply to an image`
+    guide: `{pn} <image link>\n{pn} <text>`
   },
 
-  onStart: async function ({ args, message, event, api }) {
-    let imageUrl = null;
-    let userPrompt = null;
-
+  onStart: async function ({ api, event, args, message }) {
     try {
-      // 1️⃣ Detect input
+      let imageUrl = null;
+      let userPrompt = null;
+
+      // If the first argument is a URL, treat as image
       if (args[0] && args[0].startsWith("http")) {
         imageUrl = args[0];
-      } else if (
-        event.messageReply &&
-        event.messageReply.attachments &&
-        event.messageReply.attachments[0]?.type === "photo"
-      ) {
+      } 
+      // If replying to an image
+      else if (event.messageReply && event.messageReply.attachments && 
+               event.messageReply.attachments[0]?.type === "photo") {
         imageUrl = event.messageReply.attachments[0].url;
-      } else if (args.length > 0) {
+      }
+      // Otherwise treat as text prompt
+      else if (args.length > 0) {
         userPrompt = args.join(" ");
-      } else {
-        return message.reply(
-          "Send an image link, reply to an image, OR type text."
-        );
+      }
+      else {
+        return message.reply("Send an image link, reply to an image, OR type text.\n\nExamples:\n!prompt https://image.jpg\n!prompt a futuristic city at night");
       }
 
-      api.setMessageReaction("⏳", event.messageID, () => {}, true);
+      // Call the same backend API (same as the private AI -prompt)
+      let res;
+      if (imageUrl) {
+        res = await axios.get("https://theone-fast-image-gen.vercel.app/prompt", {
+          params: { imageUrl }
+        });
+      } else {
+        res = await axios.get("https://theone-fast-image-gen.vercel.app/prompt", {
+          params: { userPrompt }
+        });
+      }
 
-      // 2️⃣ Call API safely
-      const res = await axios.get(
-        "https://theone-fast-image-gen.vercel.app/prompt",
-        {
-          params: imageUrl ? { imageUrl } : { userPrompt },
-          timeout: 15000 // ⏱️ prevent hanging
-        }
-      );
-
-      console.log("API RESPONSE:", res.data); // 🔍 debug
-
-      // 3️⃣ Safe extraction
-      const prompt =
-        res?.data?.prompt ||
-        res?.data?.data?.prompt ||
-        res?.data;
-
-      if (!prompt || typeof prompt !== "string") {
+      const prompt = res.data?.prompt;
+      if (!prompt) {
         return message.reply("Failed to generate prompt.");
       }
 
       await message.reply(prompt);
-
-      api.setMessageReaction("✅", event.messageID, () => {}, true);
-
     } catch (err) {
-      console.error("PROMPT ERROR FULL:", err.response?.data || err.message);
-
-      return message.reply(
-        "Error processing request. API might be slow or temporarily down."
-      );
+      console.error("PROMPT ERROR:", err);
+      return message.reply("Error processing request.");
     }
   }
 };
