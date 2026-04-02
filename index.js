@@ -15,7 +15,7 @@ const app = express();
 const server = http.createServer(app);
 const port = process.env.PORT || 3000;
 
-// ===== ULTRA-COMPATIBLE SOCKET.IO CONFIGURATION FOR OPERA & MOBILE DATA =====
+// ===== ULTRA-COMPATIBLE SOCKET.IO CONFIGURATION =====
 const io = new Server(server, {
   cors: { 
     origin: "*",
@@ -41,50 +41,10 @@ const io = new Server(server, {
 const onlineUsers = new Map();
 const onlineStatusTimeout = 300000; // 5 minutes
 
-// ===== MODIFIED: PERMANENT ONLINE USERS – Bots removed =====
-const PERMANENT_ONLINE_USERS = [];   // No bots are permanently online now
+// ===== PERMANENT BOT USERS (ALWAYS ONLINE, GREEN DOT) =====
+const PERMANENT_ONLINE_USERS = ['AI', 'Bot']; // <-- AI and Bot always online
 
-// ===== NEW: Active request counters for bots (green dot while responding) =====
-const activeBotRequests = {
-  'AI': 0,
-  'Bot': 0,
-  'Private AI': 0
-};
-
-// Helper to set a bot online (green dot) when its first request starts
-function setBotOnline(botUsername) {
-  if (!onlineUsers.has(botUsername)) {
-    onlineUsers.set(botUsername, {
-      socketId: 'bot-dynamic-socket',
-      username: botUsername,
-      lastSeen: Date.now(),
-      isOnline: true
-    });
-    const onlineUsersArray = Array.from(onlineUsers.keys());
-    io.emit('user-status-change', { 
-      username: botUsername, 
-      status: 'online', 
-      onlineUsers: onlineUsersArray
-    });
-    console.log(`🟢 ${botUsername} is now online (responding)`);
-  }
-}
-
-// Helper to set a bot offline when its last request finishes
-function setBotOffline(botUsername) {
-  if (onlineUsers.has(botUsername)) {
-    onlineUsers.delete(botUsername);
-    const onlineUsersArray = Array.from(onlineUsers.keys());
-    io.emit('user-status-change', { 
-      username: botUsername, 
-      status: 'offline',
-      onlineUsers: onlineUsersArray
-    });
-    console.log(`🔴 ${botUsername} is now offline (response finished)`);
-  }
-}
-
-// Function to add/keep permanent online users (now empty)
+// Function to add/keep permanent bot users online
 function addPermanentOnlineUsers() {
   const now = Date.now();
   PERMANENT_ONLINE_USERS.forEach(username => {
@@ -95,6 +55,7 @@ function addPermanentOnlineUsers() {
       isOnline: true
     });
   });
+  // Broadcast updated online list
   const onlineUsersArray = Array.from(onlineUsers.keys());
   io.emit('user-status-change', { 
     username: 'SYSTEM', 
@@ -104,7 +65,6 @@ function addPermanentOnlineUsers() {
   });
   console.log('🤖 Permanent bot users added to online list:', PERMANENT_ONLINE_USERS);
 }
-addPermanentOnlineUsers(); // does nothing because array is empty
 
 // Global setup
 global.GoatBot = { config };
@@ -175,6 +135,7 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(express.static('public'));
 
+// Helper: escape HTML
 function escapeHtml(unsafe) {
   return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
@@ -278,7 +239,7 @@ app.get('/api/auth/facebook', (req, res) => {
   res.json({ success: true, auth_url: facebookAuthUrl.toString() });
 });
 
-// ===== HELPER: Generate prompt from image or text =====
+// Helper: generate prompt from image/text
 async function handlePromptCommand(imageUrl, userPrompt) {
   try {
     const params = {};
@@ -1257,19 +1218,13 @@ function extractImageUrlFromMessage(message) {
   return null;
 }
 
-// ===== MODIFIED: COMMAND API HANDLER WITH GREEN DOT FOR RESPONDING BOTS =====
+// ===== COMMAND API HANDLER (No duplicate responses) =====
 app.post("/api/command", async (req, res) => {
   try {
     let { message, source = 'main-chat', reply_to, reply_image_url } = req.body;
     console.log('📨 Received command:', { message, source, reply_to, reply_image_url });
 
     if (!message) return res.status(400).json({ reply: "❌ Message is required" });
-
-    function getResponderUsername(commandName, source) {
-      if (source === 'private-ai') return 'Private AI';
-      if (commandName === 'ai') return 'AI';
-      return 'Bot';
-    }
 
     if (source === 'private-ai' && message.trim().startsWith('-prompt')) {
       let imageUrl = null;
@@ -1313,18 +1268,12 @@ app.post("/api/command", async (req, res) => {
 
     if (cmd.commandName === "ai") {
       responder = 'AI';
-      const botUsername = getResponderUsername('ai', source);
-      activeBotRequests[botUsername] = (activeBotRequests[botUsername] || 0) + 1;
-      if (activeBotRequests[botUsername] === 1) setBotOnline(botUsername);
       try {
         const response = await axios.get(`https://yau-cener-gpt4-api.vercel.app/ai?prompt=${encodeURIComponent(cmd.text)}&cb=${Date.now()}`, { timeout: 15000 });
         const data = response.data;
         finalReply = data.response || data.message || data.data || (typeof data === "string" ? data : "⚠️ Unknown AI response");
       } catch (err) {
         finalReply = `❌ AI Error: ${err.message}`;
-      } finally {
-        activeBotRequests[botUsername]--;
-        if (activeBotRequests[botUsername] === 0) setBotOffline(botUsername);
       }
     } else {
       responder = 'Bot';
@@ -1332,34 +1281,24 @@ app.post("/api/command", async (req, res) => {
       if (!command) {
         finalReply = "❌ Command not found";
       } else {
-        const botUsername = getResponderUsername(cmd.commandName, source);
-        activeBotRequests[botUsername] = (activeBotRequests[botUsername] || 0) + 1;
-        if (activeBotRequests[botUsername] === 1) setBotOnline(botUsername);
-        try {
-          const replies = [];
-          const event = { body: cmd.text };
-          let imageUrl = null;
-          if (reply_image_url) imageUrl = reply_image_url;
-          else if (reply_to) {
-            try {
-              const { data, error } = await supabase.from("chatter").select("*").eq("id", reply_to).single();
-              if (!error && data) imageUrl = extractImageUrlFromMessage(data);
-            } catch (err) { console.error("❌ Fetch error:", err); }
-          }
-          if (imageUrl) event.messageReply = { messageID: reply_to || null, body: '', attachments: [{ type: "photo", url: imageUrl }], image_url: imageUrl };
-          await command.onStart({
-            api: { sendMessage: (msg) => replies.push(typeof msg === "string" ? msg : JSON.stringify(msg)), supabase, io },
-            event,
-            args: cmd.args,
-            message: { reply: (content) => replies.push(content) }
-          });
-          finalReply = replies.join("\n") || "❌ No response";
-        } catch (err) {
-          finalReply = `❌ Command error: ${err.message}`;
-        } finally {
-          activeBotRequests[botUsername]--;
-          if (activeBotRequests[botUsername] === 0) setBotOffline(botUsername);
+        const replies = [];
+        const event = { body: cmd.text };
+        let imageUrl = null;
+        if (reply_image_url) imageUrl = reply_image_url;
+        else if (reply_to) {
+          try {
+            const { data, error } = await supabase.from("chatter").select("*").eq("id", reply_to).single();
+            if (!error && data) imageUrl = extractImageUrlFromMessage(data);
+          } catch (err) { console.error("❌ Fetch error:", err); }
         }
+        if (imageUrl) event.messageReply = { messageID: reply_to || null, body: '', attachments: [{ type: "photo", url: imageUrl }], image_url: imageUrl };
+        await command.onStart({
+          api: { sendMessage: (msg) => replies.push(typeof msg === "string" ? msg : JSON.stringify(msg)), supabase, io },
+          event,
+          args: cmd.args,
+          message: { reply: (content) => replies.push(content) }
+        });
+        finalReply = replies.join("\n") || "❌ No response";
       }
     }
 
@@ -1477,37 +1416,18 @@ app.get('/game/:roomCode', verifyToken, async (req, res) => { try { const { room
 
 server.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
-  console.log(`🤫 PRIVATE MESSAGING: FIXED - No more disappearing messages!`);
   console.log(`🔹 Command prefix: "${PREFIX}"`);
   console.log(`👥 Online users tracking: ACTIVE (5 minute timeout for mobile)`);
-  console.log(`💾 SINGLE RESPONSE SYSTEM: ENABLED`);
   console.log(`🤖 EXCLUSIVE ROUTING: -ai → AI only, other commands → Bot only`);
-  console.log(`🚫 DUPLICATE FIX: IMPROVED with better message ID tracking`);
-  console.log(`🎯 PREFIX-FREE AI: ENABLED for private AI (auto-adds !ai prefix)`);
   console.log(`💬 Real-time messaging: ENABLED via Socket.io`);
-  console.log(`🔌 Socket.io configuration: POLLING ONLY for Opera/Mobile compatibility`);
-  console.log(`📱 OPERA FIX: Using polling transport only for real-time updates`);
-  console.log(`🔐 USER AUTHENTICATION: ENABLED (Server-side, no localStorage)`);
-  console.log(`🔐 Password hashing: ENHANCED with SHA-256 and simple tokens`);
-  console.log(`🔐 Simple Tokens: ENABLED for secure authentication (No JWT module needed)`);
-  console.log(`🔐 Auth Providers: LOCAL, GOOGLE, and FACEBOOK supported`);
+  console.log(`🔐 USER AUTHENTICATION: ENABLED`);
   console.log(`🌐 Cross-browser compatibility: ENABLED`);
-  if (oauthConfig.google.clientId) console.log(`🔐 GOOGLE OAUTH: ENABLED with provided credentials`); else console.log(`⚠️ GOOGLE OAUTH: DISABLED`);
+  if (oauthConfig.google.clientId) console.log(`🔐 GOOGLE OAUTH: ENABLED`); else console.log(`⚠️ GOOGLE OAUTH: DISABLED`);
   if (oauthConfig.facebook.clientId) console.log(`🔐 FACEBOOK OAUTH: ENABLED`); else console.log(`⚠️ FACEBOOK OAUTH: DISABLED`);
-  console.log(`🔗 ACCOUNT MANAGEMENT: Link/Unlink OAuth, Set Password`);
-  console.log(`🤖 NEW: POST /api/ai/private - Private AI endpoint`);
-  console.log(`🤖 NEW: POST /api/ai/chat - Main AI chat endpoint`);
-  console.log(`💬 NEW: GET /api/private/conversations - Get conversations`);
-  console.log(`💬 NEW: GET /api/private/messages/:username - Get private messages`);
-  console.log(`💬 NEW: POST /api/private/messages - Send private message`);
-  console.log(`💬 NEW: PUT /api/private/messages/read - Mark as read`);
-  console.log(`💬 NEW: GET /api/private/unread - Get unread count`);
-  console.log(`👥 NEW: GET /api/users/all - Get all signed-up users`);
-  console.log(`📊 NEW: GET /api/users/stats - Get user statistics`);
+  console.log(`👥 ALL USERS DIRECTORY: ENABLED`);
   console.log(`📝 POSTS SYSTEM: ENABLED via Supabase`);
   console.log(`♟️ CHECKERS GAME: ENABLED via Supabase and Socket.io`);
-  console.log(`🎯 PREFIX-FREE USAGE IN PRIVATE AI: enabled`);
-  console.log(`🤖 PERMANENT ONLINE USERS: ${PERMANENT_ONLINE_USERS.join(', ')} (bots are now dynamic – green dot only when responding)`);
+  console.log(`🤖 PERMANENT ONLINE USERS: ${PERMANENT_ONLINE_USERS.join(', ')} (always online, green dot)`);
   if (isRender && renderExternalUrl) {
     console.log(`🌐 Render External URL: ${renderExternalUrl}`);
     console.log(`⏱️ UptimeRobot monitoring URL: ${renderExternalUrl}/health`);
