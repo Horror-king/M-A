@@ -5973,6 +5973,14 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
             img.style.marginTop = "5px";
             img.style.cursor = "pointer";
             img.onclick = () => openZoom(img.src);
+            // --- SCROLL FIX: prevent auto-scroll when image loads if user not at bottom ---
+            img.addEventListener('load', () => {
+                const container = elements.chatContainer;
+                if (container && !isAtBottom) {
+                    // User scrolled up: do nothing, avoid shifting
+                    // No automatic scroll
+                }
+            });
             contentDiv.appendChild(img);
         }
 
@@ -6027,6 +6035,13 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
                                 img.style.marginTop = "5px";
                                 img.style.cursor = "pointer";
                                 img.onclick = () => openZoom(img.src);
+                                // --- SCROLL FIX: prevent auto-scroll when image loads if user not at bottom ---
+                                img.addEventListener('load', () => {
+                                    const container = elements.chatContainer;
+                                    if (container && !isAtBottom) {
+                                        // User scrolled up: do nothing
+                                    }
+                                });
                                 contentDiv.appendChild(img);
                             } else {
                                 // Display as text if not an image
@@ -6093,6 +6108,12 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
             img.style.marginTop = "5px";
             img.style.cursor = "pointer";
             img.onclick = () => openZoom(img.src);
+            img.addEventListener('load', () => {
+                const container = elements.chatContainer;
+                if (container && !isAtBottom) {
+                    // User scrolled up: do nothing
+                }
+            });
             contentDiv.appendChild(img);
         });
 
@@ -6166,6 +6187,12 @@ function createMessageElement(text, sender, repliedTo = null, username = '', mes
             img.style.marginTop = "5px";
             img.style.cursor = "pointer";
             img.onclick = () => openZoom(img.src);
+            img.addEventListener('load', () => {
+                const container = elements.chatContainer;
+                if (container && !isAtBottom) {
+                    // User scrolled up: do nothing
+                }
+            });
             contentDiv.appendChild(img);
         }
         const textDiv = document.createElement('div');
