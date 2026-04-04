@@ -4616,7 +4616,7 @@ app.delete('/messages/:id', verifyToken, async (req, res) => {
   }
 });
 
-// FIXED: Function to save ANY bot response to Supabase
+// ===== FIXED: Function to save ANY bot response to Supabase - NOW WITH GREEN DOT =====
 async function saveBotResponseToSupabase(content, originalCommand, commandType = 'AI') {
   try {
     console.log(`🔄 Attempting to save ${commandType} response to Supabase...`);
@@ -4662,8 +4662,14 @@ async function saveBotResponseToSupabase(content, originalCommand, commandType =
         }
         console.log(`✅ ${commandType} response saved to Supabase (minimal fields). ID:`, retryData[0]?.id);
         
+        // ===== FIX: Add user_status for bot messages =====
+        const botMessage = retryData[0];
+        if (commandType === 'AI' || commandType === 'Bot') {
+          botMessage.user_status = 'online';
+          botMessage.last_seen = null;
+        }
         // BROADCAST BOT RESPONSE TO ALL CLIENTS IMMEDIATELY
-        io.emit('new-message', retryData[0]);
+        io.emit('new-message', botMessage);
         return retryData;
       }
       throw error;
@@ -4671,8 +4677,14 @@ async function saveBotResponseToSupabase(content, originalCommand, commandType =
     
     console.log(`✅ ${commandType} response saved to Supabase. ID:`, data[0]?.id);
     
+    // ===== FIX: Add user_status for bot messages =====
+    const botMessage = data[0];
+    if (commandType === 'AI' || commandType === 'Bot') {
+      botMessage.user_status = 'online';
+      botMessage.last_seen = null;
+    }
     // BROADCAST BOT RESPONSE TO ALL CLIENTS IMMEDIATELY
-    io.emit('new-message', data[0]);
+    io.emit('new-message', botMessage);
     return data;
   } catch (error) {
     console.error(`❌ Error saving ${commandType} response to Supabase:`, error);
@@ -5238,7 +5250,14 @@ io.on('connection', (socket) => {
         .limit(50);
       
       if (!error && data) {
-        socket.emit('chat-messages', data.reverse());
+        // Add user_status for bot messages before sending
+        const messagesWithStatus = data.map(msg => {
+          if (PERMANENT_ONLINE_USERS.includes(msg.username)) {
+            return { ...msg, user_status: 'online', last_seen: null };
+          }
+          return msg;
+        });
+        socket.emit('chat-messages', messagesWithStatus.reverse());
       }
     } catch (error) {
       console.error('Error sending messages to client:', error);
@@ -6416,6 +6435,7 @@ server.listen(port, () => {
   console.log(`🔐 Simple Tokens: ENABLED for secure authentication (No JWT module needed)`);
   console.log(`🔐 Auth Providers: LOCAL, GOOGLE, and FACEBOOK supported`);
   console.log(`🌐 Cross-browser compatibility: ENABLED`);
+  console.log(`🟢 BOT GREEN DOT: FIXED - Bot messages now show green dot immediately without refresh!`);
   
   // Google OAuth information
   if (oauthConfig.google.clientId) {
