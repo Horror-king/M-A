@@ -56,6 +56,16 @@ const onlineStatusTimeout = 300000; // 5 minutes = 300000 milliseconds
 // ===== PERMANENT BOT USERS (ALWAYS ONLINE, GREEN DOT) =====
 const PERMANENT_ONLINE_USERS = ['AI', 'Bot']; // Add any other bot usernames here
 
+// ===== HELPER: Ensure bot messages always have green dot =====
+function emitWithBotStatus(eventName, messageData) {
+  // If the message is from a permanent bot, attach online status
+  if (messageData && PERMANENT_ONLINE_USERS.includes(messageData.username)) {
+    messageData.user_status = 'online';
+    messageData.last_seen = null;
+  }
+  io.emit(eventName, messageData);
+}
+
 // Function to add/keep permanent bot users online
 function addPermanentOnlineUsers() {
   const now = Date.now();
@@ -2239,7 +2249,7 @@ app.post('/api/messages', async (req, res) => {
       
       if (!saveError && savedSystemMsg && savedSystemMsg[0]) {
         // Emit to all clients via Socket.io
-        io.emit('new-message', savedSystemMsg[0]);
+        emitWithBotStatus('new-message', savedSystemMsg[0]);
       } else {
         // If saving fails, at least broadcast a simple event (optional)
         io.emit('system-message', banMessage);
@@ -2287,7 +2297,7 @@ app.post('/api/messages', async (req, res) => {
         console.log('✅ Message saved with minimal fields. ID:', retryData[0]?.id);
         
         // BROADCAST NEW MESSAGE TO ALL CLIENTS IMMEDIATELY
-        io.emit('new-message', retryData[0]);
+        emitWithBotStatus('new-message', retryData[0]);
         return res.status(201).json(retryData[0]);
       }
       throw error;
@@ -2296,7 +2306,7 @@ app.post('/api/messages', async (req, res) => {
     console.log('✅ Message saved successfully via API. ID:', data[0]?.id);
     
     // BROADCAST NEW MESSAGE TO ALL CLIENTS IMMEDIATELY
-    io.emit('new-message', data[0]);
+    emitWithBotStatus('new-message', data[0]);
     res.status(201).json(data[0]);
   } catch (error) {
     console.error('❌ Failed to save message via API:', error);
@@ -3784,7 +3794,7 @@ app.post('/api/private/alt-messages', async (req, res) => {
     console.log('✅ Alternative private message saved. ID:', data[0]?.id);
     
     // Broadcast via Socket.io
-    io.emit('new-private-message', {
+    emitWithBotStatus('new-private-message', {
       ...data[0],
       sender_username: sender_username,
       receiver_username: receiver_username
@@ -3873,7 +3883,7 @@ app.get('/test-private-messages', async (req, res) => {
     console.log('✅ GET Test private message saved:', data[0]);
     
     // Broadcast via Socket.io
-    io.emit('new-private-message', data[0]);
+    emitWithBotStatus('new-private-message', data[0]);
     
     res.json({ 
       success: true, 
@@ -3931,7 +3941,7 @@ app.post('/test-private-messages', async (req, res) => {
     console.log('✅ POST Test private message saved:', data[0]);
     
     // Broadcast via Socket.io
-    io.emit('new-private-message', data[0]);
+    emitWithBotStatus('new-private-message', data[0]);
     res.json({ 
       success: true, 
       message: 'POST Test private message saved successfully',
@@ -4344,7 +4354,7 @@ app.post('/private-messages', async (req, res) => {
     console.log('✅ Private message saved. ID:', data[0]?.id);
     
     // Broadcast via Socket.io to both users
-    io.emit('new-private-message', data[0]);
+    emitWithBotStatus('new-private-message', data[0]);
     
     res.status(201).json(data[0]);
   } catch (error) {
@@ -4454,7 +4464,7 @@ app.post('/messages', async (req, res) => {
       
       if (!saveError && savedSystemMsg && savedSystemMsg[0]) {
         // Emit to all clients via Socket.io
-        io.emit('new-message', savedSystemMsg[0]);
+        emitWithBotStatus('new-message', savedSystemMsg[0]);
       } else {
         // If saving fails, at least broadcast a simple event (optional)
         io.emit('system-message', banMessage);
@@ -4502,7 +4512,7 @@ app.post('/messages', async (req, res) => {
         console.log('✅ Message saved with minimal fields. ID:', retryData[0]?.id);
         
         // BROADCAST NEW MESSAGE TO ALL CLIENTS IMMEDIATELY
-        io.emit('new-message', retryData[0]);
+        emitWithBotStatus('new-message', retryData[0]);
         return res.status(201).json(retryData[0]);
       }
       throw error;
@@ -4511,7 +4521,7 @@ app.post('/messages', async (req, res) => {
     console.log('✅ Message saved successfully via legacy endpoint. ID:', data[0]?.id);
     
     // BROADCAST NEW MESSAGE TO ALL CLIENTS IMMEDIATELY
-    io.emit('new-message', data[0]);
+    emitWithBotStatus('new-message', data[0]);
     res.status(201).json(data[0]);
   } catch (error) {
     console.error('❌ Failed to save message via legacy endpoint:', error);
@@ -4664,12 +4674,8 @@ async function saveBotResponseToSupabase(content, originalCommand, commandType =
         
         // ===== FIX: Add user_status for bot messages =====
         const botMessage = retryData[0];
-        if (commandType === 'AI' || commandType === 'Bot') {
-          botMessage.user_status = 'online';
-          botMessage.last_seen = null;
-        }
-        // BROADCAST BOT RESPONSE TO ALL CLIENTS IMMEDIATELY
-        io.emit('new-message', botMessage);
+        // Broadcast using the helper function to ensure green dot
+        emitWithBotStatus('new-message', botMessage);
         return retryData;
       }
       throw error;
@@ -4677,14 +4683,9 @@ async function saveBotResponseToSupabase(content, originalCommand, commandType =
     
     console.log(`✅ ${commandType} response saved to Supabase. ID:`, data[0]?.id);
     
-    // ===== FIX: Add user_status for bot messages =====
+    // ===== FIX: Add user_status for bot messages using the helper =====
     const botMessage = data[0];
-    if (commandType === 'AI' || commandType === 'Bot') {
-      botMessage.user_status = 'online';
-      botMessage.last_seen = null;
-    }
-    // BROADCAST BOT RESPONSE TO ALL CLIENTS IMMEDIATELY
-    io.emit('new-message', botMessage);
+    emitWithBotStatus('new-message', botMessage);
     return data;
   } catch (error) {
     console.error(`❌ Error saving ${commandType} response to Supabase:`, error);
@@ -4857,7 +4858,7 @@ app.post('/test-message', async (req, res) => {
     console.log('✅ Test message saved:', data[0]);
     
     // Broadcast via Socket.io
-    io.emit('new-message', data[0]);
+    emitWithBotStatus('new-message', data[0]);
     res.json({ 
       success: true, 
       message: 'Test message saved successfully',
@@ -5680,7 +5681,7 @@ app.put('/api/messages/:id', async (req, res) => {
     }
 
     // Broadcast update to all clients
-    io.emit('message-updated', data[0]);
+    emitWithBotStatus('message-updated', data[0]);
     
     res.json(data[0]);
   } catch (error) {
@@ -6412,6 +6413,7 @@ app.get('/game/:roomCode', verifyToken, async (req, res) => {
 // Start server
 server.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
+  console.log(`🟢 BOT GREEN DOT: FIXED - Bot messages now show green dot immediately without refresh!`);
   console.log(`🤫 PRIVATE MESSAGING: FIXED - No more disappearing messages!`);
   console.log(`✅ Fixed: Private messages will no longer disappear after sending`);
   console.log(`✅ Fixed: Duplicate message prevention improved`);
@@ -6435,7 +6437,6 @@ server.listen(port, () => {
   console.log(`🔐 Simple Tokens: ENABLED for secure authentication (No JWT module needed)`);
   console.log(`🔐 Auth Providers: LOCAL, GOOGLE, and FACEBOOK supported`);
   console.log(`🌐 Cross-browser compatibility: ENABLED`);
-  console.log(`🟢 BOT GREEN DOT: FIXED - Bot messages now show green dot immediately without refresh!`);
   
   // Google OAuth information
   if (oauthConfig.google.clientId) {
