@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-    <title>MessageMate</title>
+    <title>MessageMate · Fullscreen Chat</title>
     <meta property="og:title" content="MessageMate" />
-    <meta property="og:description" content="Chat smarter with MessageMate – Hassan powered messaging companion." />
+    <meta property="og:description" content="Chat smarter with MessageMate – fullscreen ready." />
     <meta property="og:image" content="https://i.ibb.co/p6LrrNRK/1746227326721.jpg" />
     <meta property="og:url" content="https://message-mate-lrem.onrender.com" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -4602,6 +4602,66 @@
             .piece {
                 font-size: 1.2rem;
             }
+        }
+    </style>
+    <!-- ========== FULLSCREEN FIX ========== -->
+    <style>
+        /* Force main chat interface to stretch corner-to-corner */
+        .main-chat-interface {
+            max-width: 100% !important;
+            width: 100% !important;
+            margin: 50px 0 0 0 !important;
+            border-radius: 0 !important;
+        }
+
+        /* Chat input full width at bottom */
+        .chat-input {
+            max-width: 100% !important;
+            width: 100% !important;
+            left: 0 !important;
+            right: 0 !important;
+            border-radius: 0 !important;
+        }
+
+        /* Online panel full width */
+        .online-users-panel {
+            max-width: 100% !important;
+            width: 100% !important;
+            box-sizing: border-box;
+        }
+
+        /* Ensure chat container fills properly */
+        .chat-container {
+            width: 100%;
+            max-width: 100%;
+        }
+
+        /* Remove side margins on posts, users etc */
+        .post-card, .user-directory-card {
+            width: calc(100% - 20px) !important;
+            margin-left: 10px !important;
+            margin-right: 10px !important;
+        }
+
+        .all-users-container, .posts-container {
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+        }
+
+        /* Private messages full width */
+        .private-chat-container, .users-panel {
+            width: 100%;
+        }
+
+        /* Ensure body and html have no overflow */
+        body, html {
+            overflow-x: hidden;
+            width: 100%;
+        }
+
+        /* Adjust message area padding to avoid cut-off */
+        .chat-messages, #private-ai-container {
+            padding-bottom: 80px;
         }
     </style>
 </head>
