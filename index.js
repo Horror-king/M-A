@@ -6528,7 +6528,8 @@ process.on('unhandledRejection', (err) => {
   global.utils.log.err("UNHANDLED REJECTION", err);
 });
 
-process.on('uncaughtException', (err) {
+// ===== FIXED: uncaughtException handler – was missing arrow function =====
+process.on('uncaughtException', (err) => {
   global.utils.log.err("UNCAUGHT EXCEPTION", err);
   process.exit(1);
 });
