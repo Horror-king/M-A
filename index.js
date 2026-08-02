@@ -18,6 +18,11 @@ const app = express();
 const server = http.createServer(app);
 const port = process.env.PORT || 3000;
 
+// ===== DETECT ENVIRONMENT =====
+const isVercel = !!process.env.VERCEL;
+const isRender = process.env.RENDER === 'true';
+const renderExternalUrl = process.env.RENDER_EXTERNAL_URL;
+
 // ===== ULTRA-COMPATIBLE SOCKET.IO CONFIGURATION FOR OPERA & MOBILE DATA =====
 // Force polling only for maximum compatibility with Opera Free/Mini
 const io = new Server(server, {
@@ -142,10 +147,6 @@ const upload = multer({
     cb(new Error('Only image files are allowed (jpeg, jpg, png, gif, webp)'));
   }
 });
-
-// Render-specific configuration
-const isRender = process.env.RENDER === 'true';
-const renderExternalUrl = process.env.RENDER_EXTERNAL_URL;
 
 // ===== GOOGLE AND FACEBOOK AUTH CONFIGURATION =====
 // Configuration for OAuth providers
@@ -6433,159 +6434,6 @@ app.get('/game/:roomCode', verifyToken, async (req, res) => {
 
 // ===== END CHECKERS GAME ROUTES =====
 
-// Start server
-server.listen(port, () => {
-  console.log(`🚀 Server running on port ${port}`);
-  console.log(`🤫 PRIVATE MESSAGING: FIXED - No more disappearing messages!`);
-  console.log(`✅ Fixed: Private messages will no longer disappear after sending`);
-  console.log(`✅ Fixed: Duplicate message prevention improved`);
-  console.log(`✅ Fixed: Message tracking now uses server-generated IDs`);
-  console.log(`🔒 Private messages now use proper message tracking system`);
-  console.log(`🔹 Command prefix: "${PREFIX}"`);
-  console.log(`👥 Online users tracking: ACTIVE (5 minute timeout for mobile)`);
-  console.log(`💾 SINGLE RESPONSE SYSTEM: ENABLED`);
-  console.log(`🤖 EXCLUSIVE ROUTING: -ai → AI only, other commands → Bot only`);
-  console.log(`🚫 DUPLICATE FIX: IMPROVED with better message ID tracking`);
-  console.log(`🎯 PREFIX-FREE AI: ENABLED for private AI (auto-adds !ai prefix)`);
-  console.log(`💬 Real-time messaging: ENABLED via Socket.io`);
-  console.log(`🔌 Socket.io configuration: POLLING ONLY for Opera/Mobile compatibility`);
-  console.log(`📱 OPERA FIX: Using polling transport only for real-time updates`);
-  console.log(`📱 OPERA MINI FIX: Immediate message deletion enabled`);
-  console.log(`🔌 Socket.io events: new-message, message-deleted, user-status-change`);
-  console.log(`🤫 PRIVATE MESSAGING: FIXED AND STABLE`);
-  console.log(`🔒 Private endpoints: /private-messages/*`);
-  console.log(`🔐 USER AUTHENTICATION: ENABLED (Server-side, no localStorage)`);
-  console.log(`🔐 Password hashing: ENHANCED with SHA-256 and simple tokens`);
-  console.log(`🔐 Simple Tokens: ENABLED for secure authentication (No JWT module needed)`);
-  console.log(`🔐 Auth Providers: LOCAL, GOOGLE, and FACEBOOK supported`);
-  console.log(`🌐 Cross-browser compatibility: ENABLED`);
-  console.log(`🟢 BOT GREEN DOT: FIXED - Bot messages now show green dot immediately without refresh!`);
-  
-  // Google OAuth information
-  if (oauthConfig.google.clientId) {
-    console.log(`🔐 GOOGLE OAUTH: ENABLED with provided credentials`);
-    console.log(`   GET /api/auth/google - Get Google OAuth URL`);
-    console.log(`   GET /api/auth/google/callback - Google OAuth callback`);
-  } else {
-    console.log(`⚠️ GOOGLE OAUTH: DISABLED (Set GOOGLE_CLIENT_ID environment variable)`);
-  }
-  
-  // Facebook OAuth information
-  if (oauthConfig.facebook.clientId) {
-    console.log(`🔐 FACEBOOK OAUTH: ENABLED`);
-    console.log(`   GET /api/auth/facebook - Get Facebook OAuth URL`);
-    console.log(`   GET /api/auth/facebook/callback - Facebook OAuth callback`);
-  } else {
-    console.log(`⚠️ FACEBOOK OAUTH: DISABLED (Set FACEBOOK_APP_ID environment variable)`);
-  }
-  
-  // Account linking and management
-  console.log(`🔗 ACCOUNT MANAGEMENT:`);
-  console.log(`   POST /api/auth/link-account - Link OAuth account to existing local account`);
-  console.log(`   POST /api/auth/unlink-account - Unlink OAuth account (revert to local)`);
-  console.log(`   POST /api/auth/set-password - Set password for OAuth users`);
-  
-  // NEW: Added missing endpoints
-  console.log(`🤖 NEW: POST /api/ai/private - Private AI endpoint`);
-  console.log(`🤖 NEW: POST /api/ai/chat - Main AI chat endpoint`);
-  console.log(`💬 NEW: GET /api/private/conversations - Get conversations`);
-  console.log(`💬 NEW: GET /api/private/messages/:username - Get private messages`);
-  console.log(`💬 NEW: POST /api/private/messages - Send private message`);
-  console.log(`💬 NEW: PUT /api/private/messages/read - Mark as read`);
-  console.log(`💬 NEW: GET /api/private/unread - Get unread count`);
-  console.log(`🔍 NEW: GET /api/debug/private-messages-structure - Debug table structure`);
-  console.log(`👥 NEW: GET /api/users/all - Get all signed-up users`);
-  console.log(`📊 NEW: GET /api/users/stats - Get user statistics`);
-  
-  console.log(`🔍 NEW: GET /debug-private-messages - Debug private messages table`);
-  console.log(`🧪 NEW: GET /test-private-messages - Test private message creation (GET)`);
-  console.log(`🧪 NEW: POST /test-private-messages - Test private message creation (POST)`);
-  console.log(`🔐 AUTHENTICATION ENDPOINTS:`);
-  console.log(`   POST /api/register - User registration`);
-  console.log(`   POST /api/login - User login`);
-  console.log(`   POST /api/check-username - Check username availability`);
-  console.log(`   POST /api/auth/register - User registration (client-compatible)`);
-  console.log(`   POST /api/auth/login - User login (client-compatible)`);
-  console.log(`   POST /api/auth/check-username - Check username availability (client-compatible)`);
-  console.log(`   POST /api/auth/auto-login - Auto-login with token`);
-  console.log(`   GET /api/user/profile/:username - Get user profile`);
-  console.log(`   POST /api/user/profile - Update user profile`);
-  console.log(`   GET /api/auth-test - Test all authentication endpoints`);
-  console.log(`   GET /api/auth/oauth-info - Get OAuth configuration info`);
-  console.log(`📨 MESSAGES ENDPOINTS:`);
-  console.log(`   GET /api/messages - Get messages (client-compatible)`);
-  console.log(`   POST /api/messages - Send message (client-compatible)`);
-  console.log(`   DELETE /api/messages/:id - Delete message (client-compatible) - OPERA MINI FIXED`);
-  console.log(`   GET /api/messages/:id - Get message by ID (NEW!)`);
-  console.log(`   PUT /api/messages/:id - Update message (NEW!)`);
-  console.log(`   **MODIFIED: /api/messages/:id - Now requires authentication and allows Admin0 to delete any message**`);
-  console.log(`   **MODIFIED: /messages/:id - Now requires authentication and allows Admin0 to delete any message**`);
-  console.log(`📝 POSTS SYSTEM: ENABLED via Supabase`);
-  console.log(`   GET /api/create-posts-table - Check posts table (NEW!)`);
-  console.log(`   POST /api/create-posts-table - Create posts table if needed`);
-  console.log(`   GET /api/posts - Get all posts with comments and likes`);
-  console.log(`   POST /api/posts - Create a new post`);
-  console.log(`   POST /api/posts/:postId/comments - Add a comment to a post`);
-  console.log(`   POST /api/posts/:postId/like - Like/unlike a post`);
-  console.log(`   GET /api/posts/user/:username - Get posts for a specific user`);
-  console.log(`   DELETE /api/posts/:postId - Delete a post (author only)`);
-  console.log(`🧪 Test Supabase (GET): http://localhost:${port}/test-supabase`);
-  console.log(`🧪 Test Message (POST): http://localhost:${port}/test-message`);
-  console.log(`🔍 Debug ALL Commands: http://localhost:${port}/debug-all-commands`);
-  console.log(`🔍 Debug Private Messages: http://localhost:${port}/debug-private-messages`);
-  console.log(`🔍 Debug Table Structure: http://localhost:${port}/api/debug/private-messages-structure`);
-  console.log(`📝 Test Posts Table: http://localhost:${port}/api/create-posts-table`);
-  console.log(`🎯 PREFIX-FREE USAGE IN PRIVATE AI:`);
-  console.log(`   "hello" → automatically becomes "!ai hello"`);
-  console.log(`   "help" → automatically becomes "!help"`);
-  console.log(`   "ai tell me a joke" → automatically becomes "!ai tell me a joke"`);
-  console.log(`   "!ping" → works normally (prefix already present)`);
-  console.log(`👋 FIRST VISIT FEATURE:`);
-  console.log(`   When a user joins for the first time, they will automatically see all signed-up users`);
-  console.log(`   This helps new users discover and connect with other members`);
-
-  // ===== MODIFICATION START: Log permanent online users =====
-  console.log(`🤖 PERMANENT ONLINE USERS:`, PERMANENT_ONLINE_USERS.join(', '));
-  // ===== MODIFICATION END =====
-
-  if (isRender && renderExternalUrl) {
-    console.log(`🌐 Render External URL: ${renderExternalUrl}`);
-    console.log(`⏱️ UptimeRobot monitoring URL: ${renderExternalUrl}/health`);
-    console.log(`🧪 Test Supabase: ${renderExternalUrl}/test-supabase`);
-    console.log(`🧪 Test Message: ${renderExternalUrl}/test-message`);
-    console.log(`🔍 Debug ALL Commands: ${renderExternalUrl}/debug-all-commands`);
-    console.log(`🔍 Debug Private Messages: ${renderExternalUrl}/debug-private-messages`);
-    console.log(`🧪 Test Private Message (GET): ${renderExternalUrl}/test-private-messages`);
-    console.log(`🔐 Test Authentication: ${renderExternalUrl}/api/auth-test`);
-    console.log(`📝 Test Posts Table: ${renderExternalUrl}/api/create-posts-table`);
-    console.log(`👤 Test Profile: ${renderExternalUrl}/api/test-profile`);
-    console.log(`👤 Create Profiles Table: ${renderExternalUrl}/api/create-user-profiles-table`);
-    console.log(`👥 Get All Users: ${renderExternalUrl}/api/users/all`);
-    console.log(`📊 User Stats: ${renderExternalUrl}/api/users/stats`);
-    
-    // Show OAuth callback URLs
-    console.log(`🔐 Google OAuth Callback: ${oauthConfig.google.redirectUri}`);
-    console.log(`🔐 Facebook OAuth Callback: ${oauthConfig.facebook.redirectUri}`);
-    
-    // Instructions for setting up OAuth
-    if (!oauthConfig.google.clientId || !oauthConfig.facebook.clientId) {
-      console.log(`\n⚠️ OAUTH SETUP INSTRUCTIONS:`);
-      console.log(`1. For Google OAuth:`);
-      console.log(`   - Go to https://console.cloud.google.com/apis/credentials`);
-      console.log(`   - Create OAuth 2.0 Client ID`);
-      console.log(`   - Set Authorized redirect URIs to: ${oauthConfig.google.redirectUri}`);
-      console.log(`   - Set environment variables in Render: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET`);
-      
-      console.log(`\n2. For Facebook OAuth:`);
-      console.log(`   - Go to https://developers.facebook.com/apps/`);
-      console.log(`   - Create a new app`);
-      console.log(`   - Add Facebook Login product`);
-      console.log(`   - Set Valid OAuth Redirect URIs to: ${oauthConfig.facebook.redirectUri}`);
-      console.log(`   - Set environment variables in Render: FACEBOOK_APP_ID and FACEBOOK_APP_SECRET`);
-    }
-  }
-});
-
 // Add error handling middleware
 app.use((err, req, res, next) => {
   console.error('❌ Global Error Handler:', err);
@@ -6680,10 +6528,171 @@ process.on('unhandledRejection', (err) => {
   global.utils.log.err("UNHANDLED REJECTION", err);
 });
 
-process.on('uncaughtException', (err) => {
+process.on('uncaughtException', (err) {
   global.utils.log.err("UNCAUGHT EXCEPTION", err);
   process.exit(1);
 });
 
-// Export for testing
-module.exports = { app, server, io, supabase };
+// ===== ENVIRONMENT‑AWARE STARTUP =====
+if (isVercel) {
+  // On Vercel: export the Express app (do NOT listen)
+  module.exports = app;
+} else {
+  // Local / Render: start the server normally
+  server.listen(port, () => {
+    console.log(`🚀 Server running on port ${port}`);
+    console.log(`🤫 PRIVATE MESSAGING: FIXED - No more disappearing messages!`);
+    console.log(`✅ Fixed: Private messages will no longer disappear after sending`);
+    console.log(`✅ Fixed: Duplicate message prevention improved`);
+    console.log(`✅ Fixed: Message tracking now uses server-generated IDs`);
+    console.log(`🔒 Private messages now use proper message tracking system`);
+    console.log(`🔹 Command prefix: "${PREFIX}"`);
+    console.log(`👥 Online users tracking: ACTIVE (5 minute timeout for mobile)`);
+    console.log(`💾 SINGLE RESPONSE SYSTEM: ENABLED`);
+    console.log(`🤖 EXCLUSIVE ROUTING: -ai → AI only, other commands → Bot only`);
+    console.log(`🚫 DUPLICATE FIX: IMPROVED with better message ID tracking`);
+    console.log(`🎯 PREFIX-FREE AI: ENABLED for private AI (auto-adds !ai prefix)`);
+    console.log(`💬 Real-time messaging: ENABLED via Socket.io`);
+    console.log(`🔌 Socket.io configuration: POLLING ONLY for Opera/Mobile compatibility`);
+    console.log(`📱 OPERA FIX: Using polling transport only for real-time updates`);
+    console.log(`📱 OPERA MINI FIX: Immediate message deletion enabled`);
+    console.log(`🔌 Socket.io events: new-message, message-deleted, user-status-change`);
+    console.log(`🤫 PRIVATE MESSAGING: FIXED AND STABLE`);
+    console.log(`🔒 Private endpoints: /private-messages/*`);
+    console.log(`🔐 USER AUTHENTICATION: ENABLED (Server-side, no localStorage)`);
+    console.log(`🔐 Password hashing: ENHANCED with SHA-256 and simple tokens`);
+    console.log(`🔐 Simple Tokens: ENABLED for secure authentication (No JWT module needed)`);
+    console.log(`🔐 Auth Providers: LOCAL, GOOGLE, and FACEBOOK supported`);
+    console.log(`🌐 Cross-browser compatibility: ENABLED`);
+    console.log(`🟢 BOT GREEN DOT: FIXED - Bot messages now show green dot immediately without refresh!`);
+    
+    // Google OAuth information
+    if (oauthConfig.google.clientId) {
+      console.log(`🔐 GOOGLE OAUTH: ENABLED with provided credentials`);
+      console.log(`   GET /api/auth/google - Get Google OAuth URL`);
+      console.log(`   GET /api/auth/google/callback - Google OAuth callback`);
+    } else {
+      console.log(`⚠️ GOOGLE OAUTH: DISABLED (Set GOOGLE_CLIENT_ID environment variable)`);
+    }
+    
+    // Facebook OAuth information
+    if (oauthConfig.facebook.clientId) {
+      console.log(`🔐 FACEBOOK OAUTH: ENABLED`);
+      console.log(`   GET /api/auth/facebook - Get Facebook OAuth URL`);
+      console.log(`   GET /api/auth/facebook/callback - Facebook OAuth callback`);
+    } else {
+      console.log(`⚠️ FACEBOOK OAUTH: DISABLED (Set FACEBOOK_APP_ID environment variable)`);
+    }
+    
+    // Account linking and management
+    console.log(`🔗 ACCOUNT MANAGEMENT:`);
+    console.log(`   POST /api/auth/link-account - Link OAuth account to existing local account`);
+    console.log(`   POST /api/auth/unlink-account - Unlink OAuth account (revert to local)`);
+    console.log(`   POST /api/auth/set-password - Set password for OAuth users`);
+    
+    // NEW: Added missing endpoints
+    console.log(`🤖 NEW: POST /api/ai/private - Private AI endpoint`);
+    console.log(`🤖 NEW: POST /api/ai/chat - Main AI chat endpoint`);
+    console.log(`💬 NEW: GET /api/private/conversations - Get conversations`);
+    console.log(`💬 NEW: GET /api/private/messages/:username - Get private messages`);
+    console.log(`💬 NEW: POST /api/private/messages - Send private message`);
+    console.log(`💬 NEW: PUT /api/private/messages/read - Mark as read`);
+    console.log(`💬 NEW: GET /api/private/unread - Get unread count`);
+    console.log(`🔍 NEW: GET /api/debug/private-messages-structure - Debug table structure`);
+    console.log(`👥 NEW: GET /api/users/all - Get all signed-up users`);
+    console.log(`📊 NEW: GET /api/users/stats - Get user statistics`);
+    
+    console.log(`🔍 NEW: GET /debug-private-messages - Debug private messages table`);
+    console.log(`🧪 NEW: GET /test-private-messages - Test private message creation (GET)`);
+    console.log(`🧪 NEW: POST /test-private-messages - Test private message creation (POST)`);
+    console.log(`🔐 AUTHENTICATION ENDPOINTS:`);
+    console.log(`   POST /api/register - User registration`);
+    console.log(`   POST /api/login - User login`);
+    console.log(`   POST /api/check-username - Check username availability`);
+    console.log(`   POST /api/auth/register - User registration (client-compatible)`);
+    console.log(`   POST /api/auth/login - User login (client-compatible)`);
+    console.log(`   POST /api/auth/check-username - Check username availability (client-compatible)`);
+    console.log(`   POST /api/auth/auto-login - Auto-login with token`);
+    console.log(`   GET /api/user/profile/:username - Get user profile`);
+    console.log(`   POST /api/user/profile - Update user profile`);
+    console.log(`   GET /api/auth-test - Test all authentication endpoints`);
+    console.log(`   GET /api/auth/oauth-info - Get OAuth configuration info`);
+    console.log(`📨 MESSAGES ENDPOINTS:`);
+    console.log(`   GET /api/messages - Get messages (client-compatible)`);
+    console.log(`   POST /api/messages - Send message (client-compatible)`);
+    console.log(`   DELETE /api/messages/:id - Delete message (client-compatible) - OPERA MINI FIXED`);
+    console.log(`   GET /api/messages/:id - Get message by ID (NEW!)`);
+    console.log(`   PUT /api/messages/:id - Update message (NEW!)`);
+    console.log(`   **MODIFIED: /api/messages/:id - Now requires authentication and allows Admin0 to delete any message**`);
+    console.log(`   **MODIFIED: /messages/:id - Now requires authentication and allows Admin0 to delete any message**`);
+    console.log(`📝 POSTS SYSTEM: ENABLED via Supabase`);
+    console.log(`   GET /api/create-posts-table - Check posts table (NEW!)`);
+    console.log(`   POST /api/create-posts-table - Create posts table if needed`);
+    console.log(`   GET /api/posts - Get all posts with comments and likes`);
+    console.log(`   POST /api/posts - Create a new post`);
+    console.log(`   POST /api/posts/:postId/comments - Add a comment to a post`);
+    console.log(`   POST /api/posts/:postId/like - Like/unlike a post`);
+    console.log(`   GET /api/posts/user/:username - Get posts for a specific user`);
+    console.log(`   DELETE /api/posts/:postId - Delete a post (author only)`);
+    console.log(`🧪 Test Supabase (GET): http://localhost:${port}/test-supabase`);
+    console.log(`🧪 Test Message (POST): http://localhost:${port}/test-message`);
+    console.log(`🔍 Debug ALL Commands: http://localhost:${port}/debug-all-commands`);
+    console.log(`🔍 Debug Private Messages: http://localhost:${port}/debug-private-messages`);
+    console.log(`🔍 Debug Table Structure: http://localhost:${port}/api/debug/private-messages-structure`);
+    console.log(`📝 Test Posts Table: http://localhost:${port}/api/create-posts-table`);
+    console.log(`🎯 PREFIX-FREE USAGE IN PRIVATE AI:`);
+    console.log(`   "hello" → automatically becomes "!ai hello"`);
+    console.log(`   "help" → automatically becomes "!help"`);
+    console.log(`   "ai tell me a joke" → automatically becomes "!ai tell me a joke"`);
+    console.log(`   "!ping" → works normally (prefix already present)`);
+    console.log(`👋 FIRST VISIT FEATURE:`);
+    console.log(`   When a user joins for the first time, they will automatically see all signed-up users`);
+    console.log(`   This helps new users discover and connect with other members`);
+
+    // ===== MODIFICATION START: Log permanent online users =====
+    console.log(`🤖 PERMANENT ONLINE USERS:`, PERMANENT_ONLINE_USERS.join(', '));
+    // ===== MODIFICATION END =====
+
+    if (isRender && renderExternalUrl) {
+      console.log(`🌐 Render External URL: ${renderExternalUrl}`);
+      console.log(`⏱️ UptimeRobot monitoring URL: ${renderExternalUrl}/health`);
+      console.log(`🧪 Test Supabase: ${renderExternalUrl}/test-supabase`);
+      console.log(`🧪 Test Message: ${renderExternalUrl}/test-message`);
+      console.log(`🔍 Debug ALL Commands: ${renderExternalUrl}/debug-all-commands`);
+      console.log(`🔍 Debug Private Messages: ${renderExternalUrl}/debug-private-messages`);
+      console.log(`🧪 Test Private Message (GET): ${renderExternalUrl}/test-private-messages`);
+      console.log(`🔐 Test Authentication: ${renderExternalUrl}/api/auth-test`);
+      console.log(`📝 Test Posts Table: ${renderExternalUrl}/api/create-posts-table`);
+      console.log(`👤 Test Profile: ${renderExternalUrl}/api/test-profile`);
+      console.log(`👤 Create Profiles Table: ${renderExternalUrl}/api/create-user-profiles-table`);
+      console.log(`👥 Get All Users: ${renderExternalUrl}/api/users/all`);
+      console.log(`📊 User Stats: ${renderExternalUrl}/api/users/stats`);
+      
+      // Show OAuth callback URLs
+      console.log(`🔐 Google OAuth Callback: ${oauthConfig.google.redirectUri}`);
+      console.log(`🔐 Facebook OAuth Callback: ${oauthConfig.facebook.redirectUri}`);
+      
+      // Instructions for setting up OAuth
+      if (!oauthConfig.google.clientId || !oauthConfig.facebook.clientId) {
+        console.log(`\n⚠️ OAUTH SETUP INSTRUCTIONS:`);
+        console.log(`1. For Google OAuth:`);
+        console.log(`   - Go to https://console.cloud.google.com/apis/credentials`);
+        console.log(`   - Create OAuth 2.0 Client ID`);
+        console.log(`   - Set Authorized redirect URIs to: ${oauthConfig.google.redirectUri}`);
+        console.log(`   - Set environment variables in Render: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET`);
+        
+        console.log(`\n2. For Facebook OAuth:`);
+        console.log(`   - Go to https://developers.facebook.com/apps/`);
+        console.log(`   - Create a new app`);
+        console.log(`   - Add Facebook Login product`);
+        console.log(`   - Set Valid OAuth Redirect URIs to: ${oauthConfig.facebook.redirectUri}`);
+        console.log(`   - Set environment variables in Render: FACEBOOK_APP_ID and FACEBOOK_APP_SECRET`);
+      }
+    }
+  });
+}
+
+// Keep the module export for local development (app, server, io, supabase)
+if (!isVercel) {
+  module.exports = { app, server, io, supabase };
+}
