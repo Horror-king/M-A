@@ -221,6 +221,7 @@
             border: none;
             outline: none;
         }
+
         .toggle-password:hover {
             color: #4267B2;
         }
@@ -1875,6 +1876,7 @@
             max-width: 300px;
             text-align: center;
         }
+
         /* Also update the username input to match */
         .auth-box input {
             width: 100%;
@@ -4446,11 +4448,13 @@
         .reply-preview button i {
             font-size: 16px;
         }
+
         /* Styles for post three‑dot menu */
         .post-header-actions {
             position: relative;
             margin-left: auto;
         }
+
         .post-menu-btn {
             background: transparent;
             border: none;
@@ -4463,9 +4467,11 @@
             color: #65676b;
             transition: background-color 0.2s;
         }
+
         .post-menu-btn:hover {
             background-color: #f0f2f5;
         }
+
         .post-dropdown {
             position: absolute;
             right: 0;
@@ -4478,9 +4484,11 @@
             display: none;
             border: 1px solid #e4e6eb;
         }
+
         .post-dropdown.active {
             display: block;
         }
+
         .post-dropdown button {
             width: 100%;
             background: none;
@@ -4492,15 +4500,19 @@
             color: #1c1e21;
             transition: background-color 0.2s;
         }
+
         .post-dropdown button:hover {
             background-color: #f0f2f5;
         }
+
         .post-dropdown .delete-btn {
             color: #ff4444;
         }
+
         .post-dropdown .delete-btn:hover {
             background-color: #ffeaea;
         }
+
         .post-dropdown .privacy-btn {
             color: #4267B2;
         }
@@ -4577,6 +4589,7 @@
             cursor: pointer;
             position: relative;
         }
+
         .square.valid-move::after {
             content: '';
             position: absolute;
@@ -4630,6 +4643,7 @@
                 font-size: 1.5rem;
             }
         }
+
         @media (max-width: 480px) {
             .piece {
                 font-size: 1.2rem;
@@ -4764,12 +4778,14 @@
             </div>
             <div class="kebab-dropdown">
                 <a href="#" onclick="toggleTheme()">Toggle Theme</a>
-                <a href="#" id="toggle-user-panel-btn" onclick="toggleUserPanel()"><i class="fas fa-eye-slash"></i> Hide User Panel</a>
+                <a href="#" id="toggle-user-panel-btn" onclick="toggleUserPanel()"><i class="fas fa-eye-slash"></i> Hide
+                    User Panel</a>
                 <a href="#" onclick="clearChat()">Clear Chat</a>
                 <a href="#" onclick="exportChat()">Export Chat</a>
                 <a href="#" onclick="exportChatPDF()">Download PDF</a>
                 <a href="#" onclick="showSettings()">Settings</a>
-                <a href="#" id="admin-clear-all" style="display: none;" onclick="clearAllMessages()"><i class="fas fa-trash-alt" style="color:#ff4444;"></i> Clear All Messages (Admin)</a>
+                <a href="#" id="admin-clear-all" style="display: none;" onclick="clearAllMessages()"><i
+                        class="fas fa-trash-alt" style="color:#ff4444;"></i> Clear All Messages (Admin)</a>
             </div>
         </div>
     </div>
@@ -4801,7 +4817,8 @@
         <a href="#" onclick="showContainer('features')">Features</a>
         <a href="#" onclick="showContainer('help')">Help</a>
         <a href="#" onclick="showContainer('secret-code')">Secret Code</a>
-        <a href="#" onclick="showContainer('sql-editor-container')" style="display: none;" id="sql-editor-menu-item">🔍 SQL Editor</a>
+        <a href="#" onclick="showContainer('sql-editor-container')" style="display: none;"
+        id="sql-editor-menu-item">🔍 SQL Editor</a>
         <a href="#" onclick="logout()" style="color: #ff4444;">Logout</a>
     </div>
 
@@ -4868,7 +4885,8 @@
         </div>
 
         <div class="all-users-search-container">
-            <input type="text" id="all-users-search" class="all-users-search" placeholder="Search users by name, bio, or interests...">
+            <input type="text" id="all-users-search" class="all-users-search"
+            placeholder="Search users by name, bio, or interests...">
         </div>
 
         <div class="filter-buttons" id="filter-buttons">
@@ -4892,7 +4910,7 @@
             <div class="game-controls">
                 <button id="createRoomBtn" class="btn btn-primary">Create New Room</button>
                 <div style="display: flex; gap: 8px;">
-                    <input type="text" id="joinRoomInput" placeholder="Enter room code" style="padding:8px; border-radius:8px; border:1px solid #ccc;">
+                    <input type="text" id="joinRoomInput" placeholder="Enter room code" style="padding: 8px; border-radius: 8px; border: 1px solid #ccc;">
                     <button id="joinRoomBtn" class="btn btn-secondary">Join Room</button>
                 </div>
                 <button id="shareCodeBtn" class="btn btn-primary" style="display: none;">📋 Share Code</button>
@@ -4928,7 +4946,7 @@
         </div>
 
         <!-- Chat input with paper icon -->
-        <div class="chat-input" id="chat-input-main" style="display: none;">
+        <div class="chat-input" style="display: none;">
             <!-- REPLY PREVIEW CONTAINER MOVED INSIDE CHAT-INPUT -->
             <div id="reply-preview-container"></div>
             <div class="chat-input-row">
@@ -4972,14 +4990,14 @@
         </div>
 
         <!-- Private AI chat input with paper icon -->
-        <div class="chat-input" id="chat-input-private" style="display: none;">
+        <div class="chat-input" style="display: none;">
             <!-- PRIVATE REPLY PREVIEW CONTAINER INSIDE CHAT-INPUT -->
             <div id="private-reply-preview-container"></div>
             <!-- Attachment preview area for private AI (only shown when image is attached) -->
             <div id="private-ai-attachment-preview" style="display: none; margin-top: 8px; background: #e9ecef; border-radius: 8px; padding: 6px 10px; align-items: center; gap: 10px;">
-                <img id="private-ai-attach-img" style="width:32px; height:32px; object-fit:cover; border-radius:4px;">
-                <span id="private-ai-attach-text" style="flex:1; overflow:hidden; text-overflow:ellipsis;">Image attached (will be edited)</span>
-                <button onclick="clearPrivateAIAttachment()" style="background:none; border:none; cursor:pointer; color:#666;"><i class="fas fa-times"></i></button>
+                <img id="private-ai-attach-img" style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px;">
+                <span id="private-ai-attach-text" style="flex:1; overflow: hidden; text-overflow: ellipsis;">Image attached (will be edited)</span>
+                <button onclick="clearPrivateAIAttachment()" style="background: none; border: none; cursor: pointer; color: #666;"><i class="fas fa-times"></i></button>
             </div>
             <div class="chat-input-row">
                 <button class="attach-btn" id="attach-btn-private" onclick="attachFilePrivate()" type="button">
@@ -5041,7 +5059,7 @@
                 </div>
 
                 <!-- Private messages chat input with paper icon -->
-                <div class="private-chat-input chat-input" id="chat-input-private-msg" style="display: none;" id="private-chat-input">
+                <div class="private-chat-input chat-input" style="display: none;" id="private-chat-input">
                     <div class="chat-input-row">
                         <button class="attach-btn" id="attach-btn-private-msg" onclick="attachFilePrivateMsg()" type="button">
                             <i class="fas fa-paperclip"></i>
@@ -5196,8 +5214,10 @@
             <input type="text" id="secret-code-input" placeholder="Enter secret code" maxlength="10">
             <div class="secret-code-error" id="secret-code-error">Invalid code. Please try again.</div>
             <div class="secret-code-success" id="secret-code-success">Success! Code verified.</div>
-            <div class="attempts-warning" id="attempts-warning">Warning: <span id="attempts-left">3</span> attempts remaining</div>
-            <div class="lockout-message" id="lockout-message">Too many failed attempts. Please try again in <span id="lockout-time">5</span> minutes.</div>
+            <div class="attempts-warning" id="attempts-warning">Warning: <span id="attempts-left">3</span> attempts
+            remaining</div>
+            <div class="lockout-message" id="lockout-message">Too many failed attempts. Please try again in <span
+                id="lockout-time">5</span> minutes.</div>
             <button id="verify-code-btn" onclick="verifySecretCode()">Verify Code</button>
             <div class="code-hint">Hint: The code contains numbers and letters</div>
         </div>
@@ -5248,134 +5268,142 @@
         <div id="zoom-content">
             <div style="position: absolute; top: 15px; right: 20px; display: flex; gap: 16px; z-index: 2;">
                 <button onclick="closeZoom()" style="background: none; border: none; cursor: pointer; padding: 0;">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                </button>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+            </button>
 
-                <a id="download-btn" download style="background: none; border: none; cursor: pointer; padding: 0;">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 15v4a4 4 0 0 1-4 4H5a4 4 0 0 1-4-4v-4" />
-                        <polyline points="7 10 12 15 17 10" />
-                        <line x1="12" y1="15" x2="12" y2="3" />
-                    </svg>
-                </a>
-            </div>
-
-            <img id="zoom-image" />
-        </div>
-
-        <div onclick="closeZoom()" style="position: absolute; width: 100%; height: 100%; top: 0; left: 0; z-index: 0;"></div>
+            <a id="download-btn" download style="background: none; border: none; cursor: pointer; padding: 0;">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a4 4 0 0 1-4 4H5a4 4 0 0 1-4-4v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+        </a>
     </div>
 
-    <div class="overlay" id="overlay" style="display: none;"></div>
+    <img id="zoom-image" />
+</div>
 
-    <div id="about" class="about-container" style="display: none;">
-        <span class="close-btn" onclick="hideContainer('about')">&times;</span>
-        <h2 class="section-title">About this AI Chatbot</h2>
-        <div class="section-content">
-            <p>This advanced AI chatbot is designed to provide intelligent conversations and assist users with various tasks. Built with cutting-edge technology, it offers a seamless and intuitive experience.</p>
-            <p>Our mission is to make AI accessible and helpful for everyone, providing accurate and relevant responses while maintaining user privacy and data security.</p>
-            <p>For support, please contact us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></p>
-            <p>©<span id="year"></span> AI Chatbot. All rights reserved.</p>
+<div onclick="closeZoom()" style="position: absolute; width: 100%; height: 100%; top: 0; left: 0; z-index: 0;"></div>
+</div>
+
+<div class="overlay" id="overlay" style="display: none;"></div>
+
+<div id="about" class="about-container" style="display: none;">
+    <span class="close-btn" onclick="hideContainer('about')">&times;</span>
+    <h2 class="section-title">About this AI Chatbot</h2>
+    <div class="section-content">
+        <p>This advanced AI chatbot is designed to provide intelligent conversations and assist users with various
+            tasks. Built with cutting-edge technology, it offers a seamless and intuitive experience.</p>
+        <p>Our mission is to make AI accessible and helpful for everyone, providing accurate and relevant responses
+            while maintaining user privacy and data security.</p>
+        <p>For support, please contact us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></p>
+        <p>©<span id="year"></span> AI Chatbot. All rights reserved.</p>
+    </div>
+</div>
+
+<div id="features" class="features-container" style="display: none;">
+    <span class="close-btn" onclick="hideContainer('features')">&times;</span>
+    <h2 class="section-title">Features</h2>
+    <ul class="features-list">
+        <li>Natural Language Processing for human-like conversations</li>
+        <li>Real-time response generation</li>
+        <li>Multi-language support</li>
+        <li>Context-aware conversations</li>
+        <li>Secure user authentication</li>
+        <li>Message history and copying</li>
+        <li>Customizable interface</li>
+        <li>Dark mode support</li>
+        <li>Responsive design for all devices</li>
+        <li>Facebook-style posts feed with media sharing</li>
+        <li>Like and comment functionality on posts</li>
+        <li>User directory to find and connect with all registered users</li>
+        <li>Multiplayer checkers game with real-time moves</li>
+    </ul>
+</div>
+
+<div id="help" class="help-container" style="display: none;">
+    <span class="close-btn" onclick="hideContainer('help')">&times;</span>
+    <h2 class="section-title">Help Center</h2>
+    <div class="help-section">
+        <div class="help-question">How do I start a conversation?</div>
+        <div class="help-answer">Simply type your message in the chat input box and press enter or click the send
+            button.</div>
+    </div>
+    <div class="help-section">
+        <div class="help-question">Can I copy the bot's responses?</div>
+        <div class="help-answer">Yes, click the copy button below any bot message to copy its content to your
+            clipboard.</div>
+    </div>
+    <div class="help-section">
+        <div class="help-question">How can I edit images using a link?</div>
+        <div class="help-answer">
+            You can easily edit or transform any image using the <b>!nanoedit</b> command.<br><br>
+            <b>Usage:</b><br>
+            <code>!nanoedit &lt;image_link&gt; | &lt;prompt&gt;</code><br><br>
+            <b>Example:</b><br>
+            <code>!nanoedit https://example.com/photo.jpg | turn this person into a cartoon superhero</code><br><br>
+            ➤ The bot will automatically process the image using Nano Banana AI and send back the edited image.<br><br>
+            💡 <i>Tip:</i> Make sure your image link is public and ends with .jpg, .png, or .jpeg.
         </div>
     </div>
-
-    <div id="features" class="features-container" style="display: none;">
-        <span class="close-btn" onclick="hideContainer('features')">&times;</span>
-        <h2 class="section-title">Features</h2>
-        <ul class="features-list">
-            <li>Natural Language Processing for human-like conversations</li>
-            <li>Real-time response generation</li>
-            <li>Multi-language support</li>
-            <li>Context-aware conversations</li>
-            <li>Secure user authentication</li>
-            <li>Message history and copying</li>
-            <li>Customizable interface</li>
-            <li>Dark mode support</li>
-            <li>Responsive design for all devices</li>
-            <li>Facebook-style posts feed with media sharing</li>
-            <li>Like and comment functionality on posts</li>
-            <li>User directory to find and connect with all registered users</li>
-            <li>Multiplayer checkers game with real-time moves</li>
-        </ul>
+    <div class="help-section">
+        <div class="help-question">How do I create a post?</div>
+        <div class="help-answer">
+            To create a post:<br><br>
+            1. Click on "Posts Feed" in the menu<br>
+            2. Click the "Create Post" button<br>
+            3. Type your message (up to 500 characters)<br>
+            4. Optionally add photos or videos<br>
+            5. Click "Post" to share with the community<br><br>
+            You can also like and comment on other users' posts!
+        </div>
     </div>
-
-    <div id="help" class="help-container" style="display: none;">
-        <span class="close-btn" onclick="hideContainer('help')">&times;</span>
-        <h2 class="section-title">Help Center</h2>
-        <div class="help-section">
-            <div class="help-question">How do I start a conversation?</div>
-            <div class="help-answer">Simply type your message in the chat input box and press enter or click the send button.</div>
+    <div class="help-section">
+        <div class="help-question">How do I find and connect with other users?</div>
+        <div class="help-answer">
+            To find and connect with other users:<br><br>
+            1. Click on "All Users" in the menu<br>
+            2. Browse through the user directory<br>
+            3. Use the search bar to find specific users<br>
+            4. Filter users by status (Online, New, Active)<br>
+            5. Click on any user card to:<br>
+            • View their profile<br>
+            • Send them a private message<br>
+            • See their activity stats<br><br>
+            This feature helps you discover and connect with people who share similar interests!
         </div>
-        <div class="help-section">
-            <div class="help-question">Can I copy the bot's responses?</div>
-            <div class="help-answer">Yes, click the copy button below any bot message to copy its content to your clipboard.</div>
+    </div>
+    <div class="help-section">
+        <div class="help-question">How do I play Checkers?</div>
+        <div class="help-answer">
+            To play multiplayer checkers:<br><br>
+            1. Click on "Checkers" in the menu<br>
+            2. Create a new room (you'll get a 6‑character code) or join an existing room with a code.<br>
+            3. Wait for a second player to join (first player is white, second is black).<br>
+            4. Click on a piece to select it, then click on a highlighted square to move.<br>
+            5. Capturing is forced – if you can capture, you must capture.<br>
+            6. Kings are crowned when they reach the opposite side.<br><br>
+            The game updates in real‑time for both players.
         </div>
-        <div class="help-section">
-            <div class="help-question">How can I edit images using a link?</div>
-            <div class="help-answer">
-                You can easily edit or transform any image using the <b>!nanoedit</b> command.<br><br>
-                <b>Usage:</b><br>
-                <code>!nanoedit &lt;image_link&gt; | &lt;prompt&gt;</code><br><br>
-                <b>Example:</b><br>
-                <code>!nanoedit https://example.com/photo.jpg | turn this person into a cartoon superhero</code><br><br>
-                ➤ The bot will automatically process the image using Nano Banana AI and send back the edited image.<br><br>
-                💡 <i>Tip:</i> Make sure your image link is public and ends with .jpg, .png, or .jpeg.
-            </div>
-        </div>
-        <div class="help-section">
-            <div class="help-question">How do I create a post?</div>
-            <div class="help-answer">
-                To create a post:<br><br>
-                1. Click on "Posts Feed" in the menu<br>
-                2. Click the "Create Post" button<br>
-                3. Type your message (up to 500 characters)<br>
-                4. Optionally add photos or videos<br>
-                5. Click "Post" to share with the community<br><br>
-                You can also like and comment on other users' posts!
-            </div>
-        </div>
-        <div class="help-section">
-            <div class="help-question">How do I find and connect with other users?</div>
-            <div class="help-answer">
-                To find and connect with other users:<br><br>
-                1. Click on "All Users" in the menu<br>
-                2. Browse through the user directory<br>
-                3. Use the search bar to find specific users<br>
-                4. Filter users by status (Online, New, Active)<br>
-                5. Click on any user card to:<br>
-                   • View their profile<br>
-                   • Send them a private message<br>
-                   • See their activity stats<br><br>
-                This feature helps you discover and connect with people who share similar interests!
-            </div>
-        </div>
-        <div class="help-section">
-            <div class="help-question">How do I play Checkers?</div>
-            <div class="help-answer">
-                To play multiplayer checkers:<br><br>
-                1. Click on "Checkers" in the menu<br>
-                2. Create a new room (you'll get a 6‑character code) or join an existing room with a code.<br>
-                3. Wait for a second player to join (first player is white, second is black).<br>
-                4. Click on a piece to select it, then click on a highlighted square to move.<br>
-                5. Capturing is forced – if you can capture, you must capture.<br>
-                6. Kings are crowned when they reach the opposite side.<br><br>
-                The game updates in real‑time for both players.
-            </div>
-        </div>
-        <div class="help-section">
-            <div class="help-question">How do I change my settings?</div>
-            <div class="help-answer">Navigate to the Settings section through the menu to customize your experience.</div>
-        </div>
-        <div class="help-section">
-            <div class="help-question">Is my data secure?</div>
-            <div class="help-answer">Yes, we use secure authentication and encryption to protect your conversations and personal data.</div>
-        </div>
-        <div class="help-section">
-            <div class="help-question">How can I contact support?</div>
-            <div class="help-answer">For any assistance, please email us at: <a href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
+    </div>
+    <div class="help-section">
+        <div class="help-question">How do I change my settings?</div>
+        <div class="help-answer">Navigate to the Settings section through the menu to customize your experience.</div>
+    </div>
+    <div class="help-section">
+        <div class="help-question">Is my data secure?</div>
+        <div class="help-answer">Yes, we use secure authentication and encryption to protect your conversations and
+            personal data.</div>
+    </div>
+    <div class="help-section">
+        <div class="help-question">How can I contact support?</div>
+        <div class="help-answer">For any assistance, please email us at: <a
+            href="mailto:trex28806@gmail.com">trex28806@gmail.com</a></div>
         </div>
     </div>
     <script>
@@ -5438,11 +5466,11 @@
                 const authBox = document.querySelector('.auth-box');
                 const originalContent = authBox.innerHTML;
                 authBox.innerHTML = `
-                            <div style="text-align: center; padding: 20px;">
-                                <div class="loading-spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid #4285F4; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px;"></div>
-                                <p style="color: #65676b;">Connecting to Google...</p>
-                            </div>
-                        `;
+                <div style="text-align: center; padding: 20px;">
+                    <div class="loading-spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid #4285F4; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px;"></div>
+                    <p style="color: #65676b;">Connecting to Google...</p>
+                </div>
+                `;
 
                 // Get Google OAuth URL from server
                 const response = await fetch('/api/auth/google');
@@ -5472,11 +5500,11 @@
                 const authBox = document.querySelector('.auth-box');
                 const originalContent = authBox.innerHTML;
                 authBox.innerHTML = `
-                            <div style="text-align: center; padding: 20px;">
-                                <div class="loading-spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid #1877F2; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px;"></div>
-                                <p style="color: #65676b;">Connecting to Facebook...</p>
-                            </div>
-                        `;
+                <div style="text-align: center; padding: 20px;">
+                    <div class="loading-spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid #1877F2; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px;"></div>
+                    <p style="color: #65676b;">Connecting to Facebook...</p>
+                </div>
+                `;
 
                 // Get Facebook OAuth URL from server
                 const response = await fetch('/api/auth/facebook');
@@ -5754,7 +5782,7 @@
                 return `${diffDays} days ago`;
             } else if (diffWeeks === 1) {
                 return '1 week ago';
-            } else if (diffWeeks < 4) {
+            } else if (diffWeeks < 7) {
                 return `${diffWeeks} weeks ago`;
             } else {
                 // More than a month ago, show the date
@@ -5859,8 +5887,9 @@
                     if (statusDot && statusText) {
                         if (status === 'online') {
                             statusDot.style.backgroundColor = '#31a24c';
-                            statusText.innerHTML = `<span class="status-dot" style="background-color: #31a24c;"></span>
-                                                       <span>Online</span>`;
+                            statusText.innerHTML =
+                                `<span class="status-dot" style="background-color: #31a24c;"></span>
+                                           <span>Online</span>`;
                         } else {
                             statusDot.style.backgroundColor = '#bcc0c4';
                             // Fetch last seen from API if not provided
@@ -6148,32 +6177,34 @@
                                         // Display as text if not an image
                                         const pre = document.createElement('pre');
                                         pre.style.cssText = `
-                                            background: #f5f5f5;
-                                            padding: 10px;
-                                            border-radius: 5px;
-                                            overflow-x: auto;
-                                            margin-top: 5px;
-                                            font-size: 12px;
-                                            white-space: pre-wrap;
-                                            word-wrap: break-word;
-                                        `;
-                                        pre.textContent = content.substring(0, 500) + (content.length > 500 ? '...' : '');
+                                    background: #f5f5f5;
+                                    padding: 10px;
+                                    border-radius: 5px;
+                                    overflow-x: auto;
+                                    margin-top: 5px;
+                                    font-size: 12px;
+                                    white-space: pre-wrap;
+                                    word-wrap: break-word;
+                                `;
+                                        pre.textContent = content.substring(0, 500) + (content.length > 500 ? '...' :
+                                        '');
                                         contentDiv.appendChild(pre);
                                     }
                                 } else {
                                     // Display raw text content
                                     const pre = document.createElement('pre');
                                     pre.style.cssText = `
-                                        background: #f5f5f5;
-                                        padding: 10px;
-                                        border-radius: 5px;
-                                        overflow-x: auto;
-                                        margin-top: 5px;
-                                        font-size: 12px;
-                                        white-space: pre-wrap;
-                                        word-wrap: break-word;
-                                    `;
-                                    pre.textContent = content.substring(0, 500) + (content.length > 500 ? '...' : '');
+                                    background: #f5f5f5;
+                                    padding: 10px;
+                                    border-radius: 5px;
+                                    overflow-x: auto;
+                                    margin-top: 5px;
+                                    font-size: 12px;
+                                    white-space: pre-wrap;
+                                    word-wrap: break-word;
+                                `;
+                                    pre.textContent = content.substring(0, 500) + (content.length > 500 ? '...' :
+                                    '');
                                     contentDiv.appendChild(pre);
                                 }
                             }
@@ -6186,12 +6217,12 @@
                             link.target = "_blank";
                             link.rel = "noopener noreferrer";
                             link.style.cssText = `
-                                color: #0066cc;
-                                text-decoration: underline;
-                                display: block;
-                                margin-top: 5px;
-                                word-break: break-all;
-                            `;
+                        color: #0066cc;
+                        text-decoration: underline;
+                        display: block;
+                        margin-top: 5px;
+                        word-break: break-all;
+                    `;
                             contentDiv.appendChild(link);
                         }
                     }
@@ -6306,8 +6337,8 @@
         }
 
         // ===== MODIFIED: displayMessage to accept image_url and replyImageUrl =====
-        function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true, status = 'offline',
-            lastSeen = null, image_url = null, replyImageUrl = null) {
+        function displayMessage(text, sender, repliedTo = null, username = '', messageId = null, isNew = true,
+            status = 'offline', lastSeen = null, image_url = null, replyImageUrl = null) {
             if (!elements.chatContainer) return;
 
             // Check if message already exists to prevent duplicates
@@ -6320,8 +6351,8 @@
                 return;
             }
 
-            const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId, status, lastSeen, image_url,
-                replyImageUrl);
+            const messageDiv = createMessageElement(text, sender, repliedTo, username, messageId, status, lastSeen,
+                image_url, replyImageUrl);
 
             // Add event listeners to ALL messages
             addMessageTouchListeners(messageDiv);
@@ -6472,7 +6503,8 @@
 
                     // Show a welcome message
                     setTimeout(() => {
-                        showSuccess('Welcome! Here are all the users who have signed up. You can browse and connect with them.');
+                        showSuccess(
+                        'Welcome! Here are all the users who have signed up. You can browse and connect with them.');
                     }, 500);
                 }, 1000);
             }
@@ -6499,11 +6531,11 @@
                 const container = document.getElementById('all-users-container');
                 if (container) {
                     container.innerHTML = `
-                                <div class="users-loading" style="text-align: center; padding: 40px;">
-                                    <div class="loading-spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid #4267B2; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px;"></div>
-                                    <p style="color: #65676b;">Loading users...</p>
-                                </div>
-                            `;
+                    <div class="users-loading" style="text-align: center; padding: 40px;">
+                        <div class="loading-spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid #4267B2; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px;"></div>
+                        <p style="color: #65676b;">Loading users...</p>
+                    </div>
+                `;
                 }
 
                 // Load users without blocking UI
@@ -6536,11 +6568,11 @@
             if (!container) return;
 
             container.innerHTML = `
-                        <div class="users-loading">
-                            <div class="loading-spinner"></div>
-                            <p>Loading users...</p>
-                        </div>
-                    `;
+                <div class="users-loading">
+                    <div class="loading-spinner"></div>
+                    <p>Loading users...</p>
+                </div>
+            `;
         }
 
         // Load all users from server - OPTIMIZED for speed
@@ -6601,14 +6633,14 @@
             const container = document.getElementById('all-users-container');
             if (container) {
                 container.innerHTML = `
-                            <div class="no-users-found">
-                                <i class="fas fa-users" style="font-size: 48px; color: #ddd; margin-bottom: 15px;"></i>
-                                <p>No users found or failed to load</p>
-                                <button onclick="loadAllUsers()" class="filter-btn" style="margin-top: 15px;">
-                                    Try Again
-                                </button>
-                            </div>
-                        `;
+                    <div class="no-users-found">
+                        <i class="fas fa-users" style="font-size: 48px; color: #ddd; margin-bottom: 15px;"></i>
+                        <p>No users found or failed to load</p>
+                        <button onclick="loadAllUsers()" class="filter-btn" style="margin-top: 15px;">
+                            Try Again
+                        </button>
+                    </div>
+                `;
             }
             isUsersLoaded = false;
             usersLoadStarted = false;
@@ -6668,21 +6700,21 @@
             const statsElement = document.getElementById('all-users-stats');
             if (statsElement) {
                 statsElement.innerHTML = `
-                            <div class="user-stat-item">
-                                <i class="fas fa-users"></i>
-                                <span>${totalUsers} Total Users</span>
-                            </div>
-                            <div class="user-stat-item">
-                                <i class="fas fa-circle online"></i>
-                                <span>${allUsersList.filter(u => u.status === 'online').length} Online Now</span>
-                            </div>
-                            ${newUsers > 0 ? `
-                                <div class="user-stat-item new-users">
-                                    <i class="fas fa-user-plus"></i>
-                                    <span>${newUsers} New This Week</span>
-                                </div>
-                            ` : ''}
-                        `;
+                    <div class="user-stat-item">
+                        <i class="fas fa-users"></i>
+                        <span>${totalUsers} Total Users</span>
+                    </div>
+                    <div class="user-stat-item">
+                        <i class="fas fa-circle online"></i>
+                        <span>${allUsersList.filter(u => u.status === 'online').length} Online Now</span>
+                    </div>
+                    ${newUsers > 0 ? `
+                        <div class="user-stat-item new-users">
+                            <i class="fas fa-user-plus"></i>
+                            <span>${newUsers} New This Week</span>
+                        </div>
+                    ` : ''}
+                `;
             }
         }
 
@@ -6849,7 +6881,8 @@
             // Apply search filter if any
             if (currentSearchQuery) {
                 filtered = filtered.filter(user =>
-                    (user.display_name?.toLowerCase() || user.username.toLowerCase()).includes(currentSearchQuery) ||
+                    (user.display_name?.toLowerCase() || user.username.toLowerCase()).includes(
+                    currentSearchQuery) ||
                     (user.bio?.toLowerCase() || '').includes(currentSearchQuery) ||
                     (user.interests?.toLowerCase() || '').includes(currentSearchQuery) ||
                     (user.location?.toLowerCase() || '').includes(currentSearchQuery)
@@ -6868,25 +6901,25 @@
             // If no users loaded yet and not loading, show empty state
             if (filteredUsers.length === 0 && isUsersLoaded) {
                 container.innerHTML = `
-                            <div class="no-users-found">
-                                <i class="fas fa-users" style="font-size: 48px; color: #ddd; margin-bottom: 15px;"></i>
-                                <p>No users found matching your criteria</p>
-                                <button onclick="filterUsers('all')" class="filter-btn" style="margin-top: 15px;">
-                                    Show All Users
-                                </button>
-                            </div>
-                        `;
+                    <div class="no-users-found">
+                        <i class="fas fa-users" style="font-size: 48px; color: #ddd; margin-bottom: 15px;"></i>
+                        <p>No users found matching your criteria</p>
+                        <button onclick="filterUsers('all')" class="filter-btn" style="margin-top: 15px;">
+                            Show All Users
+                        </button>
+                    </div>
+                `;
                 return;
             }
 
             // If users are still loading
             if (!isUsersLoaded) {
                 container.innerHTML = `
-                            <div class="users-loading">
-                                <div class="loading-spinner"></div>
-                                <p>Loading users...</p>
-                            </div>
-                        `;
+                    <div class="users-loading">
+                        <div class="loading-spinner"></div>
+                        <p>Loading users...</p>
+                    </div>
+                `;
                 return;
             }
 
@@ -6948,57 +6981,57 @@
             const isNewUser = diffDays <= 7 || user.is_new_user;
 
             card.innerHTML = `
-                        <div class="directory-user-header">
-                            <img src="${user.avatar || `https://i.pravatar.cc/150?u=${user.username}`}" 
-                                 alt="${user.display_name || user.username}" 
-                                 class="directory-user-avatar"
-                                 onerror="this.src='https://i.pravatar.cc/150?u=default'">
-                            ${isNewUser ? '<span class="new-user-badge">NEW</span>' : ''}
+                <div class="directory-user-header">
+                    <img src="${user.avatar || `https://i.pravatar.cc/150?u=${user.username}`}" 
+                         alt="${user.display_name || user.username}" 
+                         class="directory-user-avatar"
+                         onerror="this.src='https://i.pravatar.cc/150?u=default'">
+                    ${isNewUser ? '<span class="new-user-badge">NEW</span>' : ''}
+                </div>
+                
+                <div class="directory-user-info">
+                    <div class="directory-user-name">
+                        ${user.display_name || user.username}
+                        <span class="directory-user-details">@${user.username}</span>
+                    </div>
+                    
+                    <div class="directory-user-details">
+                        ${user.bio || 'No bio yet'}
+                    </div>
+                    
+                    <div class="user-stats">
+                        <div class="user-stat">
+                            <i class="fas fa-comment"></i>
+                            <span>${user.message_count || 0} messages</span>
                         </div>
-
-                        <div class="directory-user-info">
-                            <div class="directory-user-name">
-                                ${user.display_name || user.username}
-                                <span class="directory-user-details">@${user.username}</span>
-                            </div>
-
-                            <div class="directory-user-details">
-                                ${user.bio || 'No bio yet'}
-                            </div>
-
-                            <div class="user-stats">
-                                <div class="user-stat">
-                                    <i class="fas fa-comment"></i>
-                                    <span>${user.message_count || 0} messages</span>
-                                </div>
-                                <div class="user-stat">
-                                    <i class="fas fa-newspaper"></i>
-                                    <span>${user.post_count || 0} posts</span>
-                                </div>
-                                <div class="user-stat">
-                                    <i class="fas fa-chart-line"></i>
-                                    <span>${activityLevel}</span>
-                                </div>
-                            </div>
-
-                            <div class="directory-user-status">
-                                <span class="status-dot" style="background-color: ${statusColor};"></span>
-                                <span>${statusText}</span>
-                                ${user.status === 'offline' && user.last_seen ? `<span>• Last seen ${formatLastSeen(user.last_seen)}</span>` : ''}
-                                <span>• Joined ${timeJoined}</span>
-                                ${user.location ? `<span>• ${user.location}</span>` : ''}
-                            </div>
+                        <div class="user-stat">
+                            <i class="fas fa-newspaper"></i>
+                            <span>${user.post_count || 0} posts</span>
                         </div>
-
-                        <div class="directory-user-actions">
-                            <button class="directory-action-btn profile" onclick="showUserProfile('${user.username}')">
-                                <i class="fas fa-user"></i> Profile
-                            </button>
-                            <button class="directory-action-btn message" onclick="openPrivateChatFromDirectory('${user.username}')">
-                                <i class="fas fa-comment"></i> Message
-                            </button>
+                        <div class="user-stat">
+                            <i class="fas fa-chart-line"></i>
+                            <span>${activityLevel}</span>
                         </div>
-                    `;
+                    </div>
+                    
+                    <div class="directory-user-status">
+                        <span class="status-dot" style="background-color: ${statusColor};"></span>
+                        <span>${statusText}</span>
+                        ${user.status === 'offline' && user.last_seen ? `<span>• Last seen ${formatLastSeen(user.last_seen)}</span>` : ''}
+                        <span>• Joined ${timeJoined}</span>
+                        ${user.location ? `<span>• ${user.location}</span>` : ''}
+                    </div>
+                </div>
+                
+                <div class="directory-user-actions">
+                    <button class="directory-action-btn profile" onclick="showUserProfile('${user.username}')">
+                        <i class="fas fa-user"></i> Profile
+                    </button>
+                    <button class="directory-action-btn message" onclick="openPrivateChatFromDirectory('${user.username}')">
+                        <i class="fas fa-comment"></i> Message
+                    </button>
+                </div>
+            `;
 
             return card;
         }
@@ -7027,17 +7060,17 @@
                 const clearBtn = document.createElement('button');
                 clearBtn.innerHTML = '<i class="fas fa-times"></i>';
                 clearBtn.style.cssText = `
-                            position: absolute;
-                            right: 25px;
-                            top: 50%;
-                            transform: translateY(-50%);
-                            background: none;
-                            border: none;
-                            color: #65676b;
-                            cursor: pointer;
-                            padding: 5px;
-                            display: none;
-                        `;
+                    position: absolute;
+                    right: 25px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    background: none;
+                    border: none;
+                    color: #65676b;
+                    cursor: pointer;
+                    padding: 5px;
+                    display: none;
+                `;
 
                 searchContainer.appendChild(clearBtn);
 
@@ -7063,11 +7096,11 @@
             // Make sure filter buttons exist
             if (!filterButtons.querySelector('.filter-btn')) {
                 filterButtons.innerHTML = `
-                            <button class="filter-btn active" onclick="filterUsers('all')">All Users</button>
-                            <button class="filter-btn" onclick="filterUsers('online')">Online Now</button>
-                            <button class="filter-btn" onclick="filterUsers('new')">New Users</button>
-                            <button class="filter-btn" onclick="filterUsers('active')">Most Active</button>
-                        `;
+                    <button class="filter-btn active" onclick="filterUsers('all')">All Users</button>
+                    <button class="filter-btn" onclick="filterUsers('online')">Online Now</button>
+                    <button class="filter-btn" onclick="filterUsers('new')">New Users</button>
+                    <button class="filter-btn" onclick="filterUsers('active')">Most Active</button>
+                `;
             }
         }
 
@@ -7131,8 +7164,8 @@
 
             // Hide all info containers (INCLUDING PROFILE CONTAINER)
             document.querySelectorAll(
-                '.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container, .profile-container'
-                ).forEach(container => {
+                    '.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container, .profile-container'
+                    ).forEach(container => {
                 container.style.display = 'none';
             });
 
@@ -7146,16 +7179,16 @@
             if (container) {
                 container.style.display = 'block';
 
-                // Show the appropriate chat input - FIXED: use IDs for direct access
-                if (containerId === 'chat') {
-                    const chatInput = document.getElementById('chat-input-main');
-                    if (chatInput) chatInput.style.display = 'flex';
-                } else if (containerId === 'private-ai') {
-                    const chatInput = document.getElementById('chat-input-private');
-                    if (chatInput) chatInput.style.display = 'flex';
-                } else if (containerId === 'private-messages') {
-                    const chatInput = document.getElementById('chat-input-private-msg');
-                    if (chatInput) chatInput.style.display = 'flex';
+                // Show the appropriate chat input
+                if (containerId === 'chat' || containerId === 'private-ai') {
+                    const chatInput = container.querySelector('.chat-input');
+                    if (chatInput) {
+                        chatInput.style.display = 'flex';
+                        // Ensure it stays visible after a short delay
+                        setTimeout(() => {
+                            if (chatInput) chatInput.style.display = 'flex';
+                        }, 100);
+                    }
                 }
 
                 // For private messages, only show users panel initially
@@ -7467,27 +7500,27 @@
             createPostBox.onclick = openCreatePostModal; // Make entire box clickable
 
             createPostBox.innerHTML = `
-                        <div class="create-post-header">
-                            <img class="create-post-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/50?u=${currentUser}`}" alt="Your Avatar">
-                            <div class="create-post-input">
-                                What's on your mind?
-                            </div>
-                        </div>
-                        <div class="create-post-actions">
-                            <div class="create-post-action" onclick="event.stopPropagation(); openImageUpload()">
-                                <i class="fas fa-image" style="color: #45bd62;"></i>
-                                Photo
-                            </div>
-                            <div class="create-post-action" onclick="event.stopPropagation(); openVideoUpload()">
-                                <i class="fas fa-video" style="color: #f5533d;"></i>
-                                Video
-                            </div>
-                            <div class="create-post-action" onclick="event.stopPropagation(); openLocationShare()">
-                                <i class="fas fa-map-marker-alt" style="color: #f7b928;"></i>
-                                Location
-                            </div>
-                        </div>
-                    `;
+                <div class="create-post-header">
+                    <img class="create-post-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/50?u=${currentUser}`}" alt="Your Avatar">
+                    <div class="create-post-input">
+                        What's on your mind?
+                    </div>
+                </div>
+                <div class="create-post-actions">
+                    <div class="create-post-action" onclick="event.stopPropagation(); openImageUpload()">
+                        <i class="fas fa-image" style="color: #45bd62;"></i>
+                        Photo
+                    </div>
+                    <div class="create-post-action" onclick="event.stopPropagation(); openVideoUpload()">
+                        <i class="fas fa-video" style="color: #f5533d;"></i>
+                        Video
+                    </div>
+                    <div class="create-post-action" onclick="event.stopPropagation(); openLocationShare()">
+                        <i class="fas fa-map-marker-alt" style="color: #f7b928;"></i>
+                        Location
+                    </div>
+                </div>
+            `;
 
             createPostBoxContainer.appendChild(createPostBox);
             console.log('✅ Create post box setup complete in separate container');
@@ -7549,7 +7582,8 @@
                 // Every 3rd part starting from index 1 is an image URL (due to regex groups)
                 if ((i % 3 === 1) && parts[i]) {
                     const imageUrl = parts[i] + (parts[i + 1] || '') + (parts[i + 2] || '');
-                    processedContent += `<div class="post-content-image">
+                    processedContent +=
+                        `<div class="post-content-image">
                                 <img src="${escapeHtml(imageUrl)}" alt="Post image" onclick="openZoom('${escapeHtml(imageUrl)}')" loading="lazy">
                             </div>`;
                     // Skip the next two parts (file extension and query params)
@@ -7605,7 +7639,8 @@
             // Determine which options appear
             let menuItems = '';
             if (isAuthor || isAdmin) {
-                menuItems += `<button class="delete-btn" onclick="deletePost('${post.id}')"><i class="fas fa-trash"></i> Delete</button>`;
+                menuItems +=
+                    `<button class="delete-btn" onclick="deletePost('${post.id}')"><i class="fas fa-trash"></i> Delete</button>`;
             }
             if (isAuthor) {
                 const privacyText = post.visibility === 'private' ? 'Make Public' : 'Make Private';
@@ -7614,83 +7649,84 @@
             }
 
             postDiv.innerHTML = `
-                        <div class="post-header">
-                            <img class="post-author-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/50?u=${post.author}`}" alt="${post.author}">
-                            <div class="post-author-info">
-                                <div class="post-author-name">${userProfile.display_name || userProfile.displayName || post.author}</div>
-                                <div class="post-meta">
-                                    <span class="post-time">${timeAgo}</span>
-                                    <span>•</span>
-                                    <span class="post-visibility">${post.visibility === 'private' ? 'Private' : 'Public'}</span>
-                                </div>
-                            </div>
-                            ${menuItems ? `
-                            <div class="post-header-actions">
-                                <button class="post-menu-btn" onclick="togglePostMenu(this)">
-                                    <i class="fas fa-ellipsis-v"></i>
-                                </button>
-                                <div class="post-dropdown">
-                                    ${menuItems}
-                                </div>
-                            </div>
-                            ` : ''}
+                <div class="post-header">
+                    <img class="post-author-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/50?u=${post.author}`}" alt="${post.author}">
+                    <div class="post-author-info">
+                        <div class="post-author-name">${userProfile.display_name || userProfile.displayName || post.author}</div>
+                        <div class="post-meta">
+                            <span class="post-time">${timeAgo}</span>
+                            <span>•</span>
+                            <span class="post-visibility">${post.visibility === 'private' ? 'Private' : 'Public'}</span>
                         </div>
-                        ${post.content ? `<div class="post-content">${escapeHtml(post.content)}</div>` : ''}
-                        ${post.media ? `
-                            <div class="post-media">
-                                ${post.media.type === 'image' ? 
-                                    `<div class="post-image-container">
-                                        <img src="${post.media.url}" alt="Post image" onclick="openZoom('${post.media.url}')" loading="lazy">
-                                    </div>` : 
-                                    `<video controls><source src="${post.media.url}" type="video/mp4">Your browser does not support the video tag.</video>`
-                                }
-                            </div>
-                        ` : ''}
-                        <div class="post-stats">
-                            <div class="post-likes" onclick="likePost('${post.id}')">
-                                <i class="fas fa-thumbs-up"></i> ${post.likes || 0}
-                            </div>
-                            <div class="post-comments-count" onclick="toggleComments('${post.id}')">
-                                ${post.comments ? post.comments.length : 0} comments
+                    </div>
+                    ${menuItems ? `
+                        <div class="post-header-actions">
+                            <button class="post-menu-btn" onclick="togglePostMenu(this)">
+                                <i class="fas fa-ellipsis-v"></i>
+                            </button>
+                            <div class="post-dropdown">
+                                ${menuItems}
                             </div>
                         </div>
-                        <div class="post-actions">
-                            <button class="post-action like" onclick="likePost('${post.id}')">
-                                <i class="${post.userLiked ? 'fas' : 'far'} fa-thumbs-up"></i> Like
-                            </button>
-                            <button class="post-action" onclick="toggleComments('${post.id}')">
-                                <i class="far fa-comment"></i> Comment
-                            </button>
-                            <button class="post-action" onclick="sharePost('${post.id}')">
-                                <i class="far fa-share-square"></i> Share
-                            </button>
-                        </div>
-                        <div class="post-comments" id="comments-${post.id}" style="display: none;">
-                            <div class="comments-header">
-                                <span class="comments-title">Comments</span>
-                                <button class="close-comments" onclick="closeComments('${post.id}')">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            </div>
-                            <div class="comments-list" id="comments-list-${post.id}">
-                                ${post.comments ? post.comments.map(comment => {
-                                    const commentAuthorProfile = getUserProfile(comment.author_username || comment.author);
-                                    return `
-                                    <div class="comment">
-                                        <img class="comment-avatar" src="${commentAuthorProfile.avatar || `https://i.pravatar.cc/32?u=${comment.author_username || comment.author}`}" alt="${comment.author_username || comment.author}">
-                                        <div class="comment-content">
-                                            <div class="comment-author">${commentAuthorProfile.display_name || commentAuthorProfile.displayName || (comment.author_username || comment.author)}</div>
-                                            <div class="comment-text">${escapeHtml(comment.content || comment.text)}</div>
-                                        </div>
+                    ` : ''}
+                </div>
+                ${post.content ? `<div class="post-content">${escapeHtml(post.content)}</div>` : ''}
+                ${post.media ? `
+                    <div class="post-media">
+                        ${post.media.type === 'image' ? 
+                            `<div class="post-image-container">
+                                <img src="${post.media.url}" alt="Post image" onclick="openZoom('${post.media.url}')" loading="lazy">
+                            </div>` : 
+                            `<video controls><source src="${post.media.url}" type="video/mp4">Your browser does not support the video tag.</video>`
+                        }
+                    </div>
+                ` : ''}
+                <div class="post-stats">
+                    <div class="post-likes" onclick="likePost('${post.id}')">
+                        <i class="fas fa-thumbs-up"></i> ${post.likes || 0}
+                    </div>
+                    <div class="post-comments-count" onclick="toggleComments('${post.id}')">
+                        ${post.comments ? post.comments.length : 0} comments
+                    </div>
+                </div>
+                <div class="post-actions">
+                    <button class="post-action like" onclick="likePost('${post.id}')">
+                        <i class="${post.userLiked ? 'fas' : 'far'} fa-thumbs-up"></i> Like
+                    </button>
+                    <button class="post-action" onclick="toggleComments('${post.id}')">
+                        <i class="far fa-comment"></i> Comment
+                    </button>
+                    <button class="post-action" onclick="sharePost('${post.id}')">
+                        <i class="far fa-share-square"></i> Share
+                    </button>
+                </div>
+                <div class="post-comments" id="comments-${post.id}" style="display: none;">
+                    <div class="comments-header">
+                        <span class="comments-title">Comments</span>
+                        <button class="close-comments" onclick="closeComments('${post.id}')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="comments-list" id="comments-list-${post.id}">
+                        ${post.comments ? post.comments.map(comment => {
+                            const commentAuthorProfile = getUserProfile(comment.author_username || comment.author);
+                            return `
+                                <div class="comment">
+                                    <img class="comment-avatar" src="${commentAuthorProfile.avatar || `https://i.pravatar.cc/32?u=${comment.author_username || comment.author}`}" alt="${comment.author_username || comment.author}">
+                                    <div class="comment-content">
+                                        <div class="comment-author">${commentAuthorProfile.display_name || commentAuthorProfile.displayName || (comment.author_username || comment.author)}</div>
+                                        <div class="comment-text">${escapeHtml(comment.content || comment.text)}</div>
                                     </div>
-                                `}).join('') : '<div class="no-comments">No comments yet</div>'}
-                            </div>
-                            <div class="comment-input">
-                                <input type="text" id="comment-input-${post.id}" placeholder="Write a comment..." onkeypress="handleCommentKeypress(event, '${post.id}')">
-                                <button onclick="addCommentFromInput('${post.id}')">Post</button>
-                            </div>
-                        </div>
-                    `;
+                                </div>
+                            `;
+                        }).join('') : '<div class="no-comments">No comments yet</div>'}
+                    </div>
+                    <div class="comment-input">
+                        <input type="text" id="comment-input-${post.id}" placeholder="Write a comment..." onkeypress="handleCommentKeypress(event, '${post.id}')">
+                        <button onclick="addCommentFromInput('${post.id}')">Post</button>
+                    </div>
+                </div>
+            `;
 
             return postDiv;
         }
@@ -7867,8 +7903,8 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` :
-                            ''
+                        'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem(
+                            'auth_token')}` : ''
                     },
                     body: JSON.stringify(postData)
                 });
@@ -7949,8 +7985,8 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` :
-                            ''
+                        'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem(
+                            'auth_token')}` : ''
                     },
                     body: JSON.stringify({ username })
                 });
@@ -8037,8 +8073,8 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` :
-                            ''
+                        'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem(
+                            'auth_token')}` : ''
                     },
                     body: JSON.stringify({
                         author_username: username,
@@ -8132,12 +8168,12 @@
                             const userProfile = getUserProfile(comment.author_username || comment.author);
 
                             commentElement.innerHTML = `
-                                        <img class="comment-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/32?u=${comment.author_username || comment.author}`}" alt="${comment.author_username || comment.author}">
-                                        <div class="comment-content">
-                                            <div class="comment-author">${userProfile.display_name || userProfile.displayName || (comment.author_username || comment.author)}</div>
-                                            <div class="comment-text">${escapeHtml(comment.content || comment.text)}</div>
-                                        </div>
-                                    `;
+                                <img class="comment-avatar" src="${userProfile.avatar || `https://i.pravatar.cc/32?u=${comment.author_username || comment.author}`}" alt="${comment.author_username || comment.author}">
+                                <div class="comment-content">
+                                    <div class="comment-author">${userProfile.display_name || userProfile.displayName || (comment.author_username || comment.author)}</div>
+                                    <div class="comment-text">${escapeHtml(comment.content || comment.text)}</div>
+                                </div>
+                            `;
 
                             commentsList.appendChild(commentElement);
                         });
@@ -8349,14 +8385,14 @@
             const previewContainer = document.getElementById('post-media-preview');
             if (previewContainer) {
                 previewContainer.innerHTML = `
-                            <div class="media-preview-item">
-                                ${type === 'image' ? 
-                                    `<img src="${url}" alt="Preview">` : 
-                                    `<video controls><source src="${url}" type="video/mp4">Your browser does not support the video tag.</video>`
-                                }
-                                <button class="remove-media" onclick="removeMedia()">×</button>
-                            </div>
-                        `;
+                    <div class="media-preview-item">
+                        ${type === 'image' ? 
+                            `<img src="${url}" alt="Preview">` : 
+                            `<video controls><source src="${url}" type="video/mp4">Your browser does not support the video tag.</video>`
+                        }
+                        <button class="remove-media" onclick="removeMedia()">×</button>
+                    </div>
+                `;
             }
 
             // Enable submit button if there's media
@@ -8941,13 +8977,13 @@
         function updateReplyPreviewDeleted() {
             if (elements.replyPreview) {
                 elements.replyPreview.innerHTML = `
-                            <div class="reply-preview" style="background-color: #ffebee; border-left-color: #f44336;">
-                                <div style="display:flex; justify-content:space-between; align-items:center;">
-                                    <span style="color:#d32f2f;">The message you replied to was deleted.</span>
-                                    <button onclick="clearReply()" style="margin-left:5px; font-size:12px; padding:2px 5px;">Cancel</button>
-                                </div>
-                            </div>
-                        `;
+                    <div class="reply-preview" style="background-color: #ffebee; border-left-color: #f44336;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="color:#d32f2f;">The message you replied to was deleted.</span>
+                            <button onclick="clearReply()" style="margin-left:5px; font-size:12px; padding:2px 5px;">Cancel</button>
+                        </div>
+                    </div>
+                `;
                 // Optionally disable send button
                 // elements.sendButton.disabled = true;
                 // elements.sendButton.classList.remove('enabled');
@@ -9100,7 +9136,24 @@
             if (pendingPostId) {
                 showContainer('posts');
             } else {
-                showContainer('chat');
+                // --- FIX: Ensure chat is shown with input visible immediately ---
+                // Use requestAnimationFrame to ensure DOM is ready, then show chat
+                requestAnimationFrame(() => {
+                    showContainer('chat');
+                    // Double-check chat input visibility after a short delay
+                    setTimeout(() => {
+                        const chatContainer = document.getElementById('chat');
+                        if (chatContainer) {
+                            const chatInput = chatContainer.querySelector('.chat-input');
+                            if (chatInput) {
+                                chatInput.style.display = 'flex';
+                            }
+                            // Also ensure the container is visible
+                            chatContainer.style.display = 'block';
+                        }
+                    }, 50);
+                });
+                // --- End fix ---
             }
 
             // Show welcome message instead of login prompt
@@ -9508,7 +9561,8 @@
                             gender: data.profile.gender || '',
                             location: data.profile.location || '',
                             interests: data.profile.interests || '',
-                            avatar: data.profile.avatar || `https://i.pravatar.cc/150?u=${username}`,
+                            avatar: data.profile.avatar ||
+                            `https://i.pravatar.cc/150?u=${username}`,
                             display_name: data.profile.display_name || username,
                             status: data.profile.status || 'offline',
                             last_seen: data.profile.last_seen || null
@@ -9619,15 +9673,15 @@
             }
 
             typingIndicator.innerHTML = `
-                        <div class="typing-indicator-message">
-                            <div class="typing-dots">
-                                <div class="typing-dot"></div>
-                                <div class="typing-dot"></div>
-                                <div class="typing-dot"></div>
-                            </div>
-                            <span class="typing-text">${message}</span>
-                        </div>
-                    `;
+                <div class="typing-indicator-message">
+                    <div class="typing-dots">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                    <span class="typing-text">${message}</span>
+                </div>
+            `;
             typingIndicator.style.display = 'block';
         }
 
@@ -9942,7 +9996,8 @@
             const infoDiv = document.createElement('div');
             infoDiv.className = 'info-message';
             infoDiv.textContent = message;
-            infoDiv.style.cssText = 'background:#e7f3ff;color:#0066cc;padding:5px;border-radius:4px;margin:5px;text-align:center;';
+            infoDiv.style.cssText =
+            'background:#e7f3ff;color:#0066cc;padding:5px;border-radius:4px;margin:5px;text-align:center;';
             document.body.appendChild(infoDiv);
             setTimeout(() => infoDiv.remove(), 2000);
         }
@@ -10032,7 +10087,8 @@
                     if (sendBtn) {
                         setTimeout(() => {
                             sendBtn.disabled = !(input.value.trim().length > 0 || privateAIAttachedImageUrl);
-                            sendBtn.classList.toggle('enabled', input.value.trim().length > 0 || privateAIAttachedImageUrl);
+                            sendBtn.classList.toggle('enabled', input.value.trim().length > 0 ||
+                                privateAIAttachedImageUrl);
                         }, 500);
                     }
                     return;
@@ -10710,19 +10766,20 @@
             if (!messageExists && replyToMessageId) {
                 // Message was deleted, show warning
                 elements.replyPreview.innerHTML = `
-                            <div class="reply-preview" style="background-color: #ffebee; border-left-color: #f44336;">
-                                <span style="color:#d32f2f;">The message you replied to was deleted.</span>
-                                <button onclick="clearReply()" title="Cancel reply"><i class="fas fa-times"></i></button>
-                            </div>
-                        `;
+                    <div class="reply-preview" style="background-color: #ffebee; border-left-color: #f44336;">
+                        <span style="color:#d32f2f;">The message you replied to was deleted.</span>
+                        <button onclick="clearReply()" title="Cancel reply"><i class="fas fa-times"></i></button>
+                    </div>
+                `;
             } else {
                 // Normal reply preview with optional image thumbnail
                 let previewHtml = `<div class="reply-preview" data-reply-id="${replyToMessageId || ''}">`;
                 if (replyToImageUrl) {
-                    previewHtml += `<div style="display:flex; align-items:center; gap:5px; margin-bottom:3px;">
-                                <img src="${replyToImageUrl}" style="width:40px; height:40px; object-fit:cover; border-radius:4px;">
-                                <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Replying to: ${replyToText ? replyToText.substring(0, 80) : 'a message'}</span>
-                            </div>`;
+                    previewHtml +=
+                        `<div style="display:flex; align-items:center; gap:5px; margin-bottom:3px;">
+                                    <img src="${replyToImageUrl}" style="width:40px; height:40px; object-fit:cover; border-radius:4px;">
+                                    <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Replying to: ${replyToText ? replyToText.substring(0, 80) : 'a message'}</span>
+                                </div>`;
                 } else {
                     previewHtml +=
                         `<span>Replying to: ${replyToText ? replyToText.substring(0, 80) : 'a message'}</span>`;
@@ -10743,18 +10800,18 @@
 
             if (!messageExists && privateReplyToMessageId) {
                 privatePreview.innerHTML = `
-                            <div class="reply-preview" style="background-color: #ffebee; border-left-color: #f44336;">
-                                <span style="color:#d32f2f;">The message you replied to was deleted.</span>
-                                <button onclick="clearPrivateReply()" title="Cancel reply"><i class="fas fa-times"></i></button>
-                            </div>
-                        `;
+                    <div class="reply-preview" style="background-color: #ffebee; border-left-color: #f44336;">
+                        <span style="color:#d32f2f;">The message you replied to was deleted.</span>
+                        <button onclick="clearPrivateReply()" title="Cancel reply"><i class="fas fa-times"></i></button>
+                    </div>
+                `;
             } else {
                 privatePreview.innerHTML = `
-                            <div class="reply-preview" data-reply-id="${privateReplyToMessageId || ''}">
-                                <span>Replying to: ${privateReplyToText ? privateReplyToText.substring(0, 80) : 'a message'}</span>
-                                <button onclick="clearPrivateReply()" title="Cancel reply"><i class="fas fa-times"></i></button>
-                            </div>
-                        `;
+                    <div class="reply-preview" data-reply-id="${privateReplyToMessageId || ''}">
+                        <span>Replying to: ${privateReplyToText ? privateReplyToText.substring(0, 80) : 'a message'}</span>
+                        <button onclick="clearPrivateReply()" title="Cancel reply"><i class="fas fa-times"></i></button>
+                    </div>
+                `;
             }
         }
 
@@ -11327,8 +11384,8 @@
                     const savedMsg = await msgRes.json();
 
                     // Display immediately (will also come via socket)
-                    displayMessage(savedMsg.content, 'sent', null, savedMsg.username, savedMsg.id, true, null, null, savedMsg
-                        .image_url);
+                    displayMessage(savedMsg.content, 'sent', null, savedMsg.username, savedMsg.id, true, null, null,
+                        savedMsg.image_url);
 
                     fileInput.value = ''; // reset
                 } catch (err) {
@@ -11435,12 +11492,13 @@
 
                 // Get conversations from server
                 const token = localStorage.getItem('auth_token');
-                const response = await fetch(`/api/private/conversations?username=${encodeURIComponent(currentUser)}`, {
-                    headers: {
-                        'Authorization': token ? `Bearer ${token}` : '',
-                        'Content-Type': 'application/json'
-                    }
-                });
+                const response = await fetch(
+                    `/api/private/conversations?username=${encodeURIComponent(currentUser)}`, {
+                        headers: {
+                            'Authorization': token ? `Bearer ${token}` : '',
+                            'Content-Type': 'application/json'
+                        }
+                    });
 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -11471,18 +11529,18 @@
                     const isOnline = lastSeenData.status === 'online';
 
                     userItem.innerHTML = `
-                                <div class="user-avatar">
-                                    <img src="${profile.avatar || getAvatarUrl(conversation.username)}" alt="${conversation.username}" loading="lazy">
-                                    <div class="user-status ${isOnline ? 'online' : 'offline'}"></div>
-                                    ${conversation.unread ? '<div class="unread-badge"></div>' : ''}
-                                </div>
-                                <div class="user-info">
-                                    <div class="user-name">${profile.display_name || conversation.username}</div>
-                                    <div class="user-last-message">${conversation.isSender ? 'You: ' : ''}${conversation.lastMessage || 'No messages'}</div>
-                                    <div class="user-time">${formatMessageTime(conversation.lastMessageTime)}</div>
-                                    ${!isOnline && lastSeenData.last_seen ? `<div class="user-last-seen">Last seen ${formatLastSeen(lastSeenData.last_seen)}</div>` : ''}
-                                </div>
-                            `;
+                        <div class="user-avatar">
+                            <img src="${profile.avatar || getAvatarUrl(conversation.username)}" alt="${conversation.username}" loading="lazy">
+                            <div class="user-status ${isOnline ? 'online' : 'offline'}"></div>
+                            ${conversation.unread ? '<div class="unread-badge"></div>' : ''}
+                        </div>
+                        <div class="user-info">
+                            <div class="user-name">${profile.display_name || conversation.username}</div>
+                            <div class="user-last-message">${conversation.isSender ? 'You: ' : ''}${conversation.lastMessage || 'No messages'}</div>
+                            <div class="user-time">${formatMessageTime(conversation.lastMessageTime)}</div>
+                            ${!isOnline && lastSeenData.last_seen ? `<div class="user-last-seen">Last seen ${formatLastSeen(lastSeenData.last_seen)}</div>` : ''}
+                        </div>
+                    `;
 
                     usersList.appendChild(userItem);
                 }
@@ -11536,7 +11594,8 @@
                 document.getElementById('partner-status').style.color = '#4CAF50';
             } else {
                 if (lastSeenData.last_seen) {
-                    document.getElementById('partner-status').textContent = `Last seen ${formatLastSeen(lastSeenData.last_seen)}`;
+                    document.getElementById('partner-status').textContent =
+                        `Last seen ${formatLastSeen(lastSeenData.last_seen)}`;
                 } else {
                     document.getElementById('partner-status').textContent = 'Offline';
                 }
@@ -11547,7 +11606,7 @@
             showChatContainer();
 
             // Show chat input
-            document.getElementById('chat-input-private-msg').style.display = 'flex';
+            document.getElementById('private-chat-input').style.display = 'flex';
 
             // Join Socket.io room for real-time updates
             if (socket) {
@@ -11597,10 +11656,10 @@
 
                 if (!messages || messages.length === 0) {
                     messagesContainer.innerHTML = `
-                                <div class="no-messages">
-                                    <p>No messages yet. Start a conversation with ${username}!</p>
-                                </div>
-                            `;
+                        <div class="no-messages">
+                            <p>No messages yet. Start a conversation with ${username}!</p>
+                        </div>
+                    `;
                     return;
                 }
 
@@ -11636,9 +11695,9 @@
             const time = formatMessageTime(timestamp);
 
             messageDiv.innerHTML = `
-                        <div class="message-content">${text}</div>
-                        <div class="message-time">${time}</div>
-                    `;
+                <div class="message-content">${text}</div>
+                <div class="message-time">${time}</div>
+            `;
 
             messagesContainer.appendChild(messageDiv);
 
@@ -11762,7 +11821,8 @@
                         currentPrivateChatUser === message.receiver_username)) {
 
                     const senderType = message.sender_username === currentUser ? 'sent' : 'received';
-                    displayPrivateUserMessage(message.content, senderType, message.created_at, message.sender_username);
+                    displayPrivateUserMessage(message.content, senderType, message.created_at, message
+                        .sender_username);
 
                     // Mark as read if we're the receiver
                     if (message.receiver_username === currentUser) {
@@ -11847,19 +11907,20 @@
 
             if (!badge) {
                 // Create badge if it doesn't exist
-                const privateMessagesLink = document.querySelector('a[onclick="showContainer(\'private-messages\')"]');
+                const privateMessagesLink = document.querySelector(
+                    'a[onclick="showContainer(\'private-messages\')"]');
                 if (privateMessagesLink) {
                     badge = document.createElement('span');
                     badge.id = 'private-messages-badge';
                     badge.className = 'menu-badge';
                     badge.style.cssText = `
-                                background: #ff4444;
-                                color: white;
-                                border-radius: 10px;
-                                padding: 2px 6px;
-                                font-size: 11px;
-                                margin-left: 5px;
-                            `;
+                        background: #ff4444;
+                        color: white;
+                        border-radius: 10px;
+                        padding: 2px 6px;
+                        font-size: 11px;
+                        margin-left: 5px;
+                    `;
                     privateMessagesLink.appendChild(badge);
                 }
             }
@@ -11886,7 +11947,8 @@
                         const username = item.dataset.username;
                         const displayName = username.toLowerCase();
 
-                        if (displayName.includes(searchTerm) || username.toLowerCase().includes(searchTerm)) {
+                        if (displayName.includes(searchTerm) || username.toLowerCase().includes(
+                            searchTerm)) {
                             item.style.display = 'flex';
                         } else {
                             item.style.display = 'none';
@@ -11909,13 +11971,13 @@
                     typingIndicator.id = 'private-typing-indicator';
                     typingIndicator.className = 'typing-indicator';
                     typingIndicator.innerHTML = `
-                                ${data.username} is typing
-                                <div class="typing-dots">
-                                    <div class="typing-dot"></div>
-                                    <div class="typing-dot"></div>
-                                    <div class="typing-dot"></div>
-                                </div>
-                            `;
+                        ${data.username} is typing
+                        <div class="typing-dots">
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                        </div>
+                    `;
                     messagesContainer.appendChild(typingIndicator);
                 }
             } else if (typingIndicator) {
@@ -11985,7 +12047,7 @@
                 }
 
                 // Hide chat input
-                const chatInput = document.getElementById('chat-input-private-msg');
+                const chatInput = document.getElementById('private-chat-input');
                 if (chatInput) {
                     chatInput.style.display = 'none';
                 }
@@ -12025,7 +12087,7 @@
 
                 // Show chat input if we have a user selected
                 if (currentPrivateChatUser) {
-                    const chatInput = document.getElementById('chat-input-private-msg');
+                    const chatInput = document.getElementById('private-chat-input');
                     if (chatInput) {
                         chatInput.style.display = 'flex';
                     }
@@ -12110,7 +12172,8 @@
                     if (document.getElementById('profile-firstname')) {
                         document.getElementById('profile-firstname').value = profileCache[username].firstname;
                         document.getElementById('profile-lastname').value = profileCache[username].lastname;
-                        document.getElementById('profile-username').value = profileCache[username].username || username;
+                        document.getElementById('profile-username').value = profileCache[username].username ||
+                            username;
                         document.getElementById('profile-bio').value = profileCache[username].bio;
                         document.getElementById('profile-age').value = profileCache[username].age;
                         document.getElementById('profile-gender').value = profileCache[username].gender;
@@ -12371,8 +12434,8 @@
                     displayUsername.textContent = profile.lastname;
                 } else {
                     // Use display_name or username if no first/last name
-                    displayUsername.textContent = profile.display_name || profile.username || currentUserSession?.username ||
-                        'User';
+                    displayUsername.textContent = profile.display_name || profile.username || currentUserSession
+                        ?.username || 'User';
                 }
             }
 
@@ -12381,8 +12444,8 @@
             }
 
             if (displayAvatar) {
-                displayAvatar.src = profile.avatar || getAvatarUrl(profile.username || currentUserSession?.username ||
-                'default');
+                displayAvatar.src = profile.avatar || getAvatarUrl(profile.username || currentUserSession
+                    ?.username || 'default');
             }
 
             console.log('✅ Profile display updated');
@@ -12440,17 +12503,17 @@
                 };
 
                 profileSection.innerHTML = `
-                            <div class="profile-display-avatar">
-                                <img id="display-avatar" src="${profile.avatar}" alt="Profile" loading="lazy">
-                            </div>
-                            <div class="profile-display-info">
-                                <div class="profile-display-username" id="display-username">${profile.display_name}</div>
-                                <div class="profile-display-bio" id="display-bio">${profile.bio}</div>
-                            </div>
-                            <div class="profile-display-edit" onclick="showContainer('profile')">
-                                Edit
-                            </div>
-                        `;
+                    <div class="profile-display-avatar">
+                        <img id="display-avatar" src="${profile.avatar}" alt="Profile" loading="lazy">
+                    </div>
+                    <div class="profile-display-info">
+                        <div class="profile-display-username" id="display-username">${profile.display_name}</div>
+                        <div class="profile-display-bio" id="display-bio">${profile.bio}</div>
+                    </div>
+                    <div class="profile-display-edit" onclick="showContainer('profile')">
+                        Edit
+                    </div>
+                `;
 
                 const divider = document.createElement('div');
                 divider.className = 'menu-divider';
@@ -12546,8 +12609,8 @@
                     const usernameDiv = msg.querySelector('.username');
                     if (usernameDiv) {
                         // Find where to insert it
-                        const usernameText = Array.from(usernameDiv.childNodes).find(node => node.nodeType === Node
-                            .TEXT_NODE);
+                        const usernameText = Array.from(usernameDiv.childNodes).find(node => node.nodeType ===
+                            Node.TEXT_NODE);
                         if (usernameText) {
                             statusIndicator = createStatusIndicator();
                             usernameDiv.insertBefore(statusIndicator, usernameText.nextSibling);
@@ -12615,14 +12678,14 @@
                     const displayName = profile.display_name || user;
 
                     userElement.innerHTML = `
-                                <div class="online-user-avatar">
-                                    <img src="${avatarUrl}" alt="${displayName}" loading="lazy">
-                                    <div class="online-dot"></div>
-                                </div>
-                                <div class="online-user-info">
-                                    <div class="online-user-name">${displayName}</div>
-                                </div>
-                            `;
+                        <div class="online-user-avatar">
+                            <img src="${avatarUrl}" alt="${displayName}" loading="lazy">
+                            <div class="online-dot"></div>
+                        </div>
+                        <div class="online-user-info">
+                            <div class="online-user-name">${displayName}</div>
+                        </div>
+                    `;
 
                     userElement.onclick = () => {
                         showUserProfile(user);
@@ -12825,10 +12888,14 @@
             // Sample database for demonstration
             const sampleDatabase = {
                 users: [
-                    { id: 1, username: 'john_doe', email: 'john@example.com', status: 'active', created_at: '2024-01-15' },
-                    { id: 2, username: 'jane_smith', email: 'jane@example.com', status: 'active', created_at: '2024-01-16' },
-                    { id: 3, username: 'bob_wilson', email: 'bob@example.com', status: 'inactive', created_at: '2024-01-17' },
-                    { id: 4, username: 'alice_brown', email: 'alice@example.com', status: 'active', created_at: '2024-01-18' }
+                    { id: 1, username: 'john_doe', email: 'john@example.com', status: 'active',
+                    created_at: '2024-01-15' },
+                    { id: 2, username: 'jane_smith', email: 'jane@example.com', status: 'active',
+                    created_at: '2024-01-16' },
+                    { id: 3, username: 'bob_wilson', email: 'bob@example.com', status: 'inactive',
+                    created_at: '2024-01-17' },
+                    { id: 4, username: 'alice_brown', email: 'alice@example.com', status: 'active',
+                    created_at: '2024-01-18' }
                 ],
                 messages: [
                     { id: 1, user_id: 1, content: 'Hello everyone!', timestamp: '2024-01-15 10:30:00' },
@@ -12850,16 +12917,18 @@
                                     success: true,
                                     data: sampleDatabase.users.filter(user => user.status === 'active'),
                                     columns: ['id', 'username', 'email', 'status', 'created_at'],
-                                    rowCount: sampleDatabase.users.filter(user => user.status === 'active').length
+                                    rowCount: sampleDatabase.users.filter(user => user.status === 'active')
+                                        .length
                                 };
                             }
                             if (upperQuery.includes("USERNAME LIKE 'J%'")) {
                                 return {
                                     success: true,
-                                    data: sampleDatabase.users.filter(user => user.username.toLowerCase().startsWith('j')),
+                                    data: sampleDatabase.users.filter(user => user.username.toLowerCase()
+                                        .startsWith('j')),
                                     columns: ['id', 'username', 'email', 'status', 'created_at'],
-                                    rowCount: sampleDatabase.users.filter(user => user.username.toLowerCase().startsWith(
-                                        'j')).length
+                                    rowCount: sampleDatabase.users.filter(user => user.username.toLowerCase()
+                                        .startsWith('j')).length
                                 };
                             }
                         }
@@ -13034,12 +13103,12 @@
                 const queryItem = document.createElement('div');
                 queryItem.className = 'saved-query-item';
                 queryItem.innerHTML = `
-                            <div class="query-name">${query.name}</div>
-                            <div class="query-actions">
-                                <button onclick="loadQuery(${query.id})" class="query-btn load-btn">Load</button>
-                                <button onclick="deleteQuery(${query.id})" class="query-btn delete-btn">Delete</button>
-                            </div>
-                        `;
+                    <div class="query-name">${query.name}</div>
+                    <div class="query-actions">
+                        <button onclick="loadQuery(${query.id})" class="query-btn load-btn">Load</button>
+                        <button onclick="deleteQuery(${query.id})" class="query-btn delete-btn">Delete</button>
+                    </div>
+                `;
                 savedQueriesList.appendChild(queryItem);
             });
         }
@@ -13399,10 +13468,10 @@
                 const newsItem = document.createElement('div');
                 newsItem.className = 'news-item';
                 newsItem.innerHTML = `
-                            <h3>${news.title}</h3>
-                            <p>${news.description}</p>
-                            <small>${news.date}</small>
-                        `;
+                    <h3>${news.title}</h3>
+                    <p>${news.description}</p>
+                    <small>${news.date}</small>
+                `;
                 newsItems.appendChild(newsItem);
             });
         }
@@ -13517,7 +13586,8 @@
 
         // ===== FIXED: Helper function to get current chat container =====
         function getCurrentChatContainer() {
-            const activeContainers = document.querySelectorAll('.main-chat-interface[style*="display: block"]');
+            const activeContainers = document.querySelectorAll(
+            '.main-chat-interface[style*="display: block"]');
 
             for (let container of activeContainers) {
                 if (container.style.display === 'block') {
@@ -13538,8 +13608,8 @@
                     console.log('🔘 Overlay clicked - closing all sections');
                     // Hide all info containers (INCLUDING PROFILE)
                     document.querySelectorAll(
-                        '.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container, .profile-container'
-                        ).forEach(container => {
+                            '.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container, .profile-container'
+                            ).forEach(container => {
                         container.style.display = 'none';
                     });
                     this.style.display = 'none';
@@ -13825,8 +13895,8 @@
                 // Try to move selected piece to this square
                 const from = [selectedPiece.row, selectedPiece.col];
                 const to = [row, col];
-                const isValid = validMovesList.some(m => m.from[0] === from[0] && m.from[1] === from[1] && m.to[0] === to[
-                    0] && m.to[1] === to[1]);
+                const isValid = validMovesList.some(m => m.from[0] === from[0] && m.from[1] === from[1] && m.to[0] ===
+                    to[0] && m.to[1] === to[1]);
                 if (isValid) {
                     // Send move to server
                     const token = localStorage.getItem('auth_token');
@@ -13951,7 +14021,8 @@
                     const isCapture = Math.abs(movedTo[0] - data.lastMove.from[0]) === 2;
                     if (isCapture && gameCurrentTurn === yourRole) {
                         // Compute capture moves for the piece at the destination
-                        const captureMoves = computeValidMovesForPiece(currentBoard, movedTo[0], movedTo[1], yourRole)
+                        const captureMoves = computeValidMovesForPiece(currentBoard, movedTo[0], movedTo[1],
+                            yourRole)
                             .filter(m => m.capture === true);
                         if (captureMoves.length > 0) {
                             // Automatically select that piece
@@ -14093,7 +14164,7 @@
         if (currentUser) {
             showContainer('chat');
 
-            const chatInput = document.getElementById('chat-input-main');
+            const chatInput = document.querySelector('.chat-input');
             if (chatInput) chatInput.style.display = 'flex';
 
             updateProfileSection();
@@ -14124,8 +14195,6 @@
                 openZoom(e.target.src);
             }
         });
-
-        // --- END OF JAVASCRIPT CODE ---
     </script>
 </body>
 </html>
