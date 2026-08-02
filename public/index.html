@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-    <title>MessageMate.</title>
+    <title>MessageMate · Fullscreen Chat</title>
     <meta property="og:title" content="MessageMate" />
     <meta property="og:description" content="Chat smarter with MessageMate – fullscreen ready." />
     <meta property="og:image" content="https://i.ibb.co/p6LrrNRK/1746227326721.jpg" />
@@ -1864,7 +1864,7 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            background-color: #f0f2f5;
+            background-color: rgba(0, 0, 0, 0.5);
             padding: 0 10px;
             position: fixed;
             top: 0;
@@ -1872,6 +1872,7 @@
             width: 100%;
             height: 100%;
             z-index: 10000;
+            backdrop-filter: blur(4px);
         }
 
         .auth-box {
@@ -5468,6 +5469,17 @@
         let validMovesList = [];
         let lastMove = null;
 
+        // ===== NEW: requireLogin helper =====
+        function requireLogin() {
+            if (currentUserSession && !currentUserSession.isGuest) return true;
+            showError('Please login to use this feature.');
+            document.getElementById('auth-container').style.display = 'flex';
+            // If currently in a private container, switch to chat
+            const chat = document.getElementById('chat');
+            if (chat && chat.style.display !== 'block') showContainer('chat');
+            return false;
+        }
+
         // ----- AVATAR / PROFILE HELPERS -----
         function getAvatarUrl(username) {
             if (!username) return 'https://i.pravatar.cc/50?u=default';
@@ -6277,6 +6289,7 @@
 
         // ----- PRIVATE AI -----
         async function sendPrivateMessage() {
+            if (!requireLogin()) return;
             const input = document.getElementById('private-user-input');
             if (!input) return;
             let content = input.value.trim();
@@ -6430,6 +6443,7 @@
 
         // ----- PRIVATE MESSAGING (between users) -----
         function initializePrivateMessaging() {
+            if (!requireLogin()) return;
             loadPrivateUsers();
             setupPrivateMessageInputHandlers();
             if (socket) {
@@ -6485,6 +6499,7 @@
         }
 
         async function openPrivateChat(username) {
+            if (!requireLogin()) return;
             currentPrivateChatUser = username;
             document.querySelectorAll('.user-item').forEach(el => {
                 el.classList.remove('active');
@@ -6564,6 +6579,7 @@
         }
 
         async function sendPrivateMessageToUser() {
+            if (!requireLogin()) return;
             if (!currentPrivateChatUser) return showError('Select a user to message');
             const input = document.getElementById('private-message-input');
             const content = input.value.trim();
@@ -7161,6 +7177,11 @@
 
         // ----- SHOW / HIDE CONTAINERS -----
         function showContainer(id) {
+            // ----- requireLogin for private features -----
+            if (['private-ai', 'private-messages', 'profile'].includes(id)) {
+                if (!requireLogin()) return;
+            }
+
             document.querySelectorAll('.main-chat-interface').forEach(el => el.style.display = 'none');
             document.querySelectorAll('.about-container, .features-container, .help-container, .secret-code-container, .sql-editor-container, .profile-container')
                 .forEach(el => el.style.display = 'none');
@@ -9266,14 +9287,7 @@
                     console.log('✅ User already logged in, skipping auth');
                     initializeMainApp();
                 } else {
-                    // Check if we should show auth or go directly to chat as guest
-                    const authContainer = document.getElementById('auth-container');
-                    if (authContainer) {
-                        // Show auth container as a modal overlay
-                        authContainer.style.display = 'flex';
-                    }
-                    // BUT also show the chat behind it for guest users who just want to chat
-                    // We'll show the chat but with auth overlay on top
+                    // Guest mode: show chat, but auth overlay is available
                     document.getElementById('chat').style.display = 'block';
                     document.querySelector('.menu').style.display = 'flex';
                     document.querySelectorAll('.chat-input').forEach(el => el.style.display = 'flex');
