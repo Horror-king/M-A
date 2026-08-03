@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-    <title>MessageMate Chat</title>
+    <title>MessageMate · Fullscreen Chat</title>
     <meta property="og:title" content="MessageMate" />
     <meta property="og:description" content="Chat smarter with MessageMate – fullscreen ready." />
     <meta property="og:image" content="https://i.ibb.co/p6LrrNRK/1746227326721.jpg" />
@@ -9008,7 +9008,7 @@ function animateWelcomeText() {
     }, 2500); // Total animation time: 2.5 seconds
 }
 
-// ===== FIXED: initializeMainApp - ensures chat input and container are visible after login =====
+// ===== FIXED: initializeMainApp - ensures chat container and input are visible after login =====
 let isAppInitialized = false;
 
 function initializeMainApp() {
@@ -9055,36 +9055,38 @@ function initializeMainApp() {
         showContainer('chat');
     }
     
-    // ===== FIX: Explicitly ensure chat input and container are visible after login =====
-    // This is the critical fix - ensure the chat input is shown even if showContainer missed it
-    setTimeout(() => {
+    // ===== CRITICAL FIX: Force show chat container and input after login =====
+    // This ensures the chat is visible immediately after login without needing to click "MessageMate"
+    setTimeout(function() {
+        // First, ensure the chat container is shown
         const chatElement = document.getElementById('chat');
         if (chatElement) {
-            // Ensure the container is visible
             chatElement.style.display = 'block';
+            console.log('✅ Chat container forced to display:block');
             
             // Find and show the chat input
             const chatInput = chatElement.querySelector('.chat-input');
             if (chatInput) {
                 chatInput.style.display = 'flex';
-                console.log('✅ Chat input explicitly shown after login');
+                console.log('✅ Chat input forced to display:flex');
             } else {
                 console.warn('⚠️ Chat input not found in #chat element');
             }
             
-            // Also ensure the chat container (messages area) is visible
-            const chatContainer = document.getElementById('chat-container');
-            if (chatContainer) {
-                chatContainer.style.display = 'flex';
+            // Also ensure the chat messages container is visible
+            const chatMessages = document.getElementById('chat-container');
+            if (chatMessages) {
+                chatMessages.style.display = 'flex';
+                console.log('✅ Chat messages container forced to display:flex');
             }
             
             // Force scroll to bottom
             forceScrollToBottom('chat-container');
             updateScrollState();
         } else {
-            console.warn('⚠️ #chat element not found');
+            console.warn('⚠️ #chat element not found for force display');
         }
-    }, 100);
+    }, 50); // Small delay to ensure DOM is ready
     
     // Show welcome message instead of login prompt
     showSuccess(`Welcome back, ${currentUserSession?.username || 'User'}!`);
