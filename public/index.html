@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-    <title>MessageMate · Fullscreen Chat</title>
+    <title>MessageMate</title>
     <meta property="og:title" content="MessageMate" />
     <meta property="og:description" content="Chat smarter with MessageMate – fullscreen ready." />
     <meta property="og:image" content="https://i.ibb.co/p6LrrNRK/1746227326721.jpg" />
@@ -446,7 +446,7 @@
     }
 
     .chat-input {
-        display: flex;  /* CHANGED: was 'none' – now visible by default */
+        display: none;  /* Hidden until login */
         align-items: center;
         padding: 5px;
         border-top: 1px solid #e4e6eb;
@@ -1427,7 +1427,7 @@
     }
 
     .menu {
-        display: none;
+        display: none;  /* Hidden until login */
         justify-content: space-between;
         align-items: center;
         background-color: white;
@@ -1848,12 +1848,19 @@
     }
 
     .auth-container {
-        display: none;
+        display: flex;  /* Shown after welcome */
         justify-content: center;
         align-items: center;
         min-height: 100vh;
         background-color: #f0f2f5;
         padding: 0 10px;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 10000;
+        background: rgba(0, 0, 0, 0.5);
     }
 
     .auth-box {
@@ -1864,8 +1871,9 @@
         width: 100%;
         max-width: 300px;
         text-align: center;
+        position: relative;
     }
-    /* Also update the username input to match */
+
     .auth-box input {
         width: 100%;
         height: 57px;
@@ -2139,6 +2147,7 @@
         align-items: center;
         justify-content: center;
         z-index:1000;
+        display: none;  /* Hidden until login */
     }
 
     .news-toggle i {
@@ -4683,6 +4692,7 @@
         <div class="spinner"></div>
     </div>
 
+    <!-- AUTH CONTAINER: visible after welcome (display:flex) -->
     <div class="auth-container" id="auth-container" style="display: none;">
         <div class="auth-box">
             <h2 id="auth-title">Login</h2>
@@ -4715,7 +4725,7 @@
         </div>
     </div>
 
-    <!-- All these elements are hidden until login -->
+    <!-- ===== MAIN MENU (hidden until login) ===== -->
     <div class="menu" style="display: none;">
         <div class="hamburger" onclick="toggleDropdown()">☰</div>
         <div class="title">MessageMate&#9662;</div>
@@ -4737,7 +4747,7 @@
         </div>
     </div>
 
-    <!-- UPDATED DROPDOWN WITH ALL USERS LINK -->
+    <!-- ===== DROPDOWN ===== -->
     <div class="dropdown" id="dropdown" style="display: none;">
         <div class="profile-display-section">
             <div class="profile-display-avatar">
@@ -4869,7 +4879,7 @@
     </div>
 
     <!-- Chat container with collapsible online users panel -->
-    <div id="chat" class="main-chat-interface container" style="display: block;">
+    <div id="chat" class="main-chat-interface container" style="display: none;">
         <div class="online-users-panel" id="online-users-panel">
             <div class="online-users-header">
                 <h3 class="online-users-title">
@@ -4891,7 +4901,7 @@
         </div>
         
         <!-- Chat input with paper icon -->
-        <div class="chat-input" style="display: flex;">
+        <div class="chat-input" style="display: none;">
             <!-- REPLY PREVIEW CONTAINER MOVED INSIDE CHAT-INPUT -->
             <div id="reply-preview-container"></div>
             <div class="chat-input-row">
@@ -6412,29 +6422,6 @@ let usersRefreshInterval = null;
 // ===== POST SHARING =====
 let pendingPostId = null;
 
-// Add this function to show all users on first visit
-function showAllUsersOnFirstVisit() {
-    // Check if it's the first visit
-    const hasVisitedBefore = localStorage.getItem('hasVisitedBefore');
-    
-    if (!hasVisitedBefore) {
-        console.log('👋 First time user detected, showing all users');
-        
-        // Mark as visited
-        localStorage.setItem('hasVisitedBefore', 'true');
-        
-        // Show the all-users container after a short delay
-        setTimeout(() => {
-            showContainer('all-users');
-            
-            // Show a welcome message
-            setTimeout(() => {
-                showSuccess('Welcome! Here are all the users who have signed up. You can browse and connect with them.');
-            }, 500);
-        }, 1000);
-    }
-}
-
 // Initialize all users functionality - IMMEDIATELY without delay
 function initializeAllUsers() {
     console.log('👥 Initializing all users directory...');
@@ -7079,9 +7066,6 @@ function onUserLoginSuccess(username) {
     
     // Show success message
     showSuccess(`Welcome back, ${username}!`);
-    
-    // Check if first visit and show all users
-    showAllUsersOnFirstVisit();
 }
 
 // MODIFIED: Modify the showContainer function to initialize all users when showing the container
@@ -8941,17 +8925,6 @@ deleteButton.onclick = async () => {
     contextMenu.remove();
 };
 
-// Initialize the first visit check when the page loads
-window.addEventListener('load', function() {
-    // Check for first visit after a short delay
-    setTimeout(() => {
-        const isLoggedIn = localStorage.getItem('auth_token') && localStorage.getItem('username');
-        if (isLoggedIn && !localStorage.getItem('hasVisitedBefore')) {
-            showAllUsersOnFirstVisit();
-        }
-    }, 1500);
-});
-
 // ===== MODIFIED: Welcome screen animation function (FIXED) =====
 function animateWelcomeText() {
     // Skip animation if already logged in or if OAuth callback parameters are present
@@ -8997,7 +8970,8 @@ function animateWelcomeText() {
             } else {
                 // User not logged in - show auth container
                 console.log('❌ User not logged in, showing auth screen');
-                document.getElementById('auth-container').style.display = 'flex';
+                const authContainer = document.getElementById('auth-container');
+                if (authContainer) authContainer.style.display = 'flex';
             }
         }, 500);
     }, 2500); // Total animation time: 2.5 seconds
