@@ -1,3 +1,4 @@
+// --- CUT HERE ---
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4732,13 +4733,16 @@
         #help {
             display: none !important;
         }
+// --- CUT HERE ---
     </style>
 </head>
 <body>
     <!-- Welcome screen with animated text -->
     <div class="welcome-screen" id="welcome-screen">
         <div class="animated-logo">
-            <div class="animated-text" id="animated-text"></div>
+            <div class="animated-text" id="animated-text">
+                <!-- Letters will be added by JavaScript -->
+            </div>
         </div>
         <div class="subtitle">Your smart messaging companion</div>
         <div class="loading-bar">
@@ -4750,7 +4754,6 @@
         <div class="spinner"></div>
     </div>
 
-    <!-- Auth Container – hidden by default, shown when user clicks Login/Signup -->
     <div class="auth-container" id="auth-container" style="display: none;">
         <div class="auth-box">
             <h2 id="auth-title">Login</h2>
@@ -4768,6 +4771,8 @@
                 <span id="toggle-text">Don't have an account? </span>
                 <a href="#" id="toggle-link" onclick="toggleAuth()">Sign Up</a>
             </div>
+            
+            <!-- Google OAuth Button -->
             <div class="oauth-buttons">
                 <div class="oauth-providers">
                     <button onclick="loginWithGoogle()" class="oauth-btn google-btn">
@@ -4781,10 +4786,10 @@
         </div>
     </div>
 
-    <!-- MENU – VISIBLE BY DEFAULT -->
-    <div class="menu">
+    <!-- All these elements are hidden until login -->
+    <div class="menu" style="display: none;">
         <div class="hamburger" onclick="toggleDropdown()">☰</div>
-        <div class="title">MessageMate</div>
+        <div class="title">MessageMate&#9662;</div>
         <div class="kebab-menu" onclick="toggleKebabMenu(event)">
             <div class="dots">
                 <div class="dot"></div>
@@ -4803,20 +4808,21 @@
         </div>
     </div>
 
-    <!-- DROPDOWN -->
+    <!-- UPDATED DROPDOWN WITH ALL USERS LINK -->
     <div class="dropdown" id="dropdown" style="display: none;">
         <div class="profile-display-section">
             <div class="profile-display-avatar">
                 <img id="display-avatar" src="https://i.pravatar.cc/50?u=default" alt="Profile">
             </div>
             <div class="profile-display-info">
-                <div class="profile-display-username" id="display-username">Guest</div>
+                <div class="profile-display-username" id="display-username">User</div>
                 <div class="profile-display-bio" id="display-bio">No bio yet</div>
             </div>
             <div class="profile-display-edit" onclick="showContainer('profile')">
                 Edit
             </div>
         </div>
+        
         <div class="menu-divider"></div>
         <a href="#" onclick="showContainer('chat')">MessageMate</a>
         <a href="#" onclick="showContainer('private-ai')">Private AI</a>
@@ -4830,19 +4836,27 @@
         <a href="#" onclick="showContainer('help')">Help</a>
         <a href="#" onclick="showContainer('secret-code')">Secret Code</a>
         <a href="#" onclick="showContainer('sql-editor-container')" style="display: none;" id="sql-editor-menu-item">🔍 SQL Editor</a>
-        <a href="#" onclick="showLogin()" id="login-menu-item" style="color:#4267B2; font-weight:600;">Login / Sign Up</a>
-        <a href="#" onclick="logout()" id="logout-menu-item" style="color:#ff4444; display:none;">Logout</a>
+        <a href="#" onclick="logout()" style="color: #ff4444;">Logout</a>
     </div>
 
-    <!-- Posts Container -->
-    <div id="posts" class="main-chat-interface container">
+    <!-- Posts Container with FACEBOOK-STYLE SCROLLING -->
+    <div id="posts" class="main-chat-interface container" style="display: none;">
         <div class="posts-header">
             <h2>Community Posts</h2>
         </div>
+        
+        <!-- FIXED: Facebook-style scrolling - everything moves together -->
         <div class="posts-main-container">
-            <div id="create-post-box-container" class="create-post-box-container"></div>
-            <div class="posts-container" id="posts-container"></div>
+            <div id="create-post-box-container" class="create-post-box-container">
+                <!-- Facebook-style create post box will be inserted here by JavaScript -->
+            </div>
+            
+            <div class="posts-container" id="posts-container">
+                <!-- Posts will be loaded here -->
+            </div>
         </div>
+        
+        <!-- Create Post Modal -->
         <div id="create-post-modal" class="post-modal" style="display: none;">
             <div class="post-modal-content">
                 <div class="post-modal-header">
@@ -4882,26 +4896,32 @@
     </div>
 
     <!-- All Users Container -->
-    <div id="all-users" class="main-chat-interface container">
+    <div id="all-users" class="main-chat-interface container" style="display: none;">
         <div class="all-users-header">
             <h2>All Users</h2>
         </div>
+        
         <div class="all-users-search-container">
             <input type="text" id="all-users-search" class="all-users-search" placeholder="Search users by name, bio, or interests...">
         </div>
+        
         <div class="filter-buttons" id="filter-buttons">
             <button class="filter-btn active" onclick="filterUsers('all')">All Users</button>
             <button class="filter-btn" onclick="filterUsers('online')">Online</button>
             <button class="filter-btn" onclick="filterUsers('new')">New Users</button>
             <button class="filter-btn" onclick="filterUsers('active')">Most Active</button>
         </div>
+        
         <div class="all-users-container" id="all-users-container">
-            <div class="no-users-found"><p>Loading users...</p></div>
+            <!-- Users will be loaded here -->
+            <div class="no-users-found">
+                <p>Loading users...</p>
+            </div>
         </div>
     </div>
 
-    <!-- Checkers Tab -->
-    <div id="checkers" class="main-chat-interface container">
+    <!-- Checkers Game Tab Content -->
+    <div id="checkers" class="main-chat-interface container" style="display: none;">
         <div class="game-container">
             <div class="game-controls">
                 <button id="createRoomBtn" class="btn btn-primary">Create New Room</button>
@@ -4912,31 +4932,38 @@
                 <button id="shareCodeBtn" class="btn btn-primary" style="display: none;">📋 Share Code</button>
                 <button id="restartGameBtn" class="btn btn-secondary">Restart Game</button>
             </div>
-            <div class="game-info" id="gameInfo"></div>
+            <div class="game-info" id="gameInfo">
+                <!-- Game status shown here -->
+            </div>
             <div class="checkers-board" id="checkersBoard"></div>
         </div>
     </div>
 
-    <!-- MAIN CHAT – VISIBLE BY DEFAULT -->
-    <div id="chat" class="main-chat-interface container">
+    <!-- Chat container with collapsible online users panel -->
+    <div id="chat" class="main-chat-interface container" style="display: none;">
         <div class="online-users-panel" id="online-users-panel">
             <div class="online-users-header">
                 <h3 class="online-users-title">
-                    Online Users
+                    Online Users 
                     <span id="online-count" class="online-count-badge">0</span>
                 </h3>
-                <button id="toggle-online-panel" class="toggle-online-panel" title="Collapse Online Users Panel">
+                <button id="toggle-online-panel" class="toggle-online-panel" title="Toggle Online Users Panel">
                     <i class="fas fa-chevron-down"></i>
                 </button>
             </div>
             <div id="online-users-list" class="online-users-list"></div>
         </div>
+        
         <div class="chat-container">
             <div class="chat-messages" id="chat-container"></div>
+            
+            <!-- Typing Indicator -->
             <div id="typing-indicator"></div>
         </div>
-        <!-- CHAT INPUT – VISIBLE BY DEFAULT -->
-        <div class="chat-input">
+        
+        <!-- Chat input with paper icon -->
+        <div class="chat-input" style="display: none;">
+            <!-- REPLY PREVIEW CONTAINER MOVED INSIDE CHAT-INPUT -->
             <div id="reply-preview-container"></div>
             <div class="chat-input-row">
                 <button class="attach-btn" id="attach-btn-main" onclick="attachFile()" type="button">
@@ -4948,32 +4975,41 @@
                 </button>
             </div>
         </div>
+        
+        <!-- hidden file input for image uploads (main chat) -->
         <input type="file" id="image-upload-main" accept="image/*" style="display: none;">
+        
+        <!-- Scroll to bottom button specifically for main chat -->
         <div class="scroll-to-bottom-btn" id="scrollToBottomBtn">
             <i class="fas fa-chevron-down"></i>
             <div class="new-messages-notification" id="newMessagesCount">0</div>
         </div>
     </div>
-
-    <!-- Private AI Container -->
-    <div id="private-ai" class="main-chat-interface container">
+    
+    <!-- Private AI container with collapsible online users panel -->
+    <div id="private-ai" class="main-chat-interface container" style="display: none;">
         <div class="online-users-panel" id="private-online-users-panel">
             <div class="online-users-header">
                 <h3 class="online-users-title">
-                    Online Users
+                    Online Users 
                     <span id="private-online-count" class="online-count-badge">0</span>
                 </h3>
-                <button id="toggle-private-online-panel" class="toggle-online-panel" title="Collapse Online Users Panel">
+                <button id="toggle-private-online-panel" class="toggle-online-panel" title="Toggle Online Users Panel">
                     <i class="fas fa-chevron-down"></i>
                 </button>
             </div>
             <div id="private-online-users-list" class="online-users-list"></div>
         </div>
+        
         <div class="chat-container">
             <div class="chat-messages" id="private-ai-container"></div>
         </div>
-        <div class="chat-input">
+        
+        <!-- Private AI chat input with paper icon -->
+        <div class="chat-input" style="display: none;">
+            <!-- PRIVATE REPLY PREVIEW CONTAINER INSIDE CHAT-INPUT -->
             <div id="private-reply-preview-container"></div>
+            <!-- Attachment preview area for private AI (only shown when image is attached) -->
             <div id="private-ai-attachment-preview" style="display: none; margin-top: 8px; background: #e9ecef; border-radius: 8px; padding: 6px 10px; align-items: center; gap: 10px;">
                 <img id="private-ai-attach-img" style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px;">
                 <span id="private-ai-attach-text" style="flex:1; overflow: hidden; text-overflow: ellipsis;">Image attached (will be edited)</span>
@@ -4989,24 +5025,34 @@
                 </button>
             </div>
         </div>
+        
+        <!-- hidden file input for private AI image upload -->
         <input type="file" id="image-upload-private" accept="image/*" style="display: none;">
+        
+        <!-- Go to top button specifically for private AI -->
         <div class="go-top-btn" id="private-go-top">
             <i class="fas fa-arrow-up"></i>
         </div>
     </div>
 
-    <!-- Private Messages Container -->
-    <div id="private-messages" class="main-chat-interface container">
+    <!-- Private Messages Container with updated structure -->
+    <div id="private-messages" class="main-chat-interface container" style="display: none;">
         <div class="private-messages-header" id="private-messages-header">
             <h3 id="private-messages-title">Private Messages</h3>
             <div class="search-container">
                 <input type="text" id="search-users" placeholder="Search users...">
             </div>
         </div>
+        
         <div class="private-messages-layout">
+            <!-- Users List Panel - Show initially -->
             <div class="users-panel" id="users-panel">
-                <div class="users-list" id="users-list"></div>
+                <div class="users-list" id="users-list">
+                    <!-- Users will be dynamically loaded here -->
+                </div>
             </div>
+            
+            <!-- Chat Container - Hide initially -->
             <div class="private-chat-container" id="private-chat-container">
                 <div class="private-chat-header" id="private-chat-header">
                     <button class="back-to-users" onclick="showUsersPanel()">← Back</button>
@@ -5020,11 +5066,15 @@
                         </div>
                     </div>
                 </div>
+                
                 <div class="private-chat-messages" id="private-chat-messages">
+                    <!-- Private messages will appear here -->
                     <div class="no-chat-selected">
                         <p>Select a user from the list to start a private conversation</p>
                     </div>
                 </div>
+                
+                <!-- Private messages chat input with paper icon -->
                 <div class="private-chat-input chat-input" style="display: none;" id="private-chat-input">
                     <div class="chat-input-row">
                         <button class="attach-btn" id="attach-btn-private-msg" onclick="attachFilePrivateMsg()" type="button">
@@ -5039,30 +5089,32 @@
             </div>
         </div>
     </div>
-
+     
     <button class="news-toggle" onclick="toggleNews()" title="Toggle News" style="display: none;">
         <i class="fas fa-newspaper"></i>
     </button>
-
+  
     <div class="news-container" id="news-container" style="display: none;">
         <div class="news-header">Latest News</div>
         <div class="news-items" id="news-items"></div>
     </div>
 
     <!-- Profile Container -->
-    <div id="profile" class="profile-container">
+    <div id="profile" class="profile-container" style="display: none;">
         <span class="close-btn" onclick="hideContainer('profile')">&times;</span>
         <div class="profile-box">
             <div class="profile-header">
                 <h2>Edit Profile</h2>
                 <p>Update your personal information and preferences</p>
             </div>
+            
             <div class="profile-avatar-section">
                 <div class="profile-avatar-large">
                     <img id="profile-avatar-img" src="https://i.pravatar.cc/150?u=default" alt="Profile Avatar">
                 </div>
                 <button class="change-avatar-btn" onclick="changeAvatar()">Change Profile Picture</button>
             </div>
+            
             <form class="profile-form" id="profile-form">
                 <div class="form-row">
                     <div class="form-group">
@@ -5074,14 +5126,17 @@
                         <input type="text" id="profile-lastname" placeholder="Enter your last name">
                     </div>
                 </div>
+                
                 <div class="form-group">
                     <label for="profile-username">Username</label>
                     <input type="text" id="profile-username" placeholder="Enter your username" readonly>
                 </div>
+                
                 <div class="form-group">
                     <label for="profile-bio">Bio</label>
                     <textarea id="profile-bio" placeholder="Tell others about yourself"></textarea>
                 </div>
+                
                 <div class="form-row">
                     <div class="form-group">
                         <label for="profile-age">Age</label>
@@ -5099,14 +5154,17 @@
                         </select>
                     </div>
                 </div>
+                
                 <div class="form-group">
                     <label for="profile-location">Location</label>
                     <input type="text" id="profile-location" placeholder="Where are you from?">
                 </div>
+                
                 <div class="form-group">
                     <label for="profile-interests">Interests</label>
                     <input type="text" id="profile-interests" placeholder="Your hobbies and interests">
                 </div>
+                
                 <div class="profile-actions">
                     <button type="button" class="cancel-btn" onclick="hideContainer('profile')">Cancel</button>
                     <button type="button" class="save-btn" onclick="saveProfile()">Save Changes</button>
@@ -5133,7 +5191,9 @@
             </div>
             <div class="user-profile-body">
                 <div class="user-profile-info">
-                    <div class="user-profile-bio" id="popup-bio">No bio available</div>
+                    <div class="user-profile-bio" id="popup-bio">
+                        No bio available
+                    </div>
                     <div class="user-profile-details">
                         <div class="user-profile-detail">
                             <span class="user-profile-label">Age</span>
@@ -5162,7 +5222,7 @@
     </div>
 
     <!-- Secret Code Container -->
-    <div id="secret-code" class="secret-code-container">
+    <div id="secret-code" class="secret-code-container" style="display: none;">
         <span class="close-btn" onclick="hideContainer('secret-code')">&times;</span>
         <div class="secret-code-box">
             <h2 class="section-title">Secret Code Verification</h2>
@@ -5176,27 +5236,32 @@
             <div class="code-hint">Hint: The code contains numbers and letters</div>
         </div>
     </div>
-
-    <!-- SQL Editor Container -->
-    <div id="sql-editor-container" class="sql-editor-container">
+ 
+     <!-- SQL Editor Container -->
+    <div id="sql-editor-container" class="sql-editor-container" style="display: none;">
         <span class="close-btn" onclick="hideContainer('sql-editor-container')">&times;</span>
         <div class="sql-editor-box">
             <h2 class="section-title">SQL Editor</h2>
             <p>Execute SQL queries against the sample database. Supported operations: SELECT, INSERT, UPDATE, DELETE.</p>
+            
             <div class="sql-editor-toolbar">
                 <button id="run-sql" class="sql-btn primary">Run Query</button>
                 <button id="save-sql" class="sql-btn">Save Query</button>
                 <button id="clear-sql" class="sql-btn">Clear</button>
             </div>
+            
             <textarea id="sql-textarea" placeholder="Enter your SQL query here... Example: SELECT * FROM users"></textarea>
+            
             <div class="sql-results-container">
                 <h3>Results</h3>
                 <div id="sql-results" class="sql-results"></div>
             </div>
+            
             <div class="saved-queries-container">
                 <h3>Saved Queries</h3>
                 <div id="saved-queries-list" class="saved-queries-list"></div>
             </div>
+            
             <div class="sql-help">
                 <h4>Available Tables:</h4>
                 <ul>
@@ -5212,8 +5277,7 @@
             </div>
         </div>
     </div>
-
-    <!-- Zoom Overlay -->
+  
     <div id="zoom-overlay" style="display: none;">
         <div id="zoom-content">
             <div style="position: absolute; top: 15px; right: 20px; display: flex; gap: 16px; z-index: 2;">
@@ -5223,6 +5287,7 @@
                         <line x1="6" y1="6" x2="18" y2="18" />
                     </svg>
                 </button>
+
                 <a id="download-btn" download style="background: none; border: none; cursor: pointer; padding: 0;">
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 15v4a4 4 0 0 1-4 4H5a4 4 0 0 1-4-4v-4" />
@@ -5231,15 +5296,16 @@
                     </svg>
                 </a>
             </div>
+
             <img id="zoom-image" />
         </div>
+
         <div onclick="closeZoom()" style="position: absolute; width: 100%; height: 100%; top: 0; left: 0; z-index: 0;"></div>
     </div>
 
     <div class="overlay" id="overlay" style="display: none;"></div>
 
-    <!-- About / Features / Help -->
-    <div id="about" class="about-container">
+    <div id="about" class="about-container" style="display: none;">
         <span class="close-btn" onclick="hideContainer('about')">&times;</span>
         <h2 class="section-title">About this AI Chatbot</h2>
         <div class="section-content">
@@ -5250,7 +5316,7 @@
         </div>
     </div>
 
-    <div id="features" class="features-container">
+    <div id="features" class="features-container" style="display: none;">
         <span class="close-btn" onclick="hideContainer('features')">&times;</span>
         <h2 class="section-title">Features</h2>
         <ul class="features-list">
@@ -5270,7 +5336,7 @@
         </ul>
     </div>
 
-    <div id="help" class="help-container">
+    <div id="help" class="help-container" style="display: none;">
         <span class="close-btn" onclick="hideContainer('help')">&times;</span>
         <h2 class="section-title">Help Center</h2>
         <div class="help-section">
