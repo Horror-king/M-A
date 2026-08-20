@@ -9055,11 +9055,22 @@ function initializeMainApp() {
         enableSQLEditorAccess();
     }
     
-    // Show the appropriate container based on pendingPostId
+    // ===== FIX: Always show chat initially, regardless of pendingPostId =====
+    // This ensures MessageMate is the default view immediately after login.
+    // Pending post handling is deferred; if a shared post exists, it can be loaded
+    // in the background but the user sees the chat interface first.
+    showContainer('chat');
+    
+    // If there's a pending post ID, we clear it after a short delay to prevent
+    // it from affecting future navigation, but we don't show posts initially.
     if (pendingPostId) {
-        showContainer('posts');
-    } else {
-        showContainer('chat');
+        console.log('🔗 Pending post ID exists, but showing chat first.');
+        // We can optionally fetch the post and display a notification, but for now,
+        // we simply clear the pending ID after a few seconds to avoid side effects.
+        setTimeout(() => {
+            pendingPostId = null;
+            console.log('🧹 Cleared pendingPostId after initial load.');
+        }, 3000);
     }
     
     // ===== CRITICAL FIX: Force show chat container and input after login =====
