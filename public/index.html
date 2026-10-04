@@ -4890,7 +4890,9 @@
         </div>
         
         <div class="chat-container">
-            <div class="chat-messages" id="chat-container"></div>
+            <div class="chat-messages" id="chat-container">
+                <!-- Loading spinner will be inserted here dynamically -->
+            </div>
             
             <!-- Typing Indicator -->
             <div id="typing-indicator"></div>
@@ -9035,12 +9037,37 @@ function initializeMainApp() {
     const authContainer = document.getElementById('auth-container');
     if (authContainer) authContainer.style.display = 'none';
     
+    // ===== CRITICAL FIX: Force show chat container and input immediately =====
+    // This addresses the blank screen issue by showing the UI skeleton before fetching data.
+    showContainer('chat');
+    
+    // Show loading state in chat container
+    const chatContainer = document.getElementById('chat-container');
+    if (chatContainer) {
+        chatContainer.innerHTML = `
+            <div class="chat-loading" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #65676b; padding: 20px;">
+                <div class="spinner" style="width: 30px; height: 30px; border: 3px solid #f3f3f3; border-top: 3px solid #4267B2; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px;"></div>
+                <p>Loading messages...</p>
+            </div>
+        `;
+    }
+    
+    // Force the chat input to be visible immediately
+    const chatElement = document.getElementById('chat');
+    if (chatElement) {
+        chatElement.style.display = 'block';
+        const chatInput = chatElement.querySelector('.chat-input');
+        if (chatInput) {
+            chatInput.style.display = 'flex';
+        }
+    }
+    
     initializeButtons();
     // IMPORTANT: Create profile section and load profile data
     updateProfileSection(); // Create the profile section first
     loadProfile(); // Then load the actual profile data from server
 
-    initializeChat();
+    initializeChat(); // This calls loadMessages() internally
 
     initSocket();
     setupTypingHandlers();
@@ -9055,82 +9082,17 @@ function initializeMainApp() {
         enableSQLEditorAccess();
     }
     
-    // ===== FIX: Always show chat initially, regardless of pendingPostId =====
-    // This ensures MessageMate is the default view immediately after login.
-    // Pending post handling is deferred; if a shared post exists, it can be loaded
-    // in the background but the user sees the chat interface first.
-    showContainer('chat');
-    
     // If there's a pending post ID, we clear it after a short delay to prevent
     // it from affecting future navigation, but we don't show posts initially.
     if (pendingPostId) {
         console.log('🔗 Pending post ID exists, but showing chat first.');
-        // We can optionally fetch the post and display a notification, but for now,
-        // we simply clear the pending ID after a few seconds to avoid side effects.
         setTimeout(() => {
             pendingPostId = null;
             console.log('🧹 Cleared pendingPostId after initial load.');
         }, 3000);
     }
     
-    // ===== CRITICAL FIX: Force show chat container and input after login =====
-    // This ensures the chat is visible immediately after login without needing to click "MessageMate"
-    // Use multiple strategies to ensure visibility: immediate, requestAnimationFrame, and setTimeout fallback
-    
-    // Strategy 1: Immediate (inline)
-    const chatElementImmediate = document.getElementById('chat');
-    if (chatElementImmediate) {
-        chatElementImmediate.style.display = 'block';
-        const chatInputImmediate = chatElementImmediate.querySelector('.chat-input');
-        if (chatInputImmediate) {
-            chatInputImmediate.style.display = 'flex';
-        }
-        const chatMessagesImmediate = document.getElementById('chat-container');
-        if (chatMessagesImmediate) {
-            chatMessagesImmediate.style.display = 'flex';
-        }
-        console.log('✅ Chat container forced to display:block (immediate)');
-    }
-    
-    // Strategy 2: requestAnimationFrame for next paint
-    requestAnimationFrame(function() {
-        const chatElementRAF = document.getElementById('chat');
-        if (chatElementRAF) {
-            chatElementRAF.style.display = 'block';
-            const chatInputRAF = chatElementRAF.querySelector('.chat-input');
-            if (chatInputRAF) {
-                chatInputRAF.style.display = 'flex';
-            }
-            const chatMessagesRAF = document.getElementById('chat-container');
-            if (chatMessagesRAF) {
-                chatMessagesRAF.style.display = 'flex';
-            }
-            forceScrollToBottom('chat-container');
-            updateScrollState();
-            console.log('✅ Chat container forced to display:block (requestAnimationFrame)');
-        }
-    });
-    
-    // Strategy 3: setTimeout fallback (for slower browsers)
-    setTimeout(function() {
-        const chatElementTimeout = document.getElementById('chat');
-        if (chatElementTimeout) {
-            chatElementTimeout.style.display = 'block';
-            const chatInputTimeout = chatElementTimeout.querySelector('.chat-input');
-            if (chatInputTimeout) {
-                chatInputTimeout.style.display = 'flex';
-            }
-            const chatMessagesTimeout = document.getElementById('chat-container');
-            if (chatMessagesTimeout) {
-                chatMessagesTimeout.style.display = 'flex';
-            }
-            forceScrollToBottom('chat-container');
-            updateScrollState();
-            console.log('✅ Chat container forced to display:block (setTimeout fallback)');
-        }
-    }, 100);
-    
-    // Show welcome message instead of login prompt
+    // Show welcome message
     showSuccess(`Welcome back, ${currentUserSession?.username || 'User'}!`);
 
     // ===== NEW: Show admin menu item if current user is Admin0 =====
@@ -9185,106 +9147,64 @@ async function clearAllMessages() {
 }
 
 // ===== DOMContentLoaded listener (FIXED) =====
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     // Initialize current year
     if (document.getElementById("year")) {
         document.getElementById("year").textContent = new Date().getFullYear();
     }
     
+    // Initialize common components
+    setupPasswordToggle();
+    initializeOAuth();
+    if ('Notification' in window) {
+        Notification.requestPermission();
+    }
+    
     // FIRST: Check for OAuth callback parameters
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has('token') && urlParams.has('username')) {
-        // Handle OAuth callback immediately – this will initialize the app
-        handleOAuthCallback().catch(error => {
+        try {
+            await handleOAuthCallback();
+        } catch (error) {
             console.error('OAuth callback error:', error);
-            // If OAuth fails, fall back to normal flow
-            attemptAutoLogin().then(success => {
-                if (success) {
-                    console.log('✅ User auto-logged in successfully (fallback)');
-                    animateWelcomeText();
-                } else {
-                    console.log('❌ No valid session found, showing welcome then login');
-                    animateWelcomeText();
-                }
-            }).catch(console.error);
-        });
-        return; // Stop further initialization; OAuth will handle it
+            document.getElementById('welcome-screen').style.display = 'none';
+            document.getElementById('auth-container').style.display = 'flex';
+        }
+        return; // Stop further initialization
     }
     
-    // If no OAuth callback, try auto-login
-    attemptAutoLogin().then(success => {
-        if (success) {
-            console.log('✅ User auto-logged in successfully');
-            // Check for pending post link from sessionStorage
-            const storedPostId = sessionStorage.getItem('pendingPostId');
-            if (storedPostId) {
-                pendingPostId = storedPostId;
-                console.log('🔗 Restored pending post ID from session:', pendingPostId);
-                sessionStorage.removeItem('pendingPostId');
-            }
-            animateWelcomeText(); // This will skip animation because user is already logged in
-        } else {
-            console.log('❌ No valid session found, showing welcome then login');
-            animateWelcomeText();
+    // SECOND: Try auto-login
+    const autoLoginSuccess = await attemptAutoLogin();
+    
+    if (autoLoginSuccess) {
+        console.log('✅ Auto-login successful, skipping welcome screen');
+        document.getElementById('welcome-screen').style.display = 'none';
+        
+        // Check for pending post link from sessionStorage
+        const storedPostId = sessionStorage.getItem('pendingPostId');
+        if (storedPostId) {
+            pendingPostId = storedPostId;
+            console.log('🔗 Restored pending post ID from session:', pendingPostId);
+            sessionStorage.removeItem('pendingPostId');
         }
-    }).catch(error => {
-        console.error('Auto-login error:', error);
+        
+        initializeMainApp();
+    } else {
+        console.log('❌ No valid session, showing welcome screen');
+        // Show welcome screen and then auth
         animateWelcomeText();
-    });
+    }
     
-    // Initialize buttons and other common components
+    // Initialize other listeners (only needed once)
     initializeButtons();
-    
-    // FIXED: Initialize online panel toggle
     initializeOnlinePanelToggle();
-    
-    // Load user panel preference
     loadUserPanelPreference();
     
-    // Initialize password toggle
-    setupPasswordToggle();
-    
-    // NEW: Initialize OAuth buttons
-    initializeOAuth();
-    
-    if ('Notification' in window) {
-        Notification.requestPermission().then(permission => {
-            notificationPermissionGranted = permission === 'granted';
-            console.log('📢 Notification permission:', permission);
-        });
-    }
-
-    initializeChat();
-    
-    // ADDED: Setup typing detection
-    setupTypingDetection();
-    setupTypingSocketEvents();
-
-    // Add optimized scroll event listener for main chat
-    if (elements.chatContainer) {
-        elements.chatContainer.addEventListener('scroll', throttle(updateScrollState, 100));
-    }
-
-    // Initialize Private AI input handler
-    if (elements.privateInput) {
-        elements.privateInput.addEventListener('input', () => {
-            autoResize(elements.privateInput);
-            updatePrivateSendButtonState(); // Enable/disable send button based on text/attachment
-        });
-        elements.privateInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendPrivateMessage();
-            }
-        });
-    }
-
     // ===== POST SHARING: Check for shared post link =====
     if (urlParams.has('post')) {
         const postId = urlParams.get('post');
         pendingPostId = postId;
         console.log('🔗 Shared post link detected, post ID:', pendingPostId);
-        // Store in sessionStorage to persist across redirects
         sessionStorage.setItem('pendingPostId', postId);
     }
 
@@ -12510,6 +12430,25 @@ function batchMessageRender(messages, renderFunction) {
             if (!response.ok) throw new Error('Failed to load messages');
             const data = await response.json();
             
+            // Remove loading indicator
+            const chatContainer = document.getElementById('chat-container');
+            if (chatContainer && chatContainer.querySelector('.chat-loading')) {
+                chatContainer.innerHTML = '';
+            }
+            
+            if (data.length === 0 && messagePage === 0) {
+                // Show empty state instead of blank
+                if (chatContainer) {
+                    chatContainer.innerHTML = `
+                        <div class="no-messages" style="text-align: center; color: #65676b; padding: 40px 20px;">
+                            <i class="fas fa-comments" style="font-size: 40px; color: #ddd; margin-bottom: 15px;"></i>
+                            <p>No messages yet. Start the conversation!</p>
+                        </div>
+                    `;
+                }
+                return;
+            }
+            
             // Check for new messages to show notification
             if (data.length > 0) {
                 const latestMessage = data[data.length - 1];
@@ -12532,7 +12471,15 @@ function batchMessageRender(messages, renderFunction) {
             
         } catch (error) {
             console.error('❌ Error loading messages:', error);
-            showError('Failed to load messages. Using real-time updates only.');
+            const chatContainer = document.getElementById('chat-container');
+            if (chatContainer && chatContainer.querySelector('.chat-loading')) {
+                chatContainer.innerHTML = `
+                    <div class="no-messages" style="text-align: center; color: #e53e3e; padding: 40px 20px;">
+                        <p>Failed to load messages. Please check your connection.</p>
+                        <button onclick="loadMessages()" style="margin-top: 10px; padding: 8px 15px; background: #4267B2; color: white; border: none; border-radius: 5px; cursor: pointer;">Retry</button>
+                    </div>
+                `;
+            }
             // If HTTP fails, rely on socket for real-time messages
             if (socket && socket.connected) {
                 socket.emit('request-messages');
