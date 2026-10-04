@@ -9068,9 +9068,11 @@ function initializeMainApp() {
     updateProfileSection();
     loadProfile();
     
-    // Explicitly call loadMessages to ensure messages are fetched
-    loadMessages();
-
+    // ===== FIX: Restore initializeChat() to attach input listeners =====
+    // This enables the send button and handles keypress events
+    initializeChat();
+    
+    // Initialize socket and other features
     initSocket();
     setupTypingHandlers();
     setupTypingDetection();
@@ -9084,20 +9086,15 @@ function initializeMainApp() {
         enableSQLEditorAccess();
     }
     
-    // If there's a pending post ID, we clear it after a short delay to prevent
-    // it from affecting future navigation, but we don't show posts initially.
     if (pendingPostId) {
         console.log('🔗 Pending post ID exists, but showing chat first.');
         setTimeout(() => {
             pendingPostId = null;
-            console.log('🧹 Cleared pendingPostId after initial load.');
         }, 3000);
     }
     
-    // Show welcome message
     showSuccess(`Welcome back, ${currentUserSession?.username || 'User'}!`);
 
-    // ===== NEW: Show admin menu item if current user is Admin0 =====
     const adminClearAll = document.getElementById('admin-clear-all');
     if (adminClearAll && currentUserSession?.username === 'Admin0') {
         adminClearAll.style.display = 'block';
