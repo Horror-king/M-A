@@ -7241,21 +7241,21 @@ function showContainer(containerId) {
         }, 100);
         
         // Show main chat scroll button, hide private AI button
-        if (scrollToBottomBtn) {
+        if (typeof scrollToBottomBtn !== 'undefined' && scrollToBottomBtn) {
             scrollToBottomBtn.style.display = 'flex';
             updateScrollState();
         }
-        if (privateGoTopBtn) {
+        if (typeof privateGoTopBtn !== 'undefined' && privateGoTopBtn) {
             privateGoTopBtn.style.display = 'none';
             privateGoTopBtn.classList.remove('visible');
         }
     } else if (containerId === 'private-ai') {
         // Show private AI button, hide main chat scroll button
-        if (privateGoTopBtn) {
+        if (typeof privateGoTopBtn !== 'undefined' && privateGoTopBtn) {
             privateGoTopBtn.style.display = 'flex';
             handlePrivateScroll();
         }
-        if (scrollToBottomBtn) {
+        if (typeof scrollToBottomBtn !== 'undefined' && scrollToBottomBtn) {
             scrollToBottomBtn.style.display = 'none';
             scrollToBottomBtn.classList.remove('visible');
         }
@@ -7268,51 +7268,51 @@ function showContainer(containerId) {
         }
     } else if (containerId === 'private-messages') {
         // Hide both buttons for private messages
-        if (scrollToBottomBtn) {
+        if (typeof scrollToBottomBtn !== 'undefined' && scrollToBottomBtn) {
             scrollToBottomBtn.style.display = 'none';
             scrollToBottomBtn.classList.remove('visible');
         }
-        if (privateGoTopBtn) {
+        if (typeof privateGoTopBtn !== 'undefined' && privateGoTopBtn) {
             privateGoTopBtn.style.display = 'none';
             privateGoTopBtn.classList.remove('visible');
         }
     } else if (containerId === 'posts') {
         // Hide both buttons for posts feed
-        if (scrollToBottomBtn) {
+        if (typeof scrollToBottomBtn !== 'undefined' && scrollToBottomBtn) {
             scrollToBottomBtn.style.display = 'none';
             scrollToBottomBtn.classList.remove('visible');
         }
-        if (privateGoTopBtn) {
+        if (typeof privateGoTopBtn !== 'undefined' && privateGoTopBtn) {
             privateGoTopBtn.style.display = 'none';
             privateGoTopBtn.classList.remove('visible');
         }
     } else if (containerId === 'all-users') {
         // Hide both buttons for all users directory
-        if (scrollToBottomBtn) {
+        if (typeof scrollToBottomBtn !== 'undefined' && scrollToBottomBtn) {
             scrollToBottomBtn.style.display = 'none';
             scrollToBottomBtn.classList.remove('visible');
         }
-        if (privateGoTopBtn) {
+        if (typeof privateGoTopBtn !== 'undefined' && privateGoTopBtn) {
             privateGoTopBtn.style.display = 'none';
             privateGoTopBtn.classList.remove('visible');
         }
     } else if (containerId === 'checkers') {
         // Hide both buttons for checkers
-        if (scrollToBottomBtn) {
+        if (typeof scrollToBottomBtn !== 'undefined' && scrollToBottomBtn) {
             scrollToBottomBtn.style.display = 'none';
             scrollToBottomBtn.classList.remove('visible');
         }
-        if (privateGoTopBtn) {
+        if (typeof privateGoTopBtn !== 'undefined' && privateGoTopBtn) {
             privateGoTopBtn.style.display = 'none';
             privateGoTopBtn.classList.remove('visible');
         }
     } else {
         // For other containers, hide both buttons
-        if (scrollToBottomBtn) {
+        if (typeof scrollToBottomBtn !== 'undefined' && scrollToBottomBtn) {
             scrollToBottomBtn.style.display = 'none';
             scrollToBottomBtn.classList.remove('visible');
         }
-        if (privateGoTopBtn) {
+        if (typeof privateGoTopBtn !== 'undefined' && privateGoTopBtn) {
             privateGoTopBtn.style.display = 'none';
             privateGoTopBtn.classList.remove('visible');
         }
@@ -9037,8 +9037,10 @@ function initializeMainApp() {
     const authContainer = document.getElementById('auth-container');
     if (authContainer) authContainer.style.display = 'none';
     
+    // IMPORTANT: Initialize buttons FIRST so their variables are set
+    initializeButtons();
+    
     // ===== CRITICAL FIX: Force show chat container and input immediately =====
-    // This addresses the blank screen issue by showing the UI skeleton before fetching data.
     showContainer('chat');
     
     // Show loading state in chat container
@@ -9062,12 +9064,12 @@ function initializeMainApp() {
         }
     }
     
-    initializeButtons();
     // IMPORTANT: Create profile section and load profile data
-    updateProfileSection(); // Create the profile section first
-    loadProfile(); // Then load the actual profile data from server
-
-    initializeChat(); // This calls loadMessages() internally
+    updateProfileSection();
+    loadProfile();
+    
+    // Explicitly call loadMessages to ensure messages are fetched
+    loadMessages();
 
     initSocket();
     setupTypingHandlers();
@@ -12418,8 +12420,9 @@ function batchMessageRender(messages, renderFunction) {
         if (isLoadingMessages) return;
         isLoadingMessages = true;
         
+        console.log('📥 loadMessages called. Current user:', currentUserSession?.username);
+        
         try {
-            console.log('📥 Loading messages...');
             const token = localStorage.getItem('auth_token');
             const response = await fetch(`/api/messages?page=${messagePage}&limit=${MESSAGES_PER_PAGE}`, {
                 headers: {
