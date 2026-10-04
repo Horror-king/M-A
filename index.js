@@ -6,7 +6,6 @@ const path = require('path');
 const axios = require('axios');
 const fs = require('fs-extra');
 const http = require('http');
-const { Server } = require('socket.io');
 const crypto = require('crypto');
 
 // ===== DETECT ENVIRONMENT =====
@@ -31,26 +30,63 @@ const app = express();
 const server = http.createServer(app);
 const port = process.env.PORT || 3000;
 
-// ===== ULTRA-COMPATIBLE SOCKET.IO (polling only, no ws) =====
-const io = new Server(server, {
-  cors: { 
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    credentials: false
-  },
-  transports: ['polling'],
-  allowUpgrades: false,
-  pingTimeout: 30000,
-  pingInterval: 15000,
-  cookie: false,
-  maxHttpBufferSize: 1e5,
-  connectTimeout: 45000,
-  httpCompression: false,
-  perMessageDeflate: false,
-  allowEIO3: true,
-  // wsEngine: require('ws').Server,  // <-- REMOVED FOR VERCEL
-  allowRequest: (req, callback) => callback(null, true)
-});
+// ===== SUPABASE CLIENT (for Realtime Broadcast) =====
+const supabase = createClient(
+  process.env.SUPABASE_URL || 'https://rqissetffrnkfzfgsngm.supabase.co',
+  process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxaXNzZXRmZnJua2Z6ZmdzbmdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNzU2NzIsImV4cCI6MjA3NDc1MTY3Mn0.6tCuI4yhn3EXlua9na4kkgMqX6PL00GxjEuY0QG2bTg',
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false
+    }
+  }
+);
+
+// ===== SERVICE ROLE CLIENT (for server-side broadcast) =====
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL || 'https://rqissetffrnkfzfgsngm.supabase.co',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || 'YOUR_SERVICE_ROLE_KEY_HERE',
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false
+    }
+  }
+);
+
+// ===== REALTIME BROADCAST HELPER =====
+async function broadcastMessage(topic, event, payload, isPrivate = false) {
+  try {
+    const response = await fetch(
+      `${process.env.SUPABASE_URL || 'https://rqissetffrnkfzfgsngm.supabase.co'}/rest/v1/rpc/broadcast`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY || 'YOUR_SERVICE_ROLE_KEY_HERE',
+          'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY || 'YOUR_SERVICE_ROLE_KEY_HERE'}`
+        },
+        body: JSON.stringify({
+          topic: topic,
+          event: event,
+          payload: payload,
+          private: isPrivate
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Broadcast failed (${response.status}):`, errorText);
+    } else {
+      console.log(`📡 Broadcast sent: ${event} on ${topic}`);
+    }
+  } catch (error) {
+    console.error('❌ Broadcast error:', error.message);
+  }
+}
 
 // Track online users - 5 MINUTE TIMEOUT for mobile users
 const onlineUsers = new Map();
@@ -70,9 +106,9 @@ function addPermanentOnlineUsers() {
     });
   });
   const onlineUsersArray = Array.from(onlineUsers.keys());
-  io.emit('user-status-change', { 
-    username: 'SYSTEM', 
-    status: 'online', 
+  broadcastMessage('chat:global', 'user_status_change', {
+    username: 'SYSTEM',
+    status: 'online',
     onlineUsers: onlineUsersArray,
     permanent: PERMANENT_ONLINE_USERS
   });
@@ -90,7 +126,7 @@ function ensureBotOnline(botUsername) {
       isOnline: true
     });
     const onlineUsersArray = Array.from(onlineUsers.keys());
-    io.emit('user-status-change', {
+    broadcastMessage('chat:global', 'user_status_change', {
       username: botUsername,
       status: 'online',
       onlineUsers: onlineUsersArray
@@ -108,19 +144,6 @@ global.utils = {
   },
   getText: () => "✅ Bot is running smoothly"
 };
-
-// Initialize Supabase
-const supabase = createClient(
-  'https://rqissetffrnkfzfgsngm.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxaXNzZXRmZnJua2Z6ZmdzbmdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNzU2NzIsImV4cCI6MjA3NDc1MTY3Mn0.6tCuI4yhn3EXlua9na4kkgMqX6PL00GxjEuY0QG2bTg',
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false
-    }
-  }
-);
 
 // Configure multer for file uploads
 const storage = multer.memoryStorage();
@@ -251,7 +274,7 @@ app.get('/', async (req, res) => {
 });
 
 // ==============================
-// AUTHENTICATION (unchanged)
+// AUTHENTICATION
 // ==============================
 
 function hashPassword(password) {
@@ -535,7 +558,6 @@ function verifyToken(req, res, next) {
       req.user = decoded;
       return next();
     }
-    // fallback old token
     const oldDecoded = Buffer.from(token, 'base64').toString('ascii');
     const [username, timestamp] = oldDecoded.split(':');
     if (!username) return res.status(401).json({ success: false, error: "Invalid token" });
@@ -561,7 +583,7 @@ function verifyToken(req, res, next) {
 }
 
 // ==============================
-// USER REGISTRATION & LOGIN (unchanged)
+// USER REGISTRATION & LOGIN
 // ==============================
 
 app.post('/api/register', async (req, res) => {
@@ -1023,7 +1045,7 @@ app.get('/api/auth-test', (req, res) => {
 });
 
 // ==============================
-// PROFILE MANAGEMENT (unchanged)
+// PROFILE MANAGEMENT
 // ==============================
 
 function validateHumanName(name) {
@@ -1327,7 +1349,7 @@ app.get('/api/user/profile/:username', async (req, res) => {
 });
 
 // ==============================
-// AI ENDPOINTS (unchanged)
+// AI ENDPOINTS
 // ==============================
 
 app.post('/api/ai/private', async (req, res) => {
@@ -1419,7 +1441,7 @@ app.post('/api/ai/chat', async (req, res) => {
 });
 
 // ==============================
-// MESSAGES ENDPOINTS (unchanged)
+// MESSAGES ENDPOINTS
 // ==============================
 
 app.get('/api/messages', async (req, res) => {
@@ -1489,9 +1511,9 @@ app.post('/api/messages', async (req, res) => {
         .insert([systemMsg])
         .select();
       if (!saveError && savedSystemMsg && savedSystemMsg[0]) {
-        io.emit('new-message', savedSystemMsg[0]);
+        broadcastMessage('chat:global', 'new_message', savedSystemMsg[0]);
       } else {
-        io.emit('system-message', banMessage);
+        broadcastMessage('chat:global', 'system_message', banMessage);
       }
       return res.status(403).json({ error: "You are banned and cannot send messages." });
     }
@@ -1518,12 +1540,12 @@ app.post('/api/messages', async (req, res) => {
           .insert([minimalData])
           .select();
         if (retryError) throw retryError;
-        io.emit('new-message', retryData[0]);
+        broadcastMessage('chat:global', 'new_message', retryData[0]);
         return res.status(201).json(retryData[0]);
       }
       throw error;
     }
-    io.emit('new-message', data[0]);
+    broadcastMessage('chat:global', 'new_message', data[0]);
     res.status(201).json(data[0]);
   } catch (error) {
     console.error('❌ Failed to save message via API:', error);
@@ -1551,7 +1573,7 @@ app.delete('/api/messages/:id', verifyToken, async (req, res) => {
       .delete()
       .eq('id', id);
     if (error) throw error;
-    io.emit('message-deleted', id);
+    broadcastMessage('chat:global', 'message_deleted', { id });
     res.status(200).json({ success: true, message: "Message deleted successfully" });
   } catch (error) {
     console.error('❌ Failed to delete message:', error);
@@ -1560,7 +1582,7 @@ app.delete('/api/messages/:id', verifyToken, async (req, res) => {
 });
 
 // ==============================
-// GET ALL SIGNED-UP USERS (unchanged)
+// GET ALL SIGNED-UP USERS
 // ==============================
 
 function isNewUser(createdAt) {
@@ -1625,7 +1647,6 @@ app.get('/api/users/all', async (req, res) => {
         is_new_user: isNewUser(user.created_at)
       };
     });
-    // get message counts
     try {
       const { data: messageCounts, error: msgError } = await supabase
         .from('chatter')
@@ -1641,7 +1662,6 @@ app.get('/api/users/all', async (req, res) => {
     } catch (msgCountError) {
       console.log('⚠️ Could not fetch message counts:', msgCountError.message);
     }
-    // get post counts
     try {
       const { data: postCounts, error: postError } = await supabase
         .from('posts')
@@ -1851,7 +1871,7 @@ app.get('/api/test-profile', async (req, res) => {
 });
 
 // ==============================
-// PRIVATE MESSAGES (unchanged)
+// PRIVATE MESSAGES
 // ==============================
 
 app.post('/api/private/messages', async (req, res) => {
@@ -1890,8 +1910,8 @@ app.post('/api/private/messages', async (req, res) => {
       return res.status(500).json({ success: false, error: "Database error: " + error.message });
     }
     const responseData = { ...data[0], custom_message_id: messageId };
-    io.to(receiver_username).emit('new-private-message', responseData);
-    io.to(sender_username).emit('private-message-sent', responseData);
+    broadcastMessage(`private:${receiver_username}`, 'new_private_message', responseData);
+    broadcastMessage(`private:${sender_username}`, 'private_message_sent', responseData);
     res.status(201).json({ success: true, data: responseData, custom_message_id: messageId });
   } catch (error) {
     console.error('❌ Failed to save private message:', error);
@@ -2023,7 +2043,7 @@ app.put('/api/private/messages/read', async (req, res) => {
 });
 
 // ==============================
-// POSTS (unchanged)
+// POSTS
 // ==============================
 
 app.post('/api/create-posts-table', async (req, res) => {
@@ -2360,7 +2380,7 @@ app.delete('/api/posts/:postId', verifyToken, async (req, res) => {
     if (deleteError) {
       return res.status(500).json({ error: "Failed to delete post: " + deleteError.message });
     }
-    io.emit('post-deleted', postId);
+    broadcastMessage('chat:global', 'post_deleted', postId);
     res.json({ success: true, message: "Post deleted successfully" });
   } catch (error) {
     console.error('❌ Error deleting post:', error);
@@ -2395,7 +2415,7 @@ app.patch('/api/posts/:postId/visibility', verifyToken, async (req, res) => {
     if (updateError) {
       return res.status(500).json({ error: "Failed to update visibility" });
     }
-    io.emit('post-visibility-changed', updatedPost[0]);
+    broadcastMessage('chat:global', 'post_visibility_changed', updatedPost[0]);
     res.json({ success: true, visibility: updatedPost[0].visibility });
   } catch (error) {
     console.error('❌ Visibility change error:', error);
@@ -2545,7 +2565,7 @@ app.post('/api/private/alt-messages', async (req, res) => {
     if (error) {
       return res.status(500).json({ error: "Failed to send message: " + error.message });
     }
-    io.emit('new-private-message', {
+    broadcastMessage(`private:${receiver_username}`, 'new_private_message', {
       ...data[0],
       sender_username: sender_username,
       receiver_username: receiver_username
@@ -2606,7 +2626,7 @@ app.get('/test-private-messages', async (req, res) => {
     if (error) {
       return res.status(500).json({ success: false, error: error.message });
     }
-    io.emit('new-private-message', data[0]);
+    broadcastMessage('private:test_user2', 'new_private_message', data[0]);
     res.json({ 
       success: true, 
       message: 'GET Test private message saved successfully',
@@ -2644,7 +2664,7 @@ app.post('/test-private-messages', async (req, res) => {
     if (error) {
       return res.status(500).json({ success: false, error: error.message });
     }
-    io.emit('new-private-message', data[0]);
+    broadcastMessage(`private:${receiver_username}`, 'new_private_message', data[0]);
     res.json({ success: true, message: 'POST Test private message saved successfully', data: data[0] });
   } catch (error) {
     console.error('❌ POST Test private message error:', error);
@@ -2964,7 +2984,7 @@ app.post('/private-messages', async (req, res) => {
     if (error) {
       return res.status(500).json({ success: false, error: error.message });
     }
-    io.emit('new-private-message', data[0]);
+    broadcastMessage(`private:${receiver_username}`, 'new_private_message', data[0]);
     res.status(201).json(data[0]);
   } catch (error) {
     console.error('❌ Failed to save private message:', error);
@@ -3051,9 +3071,9 @@ app.post('/messages', async (req, res) => {
         .insert([systemMsg])
         .select();
       if (!saveError && savedSystemMsg && savedSystemMsg[0]) {
-        io.emit('new-message', savedSystemMsg[0]);
+        broadcastMessage('chat:global', 'new_message', savedSystemMsg[0]);
       } else {
-        io.emit('system-message', banMessage);
+        broadcastMessage('chat:global', 'system_message', banMessage);
       }
       return res.status(403).json({ error: "You are banned and cannot send messages." });
     }
@@ -3080,12 +3100,12 @@ app.post('/messages', async (req, res) => {
           .insert([minimalData])
           .select();
         if (retryError) throw retryError;
-        io.emit('new-message', retryData[0]);
+        broadcastMessage('chat:global', 'new_message', retryData[0]);
         return res.status(201).json(retryData[0]);
       }
       throw error;
     }
-    io.emit('new-message', data[0]);
+    broadcastMessage('chat:global', 'new_message', data[0]);
     res.status(201).json(data[0]);
   } catch (error) {
     console.error('❌ Failed to save message via legacy endpoint:', error);
@@ -3140,7 +3160,7 @@ app.delete('/messages/:id', verifyToken, async (req, res) => {
       .delete()
       .eq('id', id);
     if (error) throw error;
-    io.emit('message-deleted', id);
+    broadcastMessage('chat:global', 'message_deleted', { id });
     res.status(200).json({ success: true, message: "Message deleted successfully" });
   } catch (error) {
     console.error('❌ Failed to delete message:', error);
@@ -3184,7 +3204,7 @@ async function saveBotResponseToSupabase(content, originalCommand, commandType =
           botMessage.user_status = 'online';
           botMessage.last_seen = null;
         }
-        io.emit('new-message', botMessage);
+        broadcastMessage('chat:global', 'new_message', botMessage);
         return retryData;
       }
       throw error;
@@ -3194,7 +3214,7 @@ async function saveBotResponseToSupabase(content, originalCommand, commandType =
       botMessage.user_status = 'online';
       botMessage.last_seen = null;
     }
-    io.emit('new-message', botMessage);
+    broadcastMessage('chat:global', 'new_message', botMessage);
     return data;
   } catch (error) {
     console.error(`❌ Error saving ${commandType} response to Supabase:`, error);
@@ -3270,7 +3290,7 @@ app.post('/test-message', async (req, res) => {
     if (error) {
       return res.status(500).json({ success: false, error: error.message });
     }
-    io.emit('new-message', data[0]);
+    broadcastMessage('chat:global', 'new_message', data[0]);
     res.json({ success: true, message: 'Test message saved successfully', data: data[0] });
   } catch (error) {
     console.error('❌ Test message error:', error);
@@ -3287,7 +3307,6 @@ app.post("/api/command", async (req, res) => {
     let { message, source = 'main-chat', reply_to, reply_image_url } = req.body;
     if (!message) return res.status(400).json({ reply: "❌ Message is required" });
 
-    // ===== Handle -prompt command globally =====
     if (message.trim().startsWith('-prompt')) {
       const rest = message.trim().slice(7).trim();
       let imageUrl = null;
@@ -3318,10 +3337,8 @@ app.post("/api/command", async (req, res) => {
       }
     }
 
-    // ===== Load commands lazily =====
     loadCommandsLazy();
 
-    // ===== Dash command conversion =====
     if (source === 'private-ai' && !message.startsWith(PREFIX) && message.trim().startsWith('-')) {
       const trimmed = message.trim();
       const parts = trimmed.split(/\s+/);
@@ -3345,7 +3362,6 @@ app.post("/api/command", async (req, res) => {
       }
     }
 
-    // ===== PREFIX command =====
     if (message.trim().toLowerCase() === "prefix") {
       return res.json({ reply: `🔹 My prefix is: ${PREFIX}` });
     }
@@ -3356,7 +3372,6 @@ app.post("/api/command", async (req, res) => {
     let finalReply = null;
     let responder = null;
 
-    // ===== AI command =====
     if (cmd.commandName === "ai") {
       responder = 'AI';
       try {
@@ -3422,7 +3437,9 @@ app.post("/api/command", async (req, res) => {
           api: {
             sendMessage: (msg) => replies.push(typeof msg === "string" ? msg : JSON.stringify(msg)),
             supabase,
-            io
+            io: {
+              emit: (topic, event, payload) => broadcastMessage(topic, event, payload)
+            }
           },
           event,
           args: cmd.args,
@@ -3512,7 +3529,7 @@ app.post('/api/admin/block/:username', verifyToken, async (req, res) => {
       return res.status(500).json({ success: false, error: 'Database error.' });
     }
     onlineUsers.delete(targetUsername);
-    io.emit('user-status-change', { username: targetUsername, status: 'offline', lastSeen: new Date().toISOString() });
+    broadcastMessage('chat:global', 'user_status_change', { username: targetUsername, status: 'offline', lastSeen: new Date().toISOString() });
     console.log(`🚫 User ${targetUsername} blocked by Admin0.`);
     res.json({ success: true, message: `User @${targetUsername} has been blocked.` });
   } catch (error) {
@@ -3536,271 +3553,11 @@ app.post('/api/admin/clear-all-messages', verifyToken, async (req, res) => {
       return res.status(500).json({ success: false, error: 'Database error: ' + error.message });
     }
     console.log('✅ All public messages have been deleted.');
-    io.emit('clear-all-messages', { message: 'All public messages have been cleared by Admin0.' });
+    broadcastMessage('chat:global', 'clear_all_messages', { message: 'All public messages have been cleared by Admin0.' });
     res.json({ success: true, message: 'All public messages cleared successfully.' });
   } catch (error) {
     console.error('❌ Clear all messages error:', error);
     res.status(500).json({ success: false, error: 'Internal server error: ' + error.message });
-  }
-});
-
-// ==============================
-// SOCKET.IO EVENTS
-// ==============================
-
-io.on('connection', (socket) => {
-  console.log('🔌 User connected via polling:', socket.id);
-
-  socket.on('join-user-room', (username) => {
-    if (username) {
-      socket.join(username);
-      console.log(`👤 User ${username} joined their private room`);
-    }
-  });
-
-  socket.on('leave-user-room', (username) => {
-    if (username) {
-      socket.leave(username);
-      console.log(`👋 User ${username} left their private room`);
-    }
-  });
-
-  socket.on('request-messages', async () => {
-    try {
-      const { data, error } = await supabase
-        .from('chatter')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
-      if (!error && data) {
-        const messagesWithStatus = data.map(msg => {
-          if (PERMANENT_ONLINE_USERS.includes(msg.username)) {
-            return { ...msg, user_status: 'online', last_seen: null };
-          }
-          return msg;
-        });
-        socket.emit('chat-messages', messagesWithStatus.reverse());
-      }
-    } catch (error) {
-      console.error('Error sending messages to client:', error);
-    }
-  });
-
-  socket.on('user-online', (username) => {
-    if (username) {
-      console.log('👤 User online:', username);
-      const existingUser = onlineUsers.get(username);
-      const lastSeenTime = existingUser ? existingUser.lastSeen : Date.now();
-      onlineUsers.set(username, {
-        socketId: socket.id,
-        username: username,
-        lastSeen: lastSeenTime,
-        isOnline: true
-      });
-      updateUserStatusOnline(username);
-      const onlineUsersArray = Array.from(onlineUsers.keys());
-      console.log('📊 Updated online users:', onlineUsersArray);
-      io.emit('user-status-change', { 
-        username, 
-        status: 'online',
-        lastSeen: null,
-        onlineUsers: onlineUsersArray
-      });
-    }
-  });
-
-  socket.on('user-away', (username) => {
-    if (username && onlineUsers.has(username) && !PERMANENT_ONLINE_USERS.includes(username)) {
-      console.log('⏸️ User away:', username);
-      const userData = onlineUsers.get(username);
-      userData.lastSeen = Date.now();
-      userData.isOnline = false;
-      io.emit('user-status-change', { 
-        username, 
-        status: 'away',
-        lastSeen: new Date(userData.lastSeen).toISOString(),
-        onlineUsers: Array.from(onlineUsers.keys())
-      });
-    }
-  });
-
-  socket.on('user-offline', (username) => {
-    if (username && !PERMANENT_ONLINE_USERS.includes(username)) {
-      console.log('🔴 User offline (manual):', username);
-      removeUserFromOnlineList(username);
-    }
-  });
-
-  socket.on('typing-start', (data) => {
-    socket.broadcast.emit('user-typing', {
-      username: data.username,
-      isTyping: true
-    });
-  });
-  
-  socket.on('typing-stop', (data) => {
-    socket.broadcast.emit('user-typing', {
-      username: data.username,
-      isTyping: false
-    });
-  });
-
-  socket.on('send-private-message', async (data) => {
-    try {
-      console.log('🤫 Private AI message received via socket:', data);
-      const response = await axios.post('http://localhost:3000/api/ai/private', {
-        message: data.content
-      }, {
-        headers: { 'Content-Type': 'application/json' }
-      });
-      if (response.data.reply) {
-        socket.emit('new-private-message', {
-          content: response.data.reply,
-          username: 'Private AI',
-          sender_username: 'Private AI',
-          receiver_username: data.username,
-          created_at: new Date().toISOString()
-        });
-      }
-    } catch (error) {
-      console.error('❌ Private AI message error:', error);
-      socket.emit('new-private-message', {
-        content: "Error: Could not process your private message",
-        username: 'Private AI',
-        sender_username: 'Private AI', 
-        receiver_username: data.username,
-        created_at: new Date().toISOString()
-      });
-    }
-  });
-
-  socket.on('join-private-chat', (data) => {
-    const { username, otherUser } = data;
-    const roomName = getPrivateChatRoomName(username, otherUser);
-    socket.join(roomName);
-    console.log(`👥 ${username} joined private chat room: ${roomName}`);
-  });
-
-  socket.on('leave-private-chat', (data) => {
-    const { username, otherUser } = data;
-    const roomName = getPrivateChatRoomName(username, otherUser);
-    socket.leave(roomName);
-    console.log(`👋 ${username} left private chat room: ${roomName}`);
-  });
-
-  socket.on('send-private-message-socket', async (data) => {
-    try {
-      console.log('🤫 Private message via socket:', data);
-      const { sender_username, receiver_username, content, image_url } = data;
-      const messageId = `socket_msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const insertData = {
-        sender_username: sender_username.trim(),
-        receiver_username: receiver_username.trim(),
-        content: content ? content.trim() : '',
-        image_url: image_url || '',
-        read: false,
-        created_at: new Date().toISOString(),
-        message_id: messageId
-      };
-      const { data: messageData, error } = await supabase
-        .from('private_messages')
-        .insert([insertData])
-        .select();
-      if (error) throw error;
-      const responseData = {
-        ...messageData[0],
-        custom_message_id: messageId
-      };
-      io.to(receiver_username).emit('new-private-message', responseData);
-      socket.emit('private-message-confirmation', {
-        ...responseData,
-        status: 'sent',
-        message_id: messageId
-      });
-      console.log(`✅ Private message sent from ${sender_username} to ${receiver_username} with ID: ${messageId}`);
-    } catch (error) {
-      console.error('❌ Private message error:', error);
-      socket.emit('private-message-error', { error: 'Failed to send private message' });
-    }
-  });
-
-  socket.on('private-message-typing-start', (data) => {
-    const { sender, receiver, isTyping } = data;
-    const roomName = getPrivateChatRoomName(sender, receiver);
-    socket.to(roomName).emit('private-typing-indicator', {
-      username: sender,
-      isTyping: true
-    });
-  });
-
-  socket.on('private-message-typing-stop', (data) => {
-    const { sender, receiver, isTyping } = data;
-    const roomName = getPrivateChatRoomName(sender, receiver);
-    socket.to(roomName).emit('private-typing-indicator', {
-      username: sender,
-      isTyping: false
-    });
-  });
-
-  socket.on('private-message-confirmation', (data) => {
-    console.log('✅ Private message confirmed on server:', data.message_id);
-  });
-
-  socket.on('join-game-room', (roomCode) => {
-    if (roomCode) {
-      socket.join(`game_${roomCode}`);
-      console.log(`User joined game room: ${roomCode}`);
-    }
-  });
-
-  socket.on('leave-game-room', (roomCode) => {
-    if (roomCode) {
-      socket.leave(`game_${roomCode}`);
-      console.log(`User left game room: ${roomCode}`);
-    }
-  });
-
-  socket.on('disconnect', (reason) => {
-    console.log('🔌 User disconnected:', socket.id, 'Reason:', reason);
-    let foundUsername = null;
-    let userLastSeen = null;
-    for (let [username, data] of onlineUsers.entries()) {
-      if (data.socketId === socket.id) {
-        foundUsername = username;
-        userLastSeen = data.lastSeen;
-        data.lastSeen = Date.now();
-        data.isOnline = false;
-        if (!PERMANENT_ONLINE_USERS.includes(username)) {
-          updateUserLastActive(username);
-        }
-        console.log('⏸️ User marked as inactive:', username, 'Last seen:', new Date(userLastSeen).toLocaleString());
-        break;
-      }
-    }
-    if (foundUsername && !PERMANENT_ONLINE_USERS.includes(foundUsername)) {
-      const userData = onlineUsers.get(foundUsername);
-      const onlineUsersArray = Array.from(onlineUsers.keys());
-      io.emit('user-status-change', { 
-        username: foundUsername, 
-        status: 'offline',
-        lastSeen: new Date(userLastSeen).toISOString(),
-        onlineUsers: onlineUsersArray
-      });
-      console.log(`📢 Broadcasted offline status for ${foundUsername} with last seen:`, new Date(userLastSeen).toLocaleString());
-    }
-  });
-
-  function removeUserFromOnlineList(username) {
-    if (onlineUsers.has(username)) {
-      onlineUsers.delete(username);
-      const onlineUsersArray = Array.from(onlineUsers.keys());
-      console.log('🗑️ After removal, online users:', onlineUsersArray);
-      io.emit('user-status-change', { 
-        username, 
-        status: 'offline',
-        onlineUsers: onlineUsersArray
-      });
-    }
   }
 });
 
@@ -3870,8 +3627,8 @@ setInterval(() => {
   if (removedUsers.length > 0) {
     const onlineUsersArray = Array.from(onlineUsers.keys());
     removedUsers.forEach(user => {
-      io.emit('user-status-change', { 
-        username: user.username, 
+      broadcastMessage('chat:global', 'user_status_change', {
+        username: user.username,
         status: 'offline',
         lastSeen: new Date(user.lastSeen).toISOString(),
         onlineUsers: onlineUsersArray
@@ -3922,7 +3679,7 @@ app.put('/api/messages/:id', async (req, res) => {
     if (error) {
       return res.status(500).json({ error: 'Failed to update message' });
     }
-    io.emit('message-updated', data[0]);
+    broadcastMessage('chat:global', 'message_updated', data[0]);
     res.json(data[0]);
   } catch (error) {
     console.error('❌ Error in update message:', error);
@@ -4171,14 +3928,6 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 
 // ==============================
-// CHECKERS GAME (unchanged – included below)
-// ==============================
-
-// [Your complete checkers game code goes here – all the BOARD_SIZE, initBoard, getPieceColor, routes: /create-room, /join-room, /move, /game/:roomCode, etc.]
-// To keep this answer within a reasonable length, I’ll assume you paste your original checkers code here.
-// It is identical to what you had.
-
-// ==============================
 // ERROR HANDLING & 404
 // ==============================
 
@@ -4282,10 +4031,8 @@ process.on('uncaughtException', (err) => {
 // ==============================
 
 if (isVercel) {
-  // On Vercel: export the Express app (do NOT listen)
   module.exports = app;
 } else {
-  // Local / Render: start the server normally
   server.listen(port, () => {
     console.log(`🚀 Server running on port ${port}`);
     console.log(`🤫 PRIVATE MESSAGING: FIXED - No more disappearing messages!`);
@@ -4299,11 +4046,11 @@ if (isVercel) {
     console.log(`🤖 EXCLUSIVE ROUTING: -ai → AI only, other commands → Bot only`);
     console.log(`🚫 DUPLICATE FIX: IMPROVED with better message ID tracking`);
     console.log(`🎯 PREFIX-FREE AI: ENABLED for private AI (auto-adds !ai prefix)`);
-    console.log(`💬 Real-time messaging: ENABLED via Socket.io`);
-    console.log(`🔌 Socket.io configuration: POLLING ONLY for Opera/Mobile compatibility`);
-    console.log(`📱 OPERA FIX: Using polling transport only for real-time updates`);
+    console.log(`💬 Real-time messaging: ENABLED via Supabase Realtime Broadcast`);
+    console.log(`🔌 Supabase Realtime configuration: BROADCAST ONLY for Vercel compatibility`);
+    console.log(`📱 OPERA FIX: Using Supabase Realtime for cross-browser compatibility`);
     console.log(`📱 OPERA MINI FIX: Immediate message deletion enabled`);
-    console.log(`🔌 Socket.io events: new-message, message-deleted, user-status-change`);
+    console.log(`🔌 Supabase Realtime events: new_message, message_deleted, user_status_change`);
     console.log(`🤫 PRIVATE MESSAGING: FIXED AND STABLE`);
     console.log(`🔒 Private endpoints: /private-messages/*`);
     console.log(`🔐 USER AUTHENTICATION: ENABLED (Server-side, no localStorage)`);
@@ -4313,7 +4060,6 @@ if (isVercel) {
     console.log(`🌐 Cross-browser compatibility: ENABLED`);
     console.log(`🟢 BOT GREEN DOT: FIXED - Bot messages now show green dot immediately without refresh!`);
     
-    // Google OAuth information
     if (oauthConfig.google.clientId) {
       console.log(`🔐 GOOGLE OAUTH: ENABLED with provided credentials`);
       console.log(`   GET /api/auth/google - Get Google OAuth URL`);
@@ -4322,7 +4068,6 @@ if (isVercel) {
       console.log(`⚠️ GOOGLE OAUTH: DISABLED (Set GOOGLE_CLIENT_ID environment variable)`);
     }
     
-    // Facebook OAuth information
     if (oauthConfig.facebook.clientId) {
       console.log(`🔐 FACEBOOK OAUTH: ENABLED`);
       console.log(`   GET /api/auth/facebook - Get Facebook OAuth URL`);
@@ -4331,13 +4076,11 @@ if (isVercel) {
       console.log(`⚠️ FACEBOOK OAUTH: DISABLED (Set FACEBOOK_APP_ID environment variable)`);
     }
     
-    // Account linking and management
     console.log(`🔗 ACCOUNT MANAGEMENT:`);
     console.log(`   POST /api/auth/link-account - Link OAuth account to existing local account`);
     console.log(`   POST /api/auth/unlink-account - Unlink OAuth account (revert to local)`);
     console.log(`   POST /api/auth/set-password - Set password for OAuth users`);
     
-    // NEW: Added missing endpoints
     console.log(`🤖 NEW: POST /api/ai/private - Private AI endpoint`);
     console.log(`🤖 NEW: POST /api/ai/chat - Main AI chat endpoint`);
     console.log(`💬 NEW: GET /api/private/conversations - Get conversations`);
@@ -4434,6 +4177,6 @@ if (isVercel) {
     }
   });
   if (!isVercel) {
-    module.exports = { app, server, io, supabase };
+    module.exports = { app, server, supabase };
   }
 }
