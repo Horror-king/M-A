@@ -13,6 +13,11 @@ const isVercel = !!process.env.VERCEL;
 const isRender = process.env.RENDER === 'true';
 const renderExternalUrl = process.env.RENDER_EXTERNAL_URL;
 
+// ===== HARDCODED SUPABASE CONFIG FOR TESTING =====
+const SUPABASE_URL = 'https://rqissetffrnkfzfgsngm.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxaXNzZXRmZnJua2Z6ZmdzbmdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNzU2NzIsImV4cCI6MjA3NDc1MTY3Mn0.6tCuI4yhn3EXlua9na4kkgMqX6PL00GxjEuY0QG2bTg';
+const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxaXNzZXRmZnJua2Z6ZmdzbmdtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTE3NTY3MiwiZXhwIjoyMDc0NzUxNjcyfQ.9ls5BhhbkXNsYUvQZUPb9cmPm5P85qczaxMkz0qX3E4';
+
 // ===== SAFE CONFIG LOADING =====
 let config = {
   prefix: "!",
@@ -31,51 +36,40 @@ const server = http.createServer(app);
 const port = process.env.PORT || 3000;
 
 // ===== SUPABASE CLIENT (for Realtime Broadcast) =====
-const supabase = createClient(
-  process.env.SUPABASE_URL || 'https://rqissetffrnkfzfgsngm.supabase.co',
-  process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxaXNzZXRmZnJua2Z6ZmdzbmdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNzU2NzIsImV4cCI6MjA3NDc1MTY3Mn0.6tCuI4yhn3EXlua9na4kkgMqX6PL00GxjEuY0QG2bTg',
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false
-    }
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+    detectSessionInUrl: false
   }
-);
+});
 
 // ===== SERVICE ROLE CLIENT (for server-side broadcast) =====
-const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL || 'https://rqissetffrnkfzfgsngm.supabase.co',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || 'YOUR_SERVICE_ROLE_KEY_HERE',
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false
-    }
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+    detectSessionInUrl: false
   }
-);
+});
 
 // ===== REALTIME BROADCAST HELPER =====
 async function broadcastMessage(topic, event, payload, isPrivate = false) {
   try {
-    const response = await fetch(
-      `${process.env.SUPABASE_URL || 'https://rqissetffrnkfzfgsngm.supabase.co'}/rest/v1/rpc/broadcast`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY || 'YOUR_SERVICE_ROLE_KEY_HERE',
-          'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY || 'YOUR_SERVICE_ROLE_KEY_HERE'}`
-        },
-        body: JSON.stringify({
-          topic: topic,
-          event: event,
-          payload: payload,
-          private: isPrivate
-        })
-      }
-    );
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/broadcast`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+      },
+      body: JSON.stringify({
+        topic: topic,
+        event: event,
+        payload: payload,
+        private: isPrivate
+      })
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
