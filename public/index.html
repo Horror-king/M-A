@@ -4908,7 +4908,7 @@
                     <i class="fas fa-paperclip"></i>
                 </button>
                 <textarea id="user-input" placeholder="Type your message..."></textarea>
-                <button id="send-button" onclick="sendMessage()" disabled>
+                <button id="send-button" disabled>
                     <i class="fas fa-paper-plane"></i>
                 </button>
             </div>
@@ -8362,7 +8362,11 @@ function getUserProfile(username) {
 
 // ===== MODIFIED: sendMessage function to use OperaMiniMessenger when on Opera Mini and handle reply image =====
 async function sendMessage() {
-    // Removed global isSending and isProcessingCommand flags to allow concurrent sends.
+    // Stop typing indicator if active
+    if (isTyping) {
+        isTyping = false;
+        sendTypingStop();
+    }
     
     const content = elements.messageInput.value.trim();
     const username = currentUserSession?.username;
@@ -9494,16 +9498,6 @@ function batchMessageRender(messages, renderFunction) {
                 sendTypingStop();
             }
         });
-        
-        // Also stop typing when message is sent
-        const originalSendMessage = sendMessage;
-        window.sendMessage = function() {
-            if (isTyping) {
-                isTyping = false;
-                sendTypingStop();
-            }
-            originalSendMessage();
-        };
     }
 
     function setupTypingSocketEvents() {
