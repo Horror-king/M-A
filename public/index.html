@@ -12,8 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <!-- Supabase JS Client (replaces Socket.IO) -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style> 
     /* OAuth Button Styles */
@@ -4908,7 +4907,7 @@
                     <i class="fas fa-paperclip"></i>
                 </button>
                 <textarea id="user-input" placeholder="Type your message..."></textarea>
-                <button id="send-button" disabled>
+                <button id="send-button" onclick="sendMessage()" disabled>
                     <i class="fas fa-paper-plane"></i>
                 </button>
             </div>
@@ -5593,33 +5592,14 @@ async function initializeOAuth() {
     }
 }
 
-// ===== SUPABASE REALTIME CLIENT INITIALIZATION =====
-const SUPABASE_URL = 'https://rqissetffrnkfzfgsngm.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxaXNzZXRmZnJua2Z6ZmdzbmdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNzU2NzIsImV4cCI6MjA3NDc1MTY3Mn0.6tCuI4yhn3EXlua9na4kkgMqX6PL00GxjEuY0QG2bTg';
-
-let supabaseClient = null;
-let realtimeChannel = null;
-
-function initSupabaseClient() {
-    if (!supabaseClient && window.supabase) {
-        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-            realtime: {
-                params: {
-                    eventsPerSecond: 10
-                }
-            }
-        });
-        console.log('✅ Supabase client initialized');
-    }
-    return supabaseClient;
-}
-
-// Opera Mini compatible messaging functions (kept for backward compatibility)
+// Opera Mini compatible messaging functions
 class OperaMiniMessenger {
   constructor() {
     this.clientId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
     this.isOperaMini = navigator.userAgent.includes('Opera Mini') || 
                        navigator.userAgent.includes('Opera Mobi');
+    this.pollingInterval = null;
+    this.lastMessageId = null;
   }
 
   // Send message (works on Opera Mini)
@@ -5638,11 +5618,15 @@ class OperaMiniMessenger {
         })
       });
       
-      const data = await response.json();
-      if (data.id) {
-        return { success: true, id: data.id };
+      if (this.isOperaMini) {
+        // Minimal response handling for Opera Mini
+        const data = await response.json();
+        if (data.id) {
+          return { success: true, id: data.id };
+        }
+      } else {
+        return await response.json();
       }
-      return { error: 'Failed to send message' };
     } catch (error) {
       console.error('Send message error:', error);
       return { error: 'Failed to send message' };
@@ -5659,11 +5643,50 @@ class OperaMiniMessenger {
         }
       });
       
-      const data = await response.json();
-      return data.success;
+      if (this.isOperaMini) {
+        const data = await response.json();
+        return data.s === 1; // success check
+      } else {
+        const data = await response.json();
+        return data.success;
+      }
     } catch (error) {
       console.error('Delete message error:', error);
       return false;
+    }
+  }
+
+  // Start long-polling for Opera Mini real-time updates
+  startPolling(onMessage, onDelete) {
+    if (!this.isOperaMini) return;
+    
+    const poll = async () => {
+      try {
+        const response = await fetch(`/api/opera-poll?clientId=${this.clientId}`);
+        const data = await response.json();
+        
+        if (data.type === 'new-message') {
+          onMessage(data.data);
+        } else if (data.type === 'message-deleted') {
+          onDelete(data.data);
+        }
+        
+        // Continue polling
+        this.pollingInterval = setTimeout(() => poll(), 1000);
+      } catch (error) {
+        // Retry on error
+        console.log('Polling error, retrying...');
+        this.pollingInterval = setTimeout(() => poll(), 3000);
+      }
+    };
+    
+    poll();
+  }
+
+  // Stop polling
+  stopPolling() {
+    if (this.pollingInterval) {
+      clearTimeout(this.pollingInterval);
     }
   }
 }
@@ -7316,6 +7339,13 @@ function initializePosts() {
     
     // Start polling for updates every 5 seconds
     setInterval(pollForPostUpdates, 5000);
+    
+    // Listen for real-time post updates
+    if (typeof socket !== 'undefined' && socket) {
+        socket.on('new-post', (post) => {
+            addPostToFeed(post);
+        });
+    }
 }
 
 // MODIFIED: Load posts from server (with current user for filtering)
@@ -8362,11 +8392,7 @@ function getUserProfile(username) {
 
 // ===== MODIFIED: sendMessage function to use OperaMiniMessenger when on Opera Mini and handle reply image =====
 async function sendMessage() {
-    // Stop typing indicator if active
-    if (isTyping) {
-        isTyping = false;
-        sendTypingStop();
-    }
+    // Removed global isSending and isProcessingCommand flags to allow concurrent sends.
     
     const content = elements.messageInput.value.trim();
     const username = currentUserSession?.username;
@@ -8433,25 +8459,41 @@ async function sendMessage() {
             payload = { content, username, image_url: '', reply_to: replyToMessageId || null };
         }
         
-        // Send via HTTP
+        // Use OperaMiniMessenger for Opera Mini, otherwise use regular fetch
         let savedMessage;
-        const token = localStorage.getItem('auth_token');
-        const response = await fetch('/api/messages', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': token ? `Bearer ${token}` : ''
-            },
-            body: JSON.stringify(payload)
-        });
+        if (operaMessenger.isOperaMini) {
+            const result = await operaMessenger.sendMessage(payload.content, username);
+            if (result.error) {
+                throw new Error(result.error);
+            }
+            // Create a simple message object for Opera Mini
+            savedMessage = {
+                content: payload.content,
+                username: username,
+                reply_to: replyToMessageId || null,
+                id: result.id || Date.now().toString(),
+                image_url: payload.image_url
+            };
+        } else {
+            // Original fetch code for non-Opera Mini browsers
+            const token = localStorage.getItem('auth_token');
+            const response = await fetch('/api/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': token ? `Bearer ${token}` : ''
+                },
+                body: JSON.stringify(payload)
+            });
 
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || 'Failed to send message');
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Failed to send message');
+            }
+
+            // Get the saved message with ID from server
+            savedMessage = await response.json();
         }
-
-        // Get the saved message with ID from server
-        savedMessage = await response.json();
         
         // If this is a reply, store the reply image URL for later use when we receive the message back
         if (replyToImageUrl) {
@@ -8498,24 +8540,29 @@ async function deleteMessageContext(messageId, username) {
         
         let success;
         
-        // Original delete code
-        const token = localStorage.getItem('auth_token');
-        const response = await fetch(`/api/messages/${messageId}`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': token ? `Bearer ${token}` : '',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ username: username })
-        });
-        
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || 'Delete failed');
+        // Use OperaMiniMessenger for Opera Mini
+        if (operaMessenger.isOperaMini) {
+            success = await operaMessenger.deleteMessage(messageId);
+        } else {
+            // Original delete code for non-Opera Mini browsers
+            const token = localStorage.getItem('auth_token');
+            const response = await fetch(`/api/messages/${messageId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': token ? `Bearer ${token}` : '',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username: username })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Delete failed');
+            }
+            
+            const data = await response.json();
+            success = data.success;
         }
-        
-        const data = await response.json();
-        success = data.success;
         
         if (success) {
             console.log('✅ Message deleted successfully');
@@ -8566,203 +8613,288 @@ async function blockUser(usernameToBlock) {
     }
 }
 
-// ===== MODIFIED: initSocket function with Supabase Realtime subscription =====
+// ===== MODIFIED: initSocket function with room join, post events, and cache updates =====
 function initSocket() {
-    console.log('🔌 Initializing Supabase Realtime connection...');
-
-    // Initialize Supabase client if not already done
-    initSupabaseClient();
-    if (!supabaseClient) {
-        console.error('❌ Supabase client not available. Realtime features will not work.');
-        return;
-    }
-
-    // Clean up any existing channel
-    if (realtimeChannel) {
-        supabaseClient.removeChannel(realtimeChannel);
-        realtimeChannel = null;
-    }
-
-    // Subscribe to the global chat channel
-    realtimeChannel = supabaseClient
-        .channel('chat:global')
-        .on(
-            'broadcast',
-            { event: 'new_message' },
-            (payload) => {
-                const message = payload.payload;
-                console.log('💬 New message received via Supabase Realtime:', message);
-
+    console.log('🔌 Initializing socket connection...');
+    
+    // Start Opera Mini polling if needed
+    if (operaMessenger.isOperaMini) {
+        console.log('📱 Opera Mini detected, starting polling...');
+        operaMessenger.startPolling(
+            (message) => {
+                // Handle new message
                 const isOwnMessage = message.username === currentUserSession?.username;
                 const isAIResponse = message.username === 'AI' || message.username === 'Bot';
-
-                if (isOwnMessage) {
-                    // Update pending message with the server-generated ID
-                    const pendingMessages = document.querySelectorAll(
-                        `.message[data-username="${message.username}"]:not([data-id]), .message.sent:not([data-id])`
+                
+                if (!isOwnMessage || isAIResponse) {
+                    // Check if this message is a reply and we have a pending image for it
+                    let replyImageUrl = null;
+                    if (message.id && pendingReplyImages[message.id]) {
+                        replyImageUrl = pendingReplyImages[message.id];
+                    }
+                    // ===== ADDED: Update cache =====
+                    if (message.id) {
+                        messageContentCache[message.id] = {
+                            content: message.content,
+                            image_url: message.image_url || null
+                        };
+                        saveMessageCache();
+                    }
+                    displayMessage(
+                        message.content, 
+                        isOwnMessage ? 'sent' : 'received', 
+                        message.reply_to, 
+                        message.username, 
+                        message.id, 
+                        true,
+                        null,
+                        null,
+                        message.image_url,
+                        replyImageUrl
                     );
-                    pendingMessages.forEach(msg => {
-                        if (msg.dataset.content === message.content) {
-                            msg.dataset.id = message.id;
-                            msg.setAttribute('data-id', message.id);
-                        }
-                    });
-                    return;
+                    
+                    if (document.visibilityState !== 'visible' && !isOwnMessage) {
+                        showNotification(message.username, message.content);
+                    }
                 }
-
-                // Only display if not already in the DOM
-                const existingMessage = document.querySelector(`[data-id="${message.id}"]`);
-                if (existingMessage) return;
-
-                // Cache for reply resolution
-                if (message.id) {
-                    messageContentCache[message.id] = {
-                        content: message.content,
-                        image_url: message.image_url || null
-                    };
-                    saveMessageCache();
-                }
-
-                // Resolve reply image if applicable
-                let replyImageUrl = null;
-                if (message.id && pendingReplyImages[message.id]) {
-                    replyImageUrl = pendingReplyImages[message.id];
-                }
-
-                displayMessage(
-                    message.content,
-                    isOwnMessage ? 'sent' : 'received',
-                    message.reply_to,
-                    message.username,
-                    message.id,
-                    true,
-                    null,
-                    null,
-                    message.image_url,
-                    replyImageUrl
-                );
-
-                if (document.visibilityState !== 'visible' && !isOwnMessage) {
-                    showNotification(message.username, message.content);
-                }
-            }
-        )
-        .on(
-            'broadcast',
-            { event: 'message_deleted' },
-            (payload) => {
-                const messageId = payload.payload.id;
-                console.log('🗑️ Message deleted via Supabase Realtime:', messageId);
+            },
+            (messageId) => {
+                // Handle deleted message
+                console.log('🗑️ Message deleted via polling:', messageId);
                 const messageElement = document.querySelector(`[data-id="${messageId}"]`);
                 if (messageElement) {
                     messageElement.remove();
                     showSuccess('Message deleted (by another user)');
                 }
+                // ===== ADDED: Remove from cache =====
                 delete messageContentCache[messageId];
                 saveMessageCache();
+                
+                // === NEW: Check if this message was the one being replied to ===
                 if (replyToMessageId && replyToMessageId === messageId) {
                     updateReplyPreviewDeleted();
                 }
             }
-        )
-        .on(
-            'broadcast',
-            { event: 'user_status_change' },
-            (payload) => {
-                const data = payload.payload;
-                console.log('👤 User status change via Supabase Realtime:', data);
-                if (data.onlineUsers) {
-                    onlineUsers = data.onlineUsers;
-                    updateOnlineUsersList(onlineUsers);
-                }
-                if (data.username && data.status) {
-                    updateAllMessagesFromUser(data.username, data.status, data.lastSeen);
-                    updateUserStatusIndicator(data.username, data.status, data.lastSeen);
-                }
-            }
-        )
-        .on(
-            'broadcast',
-            { event: 'clear_all_messages' },
-            () => {
-                console.log('🧹 Clear all messages via Supabase Realtime');
-                const chatContainer = document.getElementById('chat-container');
-                if (chatContainer) {
-                    chatContainer.innerHTML = '';
-                    showInfo('All public messages have been cleared by Admin0.');
-                }
-                messageContentCache = {};
-                saveMessageCache();
-            }
-        )
-        .on(
-            'broadcast',
-            { event: 'post_deleted' },
-            (payload) => {
-                const postId = payload.payload;
-                console.log('🗑️ Post deleted via Supabase Realtime:', postId);
-                posts = posts.filter(p => p.id !== postId);
-                const postElement = document.querySelector(`[data-post-id="${postId}"]`);
-                if (postElement) {
-                    postElement.remove();
-                }
-            }
-        )
-        .on(
-            'broadcast',
-            { event: 'post_visibility_changed' },
-            (payload) => {
-                const updatedPost = payload.payload;
-                console.log('👁️ Post visibility changed via Supabase Realtime:', updatedPost);
-                const index = posts.findIndex(p => p.id === updatedPost.id);
-                if (index !== -1) {
-                    posts[index] = updatedPost;
-                }
-                renderPosts();
-            }
-        )
-        .on(
-            'broadcast',
-            { event: 'new_private_message' },
-            (payload) => {
-                const message = payload.payload;
-                console.log('🤫 New private message via Supabase Realtime:', message);
-                handleNewPrivateMessage(message);
-            }
-        )
-        .subscribe((status) => {
-            if (status === 'SUBSCRIBED') {
-                console.log('✅ Supabase Realtime connected');
-            } else if (status === 'CHANNEL_ERROR') {
-                console.error('❌ Supabase Realtime channel error');
-            } else if (status === 'TIMED_OUT') {
-                console.warn('⏰ Supabase Realtime subscription timed out');
-            }
-        });
+        );
+        
+        // Also load initial messages via polling
+        setTimeout(() => loadMessages(), 1000);
+        return;
+    }
+    
+    // Original Socket.io code for non-Opera Mini browsers
+    socket = io({
+        transports: ['polling', 'websocket'],
+        upgrade: false,
+        forceNew: true,
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 20000
+    });
+    
+    socket.on('connect', () => {
+        console.log('✅ Socket connected');
+        const username = currentUserSession?.username;
+        if (username) {
+            socket.emit('user-online', username);
+            // [FIXED] Join user's private room to receive direct messages
+            socket.emit('join-user-room', username);
+        }
+        
+        // Add touch listeners to existing messages after socket connects
+        setTimeout(addTouchListenersToExistingMessages, 1000);
+        
+        // ===== NEW: Listen for game updates =====
+        socket.on('game-update', handleGameUpdate);
+    });
 
-    // Heartbeat to keep user online (still uses HTTP)
+    // Listen for new messages in real-time
+    socket.on('new-message', (message) => {
+        console.log('💬 New message received via socket:', message);
+        
+        const isOwnMessage = message.username === currentUserSession?.username;
+        const isAIResponse = message.username === 'AI' || message.username === 'Bot';
+        
+        // Check if we already have this message displayed (without ID)
+        if (isOwnMessage) {
+            // Find messages from this user without an ID and update them
+            const userMessages = document.querySelectorAll(`.message[data-username="${message.username}"]:not([data-id]), .message.sent:not([data-id])`);
+            userMessages.forEach(msg => {
+                if (msg.dataset.content === message.content && !msg.dataset.id) {
+                    // Update the message with the ID
+                    msg.dataset.id = message.id;
+                    msg.setAttribute('data-id', message.id);
+                    console.log('✅ Updated message with ID:', message.id);
+                }
+            });
+        }
+        
+        // ===== ADDED: Update cache =====
+        if (message.id) {
+            messageContentCache[message.id] = {
+                content: message.content,
+                image_url: message.image_url || null
+            };
+            saveMessageCache();
+        }
+        
+        // Only display if we don't already have it
+        const existingMessage = document.querySelector(`[data-id="${message.id}"]`);
+        if (!existingMessage && (!isOwnMessage || isAIResponse)) {
+            // Check if this message is a reply and we have a pending image for it
+            let replyImageUrl = null;
+            if (message.id && pendingReplyImages[message.id]) {
+                replyImageUrl = pendingReplyImages[message.id];
+                // Optional: clear after use? Keep for later renders maybe
+            }
+            displayMessage(
+                message.content, 
+                isOwnMessage ? 'sent' : 'received', 
+                message.reply_to, 
+                message.username, 
+                message.id, 
+                true,
+                null,
+                null,
+                message.image_url,
+                replyImageUrl
+            );
+            
+            if (document.visibilityState !== 'visible' && !isOwnMessage) {
+                showNotification(message.username, message.content);
+            }
+        }
+    });
+
+    // Listen for message history when first connecting
+    socket.on('chat-messages', (messages) => {
+        console.log('📨 Received message history:', messages.length, 'messages');
+        renderMessages(messages, true);
+    });
+
+    // Listen for message deletions
+    socket.on('message-deleted', (messageId) => {
+        console.log('🗑️ Message deleted via socket:', messageId);
+        const messageElement = document.querySelector(`[data-id="${messageId}"]`);
+        if (messageElement) {
+            messageElement.remove();
+            showSuccess('Message deleted (by another user)');
+        }
+        // ===== ADDED: Remove from cache =====
+        delete messageContentCache[messageId];
+        saveMessageCache();
+        
+        // === NEW: Check if this message was the one being replied to ===
+        if (replyToMessageId && replyToMessageId === messageId) {
+            updateReplyPreviewDeleted();
+        }
+    });
+
+    // ===== NEW: Clear all messages listener =====
+    socket.on('clear-all-messages', () => {
+        console.log('🧹 Received clear-all-messages event from server');
+        const chatContainer = document.getElementById('chat-container');
+        if (chatContainer) {
+            chatContainer.innerHTML = '';
+            showInfo('All public messages have been cleared by Admin0.');
+        }
+        // ===== ADDED: Clear cache =====
+        messageContentCache = {};
+        saveMessageCache();
+    });
+
+    // UPDATED: User status updates with lastSeen
+    socket.on('user-status-change', (data) => {
+        console.log('👤 User status change:', data);
+        onlineUsers = data.onlineUsers || [];
+        updateOnlineUsersList(onlineUsers);
+        
+        // Update status for all messages from this user
+        if (data.username && data.status) {
+            updateAllMessagesFromUser(data.username, data.status, data.lastSeen);
+        }
+        
+        // Also update the user's status in the UI
+        updateUserStatusIndicator(data.username, data.status, data.lastSeen);
+    });
+
+    // Typing events
+    socket.on('user-typing-start', (data) => {
+        console.log('⌨️ User started typing:', data.username);
+        showTypingIndicator(data.username);
+    });
+
+    socket.on('user-typing-stop', (data) => {
+        console.log('💤 User stopped typing:', data.username);
+        hideTypingIndicator(data.username);
+    });
+
+    // ===== NEW: Post deletion event =====
+    socket.on('post-deleted', (postId) => {
+        console.log('🗑️ Post deleted via socket:', postId);
+        posts = posts.filter(p => p.id !== postId);
+        const postElement = document.querySelector(`[data-post-id="${postId}"]`);
+        if (postElement) {
+            postElement.remove();
+        }
+    });
+
+    // ===== NEW: Post visibility change event =====
+    socket.on('post-visibility-changed', (updatedPost) => {
+        console.log('👁️ Post visibility changed via socket:', updatedPost);
+        const index = posts.findIndex(p => p.id === updatedPost.id);
+        if (index !== -1) {
+            posts[index] = updatedPost;
+        }
+        renderPosts(); // re-render to update visibility label and maybe hide for non-author
+    });
+
+    socket.on('disconnect', (reason) => {
+        console.log('🔌 Socket disconnected:', reason);
+    });
+
+    socket.on('connect_error', (error) => {
+        console.error('❌ Socket connection error:', error);
+        // Fallback to HTTP polling if Socket.IO fails
+        if (!window.socketFallback) {
+            window.socketFallback = setInterval(() => {
+                loadMessages();
+            }, 3000);
+            console.log('🔄 Using HTTP polling fallback');
+        }
+    });
+
+    // Send heartbeat every 2 minutes to stay online
     const heartbeatInterval = setInterval(() => {
         const username = currentUserSession?.username;
-        if (username && realtimeChannel) {
-            // Send a user_online broadcast as heartbeat
-            realtimeChannel.send({
-                type: 'broadcast',
-                event: 'user_heartbeat',
-                payload: { username }
-            });
+        if (username && socket.connected) {
+            socket.emit('user-online', username);
             console.log('💓 Heartbeat sent - keeping user online');
         }
     }, 120000); // 2 minutes
 
-    // Cleanup on page unload
+    // Cleanup interval on page unload
     window.addEventListener('beforeunload', () => {
         clearInterval(heartbeatInterval);
-        if (realtimeChannel) {
-            supabaseClient.removeChannel(realtimeChannel);
-            realtimeChannel = null;
-            console.log('🔌 Supabase Realtime channel closed');
+        if (window.socketFallback) {
+            clearInterval(window.socketFallback);
         }
+        // Stop Opera Mini polling if active
+        if (operaMessenger) {
+            operaMessenger.stopPolling();
+        }
+        // Clear users refresh interval
+        if (usersRefreshInterval) {
+            clearInterval(usersRefreshInterval);
+        }
+        // ===== ADDED: Save cache before unload =====
         saveMessageCache();
+        // ===== NEW: Leave game room if active =====
+        if (gameRoomCode && socket) {
+            socket.emit('leave-game-room', gameRoomCode);
+        }
     });
 }
 
@@ -8777,6 +8909,9 @@ function updateReplyPreviewDeleted() {
                 </div>
             </div>
         `;
+        // Optionally disable send button
+        // elements.sendButton.disabled = true;
+        // elements.sendButton.classList.remove('enabled');
     }
 }
 
@@ -8933,12 +9068,12 @@ function initializeMainApp() {
     updateProfileSection();
     loadProfile();
     
-    // Explicitly call loadMessages to ensure messages are fetched
-    loadMessages();
-
-    // Initialize Supabase Realtime connection
-    initSocket();
+    // ===== FIX: Restore initializeChat() to attach input listeners =====
+    // This enables the send button and handles keypress events
+    initializeChat();
     
+    // Initialize socket and other features
+    initSocket();
     setupTypingHandlers();
     setupTypingDetection();
     setupTypingSocketEvents();
@@ -8951,20 +9086,15 @@ function initializeMainApp() {
         enableSQLEditorAccess();
     }
     
-    // If there's a pending post ID, we clear it after a short delay to prevent
-    // it from affecting future navigation, but we don't show posts initially.
     if (pendingPostId) {
         console.log('🔗 Pending post ID exists, but showing chat first.');
         setTimeout(() => {
             pendingPostId = null;
-            console.log('🧹 Cleared pendingPostId after initial load.');
         }, 3000);
     }
     
-    // Show welcome message
     showSuccess(`Welcome back, ${currentUserSession?.username || 'User'}!`);
 
-    // ===== NEW: Show admin menu item if current user is Admin0 =====
     const adminClearAll = document.getElementById('admin-clear-all');
     if (adminClearAll && currentUserSession?.username === 'Admin0') {
         adminClearAll.style.display = 'block';
@@ -9028,9 +9158,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     if ('Notification' in window) {
         Notification.requestPermission();
     }
-    
-    // Initialize Supabase client
-    initSupabaseClient();
     
     // FIRST: Check for OAuth callback parameters
     const urlParams = new URLSearchParams(window.location.search);
@@ -9452,23 +9579,15 @@ function batchMessageRender(messages, renderFunction) {
 
     function sendTypingStart() {
         const username = currentUserSession?.username;
-        if (username && realtimeChannel) {
-            realtimeChannel.send({
-                type: 'broadcast',
-                event: 'typing_start',
-                payload: { username }
-            });
+        if (username && socket) {
+            socket.emit('typing-start', { username });
         }
     }
 
     function sendTypingStop() {
         const username = currentUserSession?.username;
-        if (username && realtimeChannel) {
-            realtimeChannel.send({
-                type: 'broadcast',
-                event: 'typing_stop',
-                payload: { username }
-            });
+        if (username && socket) {
+            socket.emit('typing-stop', { username });
         }
     }
 
@@ -9498,28 +9617,35 @@ function batchMessageRender(messages, renderFunction) {
                 sendTypingStop();
             }
         });
+        
+        // Also stop typing when message is sent
+        const originalSendMessage = sendMessage;
+        window.sendMessage = function() {
+            if (isTyping) {
+                isTyping = false;
+                sendTypingStop();
+            }
+            originalSendMessage();
+        };
     }
 
     function setupTypingSocketEvents() {
-        if (!realtimeChannel) return;
+        if (!socket) return;
         
         // Listen for typing start events
-        realtimeChannel.on(
-            'broadcast',
-            { event: 'typing_start' },
-            (payload) => {
-                showTypingIndicator(payload.payload.username);
-            }
-        );
+        socket.on('user-typing-start', (data) => {
+            showTypingIndicator(data.username);
+        });
         
         // Listen for typing stop events
-        realtimeChannel.on(
-            'broadcast',
-            { event: 'typing_stop' },
-            (payload) => {
-                hideTypingIndicator(payload.payload.username);
-            }
-        );
+        socket.on('user-typing-stop', (data) => {
+            hideTypingIndicator(data.username);
+        });
+        
+        // Clean up typing indicators when user goes offline
+        socket.on('user-offline', (username) => {
+            hideTypingIndicator(username);
+        });
     }
 
     // ===== AUTHENTICATION FUNCTIONS =====
@@ -10789,11 +10915,18 @@ function batchMessageRender(messages, renderFunction) {
         
         const username = currentUserSession?.username;
         
-        // Clean up Supabase Realtime channel
-        if (realtimeChannel && supabaseClient) {
-            supabaseClient.removeChannel(realtimeChannel);
-            realtimeChannel = null;
-            console.log('🔌 Supabase Realtime channel closed on logout');
+        // Notify server that user is going offline
+        if (username && socket) {
+            // [FIXED] Leave private room before disconnecting
+            socket.emit('leave-user-room', username);
+            socket.emit('user-offline', username);
+            // Disconnect socket
+            socket.disconnect();
+        }
+        
+        // Stop Opera Mini polling if active
+        if (operaMessenger) {
+            operaMessenger.stopPolling();
         }
         
         // Clear user session from both storage locations
@@ -10914,7 +11047,7 @@ function batchMessageRender(messages, renderFunction) {
                 }),
             });
             
-            console.log('🤖 Command sent to server, waiting for Supabase Realtime response...');
+            console.log('🤖 Command sent to server, waiting for Socket.io response...');
             
         } catch (error) {
             console.error("Error fetching AI response:", error);
@@ -11154,6 +11287,17 @@ function batchMessageRender(messages, renderFunction) {
         // Clear old tracking data
         clearOldMessageTracking();
         
+        // Listen for real-time private messages
+        if (socket) {
+            socket.on('new-private-message', (message) => {
+                handleNewPrivateMessage(message);
+            });
+            
+            socket.on('private-typing-indicator', (data) => {
+                showPrivateTypingIndicator(data);
+            });
+        }
+        
         // Initially show only users panel
         showUsersPanel();
         
@@ -11346,24 +11490,10 @@ function batchMessageRender(messages, renderFunction) {
         // Show chat input
         document.getElementById('private-chat-input').style.display = 'flex';
         
-        // Join private chat room via Supabase Realtime
-        if (realtimeChannel && supabaseClient) {
-            const roomName = `private:${currentUserSession?.username}:${username}`;
-            const privateChannel = supabaseClient.channel(roomName)
-                .on('broadcast', { event: 'new_private_message' }, (payload) => {
-                    const message = payload.payload;
-                    if (message.sender_username === username || message.sender_username === currentUserSession?.username) {
-                        const senderType = message.sender_username === currentUserSession?.username ? 'sent' : 'received';
-                        displayPrivateUserMessage(message.content, senderType, message.created_at, message.sender_username);
-                        if (message.sender_username === username) {
-                            markMessagesAsRead(message.sender_username);
-                        }
-                    }
-                })
-                .on('broadcast', { event: 'typing_indicator' }, (payload) => {
-                    showPrivateTypingIndicator(payload.payload);
-                })
-                .subscribe();
+        // Join Socket.io room for real-time updates
+        if (socket) {
+            const currentUser = currentUserSession?.username;
+            socket.emit('join-private-chat', { username: currentUser, otherUser: username });
         }
         
         // Load messages from API
@@ -11498,21 +11628,31 @@ function batchMessageRender(messages, renderFunction) {
         try {
             const token = localStorage.getItem('auth_token');
             
-            // Send via HTTP
-            const response = await fetch('/api/private/messages', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': token ? `Bearer ${token}` : ''
-                },
-                body: JSON.stringify({
+            // Send via HTTP or Socket.io
+            if (socket) {
+                // Send via Socket.io for real-time delivery
+                socket.emit('send-private-message-socket', {
                     sender_username: currentUser,
                     receiver_username: currentPrivateChatUser,
                     content: content
-                })
-            });
-            
-            if (!response.ok) throw new Error('Failed to send message');
+                });
+            } else {
+                // Fallback to HTTP
+                const response = await fetch('/api/private/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': token ? `Bearer ${token}` : ''
+                    },
+                    body: JSON.stringify({
+                        sender_username: currentUser,
+                        receiver_username: currentPrivateChatUser,
+                        content: content
+                    })
+                });
+                
+                if (!response.ok) throw new Error('Failed to send message');
+            }
             
             // Display message immediately for better UX
             displayPrivateUserMessage(content, 'sent', new Date().toISOString(), currentUser);
@@ -11731,7 +11871,7 @@ function batchMessageRender(messages, renderFunction) {
     // Setup private message typing handlers
     function setupPrivateMessageTypingHandlers() {
         const input = document.getElementById('private-message-input');
-        if (!input || !realtimeChannel) return;
+        if (!input || !socket) return;
         
         let typing = false;
         let typingTimer;
@@ -11742,20 +11882,20 @@ function batchMessageRender(messages, renderFunction) {
             
             if (!typing) {
                 typing = true;
-                realtimeChannel.send({
-                    type: 'broadcast',
-                    event: 'typing_indicator',
-                    payload: { username: currentUser, isTyping: true }
+                socket.emit('private-message-typing-start', {
+                    sender: currentUser,
+                    receiver: currentPrivateChatUser,
+                    isTyping: true
                 });
             }
             
             clearTimeout(typingTimer);
             typingTimer = setTimeout(() => {
                 typing = false;
-                realtimeChannel.send({
-                    type: 'broadcast',
-                    event: 'typing_indicator',
-                    payload: { username: currentUser, isTyping: false }
+                socket.emit('private-message-typing-stop', {
+                    sender: currentUser,
+                    receiver: currentPrivateChatUser,
+                    isTyping: false
                 });
             }, 1000);
         });
@@ -11797,6 +11937,17 @@ function batchMessageRender(messages, renderFunction) {
             const headerTitle = document.querySelector('.private-messages-header h3');
             if (headerTitle) {
                 headerTitle.textContent = 'Private Messages';
+            }
+            
+            // Leave any private chat room
+            if (socket) {
+                const currentUser = currentUserSession?.username;
+                if (currentUser && currentPrivateChatUser) {
+                    socket.emit('leave-private-chat', { 
+                        username: currentUser, 
+                        otherUser: currentPrivateChatUser 
+                    });
+                }
             }
         }
     }
@@ -12329,8 +12480,10 @@ function batchMessageRender(messages, renderFunction) {
                     </div>
                 `;
             }
-            // If HTTP fails, rely on Supabase Realtime for messages
-            console.log('⚠️ HTTP load failed, will rely on Supabase Realtime for messages');
+            // If HTTP fails, rely on socket for real-time messages
+            if (socket && socket.connected) {
+                socket.emit('request-messages');
+            }
         } finally {
             isLoadingMessages = false;
         }
@@ -12488,15 +12641,15 @@ function batchMessageRender(messages, renderFunction) {
         if (!messageInput) return;
         messageInput.addEventListener('input', () => {
             const username = currentUserSession?.username;
-            if (!username || !realtimeChannel) return;
+            if (!username || !socket) return;
             if (!isTyping) {
                 isTyping = true;
-                sendTypingStart();
+                socket.emit('typing-start', { username });
             }
             clearTimeout(typingTimer);
             typingTimer = setTimeout(() => {
                 isTyping = false;
-                sendTypingStop();
+                socket.emit('typing-stop', { username });
             }, 1000);
         });
     }
@@ -12534,42 +12687,26 @@ function batchMessageRender(messages, renderFunction) {
     // Page visibility and unload handlers
     function handleVisibilityChange() {
         const username = currentUserSession?.username;
-        if (username && realtimeChannel) {
+        if (username && socket) {
             if (document.visibilityState === 'hidden') {
-                realtimeChannel.send({
-                    type: 'broadcast',
-                    event: 'user_away',
-                    payload: { username }
-                });
+                socket.emit('user-away', username);
             } else {
-                realtimeChannel.send({
-                    type: 'broadcast',
-                    event: 'user_online',
-                    payload: { username }
-                });
+                socket.emit('user-online', username);
             }
         }
     }
 
     function handleBeforeUnload() {
         const username = currentUserSession?.username;
-        if (username && realtimeChannel) {
-            realtimeChannel.send({
-                type: 'broadcast',
-                event: 'user_away',
-                payload: { username }
-            });
+        if (username && socket) {
+            socket.emit('user-away', username);
         }
     }
 
     function handlePageHide() {
         const username = currentUserSession?.username;
-        if (username && realtimeChannel) {
-            realtimeChannel.send({
-                type: 'broadcast',
-                event: 'user_away',
-                payload: { username }
-            });
+        if (username && socket) {
+            socket.emit('user-away', username);
         }
     }
 
@@ -13711,12 +13848,8 @@ function batchMessageRender(messages, renderFunction) {
                 renderBoard(currentBoard, gameCurrentTurn, yourRole, selectedPiece, validMovesList);
                 updateGameInfo();
                 // Join the socket room
-                if (realtimeChannel) {
-                    realtimeChannel.send({
-                        type: 'broadcast',
-                        event: 'join_game_room',
-                        payload: { roomCode }
-                    });
+                if (socket && socket.connected) {
+                    socket.emit('join-game-room', roomCode);
                 }
                 // Show share button if room code exists and it's our room
                 const shareBtn = document.getElementById('shareCodeBtn');
@@ -13865,12 +13998,8 @@ function batchMessageRender(messages, renderFunction) {
             return;
         }
         // Leave current room if any
-        if (gameRoomCode && realtimeChannel) {
-            realtimeChannel.send({
-                type: 'broadcast',
-                event: 'leave_game_room',
-                payload: { roomCode: gameRoomCode }
-            });
+        if (gameRoomCode && socket) {
+            socket.emit('leave-game-room', gameRoomCode);
         }
         await createRoom();
     }
@@ -13899,15 +14028,12 @@ function batchMessageRender(messages, renderFunction) {
         // Show placeholder board
         renderBoard(null, null, null, null, null);
         if (shareBtn) shareBtn.style.display = 'none';
-        // Listen for game updates via Supabase Realtime
-        if (realtimeChannel) {
-            realtimeChannel.on(
-                'broadcast',
-                { event: 'game_update' },
-                (payload) => {
-                    handleGameUpdate(payload.payload);
-                }
-            );
+        // If socket already connected, we might already have game-update listener attached in initSocket
+        // We add it here in case socket hasn't been initialized yet, but it will be added again later.
+        if (socket) {
+            socket.on('game-update', handleGameUpdate);
+        } else {
+            // If socket not ready, we'll rely on the one in initSocket
         }
     }
 
