@@ -14,6 +14,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- ===== SUPABASE REALTIME CLIENT ===== -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.js"></script>
     <style> 
     /* OAuth Button Styles */
     .oauth-buttons {
@@ -9017,6 +9019,310 @@ function animateWelcomeText() {
     }, 2500); // Total animation time: 2.5 seconds
 }
 
+// ============================================================
+// ===== SUPABASE REALTIME (NEW) ==============================
+// ============================================================
+// Realtime config — must match the URL/key used on the server.
+const SUPABASE_URL = 'https://rqissetffrnkfzfgsngm.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxaXNzZXRmZnJua2Z6ZmdzbmdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNzU2NzIsImV4cCI6MjA3NDc1MTY3Mn0.6tCuI4yhn3EXlua9na4kkgMqX6PL00GxjEuY0QG2bTg';
+
+let supabaseClient = null;
+let supabasePublicChannel = null;
+let supabasePrivateChannel = null;
+let supabaseRealtimeInitializedForUser = null;
+
+/**
+ * Initialize Supabase Realtime subscriptions.
+ * Call AFTER authentication (i.e. inside initializeMainApp) so that
+ * currentUserSession is populated. Idempotent per user.
+ */
+function initSupabaseRealtime() {
+    const username = currentUserSession && currentUserSession.username;
+    if (!username) {
+        console.log('⚠️ Supabase Realtime: no authenticated user yet, skipping');
+        return;
+    }
+
+    if (typeof supabase === 'undefined' || !supabase || typeof supabase.createClient !== 'function') {
+        console.error('❌ Supabase JS SDK not loaded — realtime disabled');
+        return;
+    }
+
+    // If already initialized for the same user, do nothing
+    if (supabaseRealtimeInitializedForUser === username &&
+        supabasePublicChannel && supabasePrivateChannel) {
+        console.log('ℹ️ Supabase Realtime already initialized for', username);
+        return;
+    }
+
+    // Tear down any previous user's channels (e.g. after re-login)
+    if (supabaseRealtimeInitializedForUser && supabaseRealtimeInitializedForUser !== username) {
+        cleanupSupabaseRealtime();
+    }
+
+    try {
+        if (!supabaseClient) {
+            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false,
+                    detectSessionInUrl: false
+                },
+                realtime: {
+                    params: { eventsPerSecond: 20 }
+                }
+            });
+            console.log('✅ Supabase Realtime client created');
+        }
+
+        // ---------- PUBLIC CHANNEL (chat:global) ----------
+        if (!supabasePublicChannel) {
+            supabasePublicChannel = supabaseClient.channel('chat:global');
+
+            // New message (public chat)
+            supabasePublicChannel.on('broadcast', { event: 'new_message' }, (envelope) => {
+                try {
+                    const msg = envelope && envelope.payload ? envelope.payload : envelope;
+                    handleRealtimeNewMessage(msg);
+                } catch (e) {
+                    console.error('❌ Realtime new_message handler error:', e);
+                }
+            });
+
+            // Message deleted
+            supabasePublicChannel.on('broadcast', { event: 'message_deleted' }, (envelope) => {
+                try {
+                    const data = envelope && envelope.payload ? envelope.payload : envelope;
+                    handleRealtimeMessageDeleted(data);
+                } catch (e) {
+                    console.error('❌ Realtime message_deleted handler error:', e);
+                }
+            });
+
+            // User status change
+            supabasePublicChannel.on('broadcast', { event: 'user_status_change' }, (envelope) => {
+                try {
+                    const data = envelope && envelope.payload ? envelope.payload : envelope;
+                    handleRealtimeUserStatus(data);
+                } catch (e) {
+                    console.error('❌ Realtime user_status_change handler error:', e);
+                }
+            });
+
+            // Clear all messages (admin)
+            supabasePublicChannel.on('broadcast', { event: 'clear_all_messages' }, () => {
+                try {
+                    console.log('🧹 Realtime: clear all messages received');
+                    const chatContainer = document.getElementById('chat-container');
+                    if (chatContainer) chatContainer.innerHTML = '';
+                    messageContentCache = {};
+                    saveMessageCache();
+                } catch (e) {
+                    console.error('❌ Realtime clear_all_messages handler error:', e);
+                }
+            });
+
+            // Post deleted
+            supabasePublicChannel.on('broadcast', { event: 'post_deleted' }, (envelope) => {
+                try {
+                    const payload = envelope && envelope.payload ? envelope.payload : envelope;
+                    const postId = (payload && payload.id) ? payload.id : payload;
+                    posts = posts.filter(p => p.id !== postId);
+                    const el = document.querySelector(`[data-post-id="${postId}"]`);
+                    if (el) el.remove();
+                } catch (e) {
+                    console.error('❌ Realtime post_deleted handler error:', e);
+                }
+            });
+
+            // Post visibility changed
+            supabasePublicChannel.on('broadcast', { event: 'post_visibility_changed' }, (envelope) => {
+                try {
+                    const payload = envelope && envelope.payload ? envelope.payload : envelope;
+                    if (!payload) return;
+                    const idx = posts.findIndex(p => p.id === payload.id);
+                    if (idx !== -1) posts[idx] = payload;
+                    try { renderPosts(); } catch (e) {}
+                } catch (e) {
+                    console.error('❌ Realtime post_visibility_changed handler error:', e);
+                }
+            });
+
+            supabasePublicChannel.subscribe((status, err) => {
+                if (err) {
+                    console.warn('📡 Supabase public channel status:', status, err);
+                } else {
+                    console.log('📡 Supabase public channel status:', status);
+                }
+            });
+        }
+
+        // ---------- PRIVATE CHANNEL (private:${username}) ----------
+        if (supabasePrivateChannel) {
+            try { supabaseClient.removeChannel(supabasePrivateChannel); } catch (e) {}
+            supabasePrivateChannel = null;
+        }
+
+        supabasePrivateChannel = supabaseClient.channel(`private:${username}`);
+        supabasePrivateChannel.on('broadcast', { event: 'new_private_message' }, (envelope) => {
+            try {
+                const msg = envelope && envelope.payload ? envelope.payload : envelope;
+                handleRealtimeNewPrivateMessage(msg);
+            } catch (e) {
+                console.error('❌ Realtime new_private_message handler error:', e);
+            }
+        });
+        supabasePrivateChannel.subscribe((status, err) => {
+            if (err) {
+                console.warn(`📡 Supabase private channel (${username}) status:`, status, err);
+            } else {
+                console.log(`📡 Supabase private channel (${username}) status:`, status);
+            }
+        });
+
+        supabaseRealtimeInitializedForUser = username;
+        console.log(`🚀 Supabase Realtime initialized for user: ${username}`);
+    } catch (e) {
+        console.error('❌ Failed to initialize Supabase Realtime:', e);
+    }
+}
+
+/**
+ * Handle a new message received via Supabase Realtime broadcast.
+ * Prevents duplicate display via the existing data-id dedup check inside
+ * displayMessage(). Also adopts orphaned "sent" messages that were shown
+ * before the server returned the final ID.
+ */
+function handleRealtimeNewMessage(message) {
+    if (!message || !message.id) return;
+
+    // Dedup: already displayed with same ID -> skip.
+    if (document.querySelector(`[data-id="${message.id}"]`)) {
+        return;
+    }
+
+    const isOwnMessage = message.username === currentUserSession?.username;
+    const isAIResponse = message.username === 'AI' || message.username === 'Bot';
+
+    // If it's our own message and we haven't yet assigned the ID locally
+    // (HTTP response race), adopt the orphan.
+    if (isOwnMessage) {
+        const orphan = document.querySelector('.message.sent:not([data-id])');
+        if (orphan) {
+            const stored = orphan.dataset.content;
+            const incoming = message.content != null ? message.content : '';
+            if (stored === incoming) {
+                orphan.dataset.id = message.id;
+                orphan.setAttribute('data-id', message.id);
+                if (message.image_url) orphan.dataset.imageUrl = message.image_url;
+                return;
+            }
+        }
+    }
+
+    // Cache for reply-preview resolution.
+    messageContentCache[message.id] = {
+        content: message.content,
+        image_url: message.image_url || null
+    };
+    saveMessageCache();
+
+    // Reply image lookup (existing pendingReplyImages map).
+    let replyImageUrl = null;
+    if (pendingReplyImages && pendingReplyImages[message.id]) {
+        replyImageUrl = pendingReplyImages[message.id];
+    }
+
+    displayMessage(
+        message.content,
+        isOwnMessage ? 'sent' : 'received',
+        message.reply_to || null,
+        message.username,
+        message.id,
+        true,
+        message.user_status || null,
+        message.last_seen || null,
+        message.image_url || null,
+        replyImageUrl
+    );
+
+    if (document.visibilityState !== 'visible' && !isOwnMessage) {
+        try { showNotification(message.username, message.content); } catch (e) {}
+    }
+}
+
+/**
+ * Handle message deletion broadcast.
+ */
+function handleRealtimeMessageDeleted(data) {
+    const messageId = (data && data.id) ? data.id : data;
+    if (!messageId) return;
+    const messageElement = document.querySelector(`[data-id="${messageId}"]`);
+    if (messageElement) {
+        messageElement.remove();
+    }
+    if (messageContentCache && messageContentCache[messageId]) {
+        delete messageContentCache[messageId];
+        saveMessageCache();
+    }
+    if (typeof replyToMessageId !== 'undefined' && replyToMessageId === messageId) {
+        try { updateReplyPreviewDeleted(); } catch (e) {}
+    }
+}
+
+/**
+ * Handle online/offline status change.
+ */
+function handleRealtimeUserStatus(data) {
+    if (!data) return;
+    if (Array.isArray(data.onlineUsers)) {
+        onlineUsers = data.onlineUsers;
+        try { updateOnlineUsersList(onlineUsers); } catch (e) {}
+    }
+    if (data.username && data.status) {
+        try { updateAllMessagesFromUser(data.username, data.status, data.lastSeen); } catch (e) {}
+        try { updateUserStatusIndicator(data.username, data.status, data.lastSeen); } catch (e) {}
+    }
+}
+
+/**
+ * Handle new private message received via Supabase Realtime.
+ * Reuses the existing handleNewPrivateMessage to keep behaviour in sync.
+ */
+function handleRealtimeNewPrivateMessage(message) {
+    if (!message) return;
+    try {
+        if (typeof handleNewPrivateMessage === 'function') {
+            handleNewPrivateMessage(message);
+        }
+    } catch (e) {
+        console.error('❌ Realtime private message handler error:', e);
+    }
+}
+
+/**
+ * Cleanup Supabase Realtime channels (call on logout / user switch).
+ */
+function cleanupSupabaseRealtime() {
+    try {
+        if (supabasePublicChannel && supabaseClient) {
+            supabaseClient.removeChannel(supabasePublicChannel);
+        }
+    } catch (e) { /* ignore */ }
+    try {
+        if (supabasePrivateChannel && supabaseClient) {
+            supabaseClient.removeChannel(supabasePrivateChannel);
+        }
+    } catch (e) { /* ignore */ }
+    supabasePublicChannel = null;
+    supabasePrivateChannel = null;
+    supabaseRealtimeInitializedForUser = null;
+    console.log('🧹 Supabase Realtime channels cleaned up');
+}
+// ============================================================
+// ===== END SUPABASE REALTIME ================================
+// ============================================================
+
 // ===== FIXED: initializeMainApp - ensures chat container and input are visible after login =====
 let isAppInitialized = false;
 
@@ -9077,6 +9383,16 @@ function initializeMainApp() {
     setupTypingHandlers();
     setupTypingDetection();
     setupTypingSocketEvents();
+    
+    // ===== SUPABASE REALTIME: Initialize AFTER auth + socket =====
+    // This guarantees currentUserSession is populated and gives us an
+    // additional, Socket.io-independent delivery channel that works on
+    // Vercel (serverless) where long-lived sockets may be unavailable.
+    try {
+        initSupabaseRealtime();
+    } catch (e) {
+        console.error('❌ Failed to start Supabase Realtime:', e);
+    }
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -10929,6 +11245,9 @@ function batchMessageRender(messages, renderFunction) {
             operaMessenger.stopPolling();
         }
         
+        // ===== SUPABASE REALTIME: clean up channels on logout =====
+        try { cleanupSupabaseRealtime(); } catch (e) {}
+        
         // Clear user session from both storage locations
         clearUserSession();
         
@@ -11688,7 +12007,7 @@ function batchMessageRender(messages, renderFunction) {
         if (message.sender_username === currentUser || message.receiver_username === currentUser) {
             
             // Check for duplicate display
-            const messageKey = `display-${message.sender_username}-${message.receiver_username}-${message.content}`;
+            const messageKey = `display-${message.sender_username}-${message.receiver_username}-${message.content}-${message.id || ''}`;
             if (lastSentMessages.private[messageKey]) {
                 console.log('Duplicate private message display prevented');
                 return;
